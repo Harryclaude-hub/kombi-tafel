@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kombi-Tafel</title>
+<link rel="stylesheet" href="stil.css">
+</head>
+<body>
+
+<h1>Kombi-Tafel</h1>
+<div class="unter">Die 73 Wetten aus den vier Fotos vom 24.08.2026. Sortiert nach Anstoss,
+gefiltert nach Kategorie. Eingetippte Quoten bleiben auf diesem Ger&auml;t gespeichert.</div>
+
+<div class="kern"><b>So gehst du morgen vor:</b> Zeile nehmen, Wette in den Apps suchen
+(Suchcode rechts, Anleitung unten aufklappen), die gefundenen Quoten in die vier Felder tippen.
+Das Programm rechnet Interwetten sofort <b>durch 1,05</b> herunter und f&auml;rbt den echten
+Bestwert <b>gr&uuml;n</b>. Ohne Eingaben steht rechts, wo du zuerst schauen sollst.
+Bei [doppelt]-Spielen: nur EINE der Wetten in eine Kombi.</div>
+
+<details>
+<summary>Suchf&uuml;hrer S1 bis S8: wo jede Wettart in jeder App steckt</summary>
+<div class="inhalt">
+<p><b>Immer gleich:</b> Lupe antippen, Teamnamen eintippen, Spiel &ouml;ffnen, dann den Markt-Reiter suchen.</p>
+<table>
+<tr><td>S1</td><td><b>Siegwette (-0.5):</b> Interwetten: "1X2" UND "Handicap -0,5" vergleichen, gleiche Wette, oft zwei Preise.
+Bwin: "Siegwette / 1X2". Bet365: "Vollzeit-Ergebnis" UND "Asiatisches Handicap". Stake: "Winner (1X2)".</td></tr>
+<tr><td>S2</td><td><b>Asiatische Linien / Klammern (0,25er-Schritte):</b> Bet365: Reiter "Asiatische Linien", dort stehen beide
+Klammer-Optionen direkt untereinander. Stake: "Handicap" / "Totals". Interwetten und Bwin: nur bei Topspielen, sonst auslassen.</td></tr>
+<tr><td>S3</td><td><b>Tore Ueber/Unter:</b> Interwetten: Reiter "Tore". Bwin: "Ueber/Unter". Bet365: "Tore ueber/unter"
+plus "Alternative Toranzahl". Stake: "Totals".</td></tr>
+<tr><td>S4</td><td><b>Ecken:</b> Bet365: Reiter "Ecken" ("Asiatische Ecken"). Stake: "Corners".
+NIE auf einer .de-Seite suchen, dort sind Ecken-Wetten verboten. Interwetten/Bwin: nur Topspiele.</td></tr>
+<tr><td>S5</td><td><b>Beide treffen:</b> ueberall "Beide Teams treffen" / "Both Teams to Score".</td></tr>
+<tr><td>S6</td><td><b>Halbzeit/Endstand:</b> Reiter "Halbzeit" bzw. "Halbzeit/Endstand", Auswahl "Ausw&auml;rts/Ausw&auml;rts" (2/2).</td></tr>
+<tr><td>S7</td><td><b>Draw No Bet:</b> "Draw No Bet" oder "Handicap 0", dieselbe Wette, h&ouml;heren Preis nehmen.</td></tr>
+<tr><td>S8</td><td><b>Tennis Sieg:</b> Sport Tennis, Turnier, Match, "Siegwette" / "Spielsieger" / "Winner".</td></tr>
+</table>
+</div>
+</details>
+
+<div id="filter"></div>
+<div id="zaehler"></div>
+
+<table>
+<thead>
+<tr>
+<th>Anstoss</th>
+<th>Liga</th>
+<th>Spiel</th>
+<th>Wette</th>
+<th>Tab.</th>
+<th>Interwetten</th>
+<th>Bwin</th>
+<th>Bet365</th>
+<th>Stake</th>
+<th>Setzen bei</th>
+<th>S</th>
+</tr>
+</thead>
+<tbody id="koerper"></tbody>
+</table>
+
+<div class="fuss">
+Tabellenquote (Spalte "Tab.") = Spalte G aus Saschas Tabelle. Interwetten-Eingaben werden durch 1,05
+geteilt (5 % Wettgebuehr AT, nur bei Gewinn faellig; Bwin uebernimmt seit Mai 2026 selbst, Bet365 und
+Stake ziehen nichts ab; Stake nimmt Krypto-Netzwerkgebuehr bei jeder Auszahlung). Gruen = bester echter
+Wert, braucht mindestens zwei eingetippte Quoten. Vergangene Spiele sind ausgeblendet, Schalter oben.
+Die durchgestrichene Foto-Zeile (Branstine vs Ngou) ist nicht enthalten. Alle Angaben ohne Gewaehr,
+Quoten aendern sich laufend.
+</div>
+
+<script src="daten.js"></script>
+<script src="logik.js"></script>
+</body>
+</html>

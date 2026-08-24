@@ -1,0 +1,69 @@
+/* ============================================================
+   STIL: reine Darstellung, jederzeit loeschbar.
+   Absicht: weiss, schwarz, eng wie ein Tabellenblatt.
+   Farben nur mit Bedeutung:
+     gruen = bester Wert / ueber der Linie
+     rot   = Interwetten-Abzug / vorbei / Warnung
+   Kein Schmuck, keine Animation.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+body { background: #fff; color: #000; font-family: Arial, "Segoe UI", sans-serif;
+       font-size: 13px; margin: 10px; }
+h1 { font-size: 18px; margin: 0 0 2px 0; }
+.unter { color: #444; font-size: 12px; margin-bottom: 8px; }
+.kern { border: 1px solid #c00; background: #fff; padding: 5px 8px; margin: 6px 0;
+        font-size: 12.5px; }
+.kern b { color: #c00; }
+
+/* Filterleiste */
+#filter { margin: 8px 0; }
+#filter button { font-size: 12px; margin: 0 4px 4px 0; padding: 3px 8px;
+  background: #fff; border: 1px solid #888; cursor: pointer; }
+#filter button.aktiv { background: #000; color: #fff; border-color: #000; }
+#filter button.schalter { border-style: dashed; }
+#zaehler { font-size: 12px; color: #444; margin: 2px 0 6px 0; }
+
+/* Tabelle wie das Original: eng, Linien, abwechselnd leicht grau */
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #999; padding: 2px 5px; text-align: left;
+         vertical-align: top; }
+th { background: #eee; font-size: 12px; position: sticky; top: 0; }
+tbody tr:nth-child(even) { background: #f7f7f7; }
+td.zeit { white-space: nowrap; font-size: 12px; }
+td.spiel { font-weight: bold; }
+td.wette select { font-size: 12px; max-width: 200px; }
+td.tabq { font-weight: bold; text-align: right; }
+td.such { text-align: center; font-weight: bold; }
+
+/* Tippgeber-Kuerzel wie die Farbknoepfe im Original */
+.von { font-size: 10px; padding: 0 4px; border: 1px solid #999; }
+.von.klt { background: #d9efd9; }
+.von.kafa { background: #e8dff2; }
+.von.david { background: #dde6f5; }
+
+/* Anbieterzellen */
+td.anbieter { width: 86px; }
+td.anbieter input { width: 100%; font-size: 13px; padding: 1px 3px;
+  border: 1px solid #999; }
+td.anbieter .real { font-size: 10.5px; color: #444; min-height: 12px; }
+td.anbieter.iw .real { color: #c00; }        /* Interwetten: Abzug sichtbar rot */
+td.anbieter.bester { background: #d9efd9; }  /* bester echter Wert: gruen */
+td.anbieter.bester input { border-color: #1a7a1a; border-width: 2px; }
+
+td.ansage { font-size: 12px; }
+.gruen { color: #1a7a1a; }
+.doppel { color: #c00; font-size: 11px; font-weight: bold; }
+
+/* vergangene Spiele */
+tr.vorbei { color: #999; }
+tr.vorbei td.spiel { text-decoration: line-through; font-weight: normal; }
+
+/* Suchfuehrer-Kasten */
+details { border: 1px solid #999; margin: 8px 0; }
+details summary { background: #eee; padding: 4px 8px; cursor: pointer;
+  font-weight: bold; font-size: 13px; }
+details .inhalt { padding: 6px 10px; font-size: 12.5px; }
+details table td:first-child { font-weight: bold; width: 90px; background: #f2f2f2; }
+.fuss { margin: 12px 0; font-size: 11.5px; color: #444; border-top: 1px solid #999;
+  padding-top: 6px; }
