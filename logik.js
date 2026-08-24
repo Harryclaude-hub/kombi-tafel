@@ -43,6 +43,62 @@ function istVorbei(an) {
   return new Date() > a.zeit;
 }
 
+// ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------
+// J = ja, D = duenn (nur Teile, oft nur Topspiele), N = vermutlich gar nicht.
+// Das ist Einschaetzung nach Liga-Stufe und Markttyp, kein Beleg.
+
+const STUFEN = {
+  "UEFA Conference League":"A","K League 1":"A","Liga Profesional de Futbol":"A",
+  "Liga MX, Apertura":"A","Pro League (BEL)":"A","Scottish Premiership":"A",
+  "Championship":"A","3. Liga":"A","Ekstraklasa":"A","J1 League":"A",
+  "Czech First League":"A","SuperLiga Romaniei":"A","Stoiximan Super League":"A",
+  "Saudi Pro League":"A","LaLiga 2":"A","Copa Betano do Brasil":"A","Esp2":"A",
+  "Spain1":"A","WTA":"A","ATP":"A",
+  "First Division (IRL)":"B","Liga AUF Uruguaya":"B","Chinese Super League":"B",
+  "Primera A (COL)":"B","Liga de Primera (CHI)":"B","League Two":"B",
+  "Copa Chile":"B","Norwegian 1st Division":"B","USL Championship":"B",
+  "South African Premier Division":"B","Challenge League":"B","National League":"B",
+  "Australia Cup":"C","Liga 2 Casa Pariurilor":"C","Ligue 3":"C",
+  "Liga MX, Women, Apertura":"C","Besta deild karla":"C","TOPLYGA":"C",
+  "Scottish Challenge Cup":"C"
+};
+
+function marktTyp(w) {
+  if (w.kat === "ECKEN") return "CORNER";
+  if (w.kat === "HTFT") return "HTFT";
+  if (w.kat === "DNB") return "DNB";
+  if (w.kat === "TENNIS") return "TENNIS";
+  return (w.s === "S2") ? "ASIAN" : "STD";
+}
+
+// [iw, bw, b3, st]
+const VERF = {
+  "STD_A":["J","J","J","J"],   "STD_B":["J","J","J","J"],   "STD_C":["D","D","J","J"],
+  "ASIAN_A":["D","J","J","J"], "ASIAN_B":["D","D","J","J"], "ASIAN_C":["N","N","J","J"],
+  "CORNER_A":["D","D","J","J"],"CORNER_B":["N","N","J","J"],"CORNER_C":["N","N","D","D"],
+  "HTFT_A":["J","J","J","J"],  "HTFT_B":["D","D","J","J"],  "HTFT_C":["N","N","D","D"],
+  "TENNIS_A":["J","J","J","J"],"DNB_A":["J","J","J","J"],   "DNB_B":["J","J","J","J"]
+};
+
+function verfuegbarkeit(w) {
+  const stufe = STUFEN[w.liga] || "B";
+  const v = VERF[marktTyp(w) + "_" + stufe] || ["J","J","J","J"];
+  return { iw: v[0], bw: v[1], b3: v[2], st: v[3] };
+}
+
+// Standard-Anbieter (die Vorgabe, solange keine Live-Quoten getippt sind):
+// Reihenfolge nach der 80-Kriterien-Recherche. Interwetten immer zuletzt (Gebuehr).
+function standardAnbieter(w) {
+  const typ = marktTyp(w);
+  const rang = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
+    ? ["b3", "st", "bw", "iw"]     // Spezialmaerkte: Bet365, dann Stake
+    : ["b3", "bw", "st", "iw"];    // Standardmaerkte: Bet365, dann Bwin
+  const v = verfuegbarkeit(w);
+  for (const kz of rang) if (v[kz] === "J") return kz;
+  for (const kz of rang) if (v[kz] === "D") return kz;
+  return "b3";
+}
+
 // ---------- Eingaben merken (localStorage) ----------
 
 function schluessel(id, opt, anbieter) { return "q_" + id + "_" + opt + "_" + anbieter; }
@@ -63,10 +119,10 @@ function gewaehlteOption(w) {
     const i = parseInt(v, 10);
     if (i >= 0 && i < w.o.length) return i;
   }
-  return 0; // Standard: sicherste Option (deine Regel Nr. 1)
+  return 0; // Standard: sicherste Option (Regel Nr. 1)
 }
 
-// ---------- Bester Anbieter je Zeile ----------
+// ---------- Zuweisung: bei welchem Anbieter wird DIESE Wette gesetzt ----------
 
 const ANBIETER = [
   { kz: "iw", name: "Interwetten" },
@@ -75,29 +131,27 @@ const ANBIETER = [
   { kz: "st", name: "Stake" }
 ];
 
-function besterAnbieter(w, optIdx) {
+function anbieterName(kz) { return ANBIETER.find(a => a.kz === kz).name; }
+
+// Bester aus den GETIPPTEN Quoten (echt gerechnet); null wenn nichts getippt
+function liveBester(w, optIdx) {
   const opt = w.o[optIdx][0];
   let bester = null, wert = 0, anzahl = 0;
   for (const a of ANBIETER) {
-    const e = liesEingabe(w.id, opt, a.kz);
-    const echt = echteQuote(a.kz, e);
-    if (echt) {
-      anzahl++;
-      if (echt > wert) { wert = echt; bester = a.kz; }
-    }
+    const echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
+    if (echt) { anzahl++; if (echt > wert) { wert = echt; bester = a.kz; } }
   }
-  return { kz: bester, echt: wert, anzahl: anzahl };
+  return anzahl > 0 ? { kz: bester, echt: wert, anzahl: anzahl } : null;
 }
 
-// Standard-Ansage ohne Eingaben: wo zuerst schauen
-function standardAnsage(w) {
-  if (w.kat === "ECKEN") return "Bet365 oder Stake (nie die .de-Seite!)";
-  if (w.kat === "TENNIS") return "Bet365 zuerst, dann Stake";
-  if (w.s === "S2") return "Bet365 zuerst (Asiatische Linien), dann Stake";
-  return "Bet365 oder Bwin zuerst";
+// Die Zuweisung: getippter Bestwert schlaegt die Standard-Vorgabe
+function zuweisung(w) {
+  const live = liveBester(w, gewaehlteOption(w));
+  if (live) return { kz: live.kz, echt: live.echt, quelle: "getippt", anzahl: live.anzahl };
+  return { kz: standardAnbieter(w), echt: null, quelle: "vorgabe", anzahl: 0 };
 }
 
-// ---------- Anzeigen ----------
+// ---------- Filter-Zustand ----------
 
 const KATEGORIEN = [
   ["ALLE", "Alle"],
@@ -111,7 +165,14 @@ const KATEGORIEN = [
 ];
 
 let aktiveKat = "ALLE";
+let aktiverAnbieter = "ALLE";
 let nurKommende = true;
+
+function basisListe() {
+  let liste = WETTEN.filter(w => aktiveKat === "ALLE" || w.kat === aktiveKat);
+  if (nurKommende) liste = liste.filter(w => !istVorbei(w.an));
+  return liste;
+}
 
 function baueFilter() {
   const leiste = document.getElementById("filter");
@@ -129,11 +190,59 @@ function baueFilter() {
   v.className = "schalter";
   v.onclick = () => { nurKommende = !nurKommende; zeichne(); };
   leiste.appendChild(v);
+
+  // Anbieter-Filter: eine Website nach der anderen abarbeiten
+  const az = document.getElementById("anbieterfilter");
+  az.innerHTML = '<span class="af-titel">Setzen bei:</span>';
+  const liste = basisListe();
+  const alle = document.createElement("button");
+  alle.textContent = "Alle (" + liste.length + ")";
+  alle.className = (aktiverAnbieter === "ALLE") ? "aktiv" : "";
+  alle.onclick = () => { aktiverAnbieter = "ALLE"; zeichne(); };
+  az.appendChild(alle);
+  for (const a of ANBIETER) {
+    const n = liste.filter(w => zuweisung(w).kz === a.kz).length;
+    const b = document.createElement("button");
+    b.textContent = a.name + " (" + n + ")";
+    b.className = (a.kz === aktiverAnbieter) ? "aktiv" : "";
+    b.onclick = () => { aktiverAnbieter = a.kz; zeichne(); };
+    az.appendChild(b);
+  }
 }
+
+// ---------- Erklaerung je Wette (Tooltip) ----------
+
+function erklaerung(w, optIdx) {
+  const o = w.o[optIdx][0];
+  const heim = w.wette.startsWith("HOME");
+  const seite = heim ? "Heimteam" : "Auswaertsteam";
+  if (w.kat === "TENNIS") return w.wette.replace(" ML", "") + " muss das Match gewinnen. Kein Unentschieden moeglich.";
+  if (w.kat === "BTTS") return "Beide Teams muessen mindestens 1 Tor schiessen.";
+  if (w.kat === "HTFT") return "Auswaertsteam muss zur Halbzeit fuehren UND am Ende gewinnen.";
+  if (w.kat === "DNB") return "Der genannte Verein muss gewinnen. Bei Unentschieden: Einsatz zurueck.";
+  if (w.kat === "ECKEN") return "Beide Teams zusammen hoechstens 8 Ecken. Tore egal.";
+  if (w.kat === "TORE") {
+    const richtung = w.wette.startsWith("OVER") ? "mehr" : "weniger";
+    return "Es muessen " + richtung + " als " + o + " Tore fallen. Bei Viertel-Linien (x,25/x,75) wird der Einsatz auf zwei Linien geteilt. Details oben im Begriffe-Kasten.";
+  }
+  // SIEG / Handicap
+  if (o === "-0.5") return seite + " muss gewinnen. Punkt.";
+  if (o === "0") return seite + " muss gewinnen. Bei Unentschieden: Geld zurueck (DNB).";
+  if (o === "+0.25") return seite + " muss gewinnen. Bei Unentschieden: halber Einsatz zurueck, halber gewinnt.";
+  if (o === "-0.25") return seite + " muss gewinnen. Bei Unentschieden: halber Einsatz zurueck, halber verloren.";
+  if (o === "-1.75") return "Muss mit 2 Toren Unterschied gewinnen (halber Gewinn bei genau 2, voll ab 3).";
+  return seite + " mit Handicap " + o + ". Details oben im Begriffe-Kasten.";
+}
+
+// ---------- Zellen bauen ----------
+
+const VERF_TEXT = { J: "", D: "Markt duenn, pruefen", N: "kein Markt (vermutl.)" };
 
 function eingabeFeld(w, opt, anbieter) {
   const inp = document.createElement("input");
-  inp.type = "number"; inp.step = "0.01"; inp.min = "1"; inp.placeholder = "-";
+  inp.type = "number"; inp.step = "0.01"; inp.min = "1";
+  inp.placeholder = "Live?";
+  inp.title = "Hier die Quote eintippen, die die App gerade anzeigt";
   const v = liesEingabe(w.id, opt, anbieter);
   if (v) inp.value = v;
   inp.oninput = () => {
@@ -143,22 +252,52 @@ function eingabeFeld(w, opt, anbieter) {
   return inp;
 }
 
-function zelleAnbieter(w, optIdx, anbieter, best) {
+function zelleAnbieter(w, optIdx, anbieter, zu) {
   const td = document.createElement("td");
   td.className = "anbieter " + anbieter;
   const opt = w.o[optIdx][0];
+  const ref = w.o[optIdx][1];
+  const v = verfuegbarkeit(w)[anbieter];
+
+  if (v === "N") {
+    // kein Eingabefeld noetig, klare Ansage statt leerer Flaeche
+    const kein = document.createElement("div");
+    kein.className = "keinmarkt";
+    kein.textContent = VERF_TEXT.N;
+    td.appendChild(kein);
+    return td;
+  }
+
   td.appendChild(eingabeFeld(w, opt, anbieter));
+
   const e = liesEingabe(w.id, opt, anbieter);
   const echt = echteQuote(anbieter, e);
   const info = document.createElement("div");
   info.className = "real";
-  if (anbieter === "iw") {
-    info.textContent = echt ? ("real " + rund2(echt).toFixed(2)) : "real: /1,05";
+  if (echt) {
+    info.textContent = "real " + rund2(echt).toFixed(2);
+  } else if (anbieter === "iw") {
+    // Vorgabe aus der Tabelle: Schaufenster und echter Wert, nie leer
+    info.textContent = "Tab. " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
   } else {
-    info.textContent = echt ? ("real " + rund2(echt).toFixed(2)) : "";
+    info.textContent = "voll, Tab.-Referenz " + ref.toFixed(2);
   }
   td.appendChild(info);
-  if (best.kz === anbieter && best.anzahl >= 2) td.classList.add("bester");
+
+  if (v === "D") {
+    const d = document.createElement("div");
+    d.className = "duenn";
+    d.textContent = VERF_TEXT.D;
+    td.appendChild(d);
+  }
+
+  if (zu.kz === anbieter) {
+    td.classList.add(zu.quelle === "getippt" ? "bester" : "empfohlen");
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = (zu.quelle === "getippt") ? "BESTER (getippt)" : "VORGABE";
+    td.appendChild(tag);
+  }
   return td;
 }
 
@@ -166,21 +305,17 @@ function baueZeile(w) {
   const tr = document.createElement("tr");
   tr.id = "z_" + w.id;
   const optIdx = gewaehlteOption(w);
-  const vorbei = istVorbei(w.an);
-  if (vorbei) tr.classList.add("vorbei");
+  if (istVorbei(w.an)) tr.classList.add("vorbei");
 
-  // Anstoss
   let td = document.createElement("td");
   td.className = "zeit";
   td.textContent = zeitText(w.an);
   tr.appendChild(td);
 
-  // Liga + Tippgeber
   td = document.createElement("td");
   td.innerHTML = w.liga + ' <span class="von ' + w.von + '">' + w.von + "</span>";
   tr.appendChild(td);
 
-  // Spiel (+ Doppel-Warnung)
   td = document.createElement("td");
   td.className = "spiel";
   td.textContent = w.spiel;
@@ -193,9 +328,9 @@ function baueZeile(w) {
   }
   tr.appendChild(td);
 
-  // Wette + Optionswahl
   td = document.createElement("td");
   td.className = "wette";
+  td.title = erklaerung(w, optIdx);
   if (w.o.length > 1) {
     const sel = document.createElement("select");
     w.o.forEach((o, i) => {
@@ -216,28 +351,24 @@ function baueZeile(w) {
   }
   tr.appendChild(td);
 
-  // Tabellenquote der gewaehlten Option
   td = document.createElement("td");
   td.className = "tabq";
   td.textContent = w.o[optIdx][1].toFixed(2);
   tr.appendChild(td);
 
-  // vier Anbieter
-  const best = besterAnbieter(w, optIdx);
-  for (const a of ANBIETER) tr.appendChild(zelleAnbieter(w, optIdx, a.kz, best));
+  const zu = zuweisung(w);
+  for (const a of ANBIETER) tr.appendChild(zelleAnbieter(w, optIdx, a.kz, zu));
 
-  // Ansage: wo setzen
   td = document.createElement("td");
   td.className = "ansage";
-  if (best.kz && best.anzahl >= 2) {
-    const nm = ANBIETER.find(a => a.kz === best.kz).name;
-    td.innerHTML = '<b class="gruen">' + nm + "</b> real " + rund2(best.echt).toFixed(2);
+  if (zu.quelle === "getippt") {
+    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + "</b> real " + rund2(zu.echt).toFixed(2) +
+      (zu.anzahl < 2 ? '<div class="real">erst 1 Quote getippt</div>' : "");
   } else {
-    td.textContent = standardAnsage(w);
+    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + "</b><div class=\"real\">Vorgabe, Live-Quoten tippen</div>";
   }
   tr.appendChild(td);
 
-  // Suchcode
   td = document.createElement("td");
   td.className = "such";
   td.textContent = w.s;
@@ -254,7 +385,6 @@ function aktualisiereZeile(id) {
     const fokus = document.activeElement;
     const neu = baueZeile(w);
     alt.replaceWith(neu);
-    // Fokus im gerade getippten Feld halten
     if (fokus && fokus.tagName === "INPUT") {
       const inputsAlt = Array.from(alt.querySelectorAll("input"));
       const idx = inputsAlt.indexOf(fokus);
@@ -267,6 +397,7 @@ function aktualisiereZeile(id) {
         }
       }
     }
+    baueFilter(); // Anbieter-Zaehler mitziehen
   }
 }
 
@@ -274,13 +405,14 @@ function zeichne() {
   baueFilter();
   const koerper = document.getElementById("koerper");
   koerper.innerHTML = "";
-  let liste = WETTEN.filter(w => aktiveKat === "ALLE" || w.kat === aktiveKat);
-  if (nurKommende) liste = liste.filter(w => !istVorbei(w.an));
+  let liste = basisListe();
+  if (aktiverAnbieter !== "ALLE") liste = liste.filter(w => zuweisung(w).kz === aktiverAnbieter);
   liste.sort((a, b) => liesAnstoss(a.an).zeit - liesAnstoss(b.an).zeit);
   for (const w of liste) koerper.appendChild(baueZeile(w));
-  document.getElementById("zaehler").textContent =
-    liste.length + " von " + WETTEN.length + " Wetten angezeigt" +
-    (nurKommende ? " (vergangene ausgeblendet)" : "");
+  let text = liste.length + " von " + WETTEN.length + " Wetten angezeigt";
+  if (nurKommende) text += " (vergangene ausgeblendet)";
+  if (aktiverAnbieter !== "ALLE") text += " | Filter: setzen bei " + anbieterName(aktiverAnbieter);
+  document.getElementById("zaehler").textContent = text;
 }
 
 document.addEventListener("DOMContentLoaded", zeichne);

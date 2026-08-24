@@ -11,6 +11,8 @@ Anzeige-Programm fuer die Wett-Tabelle vom 24.08.2026 (vier Fotos, 73 Wetten).
 - Vier Anbieter-Spalten (Interwetten, Bwin, Bet365, Stake) mit Eingabefeldern fuer Live-Quoten
 - Interwetten-Eingaben werden automatisch durch 1,05 geteilt (5 % Wettgebuehr AT)
 - Der beste ECHTE Wert wird gruen markiert, rechts steht die Ansage "Setzen bei"
+- Begriffe-Kasten oben erklaert jeden Begriff aus den Fotos
+- Anbieter-Filter: eine Website nach der anderen abarbeiten (Vorgabe-Zuweisung, wandert bei Live-Eingaben mit)
 - Eingaben bleiben im Browser gespeichert (localStorage, nur auf dem eigenen Geraet)
 - Vergangene Spiele werden ausgeblendet, Doppel-Spiele sind markiert
 - Suchfuehrer S1 bis S8: wo jede Wettart in jeder App zu finden ist
@@ -30,3 +32,17 @@ Kein Build, kein Server, keine Abhaengigkeiten. Datei oeffnen genuegt.
 
 Die Tabellenquote ist der Stand der Fotos. Live-Quoten aendern sich laufend und
 muessen am Wetttag selbst eingetippt werden. Alle Angaben ohne Gewaehr.
+
+## Neue Fotos einpflegen (der Ablauf fuer die Zukunft)
+
+Alle paar Tage kommen neue Fotos. Der Weg ist immer derselbe:
+
+1. Fotos an Claude geben
+2. Claude tippt die Zeilen ab und traegt sie in `daten.js` ein (nur diese Datei!)
+3. Alte, gespielte Wetten koennen in `daten.js` geloescht oder stehen gelassen werden
+   (vergangene blendet die Seite selbst aus)
+4. `git add daten.js && git commit && git push`, die Seite aktualisiert sich in etwa
+   einer Minute von selbst
+
+Wenn ein Anbieter seine Gebuehrenregel aendert: nur `GEBUEHREN_TEILER` in `daten.js`
+anpassen, nichts anderes.
