@@ -287,6 +287,19 @@ const ANBIETER_GRUND = {
 };
 const VERF_LANG = { J: "Markt: vorhanden", D: "Markt: nur duenn (pruefen)", N: "Markt: vermutlich NICHT vorhanden" };
 
+// Wer koennte bei DIESEM Markttyp besser sein als der Start-Tipp (Durchschnitts-Erfahrung)
+function alternativText(w) {
+  const typ = marktTyp(w);
+  const stufe = STUFEN[w.liga] || "B";
+  if (typ === "ASIAN" || typ === "CORNER" || stufe === "C")
+    return "Stake: hat bei Nischenligen, Viertel-Linien und Ecken im Schnitt die niedrigste Marge der vier (ca. 4,6 %). Wenn Krypto ok ist, dort zuerst gegenpruefen.";
+  if (typ === "TENNIS")
+    return "Stake: bei Tennis-Quoten oft gleichauf oder besser; kleine Turniere fuehrt Bet365 aber haeufiger.";
+  if (stufe === "A")
+    return "Bwin: bei Standardmaerkten grosser Ligen oft gleichauf mit Bet365, dazu Boost-Aktionen. Gegenpruefen lohnt.";
+  return "Bwin oder Stake: bei Standardmaerkten liegen alle drei nah beieinander, der Vergleichslink entscheidet.";
+}
+
 // ---------- Zellen bauen ----------
 
 const VERF_TEXT = { J: "", D: "Markt duenn, pruefen", N: "kein Markt (vermutl.)" };
@@ -380,6 +393,8 @@ function baueDetailZeile(w) {
     "<br><b>Warum dieser Start-Tipp:</b> Start-Tipp ist KEINE Aussage ueber die beste Live-Quote, " +
     "sondern nur: dort zuerst schauen (keine Gebuehr, Markt vorhanden). Die echte beste Quote entsteht " +
     "erst aus deinen getippten Zahlen oder ueber den Vergleichs-Link." +
+    "<br><b>Gegenpruefen bei:</b> " + alternativText(w) +
+    "<br><b>Interwetten-Schwelle:</b> lohnt nur, wenn die Anzeige dort ueber beste andere Quote mal 1,05 liegt." +
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
     "alle Anbieter-Quoten fuer dieses Spiel suchen</a> (oeffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
     "<br><b>Die vier Anbieter fuer diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
