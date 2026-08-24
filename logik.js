@@ -4,6 +4,9 @@
 // ============================================================
 "use strict";
 
+// Stand der Daten (wird oben auf der Seite angezeigt)
+const DATEN_STAND = "Fotos vom 24.08.2026, eingepflegt 24.08.2026. Gebuehren-Recherche: Stand 24.08.2026.";
+
 // ---------- Rechnen ----------
 
 function echteQuote(anbieter, eingabe) {
@@ -41,6 +44,12 @@ function istVorbei(an) {
     return new Date() > ende;
   }
   return new Date() > a.zeit;
+}
+
+function jetztText() {
+  const t = new Date();
+  return String(t.getDate()).padStart(2, "0") + "." + String(t.getMonth() + 1).padStart(2, "0") +
+    ". " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
 }
 
 // ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------
@@ -86,7 +95,8 @@ function verfuegbarkeit(w) {
   return { iw: v[0], bw: v[1], b3: v[2], st: v[3] };
 }
 
-// Standard-Anbieter (die Vorgabe, solange keine Live-Quoten getippt sind):
+// Start-Vorgabe (solange keine Live-Quoten getippt sind):
+// KEINE Aussage ueber die beste Quote! Nur: wo zuerst schauen.
 // Reihenfolge nach der 80-Kriterien-Recherche. Interwetten immer zuletzt (Gebuehr).
 function standardAnbieter(w) {
   const typ = marktTyp(w);
@@ -99,7 +109,7 @@ function standardAnbieter(w) {
   return "b3";
 }
 
-// ---------- Eingaben merken (localStorage) ----------
+// ---------- Eingaben merken (localStorage, mit Zeitstempel) ----------
 
 function schluessel(id, opt, anbieter) { return "q_" + id + "_" + opt + "_" + anbieter; }
 
@@ -108,9 +118,23 @@ function liesEingabe(id, opt, anbieter) {
   return v ? parseFloat(v) : null;
 }
 
+function liesEingabeZeit(id, opt, anbieter) {
+  const t = localStorage.getItem("t_" + schluessel(id, opt, anbieter));
+  if (!t) return null;
+  const d = new Date(t);
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
+    ". " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
 function speichereEingabe(id, opt, anbieter, wert) {
   const k = schluessel(id, opt, anbieter);
-  if (wert) localStorage.setItem(k, wert); else localStorage.removeItem(k);
+  if (wert) {
+    localStorage.setItem(k, wert);
+    localStorage.setItem("t_" + k, new Date().toISOString());
+  } else {
+    localStorage.removeItem(k);
+    localStorage.removeItem("t_" + k);
+  }
 }
 
 function gewaehlteOption(w) {
@@ -125,10 +149,10 @@ function gewaehlteOption(w) {
 // ---------- Zuweisung: bei welchem Anbieter wird DIESE Wette gesetzt ----------
 
 const ANBIETER = [
-  { kz: "iw", name: "Interwetten" },
-  { kz: "bw", name: "Bwin" },
-  { kz: "b3", name: "Bet365" },
-  { kz: "st", name: "Stake" }
+  { kz: "iw", name: "Interwetten", url: "https://www.interwetten.com/de/sportwetten" },
+  { kz: "bw", name: "Bwin", url: "https://sports.bwin.com/de/sports" },
+  { kz: "b3", name: "Bet365", url: "https://www.bet365.com/" },
+  { kz: "st", name: "Stake", url: "https://stake.com/de/sports" }
 ];
 
 function anbieterName(kz) { return ANBIETER.find(a => a.kz === kz).name; }
@@ -144,11 +168,20 @@ function liveBester(w, optIdx) {
   return anzahl > 0 ? { kz: bester, echt: wert, anzahl: anzahl } : null;
 }
 
-// Die Zuweisung: getippter Bestwert schlaegt die Standard-Vorgabe
+// Die Zuweisung: getippter Bestwert schlaegt die Start-Vorgabe
 function zuweisung(w) {
   const live = liveBester(w, gewaehlteOption(w));
   if (live) return { kz: live.kz, echt: live.echt, quelle: "getippt", anzahl: live.anzahl };
   return { kz: standardAnbieter(w), echt: null, quelle: "vorgabe", anzahl: 0 };
+}
+
+// ---------- Links je Wette ----------
+
+function vergleichsLink(w) {
+  // Suche nach dem Spiel auf einem Quotenvergleich: ein Klick, alle Anbieter-Quoten
+  const teile = w.spiel.split(" vs ");
+  const q = teile.map(t => '"' + t.trim() + '"').join(" ") + " quoten oddspedia";
+  return "https://www.google.com/search?q=" + encodeURIComponent(q);
 }
 
 // ---------- Filter-Zustand ----------
@@ -167,18 +200,27 @@ const KATEGORIEN = [
 let aktiveKat = "ALLE";
 let aktiverAnbieter = "ALLE";
 let nurKommende = true;
+const offeneDetails = new Set();
+
+// Grundmenge fuer ALLE Zaehler: dieselbe Sicht (vergangene raus, wenn Schalter an)
+function sichtBasis() {
+  return nurKommende ? WETTEN.filter(w => !istVorbei(w.an)) : WETTEN.slice();
+}
 
 function basisListe() {
-  let liste = WETTEN.filter(w => aktiveKat === "ALLE" || w.kat === aktiveKat);
-  if (nurKommende) liste = liste.filter(w => !istVorbei(w.an));
+  let liste = sichtBasis();
+  if (aktiveKat !== "ALLE") liste = liste.filter(w => w.kat === aktiveKat);
   return liste;
 }
 
 function baueFilter() {
+  const vorbeiZahl = WETTEN.filter(w => istVorbei(w.an)).length;
+  const basis = sichtBasis();
+
   const leiste = document.getElementById("filter");
   leiste.innerHTML = "";
   for (const [kz, name] of KATEGORIEN) {
-    const n = WETTEN.filter(w => kz === "ALLE" || w.kat === kz).length;
+    const n = basis.filter(w => kz === "ALLE" || w.kat === kz).length;
     const b = document.createElement("button");
     b.textContent = name + " (" + n + ")";
     b.className = (kz === aktiveKat) ? "aktiv" : "";
@@ -186,7 +228,7 @@ function baueFilter() {
     leiste.appendChild(b);
   }
   const v = document.createElement("button");
-  v.textContent = nurKommende ? "Vergangene: aus" : "Vergangene: an";
+  v.textContent = (nurKommende ? "Vergangene einblenden (" : "Vergangene ausblenden (") + vorbeiZahl + ")";
   v.className = "schalter";
   v.onclick = () => { nurKommende = !nurKommende; zeichne(); };
   leiste.appendChild(v);
@@ -210,29 +252,40 @@ function baueFilter() {
   }
 }
 
-// ---------- Erklaerung je Wette (Tooltip) ----------
+// ---------- Erklaerung je Wette ----------
 
 function erklaerung(w, optIdx) {
   const o = w.o[optIdx][0];
   const heim = w.wette.startsWith("HOME");
   const seite = heim ? "Heimteam" : "Auswaertsteam";
   if (w.kat === "TENNIS") return w.wette.replace(" ML", "") + " muss das Match gewinnen. Kein Unentschieden moeglich.";
-  if (w.kat === "BTTS") return "Beide Teams muessen mindestens 1 Tor schiessen.";
-  if (w.kat === "HTFT") return "Auswaertsteam muss zur Halbzeit fuehren UND am Ende gewinnen.";
+  if (w.kat === "BTTS") return "Beide Teams muessen mindestens 1 Tor schiessen. 1:1 gewinnt, 3:0 verliert.";
+  if (w.kat === "HTFT") return "Auswaertsteam muss zur Halbzeit fuehren UND am Ende gewinnen. Beides noetig.";
   if (w.kat === "DNB") return "Der genannte Verein muss gewinnen. Bei Unentschieden: Einsatz zurueck.";
   if (w.kat === "ECKEN") return "Beide Teams zusammen hoechstens 8 Ecken. Tore egal.";
   if (w.kat === "TORE") {
-    const richtung = w.wette.startsWith("OVER") ? "mehr" : "weniger";
-    return "Es muessen " + richtung + " als " + o + " Tore fallen. Bei Viertel-Linien (x,25/x,75) wird der Einsatz auf zwei Linien geteilt. Details oben im Begriffe-Kasten.";
+    const ueber = w.wette.startsWith("OVER");
+    const l = parseFloat(o);
+    let text = ueber ? ("Es muessen mehr als " + o + " Tore fallen.") : ("Es duerfen hoechstens " + o + " Tore fallen (weniger als " + o + ").");
+    if (Number.isInteger(l)) text += " Bei genau " + o + " Toren: Geld zurueck.";
+    else if (l % 0.5 !== 0) text += " Viertel-Linie: Einsatz wird auf zwei Linien geteilt, halbe Gewinne/Verluste moeglich.";
+    return text;
   }
-  // SIEG / Handicap
-  if (o === "-0.5") return seite + " muss gewinnen. Punkt.";
+  if (o === "-0.5") return seite + " muss gewinnen. Punkt. (Gleiche Wette wie Siegwette 1X2, beide Preise vergleichen!)";
   if (o === "0") return seite + " muss gewinnen. Bei Unentschieden: Geld zurueck (DNB).";
   if (o === "+0.25") return seite + " muss gewinnen. Bei Unentschieden: halber Einsatz zurueck, halber gewinnt.";
   if (o === "-0.25") return seite + " muss gewinnen. Bei Unentschieden: halber Einsatz zurueck, halber verloren.";
-  if (o === "-1.75") return "Muss mit 2 Toren Unterschied gewinnen (halber Gewinn bei genau 2, voll ab 3).";
-  return seite + " mit Handicap " + o + ". Details oben im Begriffe-Kasten.";
+  if (o === "-1.75") return "Muss mit 2 Toren Unterschied gewinnen: halber Gewinn bei genau 2, voller ab 3.";
+  return seite + " mit Handicap " + o + ". Details im Begriffe-Kasten oben.";
 }
+
+const ANBIETER_GRUND = {
+  iw: "Gebuehr: jede Quote zaehlt real nur durch 1,05 geteilt (nur bei Gewinn faellig).",
+  bw: "Keine Gebuehr (Bwin uebernimmt die 5 % seit Mai 2026 selbst).",
+  b3: "Keine Gebuehr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
+  st: "Keine Gebuehr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
+};
+const VERF_LANG = { J: "Markt: vorhanden", D: "Markt: nur duenn (pruefen)", N: "Markt: vermutlich NICHT vorhanden" };
 
 // ---------- Zellen bauen ----------
 
@@ -260,7 +313,6 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   const v = verfuegbarkeit(w)[anbieter];
 
   if (v === "N") {
-    // kein Eingabefeld noetig, klare Ansage statt leerer Flaeche
     const kein = document.createElement("div");
     kein.className = "keinmarkt";
     kein.textContent = VERF_TEXT.N;
@@ -275,9 +327,9 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   const info = document.createElement("div");
   info.className = "real";
   if (echt) {
-    info.textContent = "real " + rund2(echt).toFixed(2);
+    const wann = liesEingabeZeit(w.id, opt, anbieter);
+    info.textContent = "real " + rund2(echt).toFixed(2) + (wann ? " (getippt " + wann + ")" : "");
   } else if (anbieter === "iw") {
-    // Vorgabe aus der Tabelle: Schaufenster und echter Wert, nie leer
     info.textContent = "Tab. " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
   } else {
     info.textContent = "voll, Tab.-Referenz " + ref.toFixed(2);
@@ -295,10 +347,46 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     td.classList.add(zu.quelle === "getippt" ? "bester" : "empfohlen");
     const tag = document.createElement("div");
     tag.className = "tag";
-    tag.textContent = (zu.quelle === "getippt") ? "BESTER (getippt)" : "VORGABE";
+    tag.textContent = (zu.quelle === "getippt") ? "BESTER (getippt)" : "START-TIPP";
     td.appendChild(tag);
   }
   return td;
+}
+
+// Aufklapp-Zeile mit Erklaerung, Begruendung, Links und Zeitstempeln
+function baueDetailZeile(w) {
+  const optIdx = gewaehlteOption(w);
+  const opt = w.o[optIdx][0];
+  const tr = document.createElement("tr");
+  tr.className = "detail";
+  tr.id = "d_" + w.id;
+  const td = document.createElement("td");
+  td.colSpan = 11;
+
+  const v = verfuegbarkeit(w);
+  let anbieterHtml = "";
+  for (const a of ANBIETER) {
+    const e = liesEingabe(w.id, opt, a.kz);
+    const wann = liesEingabeZeit(w.id, opt, a.kz);
+    const getippt = e
+      ? ("Getippt: <b>" + e.toFixed(2) + "</b> am " + wann + ", real " + rund2(echteQuote(a.kz, e)).toFixed(2) + ".")
+      : "Noch keine Live-Quote getippt.";
+    anbieterHtml += "<li><a href=\"" + a.url + "\" target=\"_blank\" rel=\"noopener\">" + a.name + "</a>: " +
+      ANBIETER_GRUND[a.kz] + " " + VERF_LANG[v[a.kz]] + ". " + getippt + "</li>";
+  }
+
+  td.innerHTML =
+    "<b>Was die Wette heisst:</b> " + erklaerung(w, optIdx) +
+    "<br><b>Warum dieser Start-Tipp:</b> Start-Tipp ist KEINE Aussage ueber die beste Live-Quote, " +
+    "sondern nur: dort zuerst schauen (keine Gebuehr, Markt vorhanden). Die echte beste Quote entsteht " +
+    "erst aus deinen getippten Zahlen oder ueber den Vergleichs-Link." +
+    "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
+    "alle Anbieter-Quoten fuer dieses Spiel suchen</a> (oeffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
+    "<br><b>Die vier Anbieter fuer diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
+    "<b>Datenstand dieser Zeile:</b> abgetippt aus dem Foto vom 24.08.2026 (Tab.-Quote " + w.o[optIdx][1].toFixed(2) +
+    "). Markt-Angaben: Einschaetzung vom 24.08.2026, kein Beleg. Angezeigt: " + jetztText() + ".";
+  tr.appendChild(td);
+  return tr;
 }
 
 function baueZeile(w) {
@@ -326,6 +414,17 @@ function baueZeile(w) {
     s.textContent = " [doppelt]";
     td.appendChild(s);
   }
+  const mehr = document.createElement("a");
+  mehr.href = "#";
+  mehr.className = "mehr";
+  mehr.textContent = offeneDetails.has(w.id) ? "Info schliessen" : "Info + Links";
+  mehr.onclick = (ev) => {
+    ev.preventDefault();
+    if (offeneDetails.has(w.id)) offeneDetails.delete(w.id); else offeneDetails.add(w.id);
+    zeichne();
+  };
+  td.appendChild(document.createElement("br"));
+  td.appendChild(mehr);
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -365,7 +464,7 @@ function baueZeile(w) {
     td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + "</b> real " + rund2(zu.echt).toFixed(2) +
       (zu.anzahl < 2 ? '<div class="real">erst 1 Quote getippt</div>' : "");
   } else {
-    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + "</b><div class=\"real\">Vorgabe, Live-Quoten tippen</div>";
+    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + '</b><div class="real">Start-Tipp, KEINE Live-Quote</div>';
   }
   tr.appendChild(td);
 
@@ -385,6 +484,8 @@ function aktualisiereZeile(id) {
     const fokus = document.activeElement;
     const neu = baueZeile(w);
     alt.replaceWith(neu);
+    const altDetail = document.getElementById("d_" + id);
+    if (altDetail) altDetail.replaceWith(baueDetailZeile(w));
     if (fokus && fokus.tagName === "INPUT") {
       const inputsAlt = Array.from(alt.querySelectorAll("input"));
       const idx = inputsAlt.indexOf(fokus);
@@ -408,11 +509,18 @@ function zeichne() {
   let liste = basisListe();
   if (aktiverAnbieter !== "ALLE") liste = liste.filter(w => zuweisung(w).kz === aktiverAnbieter);
   liste.sort((a, b) => liesAnstoss(a.an).zeit - liesAnstoss(b.an).zeit);
-  for (const w of liste) koerper.appendChild(baueZeile(w));
-  let text = liste.length + " von " + WETTEN.length + " Wetten angezeigt";
-  if (nurKommende) text += " (vergangene ausgeblendet)";
-  if (aktiverAnbieter !== "ALLE") text += " | Filter: setzen bei " + anbieterName(aktiverAnbieter);
+  for (const w of liste) {
+    koerper.appendChild(baueZeile(w));
+    if (offeneDetails.has(w.id)) koerper.appendChild(baueDetailZeile(w));
+  }
+  const vorbeiZahl = WETTEN.filter(w => istVorbei(w.an)).length;
+  let text = liste.length + " Wetten angezeigt. Gesamt: " + WETTEN.length +
+    ", davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
+    (nurKommende ? "ausgeblendet, Knopf oben" : "eingeblendet, grau") + ").";
+  if (aktiverAnbieter !== "ALLE") text += " Filter: setzen bei " + anbieterName(aktiverAnbieter) + ".";
   document.getElementById("zaehler").textContent = text;
+  const stand = document.getElementById("stand");
+  if (stand) stand.textContent = "Datenstand: " + DATEN_STAND + " Seite angezeigt: " + jetztText() + " Uhr.";
 }
 
 document.addEventListener("DOMContentLoaded", zeichne);
