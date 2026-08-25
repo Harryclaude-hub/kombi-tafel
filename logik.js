@@ -764,4 +764,8 @@ function zeichne() {
     " Seite angezeigt: " + jetztText() + " Uhr.";
 }
 
-document.addEventListener("DOMContentLoaded", zeichne);
+// Nur zeichnen, wenn die Tafel-Elemente vorhanden sind.
+// (kombis.html laedt diese Datei nur wegen der Rechenfunktionen.)
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("koerper")) zeichne();
+});

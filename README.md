@@ -72,3 +72,4 @@ python -c "import io,re; V='20260826a'; [io.open(p,'w',encoding='utf-8').write(r
 | `index.html` | Die Kombi-Tafel: rechnen, filtern, Quoten eintragen |
 | `original.html` | Die vier Fotos eins zu eins als Tabelle, nichts gerechnet |
 | `schule.html` | Wett-Schule: alle Wettarten von Grund auf erklaert, Tafeln aus `schule.js` erzeugt |
+| `kombis.html` | Kombi-Bau: fertige 3er-Scheine nach Mindestquote und Anbieter, mit Einsatz und Verlauf |

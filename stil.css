@@ -190,3 +190,30 @@ td.anbieter .realgross.ausshotwert { border: 1px dashed #7a4a00; }
 td.anbieter .realgross .leer { font-size: 12px; color: #888; font-weight: normal; }
 td.anbieter .fotoklein { font-size: 10px; color: #444; text-align: center; }
 td.anbieter .abzug { font-size: 9.5px; color: #777; }
+
+/* ---- Kombi-Bau (kombis.html) ---- */
+input.einst, select.einst { font-size: 13px; padding: 2px 5px; border: 1px solid #888; }
+input#mind { width: 70px; font-weight: bold; }
+.filterzeile label { font-size: 12px; margin-right: 10px; white-space: nowrap; }
+button.haupt { background: #000; color: #fff; font-weight: bold; }
+.schein { border: 1px solid #444; margin: 8px 0; page-break-inside: avoid; }
+.s-kopf { background: #eee; padding: 4px 8px; font-weight: bold; font-size: 13px;
+  display: flex; align-items: baseline; gap: 10px; }
+.s-anb { color: #1a7a1a; }
+.s-quote { margin-left: auto; }
+.s-quote b { font-size: 16px; }
+table.s-tab { margin: 0; }
+table.s-tab td { border: none; border-top: 1px solid #ddd; font-size: 12px; padding: 3px 8px; }
+td.s-zeit { white-space: nowrap; color: #444; width: 90px; }
+td.s-liga { color: #444; width: 150px; }
+td.s-spiel { font-weight: bold; }
+td.s-wette { white-space: nowrap; }
+td.s-q { text-align: right; white-space: nowrap; }
+td.s-q b { font-size: 14px; }
+td.s-reiter { width: 60px; text-align: center; }
+.s-fuss { padding: 5px 8px; background: #f7f7f7; border-top: 1px solid #ddd; font-size: 13px; }
+input.einsatz { width: 60px; font-size: 13px; padding: 1px 4px; border: 1px solid #888; }
+button.merken { margin-left: 12px; font-size: 12px; padding: 2px 8px;
+  border: 1px solid #1a7a1a; background: #fff; cursor: pointer; }
+#reste ul { margin: 3px 0 10px 20px; font-size: 12px; }
+#verlauf td { font-size: 12px; }

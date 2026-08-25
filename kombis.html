@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kombi-Bau</title>
+<link rel="stylesheet" href="stil.css?v=20260825j">
+</head>
+<body>
+
+<h1>Kombi-Bau</h1>
+<div class="unter">Baut aus den noch offenen Wetten fertige 3er-Scheine.
+<a href="index.html">Kombi-Tafel</a> &nbsp;|&nbsp; <a href="schule.html">Wett-Schule</a>
+&nbsp;|&nbsp; <a href="original.html">Original-Tabelle</a></div>
+
+<div class="kern"><b>Die drei Regeln, nach denen gebaut wird:</b>
+<ol>
+<li>Jede Einzelquote liegt <b>ueber deiner Mindestquote</b>, und zwar die ECHTE Quote
+nach Gebuehr. Bei Interwetten wird also erst durch 1,05 geteilt und dann verglichen.</li>
+<li>Alle drei Wetten eines Scheins liegen beim <b>gleichen Anbieter</b>. Du gehst also
+einmal auf eine Seite und gibst dort den ganzen Schein ein.</li>
+<li>Jedes <b>Spiel kommt insgesamt nur einmal</b> vor. Steckt Jablonec schon in Schein 2,
+taucht es in keinem weiteren auf, auch nicht mit einer anderen Wette. Sonst haengen
+zwei Scheine aneinander und fallen gemeinsam.</li>
+</ol></div>
+
+<div class="filterbox">
+<div class="filterzeile">
+  <span class="f-label">Mindestquote</span>
+  <span class="f-knoepfe">
+    <input type="number" id="mind" value="1.80" step="0.05" min="1.01" class="einst">
+    <span class="mini">Gilt fuer jede einzelne Wette, nach Abzug der Gebuehr.</span>
+  </span>
+</div>
+<div class="filterzeile">
+  <span class="f-label">Welche Quoten</span>
+  <span class="f-knoepfe">
+    <select id="quellen" class="einst">
+      <option value="auchfoto">auch Foto-Quoten verwenden (zum Planen)</option>
+      <option value="geprueft">nur gepruefte Quoten (getippt oder Screenshot)</option>
+    </select>
+    <span class="mini">"Nur geprueft" ist ehrlich, aber leer solange du nichts eingetippt hast.</span>
+  </span>
+</div>
+<div class="filterzeile">
+  <span class="f-label">Anbieter erlauben</span>
+  <span class="f-knoepfe">
+    <label><input type="checkbox" class="anbwahl" value="iw" checked> Interwetten</label>
+    <label><input type="checkbox" class="anbwahl" value="bw" checked> Bwin</label>
+    <label><input type="checkbox" class="anbwahl" value="b3" checked> Bet365</label>
+    <label><input type="checkbox" class="anbwahl" value="st" checked> Stake</label>
+  </span>
+</div>
+<div class="filterzeile">
+  <span class="f-label">Aufteilung</span>
+  <span class="f-knoepfe">
+    <input type="hidden" id="mischzahl" value="1">
+    <button onclick="zeichneKombis()" class="haupt">Scheine bauen</button>
+    <button onclick="neuMischen()">Anders mischen</button>
+    <span class="mini">"Anders mischen" wuerfelt die Zusammenstellung neu, gleiche Regeln.</span>
+  </span>
+</div>
+</div>
+
+<div id="uebersicht" class="stand"></div>
+
+<h2>Deine Scheine</h2>
+<div id="scheine"></div>
+
+<h2>Was nicht in einen Schein gepasst hat</h2>
+<div id="reste"></div>
+
+<h2>Verlauf: was du wirklich gesetzt hast</h2>
+<p class="mini">Nur Scheine, die du mit "In den Verlauf" merkst, landen hier.
+Setz danach den Stand auf gewonnen oder verloren, dann rechnet die Bilanz mit.
+Alles bleibt auf diesem Geraet gespeichert.</p>
+<div id="verlauf"></div>
+
+<div class="fuss">
+Gesamtquote = die drei echten Einzelquoten malgenommen. Bei Interwetten ist jede Einzelquote
+schon durch 1,05 geteilt, deshalb steht in Klammern zusaetzlich, was der Wettschein dort anzeigen
+wird. Die Reihenfolge der Scheine ist nach Gesamtquote sortiert, die hoechste zuerst.
+Alle Angaben ohne Gewaehr, Quoten aendern sich laufend: vor dem Setzen in der App gegenpruefen.
+</div>
+
+<script src="daten.js?v=20260825j"></script>
+<script src="roh.js?v=20260825j"></script>
+<script src="recherche.js?v=20260825j"></script>
+<script src="logik.js?v=20260825j"></script>
+<script src="kombis.js?v=20260825j"></script>
+</body>
+</html>
