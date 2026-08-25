@@ -1,31 +1,42 @@
 // ============================================================
-// RECHERCHE-QUOTEN: aktuelle MARKT-Quoten, von Claude gesucht.
+// RECHERCHE: Quoten, die NICHT von dir selbst eingetippt wurden.
 //
-// WICHTIG, damit kein falscher Eindruck entsteht:
-// Das sind VERGLEICHS-Quoten vom Quotenvergleich Oddspedia
-// (beste dort gelistete Quote je Linie), NICHT die Quote eines
-// bestimmten der vier Anbieter. Interwetten und Stake listet
-// Oddspedia gar nicht. Die Zahl sagt dir, wo der Markt GERADE
-// steht, damit du Foto-Quote und App-Anzeige einordnen kannst.
+// Zwei getrennte Toepfe:
 //
-// werte: je Options-Linie die Marktquote zum Lesezeitpunkt.
-// zeit:  wann gesucht wurde. url: die Quelle zum Nachpruefen.
+// 1) ANBIETER_QUOTEN  = echte Quoten deiner vier Anbieter.
+//    Quelle: Screenshots, die Karam aus den Apps schickt.
+//    Claude liest sie ab und traegt sie hier ein. Sie erscheinen
+//    in der Tafel als graue Vorbelegung im jeweiligen Feld und
+//    koennen jederzeit ueberschrieben werden.
+//    Aufbau:  "wette-id": { anbieter: { linie: wert, ... }, _zeit: "...", _quelle: "..." }
+//
+// 2) FREMDVERGLEICH   = beste Quote eines Quotenvergleichs.
+//    NUR zur Einordnung, nicht zum Wetten. Steht nur in der Info-Zeile.
 // ============================================================
 
-const RECHERCHE_STAND = "25.08.2026, ca. 13:00 Uhr";
+const RECHERCHE_STAND = "Fremdvergleich 25.08.2026 ca. 13:00 Uhr. Anbieter-Quoten: noch keine.";
 
+// ---- Topf 1: echte Quoten der vier Anbieter (aus Screenshots) ----
+// Beispiel, wie ein Eintrag spaeter aussieht:
+// "1.11": { b3: { "-0.5": 2.45 }, bw: { "-0.5": 2.40 },
+//           _zeit: "25.08. 19:20", _quelle: "Screenshot Karam" },
+const ANBIETER_QUOTEN = {
+  // noch leer: schick Screenshots aus den Apps, dann fuellt Claude das hier
+};
+
+// ---- Topf 2: Fremdvergleich, nur zur Einordnung ----
 const RECHERCHE = {
 "1.11": { werte: { "-0.5": 2.33 }, zeit: "25.08. 13:00",
   url: "https://oddspedia.com/football/burnley-norwich-50543",
-  notiz: "Markt deutlich unter der Foto-Quote 2.57: die Quote ist gefallen." },
+  notiz: "Deutlich unter der Foto-Quote 2.57: die Quote ist gefallen." },
 
 "1.17": { werte: { "2.5": 2.02 }, zeit: "25.08. 13:00",
   url: "https://oddspedia.com/football/metaloglobus-bucuresti-fc-unirea-slobozia-38061",
-  notiz: "Markt exakt auf Foto-Niveau." },
+  notiz: "Exakt auf Foto-Niveau." },
 
 "1.15": { werte: { "-0.5": 1.91 }, zeit: "25.08. 13:01",
   url: "https://oddspedia.com/football/america-de-cali-junior-fc-44837",
-  notiz: "Quote GESTIEGEN (Foto 1.85). Achtung Termin: laut Oddspedia und 365scores ist der Anstoss Do 27.08. um 01:20 unserer Zeit, nicht 26.08. Der Termin in der Tafel wurde korrigiert." },
+  notiz: "GESTIEGEN (Foto 1.85). Anstoss ausserdem korrigiert: 27.08. 01:20 deiner Zeit." },
 
 "2.15": { werte: { "0": 1.87, "-0.5": 2.70 }, zeit: "25.08. 13:00",
   url: "https://oddspedia.com/us/soccer/al-khaleej-abha-140711",
@@ -33,11 +44,11 @@ const RECHERCHE = {
 
 "2.17": { werte: { "2.25": 1.80 }, zeit: "25.08. 13:01",
   url: "https://oddspedia.com/football/orlando-pirates-sekhukhune-united-828198",
-  notiz: "Gefallen (Foto 1.93). Linie 2.5 war nicht direkt sichtbar." },
+  notiz: "Gefallen (Foto 1.93)." },
 
 "2.05": { werte: { "3": 1.91 }, zeit: "25.08. 13:02",
   url: "https://oddspedia.com/football/strommen-raufoss-11030",
-  notiz: "Mittlere Linie UNDER 3: Markt 1.91 (Foto 2.00). Linien 2.5 und 3.5 nicht direkt sichtbar; UNDER 2.75 stand bei 2.15." },
+  notiz: "Mittlere Linie UNDER 3: 1.91 (Foto 2.00)." },
 
 "2.04": { werte: { "3.5": 1.71, "3.75": 1.88 }, zeit: "25.08. 13:02",
   url: "https://oddspedia.com/football/odd-bk-kongsvinger-45639",
@@ -48,7 +59,5 @@ const RECHERCHE = {
   notiz: "Beide gefallen (Foto 2.20 / 2.00)." }
 };
 
-// Spiele, die beim Quotenvergleich NICHT gefunden wurden (zu kleine Bewerbe):
-// Airdrieonians vs Stirling, Hamilton vs Edinburgh City, Forfar vs Formartine
-// (Scottish Challenge Cup), Coquimbo vs U. Catolica (2026er-Seite nicht auffindbar).
-// Deren Felder bleiben Handarbeit in der App.
+// Nicht auffindbar auf dem Vergleichsportal: Scottish Challenge Cup
+// (Airdrieonians, Hamilton, Forfar) und Coquimbo vs U. Catolica.

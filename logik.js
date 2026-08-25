@@ -218,8 +218,14 @@ function rangliste(w) {
     ? ["b3", "st", "bw", "iw"] : ["b3", "bw", "st", "iw"];
   const vw = { J: 2, D: 1, N: 0 };
   const liste = ANBIETER.map(a => {
-    const echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
-    return { kz: a.kz, echt: echt || 0, hat: !!echt, v: vw[v[a.kz]], p: basis.indexOf(a.kz) };
+    let echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
+    let quelle = echt ? 2 : 0;                       // 2 = selbst getippt
+    if (!echt) {
+      const shot = screenshotQuote(w, optIdx, a.kz); // 1 = aus Screenshot
+      if (shot) { echt = echteQuote(a.kz, shot.wert); quelle = 1; }
+    }
+    return { kz: a.kz, echt: echt || 0, hat: !!echt, quelle: quelle,
+             v: vw[v[a.kz]], p: basis.indexOf(a.kz) };
   });
   liste.sort((x, y) => (y.hat - x.hat) || (y.echt - x.echt) || (y.v - x.v) || (x.p - y.p));
   return liste;
@@ -235,7 +241,18 @@ function zuweisung(w) {
            anzahl: getippte, rang: idx + 1, verfN: e.v === 0 };
 }
 
-// ---------- Recherche-Quoten (Markt jetzt) ----------
+// ---------- Quoten aus Screenshots (echte Anbieter-Quoten) ----------
+
+function screenshotQuote(w, optIdx, anbieter) {
+  if (typeof ANBIETER_QUOTEN === "undefined") return null;
+  const e = ANBIETER_QUOTEN[w.id];
+  if (!e || !e[anbieter]) return null;
+  const wert = e[anbieter][w.o[optIdx][0]];
+  if (typeof wert !== "number") return null;
+  return { wert: wert, zeit: e._zeit || "", quelle: e._quelle || "Screenshot" };
+}
+
+// ---------- Fremdvergleich (nur zur Einordnung) ----------
 
 function rechercheFuer(w, optIdx) {
   if (typeof RECHERCHE === "undefined") return null;
@@ -481,10 +498,17 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
 
     const e = liesEingabe(w.id, opt, anbieter);
     const echt = echteQuote(anbieter, e);
+    const shot = screenshotQuote(w, optIdx, anbieter);
     const info = document.createElement("div");
     info.className = "real";
     if (echt) {
       info.innerHTML = "<b>real " + rund2(echt).toFixed(2) + "</b>";
+    } else if (shot) {
+      const echtShot = echteQuote(anbieter, shot.wert);
+      info.innerHTML = '<span class="ausshot">' + shot.wert.toFixed(2) +
+        " > real <b>" + rund2(echtShot).toFixed(2) + "</b></span>" +
+        '<div class="ausshot">aus Screenshot ' + shot.zeit + "</div>";
+      td.classList.add("hatshot");
     } else if (anbieter === "iw") {
       info.textContent = "Foto " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
     } else {
