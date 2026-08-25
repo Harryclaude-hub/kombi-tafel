@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Kombi-Tafel</title>
-<link rel="stylesheet" href="stil.css?v=20260825d">
+<link rel="stylesheet" href="stil.css?v=20260825e">
 </head>
 <body>
 
@@ -42,20 +42,21 @@ dort zuerst schauen, weil keine Gebuehr abgeht und der Markt dort sicher vorhand
 Welche Quote WIRKLICH die beste ist, siehst du erst, wenn du die Live-Zahlen eintippst
 oder den Vergleichslink in der Zeile &ouml;ffnest.</div>
 
-<div class="fuellkern"><b>Was genau tippst du in die vier Live-Felder?</b>
+<div class="fuellkern"><b>Der Ablauf pro Wette, nur mit deinen vier Anbietern:</b>
 <ol>
-<li><b>Nur die Quote</b>, die die App fuer GENAU diese Wette anzeigt. Beispiel: steht bei Bet365
-"Norwich -0,5 &nbsp;2.62", dann tippst du <b>2.62</b> ins Bet365-Feld. Punkt oder Komma ist egal.</li>
-<li><b>Nichts umrechnen!</b> Auch bei Interwetten tippst du die ANGEZEIGTE Zahl,
-das Programm teilt selbst durch 1,05.</li>
-<li><b>Kein Einsatz, kein Euro, kein Prozent.</b> Nur die nackte Quote (1,01 bis 99).</li>
-<li>Bei Klammer-Wetten: erst im Dropdown die <b>Linie</b> waehlen (z.&nbsp;B. OVER 2.25 oder OVER 2.5),
-dann die Quote genau DIESER Linie eintippen. Findest du nur eine andere Linie, waehle sie im Dropdown,
-wenn es sie gibt, sonst Feld leer lassen.</li>
-<li>Anbieter hat die Wette nicht? <b>Feld leer lassen.</b> Leer heisst: keine Quote bekannt.</li>
-<li>Tippfehler? Zahl einfach ueberschreiben oder loeschen, der Zeitstempel erneuert sich.</li>
+<li>In der Zeile beim gewuenschten Anbieter auf <b>"Seite oeffnen"</b> klicken. Bei <b>Bwin</b> springt
+die Suche direkt zum Team. Bei Interwetten, Bet365 und Stake oeffnet sich die Sportwetten-Seite:
+dort oben die Lupe antippen und den Teamnamen einfuegen, den du mit dem Knopf <b>"Name"</b> kopiert hast.</li>
+<li>Wette im richtigen Reiter suchen (Code in der letzten Spalte, Anleitung im Reiter-Kasten oben).</li>
+<li><b>Nur die Quote</b> ins Feld tippen, die dort steht. Nichts umrechnen, kein Einsatz.
+Bei Interwetten die ANGEZEIGTE Zahl, das Programm teilt selbst durch 1,05.</li>
+<li>Sobald du klickst oder tippst, merkt sich die Zelle <b>wann du zuletzt nachgeschaut hast</b>.
+So siehst du sofort, welche Quoten frisch sind und welche von gestern.</li>
+<li>Bei Klammer-Wetten vorher im Dropdown die Linie waehlen und die Quote genau dieser Linie eintragen.</li>
+<li>Anbieter hat die Wette nicht? Feld leer lassen, er faellt in der Rangliste automatisch zurueck.</li>
 </ol>
-Die Anbieter-Namen in der Tabellen-Kopfzeile sind jetzt direkte Links zur jeweiligen Seite.</div>
+Sobald in einer Zeile zwei Quoten stehen, ist <b>gruen</b> eine echte Aussage, und mit der Filterzeile
+<b>Setzen bei</b> arbeitest du einen Anbieter nach dem anderen ab.</div>
 
 <details>
 <summary>Gebuehren laut AGB: was kostet dich jeder Anbieter? (anklicken, Stand 24.08.2026)</summary>
@@ -82,20 +83,20 @@ Stake: Testberichte, die eigene AGB-Seite blockt automatisierten Abruf. Alle Lin
 </details>
 
 <details>
-<summary>Automatische Live-Quoten: was geht und was noch nicht (anklicken)</summary>
+<summary>Warum die Quoten nicht von selbst erscheinen (anklicken)</summary>
 <div class="inhalt">
-<p><b>Warum die Seite die Quoten nicht selbst holt:</b> Alle vier Anbieter untersagen in ihren AGB das
-automatische Auslesen ihrer Seiten, und es wuerde dein Wettkonto gefaehrden. Darum gibt es hier keinen
-heimlichen Abruf.</p>
-<p><b>Was JETZT geht:</b> In jeder Zeile steht der Link <b>Quoten-Vergleich</b> (unter Setzen bei):
-ein Klick sucht genau dieses Spiel auf einem Quotenvergleich, dort siehst du die Quoten vieler Anbieter
-auf einen Blick und tippst sie in die Felder.</p>
-<p><b>Der Weg zu echten Auto-Quoten:</b> ueber einen offiziellen Quoten-Dienst mit Schnittstelle,
-z. B. <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a> (kostenlose
-Stufe reicht zum Testen). Den Schluessel legst du selbst an (2 Minuten, E-Mail genuegt). Sobald du ihn
-hast, baut Claude den Knopf Live-Quoten holen ein: der befuellt 1X2- und Ueber/Unter-Felder automatisch
-fuer die Spiele, die der Dienst fuehrt; Spezialmaerkte (Ecken, Viertel-Linien, Nischenligen) bleiben
-Handarbeit. Das wird gemeinsam getestet, bevor es als fertig gilt.</p>
+<p><b>Deine vier Anbieter blocken das automatische Auslesen</b> ausdruecklich in ihren AGB,
+und ein Umgehen wuerde dein Wettkonto gefaehrden. Darum holt diese Seite keine Quoten heimlich ab.
+Getestet am 25.08.2026: nur <b>Bwin</b> laesst sich per Adresse direkt in die Suche schicken,
+Interwetten, Bet365 und Stake weisen automatische Zugriffe ab (Fehler 403).</p>
+<p><b>Deshalb der Weg ueber die Links:</b> ein Klick oeffnet den Anbieter, du liest die Quote ab und
+tippst sie ein. Die Zelle merkt sich Zeitpunkt und Wert. Das dauert pro Wette wenige Sekunden und ist
+die einzige Variante, die dein Konto nicht gefaehrdet.</p>
+<p><b>Wenn du es wirklich automatisch willst:</b> ueber einen offiziellen Quoten-Dienst mit Schnittstelle,
+z. B. <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>
+(kostenlose Stufe zum Testen). Den Schluessel legst du selbst an, dann baue ich den Knopf
+"Live-Quoten holen" ein. Der Dienst fuehrt Bet365 und Bwin, Interwetten und Stake nur teilweise,
+und Spezialmaerkte (Ecken, Viertel-Linien, Nischenligen) bleiben Handarbeit.</p>
 </div>
 </details>
 
@@ -137,7 +138,9 @@ einbauen, sag Bescheid wenn du das willst.</p>
 <tr><td>Quote</td><td>Eine Mal-Zahl. 10&nbsp;&euro; bei Quote 2,00 = 20&nbsp;&euro; zur&uuml;ck (10 davon waren deine). Je h&ouml;her, desto mehr Geld, desto seltener klappt es.</td></tr>
 <tr><td>Kombi</td><td>Mehrere Wetten zusammen. Die Quoten werden MALgenommen: 1,80 x 2,10 x 1,65 = 6,237. Aber ALLE m&uuml;ssen stimmen, eine daneben = alles weg.</td></tr>
 <tr><td>Foto-Quote</td><td>Die Quote aus Saschas Foto-Tabelle (Spalte G). Stand vom Foto-Tag (24.08.), kann sich laengst geaendert haben. Nur ein Anhaltspunkt zum Vergleichen, KEINE Live-Quote. In den Klammer-Dropdowns steht sie als (Foto 1.79).</td></tr>
-<tr><td>Markt jetzt</td><td>Die aktuelle Quote, von Claude auf dem Quotenvergleich gesucht, mit Suchzeit und Quellenlink. <b>Das ist die beste dort gelistete Quote, nicht die eines bestimmten Anbieters</b>: Interwetten und Stake sind dort gar nicht gelistet, und der Vergleich blendet in Oesterreich teilweise nur Referenzquoten ein. Sie sagt dir, wo der Markt gerade steht, damit du erkennst, ob die Foto-Quote noch realistisch ist. Steht "noch nicht gesucht", nimm den Link "jetzt suchen".</td></tr>
+<tr><td>geprueft TT.MM. HH:MM</td><td>Steht in jeder Anbieter-Zelle: wann du dort zuletzt nachgeschaut hast, also wann du den Link geoeffnet oder eine Quote eingetippt hast. So erkennst du auf einen Blick, welche Zahlen frisch sind. Steht "noch nicht geprueft", warst du dort noch nicht.</td></tr>
+<tr><td>Seite oeffnen / Name</td><td>"Seite oeffnen" springt zum jeweiligen Anbieter (bei Bwin direkt in die Suche, sonst auf die Sportwetten-Seite). "Name" kopiert den Teamnamen, damit du ihn dort in die Lupe einfuegen kannst.</td></tr>
+
 <tr><td>Gemeldet</td><td>Die zweite Zeitspalte der Fotos: wann der Tippgeber den Tipp eingetragen hat. Beispiel Zeile 1: Anstoss 27.08. 18:00, gemeldet 22.08. 11:50, der Tipp war beim Foto also schon 2 Tage alt. Je aelter, desto eher steht die Quote inzwischen woanders.</td></tr>
 <tr><td>real</td><td>Was du nach Gebuehr wirklich bekommst. Nur bei Interwetten anders als die Anzeige: dort gilt <b>Anzeige geteilt durch 1,05</b> (5&nbsp;% Wettgebuehr, nur bei Gewinn f&auml;llig). Bwin, Bet365 und Stake zahlen voll.</td></tr>
 <tr><td>Foto-Quote X, kein Abzug</td><td>Steht in den Zellen von Bwin/Bet365/Stake, solange du nichts getippt hast: dieser Anbieter zieht nichts ab, als Anhaltspunkt dient die Tabellenquote. Die echte Zahl siehst du erst in der App.</td></tr>
@@ -267,11 +270,10 @@ so wie das, was sie meinen.</p>
 <th>Spiel<span class="hilf" onclick="alert(this.title)" title="Die zwei Teams. [doppelt] = dieses Spiel steht mehrfach in der Liste, nur EINE Wette davon in eine Kombi. Info + Links oeffnet Erklaerung, Anbieter-Links und Vergleichslink.">?</span></th>
 <th>Wette<span class="hilf" onclick="alert(this.title)" title="Worauf gesetzt wird. Bei Klammer-Wetten waehlst du die Linie im Dropdown, sicherste zuerst. Mit der Maus auf die Wette zeigen gibt die Kurz-Erklaerung, ausfuehrlich im Begriffe-Kasten oben.">?</span></th>
 <th>Foto-Quote<span class="hilf" onclick="alert(this.title)" title="Die Quote aus Saschas Foto-Tabelle (Spalte G), Stand 24.08.2026. Nur ein Anhaltspunkt, KEINE Live-Quote. Die echten Zahlen tippst du in die vier Anbieter-Felder.">?</span></th>
-<th>Markt jetzt<span class="hilf" onclick="alert(this.title)" title="Die aktuelle Marktquote, von Claude am 25.08.2026 auf dem Quotenvergleich gesucht, mit Uhrzeit und Quellenlink. ACHTUNG: das ist die beste dort gelistete Quote, NICHT die eines bestimmten der vier Anbieter. Interwetten und Stake listet der Vergleich nicht. Gruen = hoeher als im Foto, rot = tiefer.">?</span></th>
-<th><a href="https://www.interwetten.com/de/sportwetten" target="_blank" rel="noopener">Interwetten</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Interwetten hier eintippen, und zwar die ANGEZEIGTE Zahl. Das Programm teilt selbst durch 1,05 (5 Prozent Wettgebuehr) und zeigt real. Name anklicken oeffnet die Seite.">?</span></th>
-<th><a href="https://sports.bwin.com/de/sports" target="_blank" rel="noopener">Bwin</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bwin hier eintippen. Kein Abzug, Bwin uebernimmt die Wettgebuehr seit Mai 2026 selbst. Name anklicken oeffnet die Seite.">?</span></th>
-<th><a href="https://www.bet365.com/" target="_blank" rel="noopener">Bet365</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bet365 hier eintippen. Kein Abzug. Fuer Ecken und asiatische Linien NICHT die .de-Seite verwenden. Name anklicken oeffnet die Seite.">?</span></th>
-<th><a href="https://stake.com/de/sports" target="_blank" rel="noopener">Stake</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Stake hier eintippen. Keine Wettgebuehr, aber nur Krypto und Netzwerkgebuehr bei jeder Auszahlung. Name anklicken oeffnet die Seite.">?</span></th>
+<th><a href="https://www.interwetten.com/de/sportwetten" target="_blank" rel="noopener">Interwetten</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Interwetten hier eintippen, und zwar die ANGEZEIGTE Zahl. Das Programm teilt selbst durch 1,05 (5 Prozent Wettgebuehr) und zeigt real. In der Zelle: "Seite oeffnen" springt zum Anbieter, "Name" kopiert den Teamnamen fuer die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
+<th><a href="https://sports.bwin.com/de/sports" target="_blank" rel="noopener">Bwin</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bwin hier eintippen. Kein Abzug, Bwin uebernimmt die Wettgebuehr seit Mai 2026 selbst. In der Zelle: "Seite oeffnen" springt zum Anbieter, "Name" kopiert den Teamnamen fuer die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
+<th><a href="https://www.bet365.com/" target="_blank" rel="noopener">Bet365</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bet365 hier eintippen. Kein Abzug. Fuer Ecken und asiatische Linien NICHT die .de-Seite verwenden. In der Zelle: "Seite oeffnen" springt zum Anbieter, "Name" kopiert den Teamnamen fuer die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
+<th><a href="https://stake.com/de/sports" target="_blank" rel="noopener">Stake</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Stake hier eintippen. Keine Wettgebuehr, aber nur Krypto und Netzwerkgebuehr bei jeder Auszahlung. In der Zelle: "Seite oeffnen" springt zum Anbieter, "Name" kopiert den Teamnamen fuer die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
 <th>Setzen bei<span class="hilf" onclick="alert(this.title)" title="Der Anbieter auf dem gewaehlten Rang aus der Filterzeile Anbieter-Rang. Mit getippten Quoten ist es der echte Bestwert, sonst die Start-Vorgabe. Darunter der Quoten-Vergleichslink fuer genau dieses Spiel.">?</span></th>
 <th>Reiter<span class="hilf" onclick="alert(this.title)" title="In welchem Reiter der App diese Wette steckt: SIEG, ASIA, TORE, ECKEN, BTTS, HZ-END, DNB oder TENNIS. Der Reiter-Kasten oben nennt fuer jeden die genauen Bezeichnungen bei allen vier Anbietern. Mit der Filterzeile Reiter in der App holst du dir alle Wetten eines Reiters auf einmal.">?</span></th>
 </tr>
@@ -289,9 +291,9 @@ oben. Die durchgestrichene Foto-Zeile (Branstine vs Ngou) ist nicht enthalten. A
 Quoten aendern sich laufend.
 </div>
 
-<script src="daten.js?v=20260825d"></script>
-<script src="roh.js?v=20260825d"></script>
-<script src="recherche.js?v=20260825d"></script>
-<script src="logik.js?v=20260825d"></script>
+<script src="daten.js?v=20260825e"></script>
+<script src="roh.js?v=20260825e"></script>
+<script src="recherche.js?v=20260825e"></script>
+<script src="logik.js?v=20260825e"></script>
 </body>
 </html>

@@ -144,6 +144,19 @@ function speichereEingabe(id, opt, anbieter, wert) {
   }
 }
 
+// Wann wurde bei diesem Anbieter fuer diese Wette zuletzt nachgeschaut
+function liesGeprueft(id, anbieter) {
+  const t = localStorage.getItem("p_" + id + "_" + anbieter);
+  if (!t) return null;
+  const d = new Date(t);
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
+    ". " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+function merkeGeprueft(id, anbieter) {
+  localStorage.setItem("p_" + id + "_" + anbieter, new Date().toISOString());
+}
+
 function gewaehlteOption(w) {
   const v = localStorage.getItem("opt_" + w.id);
   if (v !== null) {
@@ -156,11 +169,29 @@ function gewaehlteOption(w) {
 // ---------- Zuweisung: bei welchem Anbieter wird DIESE Wette gesetzt ----------
 
 const ANBIETER = [
-  { kz: "iw", name: "Interwetten", url: "https://www.interwetten.com/de/sportwetten" },
-  { kz: "bw", name: "Bwin", url: "https://sports.bwin.com/de/sports" },
-  { kz: "b3", name: "Bet365", url: "https://www.bet365.com/" },
-  { kz: "st", name: "Stake", url: "https://stake.com/de/sports" }
+  // suche: %s wird durch den ersten Teamnamen ersetzt.
+  // direkt = die Adresse springt wirklich in die Suche (geprueft).
+  // sonst oeffnet sich die Sportwetten-Startseite und du fuegst den Namen
+  // oben in die Lupe ein (Kopier-Knopf steht in der Zelle).
+  { kz: "iw", name: "Interwetten", url: "https://www.interwetten.com/de/sportwetten",
+    suche: "https://www.interwetten.com/de/sportwetten", direkt: false },
+  { kz: "bw", name: "Bwin", url: "https://sports.bwin.com/de/sports",
+    suche: "https://sports.bwin.com/de/sports/search?query=%s", direkt: true },
+  { kz: "b3", name: "Bet365", url: "https://www.bet365.com/",
+    suche: "https://www.bet365.com/#/AS/B1/", direkt: false },
+  { kz: "st", name: "Stake", url: "https://stake.com/de/sports",
+    suche: "https://stake.com/de/sports/search?query=%s", direkt: false }
 ];
+
+// Erster Teamname einer Wette, zum Suchen und Kopieren
+function suchName(w) {
+  const teile = w.spiel.split(/ vs | - /);
+  return teile[0].trim();
+}
+
+function anbieterSuchLink(a, w) {
+  return a.suche.replace("%s", encodeURIComponent(suchName(w)));
+}
 
 function anbieterName(kz) { return ANBIETER.find(a => a.kz === kz).name; }
 
@@ -398,6 +429,7 @@ function eingabeFeld(w, opt, anbieter) {
   if (v) inp.value = v;
   inp.oninput = () => {
     speichereEingabe(w.id, opt, anbieter, inp.value);
+    if (inp.value) merkeGeprueft(w.id, anbieter);
     aktualisiereZeile(w.id);
   };
   return inp;
@@ -406,47 +438,74 @@ function eingabeFeld(w, opt, anbieter) {
 function zelleAnbieter(w, optIdx, anbieter, zu) {
   const td = document.createElement("td");
   td.className = "anbieter " + anbieter;
+  const a = ANBIETER.find(x => x.kz === anbieter);
   const opt = w.o[optIdx][0];
   const ref = w.o[optIdx][1];
   const v = verfuegbarkeit(w)[anbieter];
+
+  // Kopfzeile der Zelle: Link zum Anbieter, dazu Kopier-Knopf fuer den Teamnamen
+  const oben = document.createElement("div");
+  oben.className = "z-kopf";
+  const lnk = document.createElement("a");
+  lnk.href = anbieterSuchLink(a, w);
+  lnk.target = "_blank";
+  lnk.rel = "noopener";
+  lnk.className = "oeffnen";
+  lnk.textContent = a.direkt ? "Suche oeffnen" : "Seite oeffnen";
+  lnk.title = a.direkt
+    ? ("Oeffnet die Suche nach \"" + suchName(w) + "\" direkt bei " + a.name)
+    : ("Oeffnet " + a.name + ". Dort oben die Lupe antippen und \"" + suchName(w) + "\" einfuegen (Kopier-Knopf daneben).");
+  lnk.onclick = () => { merkeGeprueft(w.id, anbieter); setTimeout(() => aktualisiereZeile(w.id), 50); };
+  oben.appendChild(lnk);
+
+  const kopie = document.createElement("button");
+  kopie.className = "kopier";
+  kopie.textContent = "Name";
+  kopie.title = "Teamnamen \"" + suchName(w) + "\" kopieren, dann in der App in die Suche einfuegen";
+  kopie.onclick = (ev) => {
+    ev.preventDefault();
+    navigator.clipboard.writeText(suchName(w));
+    kopie.textContent = "kopiert";
+    setTimeout(() => { kopie.textContent = "Name"; }, 1200);
+  };
+  oben.appendChild(kopie);
+  td.appendChild(oben);
 
   if (v === "N") {
     const kein = document.createElement("div");
     kein.className = "keinmarkt";
     kein.textContent = VERF_TEXT.N;
     td.appendChild(kein);
-    if (zu.kz === anbieter) {
-      td.classList.add("empfohlen");
-      const tag = document.createElement("div");
-      tag.className = "tag";
-      tag.textContent = zu.rang + ". WAHL, aber Markt fehlt wohl";
-      td.appendChild(tag);
-    }
-    return td;
-  }
-
-  td.appendChild(eingabeFeld(w, opt, anbieter));
-
-  const e = liesEingabe(w.id, opt, anbieter);
-  const echt = echteQuote(anbieter, e);
-  const info = document.createElement("div");
-  info.className = "real";
-  if (echt) {
-    const wann = liesEingabeZeit(w.id, opt, anbieter);
-    info.textContent = "real " + rund2(echt).toFixed(2) + (wann ? " (getippt " + wann + ")" : "");
-  } else if (anbieter === "iw") {
-    info.textContent = "Foto " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
   } else {
-    info.textContent = "Foto-Quote " + ref.toFixed(2) + ", kein Abzug";
-  }
-  td.appendChild(info);
+    td.appendChild(eingabeFeld(w, opt, anbieter));
 
-  if (v === "D") {
-    const d = document.createElement("div");
-    d.className = "duenn";
-    d.textContent = VERF_TEXT.D;
-    td.appendChild(d);
+    const e = liesEingabe(w.id, opt, anbieter);
+    const echt = echteQuote(anbieter, e);
+    const info = document.createElement("div");
+    info.className = "real";
+    if (echt) {
+      info.innerHTML = "<b>real " + rund2(echt).toFixed(2) + "</b>";
+    } else if (anbieter === "iw") {
+      info.textContent = "Foto " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
+    } else {
+      info.textContent = "Foto-Quote " + ref.toFixed(2) + ", kein Abzug";
+    }
+    td.appendChild(info);
+
+    if (v === "D") {
+      const d = document.createElement("div");
+      d.className = "duenn";
+      d.textContent = VERF_TEXT.D;
+      td.appendChild(d);
+    }
   }
+
+  // Zeitstempel: wann zuletzt bei diesem Anbieter nachgeschaut
+  const gep = liesGeprueft(w.id, anbieter);
+  const zeile = document.createElement("div");
+  zeile.className = gep ? "geprueft" : "real";
+  zeile.textContent = gep ? ("geprueft " + gep) : "noch nicht geprueft";
+  td.appendChild(zeile);
 
   if (zu.kz === anbieter) {
     td.classList.add(zu.quelle === "getippt" ? "bester" : "empfohlen");
@@ -457,6 +516,7 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     } else {
       tag.textContent = zu.rang + ". WAHL" + (zu.quelle === "getippt" ? " (getippt)" : "");
     }
+    if (v === "N") tag.textContent += ", Markt fehlt wohl";
     td.appendChild(tag);
   }
   return td;
@@ -470,7 +530,7 @@ function baueDetailZeile(w) {
   tr.className = "detail";
   tr.id = "d_" + w.id;
   const td = document.createElement("td");
-  td.colSpan = 13;
+  td.colSpan = 12;
 
   const v = verfuegbarkeit(w);
   let anbieterHtml = "";
@@ -491,8 +551,9 @@ function baueDetailZeile(w) {
     "erst aus deinen getippten Zahlen oder ueber den Vergleichs-Link." +
     (function () {
       const r = rechercheFuer(w, optIdx);
-      if (!r) return "<br><b>Markt jetzt:</b> fuer diese Zeile noch nicht recherchiert.";
-      return "<br><b>Markt jetzt:</b> " + (r.wert ? r.wert.toFixed(2) : "Linie nicht gelistet") +
+      if (!r) return "";
+      return "<br><b>Fremdvergleich (nur zur Einordnung, NICHT zum Wetten):</b> " +
+        (r.wert ? r.wert.toFixed(2) : "Linie nicht gelistet") +
         ", gesucht am " + r.zeit + ". " + r.notiz +
         ' <a href="' + r.url + '" target="_blank" rel="noopener">Quelle oeffnen</a>' +
         "<br><small>Das ist die beste Quote des Quotenvergleichs, NICHT die eines bestimmten " +
@@ -581,31 +642,6 @@ function baueZeile(w) {
   td.textContent = w.o[optIdx][1].toFixed(2);
   tr.appendChild(td);
 
-  // Markt jetzt: von Claude recherchierte Vergleichsquote
-  td = document.createElement("td");
-  td.className = "markt";
-  const rech = rechercheFuer(w, optIdx);
-  if (rech && rech.wert) {
-    const foto = w.o[optIdx][1];
-    const diff = rech.wert - foto;
-    const pfeil = (Math.abs(diff) < 0.005) ? "gleich" :
-                  (diff > 0 ? "hoeher als Foto" : "tiefer als Foto");
-    td.innerHTML = '<b>' + rech.wert.toFixed(2) + "</b>" +
-      '<div class="real">' + pfeil + "</div>" +
-      '<div class="real">gesucht ' + rech.zeit + "</div>" +
-      '<div><a class="vgl" href="' + rech.url + '" target="_blank" rel="noopener">Quelle</a></div>';
-    if (diff > 0.005) td.classList.add("hoch");
-    else if (diff < -0.005) td.classList.add("tief");
-  } else if (rech) {
-    td.innerHTML = '<span class="real">Linie nicht gelistet</span>' +
-      '<div class="real">gesucht ' + rech.zeit + "</div>" +
-      '<div><a class="vgl" href="' + rech.url + '" target="_blank" rel="noopener">Quelle</a></div>';
-  } else {
-    td.innerHTML = '<span class="real">noch nicht gesucht</span>' +
-      '<div><a class="vgl" href="' + vergleichsLink(w) + '" target="_blank" rel="noopener">jetzt suchen</a></div>';
-  }
-  tr.appendChild(td);
-
   const zu = zuweisung(w);
   for (const a of ANBIETER) tr.appendChild(zelleAnbieter(w, optIdx, a.kz, zu));
 
@@ -620,7 +656,6 @@ function baueZeile(w) {
       '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
   }
   if (zu.verfN) td.innerHTML += '<div class="keinmarkt">Achtung: Markt dort vermutlich nicht vorhanden</div>';
-  td.innerHTML += '<div><a class="vgl" href="' + vergleichsLink(w) + '" target="_blank" rel="noopener">Quoten-Vergleich</a></div>';
   tr.appendChild(td);
 
   td = document.createElement("td");
