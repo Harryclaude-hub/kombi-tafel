@@ -241,6 +241,20 @@ const KATEGORIEN = [
 let aktiveKat = "ALLE";
 let aktiverAnbieter = "ALLE";
 let aktiverRang = 1;   // 1 = bester Anbieter, 2 = zweitbester, ...
+let aktiverReiter = "ALLE";
+
+// Die Reiter: wo die Wette in der App steckt. Bewusst sprechende Namen
+// statt S1..S8, damit nichts verwechselt wird.
+const REITER = [
+  ["SIEG",   "Siegwette"],
+  ["ASIA",   "Asiatische Linien"],
+  ["TORE",   "Tore Ueber/Unter"],
+  ["ECKEN",  "Ecken"],
+  ["BTTS",   "Beide treffen"],
+  ["HZ-END", "Halbzeit/Endstand"],
+  ["DNB",    "Draw No Bet"],
+  ["TENNIS", "Tennis Sieg"]
+];
 let nurKommende = true;
 const offeneDetails = new Set();
 
@@ -252,6 +266,7 @@ function sichtBasis() {
 function basisListe() {
   let liste = sichtBasis();
   if (aktiveKat !== "ALLE") liste = liste.filter(w => w.kat === aktiveKat);
+  if (aktiverReiter !== "ALLE") liste = liste.filter(w => w.s === aktiverReiter);
   return liste;
 }
 
@@ -259,51 +274,67 @@ function baueFilter() {
   const vorbeiZahl = WETTEN.filter(w => istVorbei(anstossFeld(w))).length;
   const basis = sichtBasis();
 
-  const leiste = document.getElementById("filter");
-  leiste.innerHTML = "";
-  for (const [kz, name] of KATEGORIEN) {
-    const n = basis.filter(w => kz === "ALLE" || w.kat === kz).length;
-    const b = document.createElement("button");
-    b.textContent = name + " (" + n + ")";
-    b.className = (kz === aktiveKat) ? "aktiv" : "";
-    b.onclick = () => { aktiveKat = kz; zeichne(); };
-    leiste.appendChild(b);
+  // Hilfsfunktion: eine Filterzeile mit Beschriftung links und Knoepfen rechts
+  function zeile(behaelterId, beschriftung, eintraege, istAktiv, beiKlick, klasse) {
+    const box = document.getElementById(behaelterId);
+    box.innerHTML = "";
+    box.className = "filterzeile " + (klasse || "");
+    const lab = document.createElement("span");
+    lab.className = "f-label";
+    lab.textContent = beschriftung;
+    box.appendChild(lab);
+    const knoepfe = document.createElement("span");
+    knoepfe.className = "f-knoepfe";
+    for (const e of eintraege) {
+      const b = document.createElement("button");
+      b.innerHTML = e.text + (e.zahl !== undefined ? ' <span class="f-zahl">' + e.zahl + "</span>" : "");
+      if (istAktiv(e)) b.className = "aktiv";
+      if (e.titel) b.title = e.titel;
+      b.onclick = () => beiKlick(e);
+      knoepfe.appendChild(b);
+    }
+    box.appendChild(knoepfe);
   }
-  const v = document.createElement("button");
-  v.textContent = (nurKommende ? "Vergangene einblenden (" : "Vergangene ausblenden (") + vorbeiZahl + ")";
-  v.className = "schalter";
-  v.onclick = () => { nurKommende = !nurKommende; zeichne(); };
-  leiste.appendChild(v);
 
-  // Rang-Filter: welcher Platz der Rangliste angezeigt wird
-  const rz = document.getElementById("rangfilter");
-  rz.innerHTML = '<span class="af-titel">Anbieter-Rang:</span>';
-  [[1, "Bester"], [2, "Zweitbester"], [3, "Drittbester"], [4, "Viertbester"]].forEach(([r, name]) => {
-    const b = document.createElement("button");
-    b.textContent = r + ". " + name;
-    b.className = (r === aktiverRang) ? "aktiv" : "";
-    b.title = "Zeigt fuer jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste";
-    b.onclick = () => { aktiverRang = r; zeichne(); };
-    rz.appendChild(b);
-  });
+  // 1) Wett-Art
+  zeile("filter", "Wett-Art",
+    KATEGORIEN.map(([kz, name]) => ({ kz: kz, text: name,
+      zahl: basis.filter(w => kz === "ALLE" || w.kat === kz).length })),
+    e => e.kz === aktiveKat,
+    e => { aktiveKat = e.kz; zeichne(); }, "f-art");
 
-  // Anbieter-Filter: eine Website nach der anderen abarbeiten
-  const az = document.getElementById("anbieterfilter");
-  az.innerHTML = '<span class="af-titel">Setzen bei:</span>';
+  // 2) Reiter in der App
+  const nachReiter = nurKommende ? basis : WETTEN;
+  const reiterEintraege = [{ kz: "ALLE", text: "Alle", zahl: nachReiter.filter(w => aktiveKat === "ALLE" || w.kat === aktiveKat).length }]
+    .concat(REITER.map(([kz, name]) => ({ kz: kz, text: kz, titel: name,
+      zahl: nachReiter.filter(w => w.s === kz && (aktiveKat === "ALLE" || w.kat === aktiveKat)).length })));
+  zeile("reiterfilter", "Reiter in der App", reiterEintraege,
+    e => e.kz === aktiverReiter,
+    e => { aktiverReiter = e.kz; zeichne(); }, "f-reiter");
+
+  // 3) Anbieter-Rang
+  zeile("rangfilter", "Anbieter-Rang",
+    [[1, "1. Bester"], [2, "2. Zweitbester"], [3, "3. Drittbester"], [4, "4. Viertbester"]]
+      .map(([r, name]) => ({ kz: r, text: name,
+        titel: "Zeigt fuer jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste" })),
+    e => e.kz === aktiverRang,
+    e => { aktiverRang = e.kz; zeichne(); }, "f-rang");
+
+  // 4) Setzen bei
   const liste = basisListe();
-  const alle = document.createElement("button");
-  alle.textContent = "Alle (" + liste.length + ")";
-  alle.className = (aktiverAnbieter === "ALLE") ? "aktiv" : "";
-  alle.onclick = () => { aktiverAnbieter = "ALLE"; zeichne(); };
-  az.appendChild(alle);
-  for (const a of ANBIETER) {
-    const n = liste.filter(w => zuweisung(w).kz === a.kz).length;
-    const b = document.createElement("button");
-    b.textContent = a.name + " (" + n + ")";
-    b.className = (a.kz === aktiverAnbieter) ? "aktiv" : "";
-    b.onclick = () => { aktiverAnbieter = a.kz; zeichne(); };
-    az.appendChild(b);
-  }
+  zeile("anbieterfilter", "Setzen bei",
+    [{ kz: "ALLE", text: "Alle", zahl: liste.length }].concat(
+      ANBIETER.map(a => ({ kz: a.kz, text: a.name,
+        zahl: liste.filter(w => zuweisung(w).kz === a.kz).length }))),
+    e => e.kz === aktiverAnbieter,
+    e => { aktiverAnbieter = e.kz; zeichne(); }, "f-anbieter");
+
+  // 5) Zeitraum
+  zeile("zeitfilter", "Zeitraum",
+    [{ kz: true, text: "Nur kommende" },
+     { kz: false, text: "Auch vergangene", zahl: vorbeiZahl }],
+    e => e.kz === nurKommende,
+    e => { nurKommende = e.kz; zeichne(); }, "f-zeit");
 }
 
 // ---------- Erklaerung je Wette ----------
@@ -594,8 +625,10 @@ function baueZeile(w) {
 
   td = document.createElement("td");
   td.className = "such";
-  td.textContent = w.s;
-  td.title = "Suchfuehrer oben aufklappen";
+  const rEintrag = REITER.find(x => x[0] === w.s);
+  td.innerHTML = '<span class="reiter-chip">' + w.s + "</span>";
+  td.title = rEintrag ? ("Reiter in der App: " + rEintrag[1] + ". Anleitung im Reiter-Kasten oben.")
+                      : "Reiter-Kasten oben aufklappen";
   tr.appendChild(td);
 
   return tr;
@@ -641,6 +674,10 @@ function zeichne() {
   let text = liste.length + " Wetten angezeigt. Gesamt: " + WETTEN.length +
     ", davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
     (nurKommende ? "ausgeblendet, Knopf oben" : "eingeblendet, grau") + ").";
+  if (aktiverReiter !== "ALLE") {
+    const r = REITER.find(x => x[0] === aktiverReiter);
+    text += " Reiter: " + aktiverReiter + " (" + (r ? r[1] : "") + ").";
+  }
   if (aktiverRang !== 1) text += " Angezeigt wird je Wette der " + aktiverRang + ". Anbieter der Rangliste.";
   if (aktiverAnbieter !== "ALLE") text += " Filter: setzen bei " + anbieterName(aktiverAnbieter) + ".";
   document.getElementById("zaehler").textContent = text;

@@ -125,3 +125,25 @@ a.vgl { color: #00e; font-size: 11px; }
 td.markt { white-space: nowrap; font-size: 12px; }
 td.markt.hoch { background: #eef7ee; }
 td.markt.tief { background: #fdf3f3; }
+
+/* ---- Nachtrag 25.08. (7): symmetrische Filterleiste, Reiter-Chips ---- */
+.filterbox { border: 1px solid #999; margin: 8px 0; padding: 2px 0; }
+.filterzeile { display: flex; align-items: flex-start; gap: 8px;
+  padding: 4px 8px; border-bottom: 1px solid #ddd; }
+.filterzeile:last-child { border-bottom: none; }
+.filterzeile .f-label { flex: 0 0 132px; font-weight: bold; font-size: 12px;
+  padding-top: 4px; }
+.filterzeile .f-knoepfe { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.filterzeile button { font-size: 12px; padding: 3px 9px; min-width: 82px;
+  background: #fff; border: 1px solid #888; cursor: pointer; text-align: center; }
+.filterzeile button.aktiv { background: #000; color: #fff; border-color: #000; }
+.filterzeile .f-zahl { color: #666; font-size: 11px; }
+.filterzeile button.aktiv .f-zahl { color: #ddd; }
+.f-reiter button { min-width: 74px; font-weight: bold; }
+.f-anbieter button { border-color: #1a7a1a; }
+.f-anbieter button.aktiv { background: #1a7a1a; border-color: #1a7a1a; }
+.f-rang button { border-color: #444; }
+.f-rang button.aktiv { background: #444; }
+.f-zeit button { border-style: dashed; }
+.reiter-chip { display: inline-block; padding: 1px 5px; border: 1px solid #444;
+  font-size: 10.5px; font-weight: bold; background: #f2f2f2; white-space: nowrap; }
