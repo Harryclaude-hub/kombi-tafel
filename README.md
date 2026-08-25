@@ -54,3 +54,13 @@ Alle paar Tage kommen neue Fotos. Der Weg ist immer derselbe:
 
 Wenn ein Anbieter seine Gebuehrenregel aendert: nur `GEBUEHREN_TEILER` in `daten.js`
 anpassen, nichts anderes.
+
+## Nach jeder Aenderung: Versionsnummer hochzaehlen
+
+In `index.html` und `original.html` haengt an jedem `.js`- und `.css`-Verweis ein
+`?v=JJJJMMTT<buchstabe>`. Diese Nummer nach jeder Aenderung erhoehen, sonst laedt der
+Browser die alte Datei aus dem Zwischenspeicher und die Seite bleibt leer oder veraltet.
+
+```
+python -c "import io,re; V='20260826a'; [io.open(p,'w',encoding='utf-8').write(re.sub(r'(src|href)=\"([a-z]+\.(js|css))(\?v=[^\"]*)?\"', r'\1=\"\2?v='+V+'\"', io.open(p,encoding='utf-8').read())) for p in ('index.html','original.html')]"
+```
