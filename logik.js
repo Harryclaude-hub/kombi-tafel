@@ -563,7 +563,8 @@ function baueZeile(w) {
       '<div class="real">' + pfeil + "</div>" +
       '<div class="real">gesucht ' + rech.zeit + "</div>" +
       '<div><a class="vgl" href="' + rech.url + '" target="_blank" rel="noopener">Quelle</a></div>';
-    td.classList.add(diff > 0.005 ? "hoch" : (diff < -0.005 ? "tief" : ""));
+    if (diff > 0.005) td.classList.add("hoch");
+    else if (diff < -0.005) td.classList.add("tief");
   } else if (rech) {
     td.innerHTML = '<span class="real">Linie nicht gelistet</span>' +
       '<div class="real">gesucht ' + rech.zeit + "</div>" +
