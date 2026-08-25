@@ -16,12 +16,20 @@ Anzeige-Programm fuer die Wett-Tabelle vom 24.08.2026 (vier Fotos, 73 Wetten).
 - Eingaben bleiben im Browser gespeichert (localStorage, nur auf dem eigenen Geraet)
 - Vergangene Spiele werden ausgeblendet, Doppel-Spiele sind markiert
 - Suchfuehrer S1 bis S8: wo jede Wettart in jeder App zu finden ist
+- `original.html`: die vier Fotos eins zu eins als eine Tabelle (gleiche Spalten wie das
+  Original-Excel, inkl. Meldezeit, beider Quoten-Spalten, der stornierten Zeile und der
+  Foto-Ueberlappung; nichts gerechnet)
+- Anbieter-Rang-Filter (Bester bis Viertbester): zeigt fuer jede Wette den Anbieter auf
+  diesem Platz ihrer Rangliste, falls der beste Anbieter gerade nicht erreichbar ist
 
 ## Aufbau (Design von Funktion getrennt)
 
 | Datei | Inhalt | Darf geloescht werden? |
 |---|---|---|
 | `daten.js` | die 73 Wetten und die Gebuehren-Teiler | nein (Daten) |
+| `roh.js` | Meldezeiten und beide Quoten-Spalten, 1:1 wie die Fotos | nein (Daten) |
+| `rohansicht.js` | Anzeige der Original-Tabelle | nein (Funktion) |
+| `original.html` | Geruest der Original-Ansicht | nein |
 | `logik.js` | Rechnen, Sortieren, Anzeigen, Speichern | nein (Funktion) |
 | `stil.css` | weiss/schwarz, gruen/rot nur mit Bedeutung | ja, jederzeit |
 | `index.html` | Grundgeruest und Suchfuehrer-Texte | nein |
@@ -38,7 +46,7 @@ muessen am Wetttag selbst eingetippt werden. Alle Angaben ohne Gewaehr.
 Alle paar Tage kommen neue Fotos. Der Weg ist immer derselbe:
 
 1. Fotos an Claude geben
-2. Claude tippt die Zeilen ab und traegt sie in `daten.js` ein (nur diese Datei!)
+2. Claude tippt die Zeilen ab und traegt sie in `daten.js` UND `roh.js` ein (nur diese zwei Dateien!)
 3. Alte, gespielte Wetten koennen in `daten.js` geloescht oder stehen gelassen werden
    (vergangene blendet die Seite selbst aus)
 4. `git add daten.js && git commit && git push`, die Seite aktualisiert sich in etwa
