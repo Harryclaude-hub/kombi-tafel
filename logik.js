@@ -385,9 +385,9 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     const wann = liesEingabeZeit(w.id, opt, anbieter);
     info.textContent = "real " + rund2(echt).toFixed(2) + (wann ? " (getippt " + wann + ")" : "");
   } else if (anbieter === "iw") {
-    info.textContent = "Tab. " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
+    info.textContent = "Foto " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
   } else {
-    info.textContent = "voll, Tab.-Referenz " + ref.toFixed(2);
+    info.textContent = "Foto-Quote " + ref.toFixed(2) + ", kein Abzug";
   }
   td.appendChild(info);
 
@@ -420,7 +420,7 @@ function baueDetailZeile(w) {
   tr.className = "detail";
   tr.id = "d_" + w.id;
   const td = document.createElement("td");
-  td.colSpan = 11;
+  td.colSpan = 12;
 
   const v = verfuegbarkeit(w);
   let anbieterHtml = "";
@@ -444,7 +444,7 @@ function baueDetailZeile(w) {
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
     "alle Anbieter-Quoten fuer dieses Spiel suchen</a> (oeffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
     "<br><b>Die vier Anbieter fuer diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
-    "<b>Datenstand dieser Zeile:</b> abgetippt aus dem Foto vom 24.08.2026 (Tab.-Quote " + w.o[optIdx][1].toFixed(2) +
+    "<b>Datenstand dieser Zeile:</b> abgetippt aus dem Foto vom 24.08.2026 (Foto-Quote " + w.o[optIdx][1].toFixed(2) +
     "). Markt-Angaben: Einschaetzung vom 24.08.2026, kein Beleg. Angezeigt: " + jetztText() + ".";
   tr.appendChild(td);
   return tr;
@@ -459,6 +459,12 @@ function baueZeile(w) {
   let td = document.createElement("td");
   td.className = "zeit";
   td.textContent = zeitText(w.an);
+  tr.appendChild(td);
+
+  td = document.createElement("td");
+  td.className = "zeit gemeldet";
+  td.textContent = (typeof ROH !== "undefined" && ROH[w.id]) ? ROH[w.id][0] : "?";
+  td.title = "Wann der Tippgeber den Tipp eingetragen hat. Je aelter, desto eher hat sich die Quote inzwischen bewegt.";
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -496,7 +502,7 @@ function baueZeile(w) {
     w.o.forEach((o, i) => {
       const op = document.createElement("option");
       op.value = i;
-      op.textContent = w.wette.split("(")[0].trim() + " " + o[0] + "  (Tab. " + o[1].toFixed(2) + ")";
+      op.textContent = w.wette.split("(")[0].trim() + " " + o[0] + "  (Foto " + o[1].toFixed(2) + ")";
       if (i === optIdx) op.selected = true;
       sel.appendChild(op);
     });
@@ -530,6 +536,7 @@ function baueZeile(w) {
       '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
   }
   if (zu.verfN) td.innerHTML += '<div class="keinmarkt">Achtung: Markt dort vermutlich nicht vorhanden</div>';
+  td.innerHTML += '<div><a class="vgl" href="' + vergleichsLink(w) + '" target="_blank" rel="noopener">Quoten-Vergleich</a></div>';
   tr.appendChild(td);
 
   td = document.createElement("td");

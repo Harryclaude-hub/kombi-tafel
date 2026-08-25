@@ -111,3 +111,10 @@ td.q { text-align: right; white-space: nowrap; }
 .fuellkern ol { margin: 4px 0 4px 20px; padding: 0; }
 .fuellkern li { margin: 2px 0; }
 th a { color: #00e; }
+
+/* ---- Nachtrag 25.08. (5): Hilfe-Knoepfe, Gemeldet-Spalte, Vergleichslink ---- */
+.hilf { display: inline-block; margin-left: 4px; width: 14px; height: 14px;
+  line-height: 14px; text-align: center; font-size: 10px; font-weight: bold;
+  border: 1px solid #444; border-radius: 50%; cursor: help; background: #fff; }
+td.gemeldet { color: #444; font-size: 11px; }
+a.vgl { color: #00e; font-size: 11px; }
