@@ -105,3 +105,9 @@ tr.detail a { color: #00e; }
 tr.storniert td { text-decoration: line-through; color: #c00; }
 tr.bildtrenner td { background: #333; color: #fff; font-weight: bold; }
 td.q { text-align: right; white-space: nowrap; }
+
+/* ---- Nachtrag 25.08. (4): Ausfuell-Kasten, Kopfzeilen-Links ---- */
+.fuellkern { border: 1px solid #444; padding: 5px 8px; margin: 6px 0; font-size: 12.5px; }
+.fuellkern ol { margin: 4px 0 4px 20px; padding: 0; }
+.fuellkern li { margin: 2px 0; }
+th a { color: #00e; }

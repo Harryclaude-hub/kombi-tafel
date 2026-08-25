@@ -342,8 +342,8 @@ const VERF_TEXT = { J: "", D: "Markt duenn, pruefen", N: "kein Markt (vermutl.)"
 function eingabeFeld(w, opt, anbieter) {
   const inp = document.createElement("input");
   inp.type = "number"; inp.step = "0.01"; inp.min = "1";
-  inp.placeholder = "Live?";
-  inp.title = "Hier die Quote eintippen, die die App gerade anzeigt";
+  inp.placeholder = "Quote";
+  inp.title = "Nur die Quote eintippen, die die App fuer GENAU diese Wette anzeigt, z. B. 2.30. Nichts umrechnen, kein Einsatz. Anleitung: Kasten oben.";
   const v = liesEingabe(w.id, opt, anbieter);
   if (v) inp.value = v;
   inp.oninput = () => {
