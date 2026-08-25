@@ -15,6 +15,9 @@
 //   s     : Suchfuehrer-Code S1..S8 (siehe Legende in der Seite)
 //   o     : Optionen [Linie, Tabellenquote], sicherste zuerst
 //   doppel: Kennung, wenn dasselbe Spiel mehrfach in der Liste ist
+//   anKorrigiert: gesetzt, wenn die Foto-Zeit nachweislich falsch war.
+//                 IMMER in UK-Zeit eintragen wie das Feld "an", der
+//                 Zeitversatz wird danach genauso angewendet.
 // ============================================================
 
 // Saschas Tabelle laeuft in UK-Zeit (UTC+1), Karam sitzt in Oesterreich (UTC+2).
@@ -48,7 +51,7 @@ const WETTEN = [
 {id:"1.12", von:"klt", an:"2026-08-29T13:00", liga:"3. Liga", spiel:"MSV Duisburg vs FC Wuerzburger Kickers", wette:"UNDER 3.5", kat:"TORE", s:"S3", o:[["3.5",1.65]]},
 {id:"1.13", von:"klt", an:"2026-08-29T12:00", liga:"Chinese Super League", spiel:"Zhejiang vs Yunnan Yukun", wette:"OVER 3.5", kat:"TORE", s:"S3", o:[["3.5",1.85]]},
 {id:"1.14", von:"klt", an:"2026-08-29T11:15", liga:"Ekstraklasa", spiel:"Radomiak Radom vs KS Cracovia", wette:"AWAY -0.5", kat:"SIEG", s:"S1", o:[["-0.5",2.65]]},
-{id:"1.15", von:"klt", an:"2026-08-26T00:20", anKorrigiert:"2026-08-27T01:20", liga:"Primera A (COL)", spiel:"America de Cali vs Junior Barranquilla", wette:"HOME -0.5", kat:"SIEG", s:"S1", o:[["-0.5",1.85]]},
+{id:"1.15", von:"klt", an:"2026-08-26T00:20", anKorrigiert:"2026-08-27T00:20", liga:"Primera A (COL)", spiel:"America de Cali vs Junior Barranquilla", wette:"HOME -0.5", kat:"SIEG", s:"S1", o:[["-0.5",1.85]]},
 {id:"1.16", von:"klt", an:"2026-08-26T23:00", liga:"Liga de Primera (CHI)", spiel:"Coquimbo Unido vs Universidad Catolica", wette:"UNDER 2.5", kat:"TORE", s:"S3", o:[["2.5",1.87]]},
 {id:"1.17", von:"klt", an:"2026-08-25T17:00", liga:"Liga 2 Casa Pariurilor", spiel:"AFC Unirea 04 Slobozia vs FC Metaloglobus Bucuresti", wette:"OVER 2.5", kat:"TORE", s:"S3", o:[["2.5",2.02]]},
 {id:"1.18", von:"klt", an:"2026-08-27T19:00", liga:"UEFA Conference League", spiel:"AFC Ajax vs FC Sion", wette:"OVER 3.5", kat:"TORE", s:"S3", o:[["3.5",2.15]]},
