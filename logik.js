@@ -168,11 +168,33 @@ function liveBester(w, optIdx) {
   return anzahl > 0 ? { kz: bester, echt: wert, anzahl: anzahl } : null;
 }
 
-// Die Zuweisung: getippter Bestwert schlaegt die Start-Vorgabe
+// Rangliste der vier Anbieter fuer DIESE Wette, bester zuerst.
+// Getippte echte Quoten zaehlen zuerst (absteigend); ohne Eingaben entscheidet
+// die Markt-Verfuegbarkeit und dann die Standard-Reihenfolge der Recherche.
+function rangliste(w) {
+  const optIdx = gewaehlteOption(w);
+  const opt = w.o[optIdx][0];
+  const v = verfuegbarkeit(w);
+  const typ = marktTyp(w);
+  const basis = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
+    ? ["b3", "st", "bw", "iw"] : ["b3", "bw", "st", "iw"];
+  const vw = { J: 2, D: 1, N: 0 };
+  const liste = ANBIETER.map(a => {
+    const echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
+    return { kz: a.kz, echt: echt || 0, hat: !!echt, v: vw[v[a.kz]], p: basis.indexOf(a.kz) };
+  });
+  liste.sort((x, y) => (y.hat - x.hat) || (y.echt - x.echt) || (y.v - x.v) || (x.p - y.p));
+  return liste;
+}
+
+// Die Zuweisung: der Anbieter auf dem gewaehlten Rang (1 = bester)
 function zuweisung(w) {
-  const live = liveBester(w, gewaehlteOption(w));
-  if (live) return { kz: live.kz, echt: live.echt, quelle: "getippt", anzahl: live.anzahl };
-  return { kz: standardAnbieter(w), echt: null, quelle: "vorgabe", anzahl: 0 };
+  const l = rangliste(w);
+  const idx = Math.min(aktiverRang - 1, l.length - 1);
+  const e = l[idx];
+  const getippte = l.filter(x => x.hat).length;
+  return { kz: e.kz, echt: e.hat ? e.echt : null, quelle: e.hat ? "getippt" : "vorgabe",
+           anzahl: getippte, rang: idx + 1, verfN: e.v === 0 };
 }
 
 // ---------- Links je Wette ----------
@@ -199,6 +221,7 @@ const KATEGORIEN = [
 
 let aktiveKat = "ALLE";
 let aktiverAnbieter = "ALLE";
+let aktiverRang = 1;   // 1 = bester Anbieter, 2 = zweitbester, ...
 let nurKommende = true;
 const offeneDetails = new Set();
 
@@ -232,6 +255,18 @@ function baueFilter() {
   v.className = "schalter";
   v.onclick = () => { nurKommende = !nurKommende; zeichne(); };
   leiste.appendChild(v);
+
+  // Rang-Filter: welcher Platz der Rangliste angezeigt wird
+  const rz = document.getElementById("rangfilter");
+  rz.innerHTML = '<span class="af-titel">Anbieter-Rang:</span>';
+  [[1, "Bester"], [2, "Zweitbester"], [3, "Drittbester"], [4, "Viertbester"]].forEach(([r, name]) => {
+    const b = document.createElement("button");
+    b.textContent = r + ". " + name;
+    b.className = (r === aktiverRang) ? "aktiv" : "";
+    b.title = "Zeigt fuer jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste";
+    b.onclick = () => { aktiverRang = r; zeichne(); };
+    rz.appendChild(b);
+  });
 
   // Anbieter-Filter: eine Website nach der anderen abarbeiten
   const az = document.getElementById("anbieterfilter");
@@ -330,6 +365,13 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     kein.className = "keinmarkt";
     kein.textContent = VERF_TEXT.N;
     td.appendChild(kein);
+    if (zu.kz === anbieter) {
+      td.classList.add("empfohlen");
+      const tag = document.createElement("div");
+      tag.className = "tag";
+      tag.textContent = zu.rang + ". WAHL, aber Markt fehlt wohl";
+      td.appendChild(tag);
+    }
     return td;
   }
 
@@ -360,7 +402,11 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     td.classList.add(zu.quelle === "getippt" ? "bester" : "empfohlen");
     const tag = document.createElement("div");
     tag.className = "tag";
-    tag.textContent = (zu.quelle === "getippt") ? "BESTER (getippt)" : "START-TIPP";
+    if (zu.rang === 1) {
+      tag.textContent = (zu.quelle === "getippt") ? "BESTER (getippt)" : "START-TIPP";
+    } else {
+      tag.textContent = zu.rang + ". WAHL" + (zu.quelle === "getippt" ? " (getippt)" : "");
+    }
     td.appendChild(tag);
   }
   return td;
@@ -475,12 +521,15 @@ function baueZeile(w) {
 
   td = document.createElement("td");
   td.className = "ansage";
+  const rangWort = (zu.rang === 1) ? "" : (zu.rang + ". Wahl: ");
   if (zu.quelle === "getippt") {
-    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + "</b> real " + rund2(zu.echt).toFixed(2) +
-      (zu.anzahl < 2 ? '<div class="real">erst 1 Quote getippt</div>' : "");
+    td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) + "</b> real " + rund2(zu.echt).toFixed(2) +
+      (zu.anzahl < 4 ? '<div class="real">' + zu.anzahl + " von 4 Quoten getippt</div>" : "");
   } else {
-    td.innerHTML = '<b class="gruen">' + anbieterName(zu.kz) + '</b><div class="real">Start-Tipp, KEINE Live-Quote</div>';
+    td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) +
+      '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
   }
+  if (zu.verfN) td.innerHTML += '<div class="keinmarkt">Achtung: Markt dort vermutlich nicht vorhanden</div>';
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -532,6 +581,7 @@ function zeichne() {
   let text = liste.length + " Wetten angezeigt. Gesamt: " + WETTEN.length +
     ", davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
     (nurKommende ? "ausgeblendet, Knopf oben" : "eingeblendet, grau") + ").";
+  if (aktiverRang !== 1) text += " Angezeigt wird je Wette der " + aktiverRang + ". Anbieter der Rangliste.";
   if (aktiverAnbieter !== "ALLE") text += " Filter: setzen bei " + anbieterName(aktiverAnbieter) + ".";
   document.getElementById("zaehler").textContent = text;
   const stand = document.getElementById("stand");
