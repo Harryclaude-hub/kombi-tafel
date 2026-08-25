@@ -6,7 +6,8 @@
 "use strict";
 
 function rohZeitText(an) {
-  // Anstoss im Foto-Format dd/mm/jjjj hh:mm; "?" = nur Datum bekannt
+  // Anstoss im Foto-Format dd/mm/jjjj hh:mm; "?" = nur Datum bekannt.
+  // Hier BEWUSST ohne Zeitversatz: die Original-Ansicht zeigt die Foto-Werte.
   const unklar = an.endsWith("?");
   const t = new Date(unklar ? an.slice(0, -1) : an);
   const dd = String(t.getDate()).padStart(2, "0");

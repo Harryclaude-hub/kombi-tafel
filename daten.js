@@ -17,6 +17,14 @@
 //   doppel: Kennung, wenn dasselbe Spiel mehrfach in der Liste ist
 // ============================================================
 
+// Saschas Tabelle laeuft in UK-Zeit (UTC+1), Karam sitzt in Oesterreich (UTC+2).
+// Geprueft am 25.08.2026 an 7 Spielen gegen den Quotenvergleich, zwei davon
+// zusaetzlich gegen eine unabhaengige UTC-Angabe: durchgaengig genau +1 Stunde.
+// Beispiel: Norwich vs Burnley steht im Foto als 15:00, ist 14:00 UTC, also 16:00 bei dir.
+// Die Tafel rechnet die Foto-Zeit deshalb um. Die Original-Ansicht zeigt weiter die Foto-Zeit.
+// Stimmt der Versatz einmal nicht mehr: hier auf 0 setzen, sonst nichts aendern.
+const ZEITVERSATZ_MINUTEN = 60;
+
 const GEBUEHREN_TEILER = {   // echte Quote = Eingabe / Teiler
   iw: 1.05,   // Interwetten AT: 5 % Wettgebuehr, geprueft 24.08.2026
   bw: 1.00,   // Bwin uebernimmt selbst (seit Mai 2026)
@@ -40,7 +48,7 @@ const WETTEN = [
 {id:"1.12", von:"klt", an:"2026-08-29T13:00", liga:"3. Liga", spiel:"MSV Duisburg vs FC Wuerzburger Kickers", wette:"UNDER 3.5", kat:"TORE", s:"S3", o:[["3.5",1.65]]},
 {id:"1.13", von:"klt", an:"2026-08-29T12:00", liga:"Chinese Super League", spiel:"Zhejiang vs Yunnan Yukun", wette:"OVER 3.5", kat:"TORE", s:"S3", o:[["3.5",1.85]]},
 {id:"1.14", von:"klt", an:"2026-08-29T11:15", liga:"Ekstraklasa", spiel:"Radomiak Radom vs KS Cracovia", wette:"AWAY -0.5", kat:"SIEG", s:"S1", o:[["-0.5",2.65]]},
-{id:"1.15", von:"klt", an:"2026-08-26T00:20", liga:"Primera A (COL)", spiel:"America de Cali vs Junior Barranquilla", wette:"HOME -0.5", kat:"SIEG", s:"S1", o:[["-0.5",1.85]]},
+{id:"1.15", von:"klt", an:"2026-08-26T00:20", anKorrigiert:"2026-08-27T01:20", liga:"Primera A (COL)", spiel:"America de Cali vs Junior Barranquilla", wette:"HOME -0.5", kat:"SIEG", s:"S1", o:[["-0.5",1.85]]},
 {id:"1.16", von:"klt", an:"2026-08-26T23:00", liga:"Liga de Primera (CHI)", spiel:"Coquimbo Unido vs Universidad Catolica", wette:"UNDER 2.5", kat:"TORE", s:"S3", o:[["2.5",1.87]]},
 {id:"1.17", von:"klt", an:"2026-08-25T17:00", liga:"Liga 2 Casa Pariurilor", spiel:"AFC Unirea 04 Slobozia vs FC Metaloglobus Bucuresti", wette:"OVER 2.5", kat:"TORE", s:"S3", o:[["2.5",2.02]]},
 {id:"1.18", von:"klt", an:"2026-08-27T19:00", liga:"UEFA Conference League", spiel:"AFC Ajax vs FC Sion", wette:"OVER 3.5", kat:"TORE", s:"S3", o:[["3.5",2.15]]},

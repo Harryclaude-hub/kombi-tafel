@@ -18,12 +18,19 @@ function echteQuote(anbieter, eingabe) {
 
 function rund2(x) { return Math.round(x * 100) / 100; }
 
-// Anstoss lesen; "?" am Ende = Uhrzeit unbekannt
+// Anstoss lesen; "?" am Ende = Uhrzeit unbekannt.
+// Die Foto-Zeit wird um ZEITVERSATZ_MINUTEN nach vorne gerechnet (UK -> Oesterreich).
 function liesAnstoss(an) {
   const unklar = an.endsWith("?");
   const iso = unklar ? an.slice(0, -1) : an;
-  return { zeit: new Date(iso), unklar: unklar };
+  const d = new Date(iso);
+  const versatz = (typeof ZEITVERSATZ_MINUTEN === "number") ? ZEITVERSATZ_MINUTEN : 0;
+  if (!unklar && versatz) d.setMinutes(d.getMinutes() + versatz);
+  return { zeit: d, unklar: unklar };
 }
+
+// Welche Zeitangabe gilt fuer diese Wette: korrigierte, sonst die aus dem Foto
+function anstossFeld(w) { return w.anKorrigiert || w.an; }
 
 function zeitText(an) {
   const a = liesAnstoss(an);
@@ -197,6 +204,18 @@ function zuweisung(w) {
            anzahl: getippte, rang: idx + 1, verfN: e.v === 0 };
 }
 
+// ---------- Recherche-Quoten (Markt jetzt) ----------
+
+function rechercheFuer(w, optIdx) {
+  if (typeof RECHERCHE === "undefined") return null;
+  const r = RECHERCHE[w.id];
+  if (!r) return null;
+  const linie = w.o[optIdx][0];
+  const wert = r.werte[linie];
+  return { wert: (typeof wert === "number") ? wert : null, zeit: r.zeit,
+           url: r.url, notiz: r.notiz || "" };
+}
+
 // ---------- Links je Wette ----------
 
 function vergleichsLink(w) {
@@ -227,7 +246,7 @@ const offeneDetails = new Set();
 
 // Grundmenge fuer ALLE Zaehler: dieselbe Sicht (vergangene raus, wenn Schalter an)
 function sichtBasis() {
-  return nurKommende ? WETTEN.filter(w => !istVorbei(w.an)) : WETTEN.slice();
+  return nurKommende ? WETTEN.filter(w => !istVorbei(anstossFeld(w))) : WETTEN.slice();
 }
 
 function basisListe() {
@@ -237,7 +256,7 @@ function basisListe() {
 }
 
 function baueFilter() {
-  const vorbeiZahl = WETTEN.filter(w => istVorbei(w.an)).length;
+  const vorbeiZahl = WETTEN.filter(w => istVorbei(anstossFeld(w))).length;
   const basis = sichtBasis();
 
   const leiste = document.getElementById("filter");
@@ -420,7 +439,7 @@ function baueDetailZeile(w) {
   tr.className = "detail";
   tr.id = "d_" + w.id;
   const td = document.createElement("td");
-  td.colSpan = 12;
+  td.colSpan = 13;
 
   const v = verfuegbarkeit(w);
   let anbieterHtml = "";
@@ -439,6 +458,15 @@ function baueDetailZeile(w) {
     "<br><b>Warum dieser Start-Tipp:</b> Start-Tipp ist KEINE Aussage ueber die beste Live-Quote, " +
     "sondern nur: dort zuerst schauen (keine Gebuehr, Markt vorhanden). Die echte beste Quote entsteht " +
     "erst aus deinen getippten Zahlen oder ueber den Vergleichs-Link." +
+    (function () {
+      const r = rechercheFuer(w, optIdx);
+      if (!r) return "<br><b>Markt jetzt:</b> fuer diese Zeile noch nicht recherchiert.";
+      return "<br><b>Markt jetzt:</b> " + (r.wert ? r.wert.toFixed(2) : "Linie nicht gelistet") +
+        ", gesucht am " + r.zeit + ". " + r.notiz +
+        ' <a href="' + r.url + '" target="_blank" rel="noopener">Quelle oeffnen</a>' +
+        "<br><small>Das ist die beste Quote des Quotenvergleichs, NICHT die eines bestimmten " +
+        "der vier Anbieter. Interwetten und Stake sind dort nicht gelistet.</small>";
+    })() +
     "<br><b>Gegenpruefen bei:</b> " + alternativText(w) +
     "<br><b>Interwetten-Schwelle:</b> lohnt nur, wenn die Anzeige dort ueber beste andere Quote mal 1,05 liegt." +
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
@@ -454,11 +482,11 @@ function baueZeile(w) {
   const tr = document.createElement("tr");
   tr.id = "z_" + w.id;
   const optIdx = gewaehlteOption(w);
-  if (istVorbei(w.an)) tr.classList.add("vorbei");
+  if (istVorbei(anstossFeld(w))) tr.classList.add("vorbei");
 
   let td = document.createElement("td");
   td.className = "zeit";
-  td.textContent = zeitText(w.an);
+  td.textContent = zeitText(anstossFeld(w));
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -522,6 +550,30 @@ function baueZeile(w) {
   td.textContent = w.o[optIdx][1].toFixed(2);
   tr.appendChild(td);
 
+  // Markt jetzt: von Claude recherchierte Vergleichsquote
+  td = document.createElement("td");
+  td.className = "markt";
+  const rech = rechercheFuer(w, optIdx);
+  if (rech && rech.wert) {
+    const foto = w.o[optIdx][1];
+    const diff = rech.wert - foto;
+    const pfeil = (Math.abs(diff) < 0.005) ? "gleich" :
+                  (diff > 0 ? "hoeher als Foto" : "tiefer als Foto");
+    td.innerHTML = '<b>' + rech.wert.toFixed(2) + "</b>" +
+      '<div class="real">' + pfeil + "</div>" +
+      '<div class="real">gesucht ' + rech.zeit + "</div>" +
+      '<div><a class="vgl" href="' + rech.url + '" target="_blank" rel="noopener">Quelle</a></div>';
+    td.classList.add(diff > 0.005 ? "hoch" : (diff < -0.005 ? "tief" : ""));
+  } else if (rech) {
+    td.innerHTML = '<span class="real">Linie nicht gelistet</span>' +
+      '<div class="real">gesucht ' + rech.zeit + "</div>" +
+      '<div><a class="vgl" href="' + rech.url + '" target="_blank" rel="noopener">Quelle</a></div>';
+  } else {
+    td.innerHTML = '<span class="real">noch nicht gesucht</span>' +
+      '<div><a class="vgl" href="' + vergleichsLink(w) + '" target="_blank" rel="noopener">jetzt suchen</a></div>';
+  }
+  tr.appendChild(td);
+
   const zu = zuweisung(w);
   for (const a of ANBIETER) tr.appendChild(zelleAnbieter(w, optIdx, a.kz, zu));
 
@@ -579,12 +631,12 @@ function zeichne() {
   koerper.innerHTML = "";
   let liste = basisListe();
   if (aktiverAnbieter !== "ALLE") liste = liste.filter(w => zuweisung(w).kz === aktiverAnbieter);
-  liste.sort((a, b) => liesAnstoss(a.an).zeit - liesAnstoss(b.an).zeit);
+  liste.sort((a, b) => liesAnstoss(anstossFeld(a)).zeit - liesAnstoss(anstossFeld(b)).zeit);
   for (const w of liste) {
     koerper.appendChild(baueZeile(w));
     if (offeneDetails.has(w.id)) koerper.appendChild(baueDetailZeile(w));
   }
-  const vorbeiZahl = WETTEN.filter(w => istVorbei(w.an)).length;
+  const vorbeiZahl = WETTEN.filter(w => istVorbei(anstossFeld(w))).length;
   let text = liste.length + " Wetten angezeigt. Gesamt: " + WETTEN.length +
     ", davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
     (nurKommende ? "ausgeblendet, Knopf oben" : "eingeblendet, grau") + ").";
@@ -592,7 +644,10 @@ function zeichne() {
   if (aktiverAnbieter !== "ALLE") text += " Filter: setzen bei " + anbieterName(aktiverAnbieter) + ".";
   document.getElementById("zaehler").textContent = text;
   const stand = document.getElementById("stand");
-  if (stand) stand.textContent = "Datenstand: " + DATEN_STAND + " Seite angezeigt: " + jetztText() + " Uhr.";
+  if (stand) stand.textContent = "Datenstand: " + DATEN_STAND +
+    (typeof RECHERCHE_STAND !== "undefined" ? " Markt-Quoten gesucht: " + RECHERCHE_STAND + "." : "") +
+    " Anstosszeiten auf oesterreichische Zeit umgerechnet (+1 h gegenueber dem Foto)." +
+    " Seite angezeigt: " + jetztText() + " Uhr.";
 }
 
 document.addEventListener("DOMContentLoaded", zeichne);
