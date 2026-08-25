@@ -160,3 +160,23 @@ td.anbieter .geprueft { font-size: 10px; color: #1a7a1a; }
 /* ---- Nachtrag 25.08. (9): Quoten aus Screenshots ---- */
 .ausshot { color: #7a4a00; font-size: 10.5px; }
 td.anbieter.hatshot { background: #fffaf0; }
+
+/* ---- Wett-Schule (schule.html) ---- */
+.ergebnistafel td, .ergebnistafel th { text-align: center; font-size: 11px; padding: 3px 4px; }
+.ergebnistafel td.linie { text-align: left; white-space: nowrap; background: #f2f2f2; }
+.ergebnistafel td.klartext { text-align: left; font-size: 11px; }
+.ergebnistafel tr.hervor td { background: #eee; font-weight: bold; }
+.ergebnistafel tr.hervor td.e-gew { background: #cdebcd; }
+.ergebnistafel tr.hervor td.e-ver { background: #f6d4d4; }
+.mini { font-size: 9.5px; color: #555; font-weight: normal; }
+.e-gew    { background: #d9efd9; color: #0a5a0a; }
+.e-halbgew{ background: #eef7d9; color: #4a6a00; }
+.e-zur    { background: #f0f0f0; color: #333; }
+.e-halbver{ background: #fbe6d4; color: #8a4200; }
+.e-ver    { background: #fdd; color: #a00; }
+.legende { margin: 6px 0; font-size: 11px; }
+.legende span { display: inline-block; padding: 2px 7px; margin-right: 5px; border: 1px solid #999; }
+.scrollbox { overflow-x: auto; }
+table.klein { width: auto; margin: 4px 0; }
+table.klein td, table.klein th { font-size: 12px; padding: 3px 7px; }
+.haelfte { background: #f4f8ff; text-align: center; font-weight: bold; }

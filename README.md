@@ -64,3 +64,11 @@ Browser die alte Datei aus dem Zwischenspeicher und die Seite bleibt leer oder v
 ```
 python -c "import io,re; V='20260826a'; [io.open(p,'w',encoding='utf-8').write(re.sub(r'(src|href)=\"([a-z]+\.(js|css))(\?v=[^\"]*)?\"', r'\1=\"\2?v='+V+'\"', io.open(p,encoding='utf-8').read())) for p in ('index.html','original.html')]"
 ```
+
+## Seiten
+
+| Datei | Zweck |
+|---|---|
+| `index.html` | Die Kombi-Tafel: rechnen, filtern, Quoten eintragen |
+| `original.html` | Die vier Fotos eins zu eins als Tabelle, nichts gerechnet |
+| `schule.html` | Wett-Schule: alle Wettarten von Grund auf erklaert, Tafeln aus `schule.js` erzeugt |
