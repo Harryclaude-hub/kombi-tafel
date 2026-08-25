@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Kombi-Tafel</title>
-<link rel="stylesheet" href="stil.css?v=20260825e">
+<link rel="stylesheet" href="stil.css?v=20260825f">
 </head>
 <body>
 
@@ -83,20 +83,31 @@ Stake: Testberichte, die eigene AGB-Seite blockt automatisierten Abruf. Alle Lin
 </details>
 
 <details>
-<summary>Warum die Quoten nicht von selbst erscheinen (anklicken)</summary>
+<summary>Koennen die Quoten automatisch kommen? (anklicken, Stand 25.08.2026)</summary>
 <div class="inhalt">
-<p><b>Deine vier Anbieter blocken das automatische Auslesen</b> ausdruecklich in ihren AGB,
-und ein Umgehen wuerde dein Wettkonto gefaehrden. Darum holt diese Seite keine Quoten heimlich ab.
-Getestet am 25.08.2026: nur <b>Bwin</b> laesst sich per Adresse direkt in die Suche schicken,
-Interwetten, Bet365 und Stake weisen automatische Zugriffe ab (Fehler 403).</p>
-<p><b>Deshalb der Weg ueber die Links:</b> ein Klick oeffnet den Anbieter, du liest die Quote ab und
-tippst sie ein. Die Zelle merkt sich Zeitpunkt und Wert. Das dauert pro Wette wenige Sekunden und ist
-die einzige Variante, die dein Konto nicht gefaehrdet.</p>
-<p><b>Wenn du es wirklich automatisch willst:</b> ueber einen offiziellen Quoten-Dienst mit Schnittstelle,
-z. B. <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>
-(kostenlose Stufe zum Testen). Den Schluessel legst du selbst an, dann baue ich den Knopf
-"Live-Quoten holen" ein. Der Dienst fuehrt Bet365 und Bwin, Interwetten und Stake nur teilweise,
-und Spezialmaerkte (Ecken, Viertel-Linien, Nischenligen) bleiben Handarbeit.</p>
+<p><b>Direkt von den Anbieter-Seiten: nein.</b> Alle vier untersagen das automatische Auslesen in
+ihren AGB, und ein Umgehen wuerde dein Wettkonto gefaehrden. Getestet: nur <b>Bwin</b> laesst sich
+per Adresse direkt in die Suche schicken, Interwetten, Bet365 und Stake weisen automatische
+Zugriffe ab (Fehler 403). Darum die Links plus Eintippen.</p>
+
+<p><b>Ueber einen Quoten-Dienst: ja, aber nur mit dem richtigen.</b> Geprueft am 25.08.2026:</p>
+<table>
+<tr><th>Dienst</th><th>Fuehrt deine vier?</th><th>Kostenlos</th><th>Urteil</th></tr>
+<tr><td>The Odds API</td>
+<td class="rot">Nein. Bwin, Interwetten und Stake fehlen ganz, Bet365 nur fuer Australien.</td>
+<td>500 Anfragen/Monat</td><td class="rot">Fuer dich nutzlos.</td></tr>
+<tr><td><b>OddsPapi</b></td>
+<td class="gruen">Ja, alle vier: Bet365 (auch DE), Bwin (auch DE), Interwetten, Stake.com</td>
+<td>250 Anfragen/Monat, eine Anfrage liefert alle Buchmacher auf einmal</td>
+<td class="gruen">Der einzige gepruefte, der passt.</td></tr>
+</table>
+<p><b>Offen:</b> Ob OddsPapi auch asiatische Viertel-Linien, Ecken und die tiefen Nischenligen
+(Island, Litauen, Scottish Challenge Cup) fuehrt, steht nicht in der oeffentlichen Doku.
+Die Siegwette (Moneyline) ist dokumentiert. Das laesst sich erst mit einem Schluessel testen.</p>
+<p><b>Was du tun muesstest:</b> Konto bei <a href="https://oddspapi.io" target="_blank" rel="noopener">oddspapi.io</a>
+anlegen und den Schluessel holen. <b>Das kannst nur du selbst machen</b>, Claude legt keine Konten an.
+Danach baut Claude den Knopf "Alle Quoten holen" ein: ein Klick, und alle Felder, die der Dienst
+kennt, fuellen sich mit Zeitstempel. Was er nicht kennt, bleibt Handarbeit.</p>
 </div>
 </details>
 
@@ -291,9 +302,9 @@ oben. Die durchgestrichene Foto-Zeile (Branstine vs Ngou) ist nicht enthalten. A
 Quoten aendern sich laufend.
 </div>
 
-<script src="daten.js?v=20260825e"></script>
-<script src="roh.js?v=20260825e"></script>
-<script src="recherche.js?v=20260825e"></script>
-<script src="logik.js?v=20260825e"></script>
+<script src="daten.js?v=20260825f"></script>
+<script src="roh.js?v=20260825f"></script>
+<script src="recherche.js?v=20260825f"></script>
+<script src="logik.js?v=20260825f"></script>
 </body>
 </html>
