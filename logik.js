@@ -496,25 +496,42 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   } else {
     td.appendChild(eingabeFeld(w, opt, anbieter));
 
-    const e = liesEingabe(w.id, opt, anbieter);
-    const echt = echteQuote(anbieter, e);
-    const shot = screenshotQuote(w, optIdx, anbieter);
-    const info = document.createElement("div");
-    info.className = "real";
-    if (echt) {
-      info.innerHTML = "<b>real " + rund2(echt).toFixed(2) + "</b>";
-    } else if (shot) {
-      const echtShot = echteQuote(anbieter, shot.wert);
-      info.innerHTML = '<span class="ausshot">' + shot.wert.toFixed(2) +
-        " > real <b>" + rund2(echtShot).toFixed(2) + "</b></span>" +
-        '<div class="ausshot">aus Screenshot ' + shot.zeit + "</div>";
-      td.classList.add("hatshot");
-    } else if (anbieter === "iw") {
-      info.textContent = "Foto " + ref.toFixed(2) + " > real " + rund2(ref / GEBUEHREN_TEILER.iw).toFixed(2);
+    const eigene = liesEingabe(w.id, opt, anbieter);
+    const shot = eigene ? null : screenshotQuote(w, optIdx, anbieter);
+    const roh = eigene || (shot ? shot.wert : null);
+    const teiler = GEBUEHREN_TEILER[anbieter];
+
+    // Grosse Zeile: die echte Quote, also das, was du wirklich bekommst
+    const gross = document.createElement("div");
+    gross.className = "realgross";
+    if (roh) {
+      const echt = rund2(roh / teiler);
+      gross.innerHTML = "<b>" + echt.toFixed(2) + "</b>";
+      // Farbe: echte Quote gegen die Foto-Quote
+      if (echt >= ref - 0.001) { gross.classList.add("besser"); }
+      else { gross.classList.add("schlechter"); }
+      if (shot) gross.classList.add("ausshotwert");
     } else {
-      info.textContent = "Foto-Quote " + ref.toFixed(2) + ", kein Abzug";
+      gross.innerHTML = '<span class="leer">real ?</span>';
     }
-    td.appendChild(info);
+    td.appendChild(gross);
+
+    // Kleine Zeile: Foto-Quote als Vergleich, plus Hinweis auf den Abzug
+    const klein = document.createElement("div");
+    klein.className = "fotoklein";
+    if (roh) {
+      const echt = rund2(roh / teiler);
+      const unt = echt - ref;
+      const vorz = (unt > 0.001) ? "+" : "";
+      klein.innerHTML = "Foto " + ref.toFixed(2) + " &nbsp;(" + vorz + unt.toFixed(2) + ")" +
+        (teiler !== 1 ? '<div class="abzug">angezeigt ' + roh.toFixed(2) + ", minus Gebuehr</div>" : "") +
+        (shot ? '<div class="abzug">aus Screenshot ' + shot.zeit + "</div>" : "");
+    } else {
+      const waere = rund2(ref / teiler);
+      klein.innerHTML = "Foto " + ref.toFixed(2) +
+        (teiler !== 1 ? '<div class="abzug">waere real ' + waere.toFixed(2) + "</div>" : "");
+    }
+    td.appendChild(klein);
 
     if (v === "D") {
       const d = document.createElement("div");

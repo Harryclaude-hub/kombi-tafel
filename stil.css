@@ -180,3 +180,13 @@ td.anbieter.hatshot { background: #fffaf0; }
 table.klein { width: auto; margin: 4px 0; }
 table.klein td, table.klein th { font-size: 12px; padding: 3px 7px; }
 .haelfte { background: #f4f8ff; text-align: center; font-weight: bold; }
+
+/* ---- Nachtrag 25.08. (10): echte Quote gross, Foto-Quote klein ---- */
+td.anbieter .realgross { font-size: 17px; line-height: 1.15; margin: 2px 0 1px 0;
+  text-align: center; border-radius: 2px; }
+td.anbieter .realgross.besser     { background: #d9efd9; color: #0a5a0a; }
+td.anbieter .realgross.schlechter { background: #fdd;    color: #a00; }
+td.anbieter .realgross.ausshotwert { border: 1px dashed #7a4a00; }
+td.anbieter .realgross .leer { font-size: 12px; color: #888; font-weight: normal; }
+td.anbieter .fotoklein { font-size: 10px; color: #444; text-align: center; }
+td.anbieter .abzug { font-size: 9.5px; color: #777; }
