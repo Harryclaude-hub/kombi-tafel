@@ -102,7 +102,9 @@ function marktTyp(w) {
   if (w.kat === "HTFT") return "HTFT";
   if (w.kat === "DNB") return "DNB";
   if (w.kat === "TENNIS") return "TENNIS";
-  return (w.s === "S2") ? "ASIAN" : "STD";
+  // Achtung Altfehler vom 25.08.: hier stand noch das alte Kuerzel "S2",
+  // dadurch galten alle ASIA-Wetten als Standard. Behoben 26.08.
+  return (w.s === "ASIA") ? "ASIAN" : "STD";
 }
 
 // [iw, bw, b3, st]
