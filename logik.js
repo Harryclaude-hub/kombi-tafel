@@ -74,7 +74,101 @@ function satzWetten() {
 
 function satzWaehlen(id) {
   localStorage.setItem("kt_satz", id);
-  if (typeof zeichne === "function" && document.getElementById("koerper")) zeichne();
+  location.reload();   // alle Seiten haengen am aktiven Ordner
+}
+
+// ---------- Ordner-Deko: Farbe, Emoji, Notiz je Satz ----------
+
+const ORDNER_FARBEN = [
+  ["#1a2c50", "Blau"], ["#0a5a0a", "Gruen"], ["#a00000", "Rot"],
+  ["#7a4a00", "Braun"], ["#5b2a86", "Lila"], ["#444444", "Grau"]
+];
+
+function satzDeko(id) {
+  try { return JSON.parse(localStorage.getItem("kt_satzdeko_" + id) || "{}"); }
+  catch (e) { return {}; }
+}
+
+function satzDekoSetzen(id, feld, wert) {
+  const d = satzDeko(id);
+  d[feld] = wert;
+  localStorage.setItem("kt_satzdeko_" + id, JSON.stringify(d));
+  zeichneOrdnerLeiste();
+}
+
+let ordnerPanelOffen = "";   // "" | "anpassen" | "wechseln"
+
+function ordnerPanel(art) {
+  ordnerPanelOffen = (ordnerPanelOffen === art) ? "" : art;
+  zeichneOrdnerLeiste();
+}
+
+// Die Leiste ganz oben: der offene Ordner, seine Knoepfe, sein Verlauf
+function zeichneOrdnerLeiste() {
+  const box = document.getElementById("ordnerleiste");
+  if (!box) return;
+  const id = aktiverSatzId();
+  const satz = SAETZE.find(x => x.id === id) || SAETZE[SAETZE.length - 1];
+  const deko = satzDeko(id);
+  const farbe = deko.farbe || "#1a2c50";
+  const emoji = deko.emoji || "";
+  const anzahl = satzWetten().length;
+  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w))).length;
+
+  let html = '<div class="ordnerkarte" style="border-color:' + farbe + '">' +
+    '<div class="ordnerkopf" style="background:' + farbe + '">' +
+    (emoji ? '<span class="ordneremoji">' + emoji + "</span> " : "") +
+    "Offener Ordner: <b>" + satz.titel + "</b>" +
+    '<span class="ordnerzahl">' + anzahl + " Wetten, " + offen + " offen</span></div>" +
+    '<div class="ordnerknoepfe">' +
+    '<a class="ordnerknopf" href="mein.html#fotos">Neue Fotos hochladen</a>' +
+    '<button class="ordnerknopf" onclick="ordnerPanel(\'wechseln\')">Ordner wechseln (' +
+      SAETZE.length + ")</button>" +
+    '<button class="ordnerknopf" onclick="ordnerPanel(\'anpassen\')">Farbe, Emoji, Notiz</button>' +
+    "</div>";
+
+  if (deko.notiz) {
+    html += '<div class="ordnernotiz">' +
+      deko.notiz.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>";
+  }
+
+  if (ordnerPanelOffen === "anpassen") {
+    let farben = "";
+    for (const [wert, name] of ORDNER_FARBEN) {
+      farben += '<button class="farbknopf' + (farbe === wert ? " aktiv" : "") +
+        '" style="background:' + wert + '" title="' + name +
+        '" onclick="satzDekoSetzen(\'' + id + '\',\'farbe\',\'' + wert + '\')"></button>';
+    }
+    html += '<div class="ordnerpanel">' +
+      "<div><b>Farbe:</b> " + farben + "</div>" +
+      '<div><b>Emoji:</b> <input maxlength="4" style="width:70px" value="' + emoji +
+      '" onchange="satzDekoSetzen(\'' + id + '\',\'emoji\',this.value)"> ' +
+      '<span class="mini">z. B. ein Symbol vom Handy-Tastenfeld</span></div>' +
+      '<div><b>Notiz zum Ordner:</b><br><textarea class="notizfeld" ' +
+      'onchange="satzDekoSetzen(\'' + id + '\',\'notiz\',this.value)">' +
+      (deko.notiz || "") + "</textarea></div></div>";
+  }
+
+  if (ordnerPanelOffen === "wechseln") {
+    html += '<div class="ordnerpanel"><b>Alle Ordner (nur einer ist offen):</b>' +
+      (SAETZE.length > 5
+        ? ' <input id="ordner_suche" placeholder="Datum filtern, z. B. 2026-09" ' +
+          'oninput="zeichneOrdnerLeiste()" style="width:180px">' : "") +
+      '<div class="ordnerliste">';
+    const filter = (document.getElementById("ordner_suche") || { value: "" }).value.trim();
+    for (const x of SAETZE.slice().reverse()) {
+      if (filter && !x.id.includes(filter) && !x.titel.includes(filter)) continue;
+      const d = satzDeko(x.id);
+      html += '<button class="ordnerwahl' + (x.id === id ? " aktiv" : "") +
+        '" style="border-color:' + (d.farbe || "#1a2c50") + '" ' +
+        'onclick="satzWaehlen(\'' + x.id + '\')">' +
+        (d.emoji ? d.emoji + " " : "") + x.titel +
+        (x.id === id ? " (offen)" : "") + "</button>";
+    }
+    html += "</div></div>";
+  }
+
+  box.innerHTML = html + "</div>";
 }
 
 // ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------
@@ -363,17 +457,6 @@ function baueFilter() {
       knoepfe.appendChild(b);
     }
     box.appendChild(knoepfe);
-  }
-
-  // 0) Foto-Satz (nur zeigen, wenn es mehr als einen gibt)
-  const sf = document.getElementById("satzfilter");
-  if (sf) {
-    if (SAETZE.length >= 1) {
-      zeile("satzfilter", "Foto-Satz",
-        SAETZE.map(x => ({ kz: x.id, text: x.titel })),
-        e => e.kz === aktiverSatzId(),
-        e => { satzWaehlen(e.kz); }, "f-satz");
-    } else { sf.innerHTML = ""; }
   }
 
   // 1) Wett-Art
@@ -797,5 +880,6 @@ function zeichne() {
 // Nur zeichnen, wenn die Tafel-Elemente vorhanden sind.
 // (kombis.html laedt diese Datei nur wegen der Rechenfunktionen.)
 document.addEventListener("DOMContentLoaded", () => {
+  zeichneOrdnerLeiste();
   if (document.getElementById("koerper")) zeichne();
 });

@@ -424,20 +424,8 @@ function meldung(text, art) {
 
 // ---------- Anzeige ----------
 
-function zeichneSatzwahl() {
-  const box = document.getElementById("satzwahl");
-  if (!box) return;
-  // Der Ordner ist immer sichtbar, auch wenn es nur einen gibt.
-  let html = '<div class="filterzeile f-satz"><span class="f-label">Foto-Satz</span><span class="f-knoepfe">';
-  for (const x of SAETZE) {
-    html += '<button class="' + (x.id === aktiverSatzId() ? "aktiv" : "") +
-      '" onclick="localStorage.setItem(\'kt_satz\',\'' + x.id + '\'); zeichne_();">' + x.titel + "</button>";
-  }
-  box.innerHTML = html + "</span></div>";
-}
-
 function zeichne_() {
-  zeichneSatzwahl();
+  zeichneOrdnerLeiste();
   // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
   if (!document.getElementById("scheine")) {
     zeichneVerlauf();

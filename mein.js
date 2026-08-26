@@ -171,6 +171,10 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   await zeichneBereich();
   await zeichneFotoSaetze();
   await zeichneBuchhaltung();
+  if (location.hash === "#fotos") {
+    const d = el("fotosaetze").querySelector("details");
+    if (d) { d.open = true; d.scrollIntoView(); }
+  }
 }
 
 async function zeichneTabs() {
