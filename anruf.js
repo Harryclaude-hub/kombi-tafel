@@ -32,7 +32,10 @@ async function anrufBereit() {
 function anrufKanalZu(zielId) {
   return new Promise(fertig => {
     if (_anrufKanaele[zielId]) { fertig(_anrufKanaele[zielId]); return; }
-    const k = supa.channel("kt-anruf-" + zielId);
+    // self:true auch beim Sende-Kanal: noetig, damit Sender- und
+    // Hoerer-Kanal desselben Clients sich erreichen (Test und Sonderfaelle);
+    // im normalen Zwei-Geraete-Anruf ohne Wirkung (kein Hoerer hier).
+    const k = supa.channel("kt-anruf-" + zielId, { config: { broadcast: { self: true } } });
     k.subscribe(status => {
       if (status === "SUBSCRIBED") { _anrufKanaele[zielId] = k; fertig(k); }
     });
