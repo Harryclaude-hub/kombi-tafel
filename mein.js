@@ -725,10 +725,10 @@ function personPruefen(ordnerId, scheine) {
 // (Anstoss + 3 Stunden Spieldauer-Puffer). Ein fertiger OFFENER Schein
 // wartet auf Karams Bericht: gewonnen oder verloren.
 function scheinEnde(s) {
-  if (typeof wetteNachId !== "function") return null;
+  if (typeof WETTEN === "undefined" || typeof liesAnstoss !== "function") return null;
   let ende = null;
   for (const t of (s.daten.wetten || [])) {
-    const w = wetteNachId(t.id);
+    const w = WETTEN.find(x => x.id === t.id);
     if (!w) return null;                        // Zeit unbekannt: nicht werten
     const a = liesAnstoss(anstossFeld(w));
     const e = new Date(a.zeit);
