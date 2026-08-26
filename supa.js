@@ -157,3 +157,48 @@ async function supaNachrichtSenden(bereichId, text) {
   const u = await supaNutzer();
   return await supa.from("kt_nachrichten").insert({ bereich: bereichId, autor: u.id, text: text });
 }
+
+
+// ---------- Freunde (unabhaengig vom Bereich-Teilen) ----------
+
+async function supaKontaktAdden(username) {
+  const p = await supaProfilSuchen(username);
+  if (!p) return { fehler: "Benutzer nicht gefunden." };
+  const u = await supaNutzer();
+  if (p.id === u.id) return { fehler: "Dich selbst musst du nicht adden." };
+  const r = await supa.from("kt_kontakte").insert({ a: u.id, b: p.id });
+  if (r.error && !String(r.error.message).includes("duplicate"))
+    return { fehler: r.error.message };
+  return { ok: true, profil: p };
+}
+
+async function supaKontakteLaden() {
+  const u = await supaNutzer();
+  if (!u) return [];
+  const r = await supa.from("kt_kontakte").select("a, b").or("a.eq." + u.id + ",b.eq." + u.id);
+  const ids = [...new Set((r.data || []).map(k => k.a === u.id ? k.b : k.a))];
+  if (!ids.length) return [];
+  const p = await supa.from("kt_profiles").select("id, username").in("id", ids);
+  return (p.data || []).map(x => ({ partnerId: x.id, username: x.username }));
+}
+
+async function supaKontaktEntfernen(partnerId) {
+  const u = await supaNutzer();
+  await supa.from("kt_kontakte").delete().eq("a", u.id).eq("b", partnerId);
+  await supa.from("kt_kontakte").delete().eq("a", partnerId).eq("b", u.id);
+}
+
+async function supaDmLaden(partnerId, abId) {
+  const u = await supaNutzer();
+  let q = supa.from("kt_direkt").select("id, von, an, text, created_at")
+    .or("and(von.eq." + u.id + ",an.eq." + partnerId + "),and(von.eq." + partnerId + ",an.eq." + u.id + ")")
+    .order("id", { ascending: true }).limit(200);
+  if (abId) q = q.gt("id", abId);
+  const r = await q;
+  return r.data || [];
+}
+
+async function supaDmSenden(partnerId, text) {
+  const u = await supaNutzer();
+  return await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: text });
+}

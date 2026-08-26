@@ -380,3 +380,13 @@ button.auge { font-size: 11px; padding: 2px 7px; margin-left: 4px; border: 1px s
 .chatzeile.vonmir { background: #e8f5e9; border-left-color: #1a7a1a; }
 .chateingabe { display: flex; gap: 6px; margin-top: 6px; }
 .chateingabe input { flex: 1; font-size: 15px; padding: 6px 9px; border: 1px solid #888; }
+
+/* ---- Logo, Nachrichten-Knopf, Freunde ---- */
+.logo { width: 40px; height: 40px; align-self: center; margin-right: 4px; }
+.navleiste a.glocke { border-color: #1a7a1a; color: #1a7a1a; }
+.navleiste a.glocke .badge { margin-left: 5px; }
+button.freundknopf { font-size: 13px; padding: 4px 12px; margin: 2px 4px 2px 0;
+  border: 2px solid var(--blau); background: #fff; color: var(--blau);
+  font-weight: bold; cursor: pointer; }
+button.freundknopf.aktiv { background: var(--blau); color: #fff; }
+#freunde input { font-size: 14px; padding: 4px 8px; border: 1px solid #888; }

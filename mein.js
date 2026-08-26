@@ -147,6 +147,7 @@ async function zeigeApp() {
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button></div>
 <div id="bereichtabs" class="navleiste"></div>
+<div id="freunde"></div>
 <div id="teilen"></div>
 <div id="importkasten"></div>
 <h2>Konto dieses Bereichs</h2>
@@ -162,6 +163,7 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   <button class="haupt" onclick="tuChatSenden()">Senden</button></div>`;
 
   await zeichneTabs();
+  await zeichneFreunde();
   await zeichneTeilen();
   zeichneImport();
   await zeichneBereich();
@@ -189,6 +191,97 @@ async function neueNachrichten(bereichId) {
   const r = await supa.from("kt_nachrichten").select("id", { count: "exact", head: true })
     .eq("bereich", bereichId).gt("id", gelesen);
   return r.count || 0;
+}
+
+// ---------- Freunde und Direktnachrichten ----------
+
+let dmPartner = null;
+let dmTimer = null;
+let letzteDmId = 0;
+
+async function zeichneFreunde() {
+  const box = el("freunde");
+  const kontakte = await supaKontakteLaden();
+  let knoepfe = "";
+  for (const k of kontakte) {
+    const gelesen = parseInt(localStorage.getItem("kt_dm_gelesen_" + k.partnerId) || "0", 10);
+    const r = await supa.from("kt_direkt").select("id", { count: "exact", head: true })
+      .eq("an", ich.id).eq("von", k.partnerId).gt("id", gelesen);
+    const neu = r.count || 0;
+    knoepfe += '<button class="freundknopf' + (dmPartner && dmPartner.partnerId === k.partnerId ? " aktiv" : "") +
+      '" onclick="tuDmOeffnen(\'' + k.partnerId + "','" + k.username + '\')">' + k.username +
+      (neu ? ' <span class="badge">' + neu + "</span>" : "") + "</button> ";
+  }
+  box.innerHTML = '<details open><summary>Freunde und Nachrichten (anklicken)</summary><div class="inhalt">' +
+    '<p class="mini">Freunde adden geht OHNE deinen Bereich zu teilen: ihr koennt euch dann ' +
+    "Direktnachrichten schicken. Teilen kannst du danach immer noch, musst du aber nicht.</p>" +
+    '<input id="freund_user" placeholder="Benutzername"> ' +
+    '<button class="haupt" onclick="tuFreundAdden()">Als Freund adden</button>' +
+    (kontakte.length ? "<p><b>Deine Freunde:</b> " + knoepfe + "</p>" : "") +
+    '<div id="dmfenster"></div></div></details>';
+  if (dmPartner) zeichneDmFenster();
+}
+
+async function tuFreundAdden() {
+  const r = await supaKontaktAdden(el("freund_user").value.trim());
+  if (r.fehler) { meldungM(r.fehler, "warn"); return; }
+  meldungM("<b>" + r.profil.username + "</b> ist jetzt dein Freund. Ihr koennt euch schreiben.", "gut");
+  zeichneFreunde();
+}
+
+function tuDmOeffnen(partnerId, username) {
+  dmPartner = { partnerId: partnerId, username: username };
+  letzteDmId = 0;
+  zeichneFreunde();
+}
+
+function zeichneDmFenster() {
+  el("dmfenster").innerHTML = "<h3>Nachrichten mit " + dmPartner.username +
+    ' <button onclick="tuFreundWeg()">Freund entfernen</button></h3>' +
+    '<div id="dmliste" class="chatliste"></div>' +
+    '<div class="chateingabe"><input id="dm_text" placeholder="Nachricht an ' + dmPartner.username + '..." ' +
+    "onkeydown=\"if(event.key==='Enter')tuDmSenden()\">" +
+    '<button class="haupt" onclick="tuDmSenden()">Senden</button></div>';
+  ladeDm(true);
+  if (dmTimer) clearInterval(dmTimer);
+  dmTimer = setInterval(() => ladeDm(false), 10000);
+}
+
+async function ladeDm(komplett) {
+  if (!dmPartner || !el("dmliste")) return;
+  if (komplett) { letzteDmId = 0; el("dmliste").innerHTML = ""; }
+  const neue = await supaDmLaden(dmPartner.partnerId, letzteDmId || null);
+  if (!neue.length) return;
+  const box = el("dmliste");
+  for (const n of neue) {
+    letzteDmId = Math.max(letzteDmId, n.id);
+    const zeile = document.createElement("div");
+    zeile.className = "chatzeile" + (n.von === ich.id ? " vonmir" : "");
+    zeile.innerHTML = "<b>" + (n.von === ich.id ? ich.username : dmPartner.username) + "</b> " +
+      "<span class='mini'>" + zeitM(n.created_at) + "</span><br>" +
+      n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    box.appendChild(zeile);
+  }
+  box.scrollTop = box.scrollHeight;
+  localStorage.setItem("kt_dm_gelesen_" + dmPartner.partnerId, String(letzteDmId));
+}
+
+async function tuDmSenden() {
+  const feld = el("dm_text");
+  const text = feld.value.trim();
+  if (!text) return;
+  const r = await supaDmSenden(dmPartner.partnerId, text);
+  if (r.error) { meldungM("Nicht gesendet: " + r.error.message, "warn"); return; }
+  feld.value = "";
+  ladeDm(false);
+}
+
+async function tuFreundWeg() {
+  await supaKontaktEntfernen(dmPartner.partnerId);
+  dmPartner = null;
+  if (dmTimer) clearInterval(dmTimer);
+  zeichneFreunde();
+  meldungM("Freund entfernt.", "gut");
 }
 
 // ---------- Teilen ----------
