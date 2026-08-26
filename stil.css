@@ -301,3 +301,40 @@ textarea.notizfeld { width: 100%; min-height: 44px; font-size: 13px;
   font-family: inherit; border: 1px solid #888; padding: 3px 5px; }
 .fotoname { font-weight: bold; font-size: 12.5px; }
 .s-foto .fotoname { margin-bottom: 3px; }
+
+/* ============================================================
+   LESE-SCHICHT 26.08.: eine Leseschrift ueberall, auch in den
+   Erklaer-Bereichen, plus saubere Druck-Ansicht.
+   Reine Optik, komplett loeschbar.
+   ============================================================ */
+
+/* Eine ruhige, gut lesbare Schrift auf der ganzen Seite */
+body, input, select, textarea, button {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+
+/* Die Erklaer-Bereiche ziehen mit der Grundschrift gleich */
+details .inhalt { font-size: 15px; line-height: 1.5; }
+details .inhalt td, details .inhalt th { font-size: 14px; line-height: 1.45; }
+.bsp { font-size: 15px; line-height: 1.5; padding: 10px 14px; }
+table.klein td, table.klein th { font-size: 14px; }
+.fuss { line-height: 1.5; }
+#reste ul, .kern ol, .fuellkern ol { line-height: 1.5; }
+td.s-spiel, td.s-liga, td.s-zeit { line-height: 1.4; }
+.legende span { font-size: 12.5px; }
+
+/* Druck-Ansicht: nur der Inhalt, keine Bedienung */
+@media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-size: 12pt; line-height: 1.4; margin: 0; }
+  .navleiste, .filterbox, #filter, #reiterfilter, #rangfilter,
+  #anbieterfilter, #zeitfilter, #meldung,
+  button, select.anbwechsel, label.fotoknopf,
+  a.mehr, .hilf, td.s-raus, .s-raus-liste { display: none !important; }
+  input { border: none; font-weight: bold; }
+  a { color: #000; text-decoration: none; }
+  details { border: none; }
+  details:not([open]) { display: none; }   /* zugeklappte Kaesten nicht mitdrucken */
+  .schein, .bsp, .kern, .warnkern, .zeitkern, tr { page-break-inside: avoid; }
+  h2 { page-break-after: avoid; }
+  th { position: static; }                 /* klebende Kopfzeile stoert beim Druck */
+}
