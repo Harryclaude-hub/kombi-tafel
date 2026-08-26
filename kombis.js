@@ -723,8 +723,22 @@ async function ordnerNeuUndSpeichern(scheinId, bereichId) {
 function scheinInsKonto(scheinId, bereichId, ordnerId) {
   const b = baueVerlaufsEintrag(scheinId);
   if (!b) return;
+  if (!b.eintrag.einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
+  // Doppelklick-Schutz: Panel sofort stilllegen, sonst speichert ein
+  // zweiter Klick den Schein doppelt in die Datenbank.
+  const box = document.getElementById("ordnerwahl_" + scheinId);
+  if (box) {
+    if (box.dataset.laeuft === "1") return;
+    box.dataset.laeuft = "1";
+    box.innerHTML = '<div class="ordnerpflicht mini">Wird gespeichert...</div>';
+  }
   supaScheinAnlegen(bereichId, b.eintrag, b.foto, b.fotoName, ordnerId).then(r => {
-    if (r.error) { meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn"); return; }
+    if (box) box.dataset.laeuft = "";
+    if (r.error) {
+      meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn");
+      ordnerWahlZeigen(scheinId, bereichId);
+      return;
+    }
     ordnerWahlZu(scheinId);
     meldung("Schein " + b.s.nr + " in dein Konto gespeichert und dem Konto-Ordner zugeordnet: " +
       '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");

@@ -419,7 +419,7 @@ function zeichneOrdnerBox(scheine) {
         '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' +
         (n === 0
           ? '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">loeschen</button>'
-          : '<span class="mini">' + n + " Scheine drin - erst leeren, dann loeschen</span>") +
+          : '<span class="mini">' + n + (n === 1 ? " Schein" : " Scheine") + " drin - erst leeren, dann loeschen</span>") +
         "</div>";
     }
     verwalten = '<details><summary>Ordner verwalten (anlegen, umbenennen, loeschen)</summary><div class="inhalt">' +
