@@ -110,7 +110,7 @@ function baueAlles() {
       if (!rest || !topf[kz].length) continue;
       for (let i = 0; i < rest; i++) {
         const k = topf[kz][topf[kz].length - 1];
-        const ziel = k.moeglich.find(m => m.kz !== kz && topf[m.kz] && (topf[m.kz].length % 3) !== 0);
+        const ziel = k.moeglich.find(m => m.kz !== kz && m.kz !== "b3" && topf[m.kz] && (topf[m.kz].length % 3) !== 0);
         if (ziel) { topf[kz].pop(); topf[ziel.kz].push(k); } else break;
       }
     }
@@ -163,8 +163,13 @@ function baueAlles() {
 // 2. wer bisher am wenigsten Wetten bekommen hat.
 // So verteilen sich die Scheine ueber alle Anbieter statt alle bei einem zu landen.
 function waehleAnbieter(moeglich, topf) {
-  const beste = moeglich[0].q.echt;
-  const gleichauf = moeglich.filter(m => m.q.echt >= beste - 0.005);
+  // Karams Regel: Bet365 ist die LETZTE Option. Solange irgendein anderer
+  // erlaubter Anbieter die Wette fuehrt, bekommt Bet365 sie nicht automatisch.
+  // (Einen Schein von Hand auf Bet365 stellen geht weiterhin.)
+  const ohneB3 = moeglich.filter(m => m.kz !== "b3");
+  const auswahl = ohneB3.length ? ohneB3 : moeglich;
+  const beste = auswahl[0].q.echt;
+  const gleichauf = auswahl.filter(m => m.q.echt >= beste - 0.005);
   gleichauf.sort((a, b) => {
     if (a.duenn !== b.duenn) return a.duenn ? 1 : -1;
     const la = (topf[a.kz] || []).length, lb = (topf[b.kz] || []).length;
@@ -570,6 +575,7 @@ function scheinHtml(s, z) {
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
     "</div>" +
+    '<div class="ordnerwahl" id="ordnerwahl_' + s.id + '"></div>' +
     (foto ? (function () {
       const name = localStorage.getItem(fotoSchluessel(s.id) + "_name") || "Wettschein";
       return '<div class="s-foto"><div class="fotoname">' + name + "</div>" +
@@ -620,11 +626,11 @@ function liesVerlauf() {
 }
 function speichereVerlauf(v) { localStorage.setItem("verlauf", JSON.stringify(v)); }
 
-function scheinMerken(scheinId) {
+function baueVerlaufsEintrag(scheinId) {
   const z = liesZustand();
   const s = z.scheine.find(x => x.id === scheinId);
+  if (!s) return null;
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
-  if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
   let gesamt = 1;
   const wetten = s.wetten.map(eintrag => {
     const w = wetteNachId(eintrag.id);
@@ -638,32 +644,92 @@ function scheinMerken(scheinId) {
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   };
-  const foto = localStorage.getItem(fotoSchluessel(scheinId));
-  const fotoNameWert = localStorage.getItem(fotoSchluessel(scheinId) + "_name");
+  return { s: s, eintrag: eintrag,
+    foto: localStorage.getItem(fotoSchluessel(scheinId)),
+    fotoName: localStorage.getItem(fotoSchluessel(scheinId) + "_name") };
+}
 
-  // Eingeloggt? Dann direkt ins Konto, sonst wie bisher auf dieses Geraet.
+function scheinMerken(scheinId) {
+  const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
+  if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
+  // Eingeloggt? Dann ist die Konto-Ordner-Frage PFLICHT (Karams Regel:
+  // jede Kombination muss zugeordnet sein). Ohne Konto wie bisher lokal.
   if (typeof supaNutzer === "function" && window.supa) {
     supaNutzer().then(u => {
-      if (u) {
-        supaScheinAnlegen(u.id, eintrag, foto, fotoNameWert).then(r => {
-          if (r.error) meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn");
-          else meldung("Schein " + s.nr + " in dein Konto gespeichert: <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
-        });
-      } else {
-        const v = liesVerlauf();
-        v.unshift(eintrag);
-        speichereVerlauf(v);
-        meldung("Schein " + s.nr + " auf diesem Geraet gespeichert. Melde dich in <a href=\"mein.html\"><b>Mein Bereich</b></a> an, um ihn ins Konto zu holen und zu teilen.", "gut");
-      }
+      if (u) ordnerWahlZeigen(scheinId, u.id);
+      else scheinLokalMerken(scheinId, true);
     });
   } else {
-    const v = liesVerlauf();
-    v.unshift(eintrag);
-    speichereVerlauf(v);
-    meldung("Schein " + s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
+    scheinLokalMerken(scheinId, false);
   }
+}
+
+function scheinLokalMerken(scheinId, ohneKonto) {
+  const b = baueVerlaufsEintrag(scheinId);
+  if (!b) return;
+  const v = liesVerlauf();
+  v.unshift(b.eintrag);
+  speichereVerlauf(v);
+  meldung(ohneKonto
+    ? "Schein " + b.s.nr + " auf diesem Geraet gespeichert. Melde dich in <a href=\"mein.html\"><b>Mein Bereich</b></a> an, um ihn ins Konto zu holen und zu teilen."
+    : "Schein " + b.s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
+}
+
+// ---------- Konto-Ordner-Pflicht beim Speichern ----------
+// Karams Ordner sind Accounts/Personen, bei denen gesetzt wurde. Jeder
+// gespeicherte Schein MUSS einem zugeordnet werden.
+
+function textSicher(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+async function ordnerWahlZeigen(scheinId, bereichId) {
+  const box = document.getElementById("ordnerwahl_" + scheinId);
+  if (!box) return;
+  box.innerHTML = '<div class="ordnerpflicht mini">Ordner werden geladen...</div>';
+  const liste = await supaOrdnerLaden(bereichId);
+  let knoepfe = "";
+  for (const o of liste) {
+    knoepfe += '<button onclick="ordnerGewaehlt(\'' + scheinId + "','" + bereichId + "','" + o.id + '\')">' +
+      textSicher(o.name) + "</button> ";
+  }
+  box.innerHTML = '<div class="ordnerpflicht"><b>Bei wem hast du diesen Schein gesetzt?</b> ' +
+    '<span class="mini">Jede Kombination gehoert in einen Konto-Ordner, damit du in Mein Bereich ' +
+    "siehst, bei welchem Account sie lief. Die Buchhaltung bleibt eine gemeinsame.</span><br>" +
+    (liste.length ? knoepfe : '<span class="mini">Du hast noch keine Ordner - leg gleich hier den ersten an.</span> ') +
+    '<input id="neuordner_' + scheinId + '" placeholder="Neuer Ordner, z. B. ein Name"> ' +
+    '<button class="haupt" onclick="ordnerNeuUndSpeichern(\'' + scheinId + "','" + bereichId + '\')">Anlegen und speichern</button> ' +
+    '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
+}
+
+function ordnerWahlZu(scheinId) {
+  const box = document.getElementById("ordnerwahl_" + scheinId);
+  if (box) box.innerHTML = "";
+}
+
+function ordnerGewaehlt(scheinId, bereichId, ordnerId) {
+  scheinInsKonto(scheinId, bereichId, ordnerId);
+}
+
+async function ordnerNeuUndSpeichern(scheinId, bereichId) {
+  const feld = document.getElementById("neuordner_" + scheinId);
+  const r = await supaOrdnerAnlegen(bereichId, feld ? feld.value : "");
+  if (r.fehler) { meldung("Ordner nicht angelegt: " + r.fehler, "warn"); return; }
+  scheinInsKonto(scheinId, bereichId, r.ordner.id);
+}
+
+function scheinInsKonto(scheinId, bereichId, ordnerId) {
+  const b = baueVerlaufsEintrag(scheinId);
+  if (!b) return;
+  supaScheinAnlegen(bereichId, b.eintrag, b.foto, b.fotoName, ordnerId).then(r => {
+    if (r.error) { meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn"); return; }
+    ordnerWahlZu(scheinId);
+    meldung("Schein " + b.s.nr + " in dein Konto gespeichert und dem Konto-Ordner zugeordnet: " +
+      '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");
+    zeichneKonto();
+  });
 }
 
 function zeichneVerlauf() {

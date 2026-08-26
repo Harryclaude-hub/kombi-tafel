@@ -154,6 +154,11 @@ async function zeigeApp() {
 <div id="buchhaltung"></div>
 <h2>Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
+<h2>Konto-Ordner</h2>
+<p class="mini">Deine Unterordner: je ein Account oder eine Person, bei der du Kombinationen
+gesetzt hast. Jede Kombination gehoert in einen Ordner - die Buchhaltung oben bleibt EINE
+gemeinsame, die Ordner sortieren nur die Scheine.</p>
+<div id="ordnerbox"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="scheine_db"></div>
 <h2>Chat dieses Bereichs</h2>
@@ -360,7 +365,8 @@ async function tuImport() {
   }
   if (ok === lokal.length) {
     localStorage.removeItem("verlauf");
-    meldungM("Alle " + ok + " Scheine uebernommen und lokal aufgeraeumt.", "gut");
+    meldungM("Alle " + ok + " Scheine uebernommen und lokal aufgeraeumt. Sie liegen unter " +
+      "\"ohne Ordner\" - bitte in der Tabelle den Konto-Ordnern zuordnen.", "gut");
   } else {
     meldungM("Nur " + ok + " von " + lokal.length + " uebernommen; die lokalen bleiben zur Sicherheit liegen.", "warn");
   }
@@ -371,12 +377,109 @@ async function tuImport() {
 
 function darfSchreiben() { return aktiverBereich.rolle === "ich" || aktiverBereich.rolle === "close"; }
 
+// ---------- Konto-Ordner ----------
+
+let ordnerListe = [];
+let ordnerFilter = "alle";
+
+function textSicherM(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+function ordnerNameM(id) {
+  const o = ordnerListe.find(x => x.id === id);
+  return o ? o.name : null;
+}
+
+function zeichneOrdnerBox(scheine) {
+  const box = el("ordnerbox");
+  if (!box) return;
+  const zahl = {};
+  let ohne = 0;
+  for (const s of scheine) {
+    if (s.ordner) zahl[s.ordner] = (zahl[s.ordner] || 0) + 1;
+    else ohne++;
+  }
+  const schreib = darfSchreiben();
+
+  let filter = '<div class="ordnerfilter">' +
+    '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'alle\')">Alle (' + scheine.length + ")</button> ";
+  for (const o of ordnerListe) {
+    filter += '<button class="' + (ordnerFilter === o.id ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'' + o.id + '\')">' +
+      textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")</button> ";
+  }
+  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Ordner (' + ohne + ")</button></div>";
+
+  let verwalten = "";
+  if (schreib) {
+    let zeilen = "";
+    for (const o of ordnerListe) {
+      const n = zahl[o.id] || 0;
+      zeilen += '<div class="ordnerzeile"><input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '"> ' +
+        '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' +
+        (n === 0
+          ? '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">loeschen</button>'
+          : '<span class="mini">' + n + " Scheine drin - erst leeren, dann loeschen</span>") +
+        "</div>";
+    }
+    verwalten = '<details><summary>Ordner verwalten (anlegen, umbenennen, loeschen)</summary><div class="inhalt">' +
+      '<input id="ordner_neu" placeholder="Neuer Ordner, z. B. ein Name"> ' +
+      '<button class="haupt" onclick="tuOrdnerAnlegen()">Ordner anlegen</button>' +
+      (zeilen ? "<div>" + zeilen + "</div>" : "") +
+      "</div></details>";
+  }
+  box.innerHTML = filter + verwalten +
+    (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
+      " ohne Ordner</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
+}
+
+function tuOrdnerFilter(wert) {
+  ordnerFilter = wert;
+  zeichneBereich();
+}
+
+async function tuOrdnerAnlegen() {
+  const r = await supaOrdnerAnlegen(aktiverBereich.id, el("ordner_neu").value);
+  if (r.fehler) { meldungM("Ordner nicht angelegt: " + r.fehler, "warn"); return; }
+  meldungM('Ordner <b>' + textSicherM(r.ordner.name) + "</b> angelegt.", "gut");
+  zeichneBereich();
+}
+
+async function tuOrdnerUmbenennen(id) {
+  const feld = el("ob_neu_" + id);
+  const r = await supaOrdnerUmbenennen(id, feld ? feld.value : "");
+  if (r.fehler) { meldungM("Nicht umbenannt: " + r.fehler, "warn"); return; }
+  meldungM("Ordner umbenannt.", "gut");
+  zeichneBereich();
+}
+
+async function tuOrdnerLoeschen(id) {
+  const r = await supaOrdnerLoeschen(id);
+  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  if (ordnerFilter === id) ordnerFilter = "alle";
+  meldungM("Ordner geloescht.", "gut");
+  zeichneBereich();
+}
+
+async function tuScheinOrdner(id, wert) {
+  const r = await supaScheinAendern(id, { ordner: wert || null });
+  if (r.error) { meldungM("Nicht zugeordnet: " + r.error.message, "warn"); return; }
+  zeichneBereich();
+}
+
 async function zeichneBereich() {
   el("scheine_titel").textContent = (aktiverBereich.rolle === "ich")
     ? "Meine Kombinationen" : "Kombinationen von " + aktiverBereich.username;
   const scheine = await supaScheineLaden(aktiverBereich.id);
-  zeichneKontoDb(scheine);
-  zeichneScheineDb(scheine);
+  ordnerListe = await supaOrdnerLaden(aktiverBereich.id);
+  if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
+      !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
+  zeichneOrdnerBox(scheine);
+  const gefiltert = (ordnerFilter === "alle") ? scheine
+    : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
+    : scheine.filter(s => s.ordner === ordnerFilter);
+  zeichneKontoDb(gefiltert);
+  zeichneScheineDb(gefiltert);
   await ladeChat(true);
   if (chatTimer) clearInterval(chatTimer);
   chatTimer = setInterval(() => ladeChat(false), 10000);
@@ -421,11 +524,18 @@ function zeichneScheineDb(scheine) {
   if (!scheine.length) { el("scheine_db").innerHTML = '<p class="mini">Noch keine Scheine hier. ' +
     'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" druecken.</p>'; return; }
   const schreib = darfSchreiben();
-  let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Wetten</th><th>Quote</th>" +
+  let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Konto-Ordner</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Moeglich</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
-    html += "<tr><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
+    const ordnerZelle = schreib
+      ? "<select onchange=\"tuScheinOrdner('" + s.id + "', this.value)\">" +
+        "<option value=''" + (!s.ordner ? " selected" : "") + ">ohne Ordner</option>" +
+        ordnerListe.map(o => "<option value='" + o.id + "'" + (s.ordner === o.id ? " selected" : "") +
+          ">" + textSicherM(o.name) + "</option>").join("") + "</select>"
+      : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?") : "<span class='mini'>ohne</span>");
+    html += "<tr" + (!s.ordner ? " class='ohneordner'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
+      "<td>" + ordnerZelle + "</td>" +
       "<td class='mini'>" + (d.wetten || []).map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
       (s.foto ? '<div class="fotoname mini">' + (s.foto_name || "") + "</div>" +
         '<div><img src="' + s.foto + '" class="minifoto"></div>' : "") + "</td>" +
@@ -468,7 +578,8 @@ async function tuKopieren(id) {
   if (!s) return;
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
-    : "In deinen Bereich kopiert.", r.error ? "warn" : "gut");
+    : "In deinen Bereich kopiert - er liegt dort unter \"ohne Ordner\", bitte einem deiner Konto-Ordner zuordnen.",
+    r.error ? "warn" : "gut");
 }
 
 // ---------- Foto-Saetze hochladen ----------

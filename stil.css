@@ -437,3 +437,16 @@ button.freundknopf.aktiv { background: var(--blau); color: #fff; }
 .ordnerwahl { font-size: 13px; padding: 6px 12px; border: 2px solid var(--blau);
   background: #fff; cursor: pointer; font-weight: bold; }
 .ordnerwahl.aktiv { background: var(--blauhell); }
+
+/* ============================================================
+   DESIGN-SCHICHT 26.08. (Konto-Ordner): loeschbar, nur Optik.
+   ============================================================ */
+.ordnerpflicht { border: 2px solid #1a2c50; background: #f2f5fb;
+  padding: 10px 12px; margin-top: 8px; }
+.ordnerpflicht button { margin: 6px 6px 0 0; }
+.ordnerpflicht input { margin-top: 6px; }
+.ordnerfilter { margin: 4px 0 8px 0; }
+.ordnerfilter button { margin: 0 4px 4px 0; }
+.ordnerfilter button.aktiv { background: #1a2c50; color: #fff; border-color: #1a2c50; }
+.ordnerzeile { margin: 6px 0; }
+tr.ohneordner td { background: #fff8e1; }

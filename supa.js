@@ -125,12 +125,13 @@ async function supaScheineLaden(bereichId) {
   return r.data || [];
 }
 
-async function supaScheinAnlegen(bereichId, daten, foto, fotoName) {
+async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
   const u = await supaNutzer();
   return await supa.from("kt_scheine").insert({
     bereich: bereichId, angelegt_von: u.id, daten: daten,
     foto: foto || null, foto_name: fotoName || null,
-    stand: daten.stand || "offen", notiz: daten.notiz || ""
+    stand: daten.stand || "offen", notiz: daten.notiz || "",
+    ordner: ordnerId || null
   });
 }
 
@@ -260,4 +261,44 @@ async function supaSatzFotoHochladen(bereichId, satzDatum, fotoDataUrl) {
 
 async function supaSatzUploadLoeschen(id) {
   return await supa.from("kt_satz_uploads").delete().eq("id", id);
+}
+
+// ---------- Konto-Ordner (Unterordner fuer die Kombinationen) ----------
+// Karams Regel: jeder Ordner ist ein Account/eine Person, bei der gesetzt
+// wurde. Die Buchhaltung bleibt EINE - die Ordner sortieren nur die Scheine.
+
+async function supaOrdnerLaden(bereichId) {
+  const r = await supa.from("kt_ordner").select("id, name")
+    .eq("bereich", bereichId).order("name", { ascending: true });
+  return r.data || [];
+}
+
+async function supaOrdnerAnlegen(bereichId, name) {
+  const sauber = (name || "").trim();
+  if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
+  if (sauber.length > 60) return { fehler: "Hoechstens 60 Zeichen." };
+  const r = await supa.from("kt_ordner").insert({ bereich: bereichId, name: sauber })
+    .select("id, name").single();
+  if (r.error) {
+    if (String(r.error.message).includes("duplicate")) return { fehler: "Diesen Ordner gibt es schon." };
+    return { fehler: r.error.message };
+  }
+  return { ok: true, ordner: r.data };
+}
+
+async function supaOrdnerUmbenennen(id, name) {
+  const sauber = (name || "").trim();
+  if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
+  // RLS-Lektion: verbotenes UPDATE gibt keinen Fehler, nur 0 Zeilen - deshalb select()
+  const r = await supa.from("kt_ordner").update({ name: sauber }).eq("id", id).select("id").maybeSingle();
+  if (r.error) {
+    if (String(r.error.message).includes("duplicate")) return { fehler: "Diesen Ordner gibt es schon." };
+    return { fehler: r.error.message };
+  }
+  if (!r.data) return { fehler: "Nicht erlaubt oder Ordner weg." };
+  return { ok: true };
+}
+
+async function supaOrdnerLoeschen(id) {
+  return await supa.from("kt_ordner").delete().eq("id", id);
 }
