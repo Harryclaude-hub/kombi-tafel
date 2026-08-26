@@ -42,6 +42,8 @@ function zeichneOriginal() {
 
   // Nur der offene Ordner; die Gruppen ("Bilder") ergeben sich aus den id-Praefixen
   const basis = (typeof satzWetten === "function") ? satzWetten() : WETTEN;
+  // Extra-Zeilen (Storno, Ueberlappung) gehoeren nur zum Foto-Satz vom 24.08.
+  const extraZeigen = (typeof aktiverSatzId !== "function" || aktiverSatzId() === "2026-08-24");
   const gruppen = [];
   for (const w of basis) {
     const g = w.id.split(".")[0];
@@ -79,7 +81,6 @@ function zeichneOriginal() {
     }
   }
 
-  const extraZeigen = (typeof aktiverSatzId !== "function" || aktiverSatzId() === "2026-08-24");
   document.getElementById("rohzaehler").textContent = !extraZeigen
     ? (basis.length + " Wetten in diesem Ordner.")
     :
