@@ -235,3 +235,5 @@ label.fotoknopf { margin-left: 12px; font-size: 12px; padding: 2px 8px;
 .s-foto { padding: 6px 8px; background: #f7f7f7; border-top: 1px solid #ddd; }
 .s-foto img { max-width: 100%; border: 1px solid #999; }
 img.minifoto { max-width: 120px; border: 1px solid #999; margin-top: 3px; }
+button.aufloesen { margin-left: 8px; font-size: 12px; padding: 2px 8px;
+  border: 1px solid #c8102e; color: #c8102e; background: #fff; cursor: pointer; }
