@@ -23,7 +23,7 @@ async function anrufBereit() {
   try {
     const u = await supaNutzer();
     if (!u || anrufEigenerKanal) return;
-    anrufEigenerKanal = supa.channel("kt-anruf-" + u.id);
+    anrufEigenerKanal = supa.channel("kt-anruf-" + u.id, { config: { broadcast: { self: true } } });
     anrufEigenerKanal.on("broadcast", { event: "signal" }, p => anrufSignal(p.payload));
     anrufEigenerKanal.subscribe();
   } catch (e) { /* Anrufe stoeren nie die Seite */ }
