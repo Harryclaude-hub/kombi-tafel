@@ -599,14 +599,35 @@ function scheinMerken(scheinId) {
     return { id: w.id, spiel: w.spiel, wette: w.wette, linie: w.o[eintrag.optIdx][0],
              quote: rund2(q.echt), quelle: q.quelle };
   });
-  const v = liesVerlauf();
-  v.unshift({
+  const eintrag = {
     zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz,
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
-  });
-  speichereVerlauf(v);
-  meldung("Schein " + s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
+  };
+  const foto = localStorage.getItem(fotoSchluessel(scheinId));
+  const fotoNameWert = localStorage.getItem(fotoSchluessel(scheinId) + "_name");
+
+  // Eingeloggt? Dann direkt ins Konto, sonst wie bisher auf dieses Geraet.
+  if (typeof supaNutzer === "function" && window.supa) {
+    supaNutzer().then(u => {
+      if (u) {
+        supaScheinAnlegen(u.id, eintrag, foto, fotoNameWert).then(r => {
+          if (r.error) meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn");
+          else meldung("Schein " + s.nr + " in dein Konto gespeichert: <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
+        });
+      } else {
+        const v = liesVerlauf();
+        v.unshift(eintrag);
+        speichereVerlauf(v);
+        meldung("Schein " + s.nr + " auf diesem Geraet gespeichert. Melde dich in <a href=\"mein.html\"><b>Mein Bereich</b></a> an, um ihn ins Konto zu holen und zu teilen.", "gut");
+      }
+    });
+  } else {
+    const v = liesVerlauf();
+    v.unshift(eintrag);
+    speichereVerlauf(v);
+    meldung("Schein " + s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
+  }
   zeichneVerlauf();
   zeichneKonto();
 }
