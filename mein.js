@@ -159,6 +159,7 @@ async function zeigeApp() {
 gesetzt hast. Jede Kombination gehoert in einen Ordner - die Buchhaltung oben bleibt EINE
 gemeinsame, die Ordner sortieren nur die Scheine.</p>
 <div id="ordnerbox"></div>
+<div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="scheine_db"></div>
 <h2>Chat dieses Bereichs</h2>
@@ -404,9 +405,13 @@ function zeichneOrdnerBox(scheine) {
 
   let filter = '<div class="ordnerfilter">' +
     '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'alle\')">Alle (' + scheine.length + ")</button> ";
+  let irgendwoWarnung = false;
   for (const o of ordnerListe) {
+    const warn = personPruefen(o.id, scheine).probleme.length > 0;
+    if (warn) irgendwoWarnung = true;
     filter += '<button class="' + (ordnerFilter === o.id ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'' + o.id + '\')">' +
-      textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")</button> ";
+      textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")" +
+      (warn ? ' <span class="warnbadge">!</span>' : "") + "</button> ";
   }
   filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Ordner (' + ohne + ")</button></div>";
 
@@ -429,6 +434,8 @@ function zeichneOrdnerBox(scheine) {
       "</div></details>";
   }
   box.innerHTML = filter + verwalten +
+    (irgendwoWarnung ? '<p class="mini rot"><b>Ein rotes ! heisst:</b> die Personen-Kasse dieser Person ' +
+      "geht sich nicht aus. Person anklicken und nachsehen.</p>" : "") +
     (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
       " ohne Ordner</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
 }
@@ -474,7 +481,9 @@ async function zeichneBereich() {
   ordnerListe = await supaOrdnerLaden(aktiverBereich.id);
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
+  personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
   zeichneOrdnerBox(scheine);
+  zeichnePersonenKasse(scheine);
   const gefiltert = (ordnerFilter === "alle") ? scheine
     : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
     : scheine.filter(s => s.ordner === ordnerFilter);
@@ -493,7 +502,7 @@ function zeichneKontoDb(scheine) {
     const k = konto[kz];
     k.n++; k.ein += s.daten.einsatz || 0;
     if (s.stand === "offen") { k.offen++; k.imSpiel += s.daten.einsatz || 0; }
-    else if (s.stand === "gewonnen") { k.gew++; k.zur += s.daten.moeglich || 0; }
+    else if (s.stand === "gewonnen") { k.gew++; k.zur += echtZurueckWert(s); }
     else k.ver++;
   }
   const kz_ = Object.keys(konto);
@@ -525,7 +534,7 @@ function zeichneScheineDb(scheine) {
     'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" druecken.</p>'; return; }
   const schreib = darfSchreiben();
   let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Konto-Ordner</th><th>Wetten</th><th>Quote</th>" +
-    "<th>Einsatz</th><th>Moeglich</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
+    "<th>Einsatz</th><th>Moeglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
     const ordnerZelle = schreib
@@ -541,6 +550,7 @@ function zeichneScheineDb(scheine) {
         '<div><img src="' + s.foto + '" class="minifoto"></div>' : "") + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
+      "<td>" + echtZelle(s, schreib) + "</td>" +
       "<td>" + (schreib
         ? "<select onchange=\"tuStand('" + s.id + "', this.value)\">" +
           ["offen", "gewonnen", "verloren"].map(o => "<option" + (s.stand === o ? " selected" : "") + ">" + o + "</option>").join("") + "</select>"
@@ -580,6 +590,191 @@ async function tuKopieren(id) {
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
     : "In deinen Bereich kopiert - er liegt dort unter \"ohne Ordner\", bitte einem deiner Konto-Ordner zuordnen.",
     r.error ? "warn" : "gut");
+}
+
+// ---------- Personen-Kasse ----------
+// Jede Person (Konto-Ordner) hat vier Zahlungswege: PayPal, Paysafe,
+// Neteller, Skrill. Karam schreibt manuell: was auf einen Weg ERHALTEN
+// wurde, was davon ZU einem Wettanbieter eingezahlt und was VOM Anbieter
+// zurueckgeholt wurde. Das Programm rechnet gegen die Kombinationen der
+// Person und warnt, wenn etwas keinen Sinn ergibt. Die Zwei-Listen-
+// Buchhaltung oben bleibt davon unberuehrt.
+
+let personBuchungen = [];
+
+const KASSE_WEGE = [["paypal", "PayPal"], ["paysafe", "Paysafe"], ["neteller", "Neteller"], ["skrill", "Skrill"]];
+const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"], ["vom_anbieter", "vom Anbieter zurueck"]];
+const KASSE_ANBIETER = [["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"], ["st", "Stake"]];
+
+function wegName(w) { const x = KASSE_WEGE.find(k => k[0] === w); return x ? x[1] : w; }
+function artName(a) { const x = KASSE_ARTEN.find(k => k[0] === a); return x ? x[1] : a; }
+
+// Was kam bei einem gewonnenen Schein WIRKLICH zurueck? Solange nichts
+// eingetragen ist, rechnen wir mit "moeglich" (also ohne Gebuehren).
+function echtZurueckWert(s) {
+  return (s.echt_zurueck !== null && s.echt_zurueck !== undefined)
+    ? Number(s.echt_zurueck) : (s.daten.moeglich || 0);
+}
+
+function echtZelle(s, schreib) {
+  if (s.stand !== "gewonnen") return "<span class='mini'>-</span>";
+  const moeglich = s.daten.moeglich || 0;
+  const hat = s.echt_zurueck !== null && s.echt_zurueck !== undefined;
+  const gebuehr = hat ? (moeglich - Number(s.echt_zurueck)) : 0;
+  const gebuehrText = (hat && gebuehr > 0.004)
+    ? "<div class='mini rot'>Gebuehren: " + gebuehr.toFixed(2) + " &euro;</div>" : "";
+  if (!schreib) return (hat ? Number(s.echt_zurueck).toFixed(2) + " &euro;" : "<span class='mini'>-</span>") + gebuehrText;
+  return "<input type='number' step='0.01' min='0' class='einsatz' value='" +
+    (hat ? Number(s.echt_zurueck) : "") + "' placeholder='" + moeglich.toFixed(2) + "' " +
+    "onchange=\"tuEchtZurueck('" + s.id + "', this.value)\"> &euro;" + gebuehrText;
+}
+
+async function tuEchtZurueck(id, wert) {
+  const zahl = wert === "" ? null : parseFloat(wert);
+  if (zahl !== null && (isNaN(zahl) || zahl < 0)) { meldungM("Bitte einen gueltigen Betrag eintragen.", "warn"); return; }
+  const r = await supaScheinAendern(id, { echt_zurueck: zahl });
+  if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  zeichneBereich();
+}
+
+// Prueft eine Person: Stand je Zahlungsweg und rechnerisches Guthaben je
+// Anbieter. Negativ heisst: die Zahlen koennen so nicht stimmen.
+function personPruefen(ordnerId, scheine) {
+  const buch = personBuchungen.filter(b => b.ordner === ordnerId);
+  const meine = scheine.filter(s => s.ordner === ordnerId);
+  const wege = {};
+  for (const [w] of KASSE_WEGE) wege[w] = { erhalten: 0, hin: 0, zurueck: 0, stand: 0 };
+  const anbieter = {};
+  for (const [kz] of KASSE_ANBIETER) anbieter[kz] = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, guthaben: 0 };
+  for (const b of buch) {
+    const betrag = Number(b.betrag) || 0;
+    if (!wege[b.weg]) continue;
+    if (b.art === "erhalten") wege[b.weg].erhalten += betrag;
+    else if (b.art === "zum_anbieter") { wege[b.weg].hin += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].einge += betrag; }
+    else { wege[b.weg].zurueck += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].geholt += betrag; }
+  }
+  for (const s of meine) {
+    const a = anbieter[s.daten.kz];
+    if (!a) continue;
+    a.einsatz += s.daten.einsatz || 0;
+    if (s.stand === "gewonnen") a.gewonnen += echtZurueckWert(s);
+  }
+  const probleme = [];
+  for (const [w, nameW] of KASSE_WEGE) {
+    const x = wege[w];
+    x.stand = x.erhalten - x.hin + x.zurueck;
+    if (x.stand < -0.004) probleme.push(nameW + " ist im Minus (" + x.stand.toFixed(2) +
+      " Euro): mehr weitergezahlt als erhalten. Buchung vergessen oder falsch eingetragen.");
+  }
+  for (const [kz, nameA] of KASSE_ANBIETER) {
+    const a = anbieter[kz];
+    a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen;
+    if (a.guthaben < -0.004) probleme.push("Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
+      a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurueckgeholt als eingezahlt und gewonnen. " +
+      "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehoert zu einer anderen Person.");
+  }
+  const eingesamt = buch.filter(b => b.art === "zum_anbieter").reduce((p, b) => p + Number(b.betrag), 0);
+  const erhaltengesamt = buch.filter(b => b.art === "erhalten").reduce((p, b) => p + Number(b.betrag), 0);
+  return { wege: wege, anbieter: anbieter, probleme: probleme, buch: buch,
+    eingesamt: eingesamt, erhaltengesamt: erhaltengesamt };
+}
+
+function heuteDatum() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+
+function zeichnePersonenKasse(scheine) {
+  const box = el("personenkasse");
+  if (!box) return;
+  const person = ordnerListe.find(o => o.id === ordnerFilter);
+  if (!person) { box.innerHTML = ""; return; }
+  const schreib = darfSchreiben();
+  const p = personPruefen(person.id, scheine);
+
+  let html = '<div class="kassenkasten"><h3>Personen-Kasse: ' + textSicherM(person.name) + "</h3>";
+  if (p.probleme.length) {
+    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte pruefen:</b><ul>' +
+      p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
+  } else if (p.buch.length) {
+    html += '<p class="mini gruen"><b>Alles geht sich aus:</b> Buchungen und Kombinationen passen zusammen.</p>';
+  }
+  html += "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " &euro;</b> &nbsp;&nbsp; " +
+    "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " &euro;</b></p>";
+
+  html += "<table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
+    "<th>zurueck</th><th>Stand jetzt</th></tr></thead><tbody>";
+  for (const [w, nameW] of KASSE_WEGE) {
+    const x = p.wege[w];
+    html += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
+      "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
+      "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td></tr>";
+  }
+  html += "</tbody></table>";
+
+  html += "<table><thead><tr><th>Anbieter</th><th>eingezahlt</th><th>zurueckgeholt</th>" +
+    "<th>eingesetzt</th><th>wirklich gewonnen</th><th>rechnerisch dort</th></tr></thead><tbody>";
+  for (const kz of ["iw", "bw", "b3", "st"]) {
+    const a = p.anbieter[kz];
+    html += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
+      "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
+      "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
+      "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
+  }
+  html += "</tbody></table>";
+
+  if (schreib) {
+    html += '<div class="kassenformular"><b>Neue Buchung:</b> ' +
+      '<input type="date" id="pk_datum" value="' + heuteDatum() + '"> ' +
+      '<select id="pk_weg">' + KASSE_WEGE.map(w => "<option value='" + w[0] + "'>" + w[1] + "</option>").join("") + "</select> " +
+      '<select id="pk_art" onchange="pkArtWechsel()">' + KASSE_ARTEN.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
+      '<select id="pk_anbieter" style="display:none">' + KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
+      '<input type="number" id="pk_betrag" step="0.01" min="0" class="einsatz" placeholder="Betrag"> &euro; ' +
+      '<input id="pk_notiz" placeholder="Notiz (freiwillig)"> ' +
+      '<button class="haupt" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button></div>';
+  }
+
+  if (p.buch.length) {
+    html += "<table><thead><tr><th>Datum</th><th>Zahlungsweg</th><th>Was</th><th>Anbieter</th>" +
+      "<th>Betrag</th><th>Notiz</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
+    for (const b of p.buch.slice().reverse()) {
+      html += "<tr><td class='mini'>" + b.datum + "</td><td>" + wegName(b.weg) + "</td>" +
+        "<td>" + artName(b.art) + "</td><td>" + (b.anbieter ? markeM(b.anbieter) : "-") + "</td>" +
+        "<td><b>" + Number(b.betrag).toFixed(2) + " &euro;</b></td>" +
+        "<td class='mini'>" + textSicherM(b.notiz || "") + "</td>" +
+        (schreib ? "<td><button onclick=\"tuPersonBuchungWeg(" + b.id + ")\">weg</button></td>" : "") + "</tr>";
+    }
+    html += "</tbody></table>";
+  } else {
+    html += '<p class="mini">Noch keine Buchungen bei dieser Person. Trag oben ein, was du ' +
+      "erhalten und was du zu den Anbietern eingezahlt hast.</p>";
+  }
+  html += "</div>";
+  box.innerHTML = html;
+}
+
+function pkArtWechsel() {
+  el("pk_anbieter").style.display = el("pk_art").value === "erhalten" ? "none" : "";
+}
+
+async function tuPersonBuchen(ordnerId) {
+  const betrag = parseFloat(el("pk_betrag").value);
+  if (!betrag || betrag <= 0) { meldungM("Bitte einen Betrag eintragen.", "warn"); return; }
+  const datum = el("pk_datum").value;
+  if (!datum) { meldungM("Bitte ein Datum waehlen.", "warn"); return; }
+  const art = el("pk_art").value;
+  const r = await supaPersonBuchen(aktiverBereich.id, ordnerId, datum,
+    el("pk_weg").value, art, art === "erhalten" ? null : el("pk_anbieter").value,
+    betrag, el("pk_notiz").value.trim());
+  if (r.error) { meldungM("Nicht gebucht: " + r.error.message, "warn"); return; }
+  zeichneBereich();
+}
+
+async function tuPersonBuchungWeg(id) {
+  const r = await supaPersonBuchungLoeschen(id);
+  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  zeichneBereich();
 }
 
 // ---------- Foto-Saetze hochladen ----------

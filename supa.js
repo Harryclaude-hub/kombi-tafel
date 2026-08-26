@@ -302,3 +302,24 @@ async function supaOrdnerUmbenennen(id, name) {
 async function supaOrdnerLoeschen(id) {
   return await supa.from("kt_ordner").delete().eq("id", id);
 }
+
+// ---------- Personen-Kasse (Zahlungswege je Konto-Ordner) ----------
+
+async function supaPersonBuchungenLaden(bereichId) {
+  const r = await supa.from("kt_person_zahlungen").select("*")
+    .eq("bereich", bereichId).order("datum", { ascending: true }).order("id", { ascending: true });
+  return r.data || [];
+}
+
+async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, betrag, notiz) {
+  const u = await supaNutzer();
+  return await supa.from("kt_person_zahlungen").insert({
+    bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
+    weg: weg, art: art, anbieter: art === "erhalten" ? null : anbieter,
+    betrag: betrag, notiz: notiz || ""
+  });
+}
+
+async function supaPersonBuchungLoeschen(id) {
+  return await supa.from("kt_person_zahlungen").delete().eq("id", id);
+}

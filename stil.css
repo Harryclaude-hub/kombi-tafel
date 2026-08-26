@@ -450,3 +450,13 @@ button.freundknopf.aktiv { background: var(--blau); color: #fff; }
 .ordnerfilter button.aktiv { background: #1a2c50; color: #fff; border-color: #1a2c50; }
 .ordnerzeile { margin: 6px 0; }
 tr.ohneordner td { background: #fff8e1; }
+
+/* Personen-Kasse (Design-Schicht, loeschbar) */
+.kassenkasten { border: 2px solid #1a2c50; padding: 10px 14px; margin: 10px 0; }
+.kassenkasten h3 { margin-top: 0; }
+.kassenkasten table { margin: 8px 0; }
+.kassenwarnung { border: 2px solid #a00000; background: #fdeaea; color: #a00000;
+  padding: 8px 12px; margin: 6px 0; }
+.kassenformular { margin: 10px 0; padding: 8px; background: #f2f5fb; }
+.warnbadge { display: inline-block; background: #a00000; color: #fff;
+  border-radius: 50%; min-width: 16px; padding: 0 5px; font-weight: bold; }
