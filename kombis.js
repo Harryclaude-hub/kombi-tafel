@@ -200,18 +200,19 @@ function findeErsatz(z, kz, ausgeschlossen) {
   const drin = verbraucht(z);
   const kenn = verbrauchteKennungen(z);
   const raus = new Set(ausgeschlossen || []);
-  const kandidaten = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
-    .filter(w => !drin.has(w.id) && !raus.has(w.id) && !kenn.has(spielKennung(w)))
-    .filter(w => verfuegbarkeit(w)[kz] !== "N");
+  const frei = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
+    .filter(w => !drin.has(w.id) && !raus.has(w.id) && !kenn.has(spielKennung(w)));
+  const mitMarkt = frei.filter(w => verfuegbarkeit(w)[kz] !== "N");
   const bewertet = [];
-  for (const w of kandidaten) {
+  for (const w of mitMarkt) {
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
     if (q.echt >= e.mind - 0.0001) bewertet.push({ w: w, optIdx: optIdx, echt: q.echt });
   }
-  if (!bewertet.length) return null;
+  const info = { frei: frei.length, mitMarkt: mitMarkt.length, passend: bewertet.length };
+  if (!bewertet.length) return { treffer: null, info: info };
   bewertet.sort((a, b) => liesAnstoss(anstossFeld(a.w)).zeit - liesAnstoss(anstossFeld(b.w)).zeit);
-  return { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx };
+  return { treffer: { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx }, info: info };
 }
 
 function wetteRaus(scheinId, wettId, grund) {
@@ -229,16 +230,25 @@ function wetteRaus(scheinId, wettId, grund) {
   // Ersatz suchen, der beim GLEICHEN Anbieter verfuegbar ist
   const ausgeschlossen = [];
   for (const s of z.scheine) for (const en of s.entfernt) ausgeschlossen.push(en.id);
-  const ersatz = findeErsatz(z, sch.kz, ausgeschlossen);
-  if (ersatz) {
-    sch.wetten.splice(pos, 0, ersatz);
+  const suche = findeErsatz(z, sch.kz, ausgeschlossen);
+  if (suche.treffer) {
+    sch.wetten.splice(pos, 0, suche.treffer);
     speichereZustand(z);
-    meldung("Ersatz nachgerueckt: " + wetteNachId(ersatz.id).spiel + " (bei " +
-      anbieterName(sch.kz) + " verfuegbar, ueber der Mindestquote).", "gut");
+    meldung("Ersatz nachgerueckt: <b>" + wetteNachId(suche.treffer.id).spiel + "</b> " +
+      "(bei " + anbieterName(sch.kz) + " verfuegbar und ueber der Mindestquote).", "gut");
   } else {
-    meldung("Kein Ersatz gefunden, der bei " + anbieterName(sch.kz) +
-      " verfuegbar ist und die Mindestquote schafft. Der Schein hat jetzt nur noch " +
-      sch.wetten.length + " Wetten.", "warn");
+    const i = suche.info;
+    let grundText;
+    if (i.frei === 0) grundText = "Es ist keine einzige Wette mehr frei, alle stecken schon in Scheinen.";
+    else if (i.mitMarkt === 0) grundText = "Von den " + i.frei + " freien Wetten fuehrt " +
+      anbieterName(sch.kz) + " keine einzige.";
+    else grundText = "Von den " + i.frei + " freien Wetten fuehrt " + anbieterName(sch.kz) +
+      " zwar " + i.mitMarkt + ", aber keine davon schafft deine Mindestquote " +
+      z.einst.mind.toFixed(2) + ".";
+    meldung("<b>Kein Ersatz gefunden.</b> " + grundText +
+      " Der Schein hat jetzt " + sch.wetten.length + " Wetten. Deine Moeglichkeiten: " +
+      "als " + sch.wetten.length + "er stehen lassen, oder oben auf <b>Anders mischen</b> " +
+      "druecken (verteilt alles neu), oder die Mindestquote senken.", "warn");
   }
   zeichne_();
 }
@@ -401,6 +411,8 @@ function scheinHtml(s, z) {
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
     "Schein " + s.nr + ' <span class="s-anb">' + anbieterName(s.kz) + "</span>" +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
+    (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
+      ' Wetten, kein Dreier mehr</span>' : "") +
     '<span class="s-quote">' + s.wetten.length + "er, Gesamtquote <b>" + rund2(gesamt).toFixed(2) + "</b>" +
     (GEBUEHREN_TEILER[s.kz] !== 1 ? ' <span class="mini">(Schein zeigt ' + rund2(gesamtRoh).toFixed(2) + ")</span>" : "") +
     (alleFest ? ' <span class="mini gruen">alle Quoten selbst geprueft</span>'
@@ -416,6 +428,9 @@ function scheinHtml(s, z) {
       "id='e_" + s.id + "' value='10' oninput=\"rechneGewinn('" + s.id + "'," + gesamt + ")\"> &euro;" +
       ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(10 * gesamt).toFixed(2) + " &euro;</b>" +
       '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
+      (s.wetten.length !== 3
+        ? '<button class="aufloesen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein aufloesen</button>'
+        : "") +
       '<label class="fotoknopf">Foto vom Wettschein' +
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
@@ -442,6 +457,15 @@ function zeichneReste(z) {
   html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
   html += liste(z.keinMarkt, "Kein erlaubter Anbieter", "Keiner der angehakten Anbieter fuehrt diesen Markt.");
   document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
+}
+
+function scheinAufloesen(scheinId) {
+  const z = liesZustand();
+  z.scheine = z.scheine.filter(s => s.id !== scheinId);
+  speichereZustand(z);
+  meldung("Schein aufgeloest. Die Wetten sind wieder frei und werden beim naechsten " +
+    "Anders mischen neu verteilt.", "gut");
+  zeichne_();
 }
 
 function rechneGewinn(scheinId, gesamt) {
