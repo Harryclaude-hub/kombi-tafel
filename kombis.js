@@ -349,6 +349,14 @@ function quoteEintragen(scheinId, wettId, feld) {
     return;
   }
   feld.classList.remove("fehler");
+  // Karams Regel: unter der Mindestquote ist gesperrt (oben), weit UEBER der
+  // Foto-Quote gibt es eine Mahnung - das riecht nach Tippfehler.
+  const fotoRoh = w.o[eintrag.optIdx][1];
+  if (fotoRoh && roh > fotoRoh * 1.15) {
+    meldung("<b>Mahnung, bitte pruefen:</b> deine Quote <b>" + roh.toFixed(2) + "</b> liegt weit ueber der " +
+      "Foto-Quote <b>" + fotoRoh.toFixed(2) + "</b> (mehr als 15 Prozent drueber). Vertippt? " +
+      "Uebernommen ist sie trotzdem - wenn sie wirklich stimmt, ist alles gut.", "warn");
+  }
   speichereEingabe(wettId, opt, sch.kz, String(roh));
   merkeGeprueft(wettId, sch.kz);
   zeichne_();

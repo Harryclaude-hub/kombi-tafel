@@ -401,10 +401,17 @@ function zeichneOrdnerBox(scheine) {
   const box = el("ordnerbox");
   if (!box) return;
   const zahl = {};
-  let ohne = 0;
+  const wartend = {};
+  let ohne = 0, ohneWartend = 0;
   for (const s of scheine) {
-    if (s.ordner) zahl[s.ordner] = (zahl[s.ordner] || 0) + 1;
-    else ohne++;
+    const fertig = scheinWartet(s);
+    if (s.ordner) {
+      zahl[s.ordner] = (zahl[s.ordner] || 0) + 1;
+      if (fertig) wartend[s.ordner] = (wartend[s.ordner] || 0) + 1;
+    } else {
+      ohne++;
+      if (fertig) ohneWartend++;
+    }
   }
   const schreib = darfSchreiben();
 
@@ -416,9 +423,11 @@ function zeichneOrdnerBox(scheine) {
     if (warn) irgendwoWarnung = true;
     filter += '<button class="' + (ordnerFilter === o.id ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'' + o.id + '\')">' +
       textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")" +
+      (wartend[o.id] ? ' <span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "") +
       (warn ? ' <span class="warnbadge">!</span>' : "") + "</button> ";
   }
-  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")</button></div>";
+  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")" +
+    (ohneWartend ? ' <span class="fertigbadge">' + ohneWartend + ' fertig</span>' : "") + "</button></div>";
 
   let verwalten = "";
   if (schreib) {
@@ -443,7 +452,10 @@ function zeichneOrdnerBox(scheine) {
       (zeilen ? '<details><summary>Personen verwalten (umbenennen, loeschen)</summary>' +
         '<div class="inhalt"><div>' + zeilen + "</div></div></details>" : "");
   }
+  const wartendGesamt = Object.values(wartend).reduce((p, x) => p + x, 0) + ohneWartend;
   box.innerHTML = filter + verwalten +
+    (wartendGesamt ? '<p class="mini"><b>fertig</b> heisst: alle Spiele dieses Scheins sind aus - ' +
+      "bitte Person anklicken und unten <b>gewonnen oder verloren</b> eintragen, dann stimmt das Geld.</p>" : "") +
     (irgendwoWarnung ? '<p class="mini rot"><b>Ein rotes ! heisst:</b> die Personen-Kasse dieser Person ' +
       "geht sich nicht aus. Person anklicken und nachsehen.</p>" : "") +
     (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
@@ -497,6 +509,7 @@ async function zeichneBereich() {
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
   personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
+  kasseScheine = scheine;
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);
   const gefiltert = (ordnerFilter === "alle") ? scheine
@@ -558,7 +571,10 @@ function zeichneScheineDb(scheine) {
         ordnerListe.map(o => "<option value='" + o.id + "'" + (s.ordner === o.id ? " selected" : "") +
           ">" + textSicherM(o.name) + "</option>").join("") + "</select>"
       : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?") : "<span class='mini'>ohne</span>");
-    html += "<tr" + (!s.ordner ? " class='ohneordner'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
+    const zklassen = [];
+    if (!s.ordner) zklassen.push("ohneordner");
+    if (scheinWartet(s)) zklassen.push("fertigzeile");
+    html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
       "<td class='mini'>" + (d.wetten || []).map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
       (s.foto ? '<div class="fotoname mini">' + (s.foto_name || "") + "</div>" +
@@ -569,7 +585,8 @@ function zeichneScheineDb(scheine) {
       "<td>" + (schreib
         ? "<select onchange=\"tuStand('" + s.id + "', this.value)\">" +
           ["offen", "gewonnen", "verloren"].map(o => "<option" + (s.stand === o ? " selected" : "") + ">" + o + "</option>").join("") + "</select>"
-        : s.stand) + "</td>" +
+        : s.stand) +
+      (scheinWartet(s) ? "<div class='mini fertigmark'>alle Spiele aus - Ergebnis?</div>" : "") + "</td>" +
       "<td class='notizzelle'>" + (schreib
         ? "<textarea class='notizfeld' onchange=\"tuNotiz('" + s.id + "', this.value)\">" + (s.notiz || "") + "</textarea>"
         : "<span class='mini'>" + (s.notiz || "") + "</span>") + "</td>" +
@@ -617,6 +634,7 @@ async function tuKopieren(id) {
 // Buchhaltung oben bleibt davon unberuehrt.
 
 let personBuchungen = [];
+let kasseScheine = [];
 
 const KASSE_WEGE = [["paypal", "PayPal"], ["paysafe", "Paysafe"], ["neteller", "Neteller"], ["skrill", "Skrill"]];
 const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"], ["vom_anbieter", "vom Anbieter zurueck"]];
@@ -675,6 +693,13 @@ function personPruefen(ordnerId, scheine) {
     if (!a) continue;
     a.einsatz += s.daten.einsatz || 0;
     if (s.stand === "gewonnen") a.gewonnen += echtZurueckWert(s);
+    if (s.stand === "offen") {
+      a.imSpiel = (a.imSpiel || 0) + (s.daten.einsatz || 0);
+      a.moeglichOffen = (a.moeglichOffen || 0) + (s.daten.moeglich || 0);
+      if (scheinWartet(s)) a.wartet = (a.wartet || 0) + 1;
+      const e = scheinEnde(s);
+      if (e && (!a.endeMax || e > a.endeMax)) a.endeMax = e;
+    }
   }
   const probleme = [];
   for (const [w, nameW] of KASSE_WEGE) {
@@ -694,6 +719,50 @@ function personPruefen(ordnerId, scheine) {
   const erhaltengesamt = buch.filter(b => b.art === "erhalten").reduce((p, b) => p + Number(b.betrag), 0);
   return { wege: wege, anbieter: anbieter, probleme: probleme, buch: buch,
     eingesamt: eingesamt, erhaltengesamt: erhaltengesamt };
+}
+
+// Wann ist ein Schein "fertig"? Wenn das letzte Spiel darin sicher aus ist
+// (Anstoss + 3 Stunden Spieldauer-Puffer). Ein fertiger OFFENER Schein
+// wartet auf Karams Bericht: gewonnen oder verloren.
+function scheinEnde(s) {
+  if (typeof wetteNachId !== "function") return null;
+  let ende = null;
+  for (const t of (s.daten.wetten || [])) {
+    const w = wetteNachId(t.id);
+    if (!w) return null;                        // Zeit unbekannt: nicht werten
+    const a = liesAnstoss(anstossFeld(w));
+    const e = new Date(a.zeit);
+    if (a.unklar) e.setHours(23, 59);
+    e.setHours(e.getHours() + 3);
+    if (!ende || e > ende) ende = e;
+  }
+  return ende;
+}
+
+function scheinWartet(s) {
+  if (s.stand !== "offen") return false;
+  const e = scheinEnde(s);
+  return !!e && new Date() > e;
+}
+
+function kasseZeit(d) {
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
+    ". " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+// Was in Ansicht UND PDF gezeigt wird, je Person gemerkt (z. B. kein Neteller)
+function kasseZeigen(ordnerId) {
+  try {
+    const s = JSON.parse(localStorage.getItem("kt_kasse_zeigen_" + ordnerId) || "{}");
+    return { wege: s.wege || {}, anbieter: s.anbieter || {} };
+  } catch (e) { return { wege: {}, anbieter: {} }; }
+}
+
+function tuKasseZeigen(ordnerId, typ, key, an) {
+  const z = kasseZeigen(ordnerId);
+  z[typ][key] = !!an;
+  localStorage.setItem("kt_kasse_zeigen_" + ordnerId, JSON.stringify(z));
+  zeichneBereich();
 }
 
 function heuteDatum() {
@@ -717,12 +786,33 @@ function zeichnePersonenKasse(scheine) {
   } else if (p.buch.length) {
     html += '<p class="mini gruen"><b>Alles geht sich aus:</b> Buchungen und Kombinationen passen zusammen.</p>';
   }
+  const meineScheine = scheine.filter(s => s.ordner === person.id);
+  const wartendHier = meineScheine.filter(s => scheinWartet(s)).length;
+  if (wartendHier) {
+    html += '<div class="fertighinweis"><b>' + wartendHier + " Schein" + (wartendHier === 1 ? "" : "e") +
+      " fertig:</b> alle Spiele sind aus. Bitte unten in der Tabelle <b>gewonnen oder verloren</b> " +
+      "eintragen - erst dann stimmt die Rechnung hier.</div>";
+  }
   html += "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " &euro;</b> &nbsp;&nbsp; " +
     "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " &euro;</b></p>";
+
+  // Was gezeigt wird (Ansicht UND PDF) - z. B. kein Neteller: Haken weg
+  const zg = kasseZeigen(person.id);
+  html += '<div class="kassewahl mini"><b>Zeigen (gilt auch fuers PDF):</b> ';
+  for (const [w, nameW] of KASSE_WEGE) {
+    html += '<label><input type="checkbox"' + (zg.wege[w] !== false ? " checked" : "") +
+      ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
+  }
+  for (const [kz, nameA] of KASSE_ANBIETER) {
+    html += '<label><input type="checkbox"' + (zg.anbieter[kz] !== false ? " checked" : "") +
+      ' onchange="tuKasseZeigen(\'' + person.id + "','anbieter','" + kz + '\', this.checked)"> ' + nameA + "</label> ";
+  }
+  html += '<button onclick="tuKassePdf(\'' + person.id + '\')">Als PDF herunterladen</button></div>';
 
   html += "<table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
     "<th>zurueck</th><th>Stand jetzt</th></tr></thead><tbody>";
   for (const [w, nameW] of KASSE_WEGE) {
+    if (zg.wege[w] === false) continue;
     const x = p.wege[w];
     html += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
       "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
@@ -731,12 +821,18 @@ function zeichnePersonenKasse(scheine) {
   html += "</tbody></table>";
 
   html += "<table><thead><tr><th>Anbieter</th><th>eingezahlt</th><th>zurueckgeholt</th>" +
-    "<th>eingesetzt</th><th>wirklich gewonnen</th><th>rechnerisch dort</th></tr></thead><tbody>";
+    "<th>eingesetzt</th><th>im Spiel (wartet)</th><th>moeglich offen</th><th>wirklich gewonnen</th>" +
+    "<th>fertig</th><th>Ergebnis ab</th><th>rechnerisch dort</th></tr></thead><tbody>";
   for (const kz of ["iw", "bw", "b3", "st"]) {
+    if (zg.anbieter[kz] === false) continue;
     const a = p.anbieter[kz];
     html += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
       "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
+      "<td>" + (a.imSpiel || 0).toFixed(2) + " &euro;</td>" +
+      "<td>" + (a.moeglichOffen || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
+      "<td>" + (a.wartet ? "<b class='rot'>" + a.wartet + "</b>" : "-") + "</td>" +
+      "<td class='mini'>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td>" +
       "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
   }
   html += "</tbody></table>";
@@ -749,7 +845,7 @@ function zeichnePersonenKasse(scheine) {
       '<select id="pk_anbieter" style="display:none">' + KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
       '<input type="number" id="pk_betrag" step="0.01" min="0" class="einsatz" placeholder="Betrag"> &euro; ' +
       '<input id="pk_notiz" placeholder="Notiz (freiwillig)"> ' +
-      '<button class="haupt" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button></div>';
+      '<button class="haupt" id="pk_knopf" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button></div>';
   }
 
   if (p.buch.length) {
@@ -781,11 +877,96 @@ async function tuPersonBuchen(ordnerId) {
   const datum = el("pk_datum").value;
   if (!datum) { meldungM("Bitte ein Datum waehlen.", "warn"); return; }
   const art = el("pk_art").value;
+  // Buchhaltungsfehler frueh erwischen: reicht das Geld dafuer ueberhaupt?
+  // Erster Klick warnt nur, zweiter Klick ("Trotzdem eintragen") bucht.
+  const knopf = el("pk_knopf");
+  if (knopf && knopf.dataset.trotzdem !== "1") {
+    const p = personPruefen(ordnerId, kasseScheine);
+    let problem = null;
+    if (art === "zum_anbieter") {
+      const st = p.wege[el("pk_weg").value].stand;
+      if (st < betrag - 0.004) problem = "Auf " + wegName(el("pk_weg").value) + " liegen rechnerisch nur " +
+        st.toFixed(2) + " Euro, du willst aber " + betrag.toFixed(2) + " Euro weiterzahlen.";
+    } else if (art === "vom_anbieter") {
+      const g = p.anbieter[el("pk_anbieter").value].guthaben;
+      if (g < betrag - 0.004) problem = "Beim Anbieter sind rechnerisch nur " + g.toFixed(2) +
+        " Euro, du willst aber " + betrag.toFixed(2) + " Euro zurueckholen.";
+    }
+    if (problem) {
+      meldungM("<b>Passt rechnerisch nicht:</b> " + problem +
+        " Vermutlich fehlt eine Buchung davor. Wenn es trotzdem stimmt, druecke noch einmal.", "warn");
+      knopf.dataset.trotzdem = "1";
+      knopf.textContent = "Trotzdem eintragen";
+      return;
+    }
+  }
   const r = await supaPersonBuchen(aktiverBereich.id, ordnerId, datum,
     el("pk_weg").value, art, art === "erhalten" ? null : el("pk_anbieter").value,
     betrag, el("pk_notiz").value.trim());
   if (r.error) { meldungM("Nicht gebucht: " + r.error.message, "warn"); return; }
   zeichneBereich();
+}
+
+function tuKassePdf(ordnerId) {
+  const person = ordnerListe.find(o => o.id === ordnerId);
+  if (!person) return;
+  const p = personPruefen(ordnerId, kasseScheine);
+  const zg = kasseZeigen(ordnerId);
+  const jetzt = new Date();
+  let h = "<h1>Uebersicht: " + textSicherM(person.name) + "</h1>" +
+    "<p>Stand: " + kasseZeit(jetzt) + " Uhr</p>" +
+    "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " Euro</b><br>" +
+    "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " Euro</b></p>";
+
+  h += "<h2>Zahlungswege</h2><table><tr><th>Zahlungsweg</th><th>erhalten</th>" +
+    "<th>zum Anbieter</th><th>zurueck</th><th>Stand jetzt</th></tr>";
+  for (const [w, nameW] of KASSE_WEGE) {
+    if (zg.wege[w] === false) continue;
+    const x = p.wege[w];
+    h += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + "</td><td>" + x.hin.toFixed(2) +
+      "</td><td>" + x.zurueck.toFixed(2) + "</td><td><b>" + x.stand.toFixed(2) + "</b></td></tr>";
+  }
+  h += "</table>";
+
+  h += "<h2>Anbieter</h2><table><tr><th>Anbieter</th><th>eingezahlt</th><th>zurueckgeholt</th>" +
+    "<th>eingesetzt</th><th>im Spiel</th><th>moeglich offen</th><th>wirklich gewonnen</th>" +
+    "<th>Ergebnis ab</th><th>rechnerisch dort</th></tr>";
+  for (const [kz, nameA] of KASSE_ANBIETER) {
+    if (zg.anbieter[kz] === false) continue;
+    const a = p.anbieter[kz];
+    h += "<tr><td>" + nameA + "</td><td>" + a.einge.toFixed(2) + "</td><td>" + a.geholt.toFixed(2) +
+      "</td><td>" + a.einsatz.toFixed(2) + "</td><td>" + (a.imSpiel || 0).toFixed(2) +
+      "</td><td>" + (a.moeglichOffen || 0).toFixed(2) + "</td><td>" + a.gewonnen.toFixed(2) +
+      "</td><td>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td><td><b>" + a.guthaben.toFixed(2) + "</b></td></tr>";
+  }
+  h += "</table>";
+
+  const offene = kasseScheine.filter(s => s.ordner === ordnerId && s.stand === "offen" &&
+    zg.anbieter[s.daten.kz] !== false);
+  if (offene.length) {
+    h += "<h2>Offene Kombinationen</h2><table><tr><th>Anbieter</th><th>Spiele</th><th>Quote</th>" +
+      "<th>Einsatz</th><th>moeglich</th><th>Stand</th></tr>";
+    for (const s of offene) {
+      const e = scheinEnde(s);
+      h += "<tr><td>" + textSicherM(s.daten.anbieter || s.daten.kz) + "</td>" +
+        "<td>" + (s.daten.wetten || []).map(t => textSicherM(t.spiel)).join("<br>") + "</td>" +
+        "<td>" + (s.daten.quote || 0).toFixed(2) + "</td><td>" + (s.daten.einsatz || 0).toFixed(2) + "</td>" +
+        "<td>" + (s.daten.moeglich || 0).toFixed(2) + "</td>" +
+        "<td>" + (scheinWartet(s) ? "fertig, Ergebnis offen" : (e ? "laeuft bis " + kasseZeit(e) : "laeuft")) + "</td></tr>";
+    }
+    h += "</table>";
+  }
+
+  const f = window.open("", "_blank");
+  if (!f) { meldungM("Das PDF-Fenster wurde vom Browser geblockt - bitte Pop-ups erlauben.", "warn"); return; }
+  f.document.write("<html><head><title>Uebersicht " + textSicherM(person.name) + "</title><style>" +
+    "body{font-family:Arial,sans-serif;color:#000;background:#fff;margin:24px;}" +
+    "h1{font-size:22px;margin:0 0 4px 0;} h2{font-size:16px;margin:18px 0 6px 0;}" +
+    "table{border-collapse:collapse;width:100%;} th,td{border:1px solid #000;padding:4px 8px;" +
+    "font-size:13px;text-align:left;} th{background:#eee;}" +
+    "</style></head><body>" + h + "</body></html>");
+  f.document.close();
+  setTimeout(() => { f.print(); }, 400);
 }
 
 async function tuPersonBuchungWeg(id) {

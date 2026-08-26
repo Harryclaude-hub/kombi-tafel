@@ -464,3 +464,13 @@ tr.ohneordner td { background: #fff8e1; }
 /* Admin-Bereich (Design-Schicht, loeschbar) */
 .adminkasten { border: 2px solid #a00000; padding: 4px 10px; margin: 8px 0; }
 button.adminrot { background: #a00000; color: #fff; border-color: #a00000; }
+
+/* Personen-Uebersicht: fertig-Markierungen und Zeigen-Auswahl (Design-Schicht) */
+.fertigbadge { display: inline-block; background: #b35a00; color: #fff;
+  border-radius: 9px; padding: 0 7px; font-weight: bold; font-size: 13px; }
+tr.fertigzeile td { background: #ffe9cc; }
+.fertighinweis { border: 2px solid #b35a00; background: #fff3e0; color: #7a3d00;
+  padding: 8px 12px; margin: 6px 0; }
+.fertigmark { color: #b35a00; font-weight: bold; }
+.kassewahl { margin: 8px 0; padding: 6px 8px; background: #f4f4f4; }
+.kassewahl label { margin-right: 12px; white-space: nowrap; }
