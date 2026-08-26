@@ -120,5 +120,17 @@ const WETTEN = [
 {id:"4.18", von:"klt", an:"2026-08-25T19:45", liga:"Scottish Challenge Cup", spiel:"Hamilton Academical vs Edinburgh City F.C.", wette:"HOME -0.5", kat:"SIEG", s:"SIEG", o:[["-0.5",1.87]]}
 ];
 
+// ============================================================
+// FOTO-SAETZE: jede Foto-Lieferung ist ein eigener, strikt
+// getrennter Ordner. Der Kombi-Bau mischt NIE ueber Saetze hinweg.
+// Neue Lieferung: neuen Eintrag anlegen, neue Wetten bekommen
+// satz:"<id>" und ids mit eigenem Praefix (z.B. "b-1.01").
+// ============================================================
+const SAETZE = [
+  { id: "2026-08-24", titel: "Fotos vom 24.08.2026" }
+];
+// Alle bisherigen Wetten gehoeren zum ersten Satz:
+WETTEN.forEach(w => { if (!w.satz) w.satz = "2026-08-24"; });
+
 // Anmerkung: die kafa-Zeile "Branstine vs Ngou" war im Foto durchgestrichen
 // (storniert) und ist deshalb absichtlich NICHT in dieser Liste.

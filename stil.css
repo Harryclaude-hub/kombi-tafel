@@ -390,3 +390,22 @@ button.freundknopf { font-size: 13px; padding: 4px 12px; margin: 2px 4px 2px 0;
   font-weight: bold; cursor: pointer; }
 button.freundknopf.aktiv { background: var(--blau); color: #fff; }
 #freunde input { font-size: 14px; padding: 4px 8px; border: 1px solid #888; }
+
+/* ---- Nachrichten-Fenster (Glocke) und Satz-Waehler ---- */
+.navleiste a.glocke { margin-left: auto; }   /* Nachrichten-Knopf ganz rechts */
+#glockenpanel { position: fixed; top: 12px; right: 12px; width: 340px; max-width: 92vw;
+  background: #fff; border: 2px solid var(--blau); z-index: 1000;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+.gp-kopf { background: var(--blau); color: #fff; font-weight: bold; padding: 7px 12px;
+  display: flex; justify-content: space-between; align-items: center; }
+.gp-zu { font-size: 11px; padding: 2px 8px; border: 1px solid #fff; background: transparent;
+  color: #fff; cursor: pointer; }
+#gp-inhalt { padding: 8px 10px; }
+.gp-freund { display: block; width: 100%; text-align: left; font-size: 14px;
+  padding: 7px 10px; margin: 3px 0; border: 1px solid var(--blau); background: #fff;
+  color: var(--blau); font-weight: bold; cursor: pointer; }
+.gp-liste { max-height: 260px; margin: 6px 0; }
+.gp-zurueck { font-size: 11px; padding: 2px 8px; border: 1px solid #888;
+  background: #f2f2f2; cursor: pointer; }
+.f-satz button { border: 2px solid #7a4a00; color: #7a4a00; font-weight: bold; }
+.f-satz button.aktiv { background: #7a4a00; color: #fff; }

@@ -17,7 +17,8 @@
 // ============================================================
 "use strict";
 
-const ZUSTAND_SCHLUESSEL = "scheinbau_v1";
+// Jeder Foto-Satz hat seinen eigenen Bau-Zustand: nie mischen!
+function zustandSchluessel() { return "scheinbau_" + aktiverSatzId(); }
 
 // ---------- Quellen fuer eine Quote ----------
 
@@ -41,10 +42,10 @@ function wetteNachId(id) { return WETTEN.find(w => w.id === id); }
 // ---------- Zustand ----------
 
 function liesZustand() {
-  try { return JSON.parse(localStorage.getItem(ZUSTAND_SCHLUESSEL) || "null"); }
+  try { return JSON.parse(localStorage.getItem(zustandSchluessel()) || "null"); }
   catch (e) { return null; }
 }
-function speichereZustand(z) { localStorage.setItem(ZUSTAND_SCHLUESSEL, JSON.stringify(z)); }
+function speichereZustand(z) { localStorage.setItem(zustandSchluessel(), JSON.stringify(z)); }
 
 function einstellungenLesen() {
   const anb = [];
@@ -60,7 +61,7 @@ function einstellungenLesen() {
 
 function baueAlles() {
   const e = einstellungenLesen();
-  const offen = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
+  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)))
     .sort((a, b) => liesAnstoss(anstossFeld(a)).zeit - liesAnstoss(anstossFeld(b)).zeit);
 
   // 1. Doppelte Spiele: nur das erste behalten
@@ -82,12 +83,12 @@ function baueAlles() {
   for (const w of einmalig) {
     const optIdx = gewaehlteOption(w);
     const v = verfuegbarkeit(w);
+    // Karams Regel: nie zu 100 % behaupten, ein Anbieter habe den Markt nicht.
+    // Alle erlaubten Anbieter kommen in Frage; unsichere bekommen nur einen Hinweis.
     const moeglich = [];
     for (const kz of e.anbieter) {
-      if (v[kz] === "N") continue;
-      moeglich.push({ kz: kz, q: zielQuote(w, optIdx, kz), duenn: v[kz] === "D" });
+      moeglich.push({ kz: kz, q: zielQuote(w, optIdx, kz), duenn: v[kz] !== "J" });
     }
-    if (!moeglich.length) { keinMarkt.push(w.id); continue; }
     moeglich.sort((a, b) => b.q.echt - a.q.echt);
     const ueber = moeglich.filter(m => m.q.echt >= e.mind - 0.0001);
     if (ueber.length) passt.push({ id: w.id, optIdx: optIdx, moeglich: ueber, alle: moeglich });
@@ -192,10 +193,7 @@ function anbieterWechseln(scheinId, neuKz) {
     const w = wetteNachId(eintrag.id);
     if (!w) continue;
     const v = verfuegbarkeit(w)[neuKz];
-    if (v === "N") {
-      probleme.push(w.spiel + ": " + anbieterName(neuKz) + " fuehrt diesen Markt vermutlich nicht");
-      continue;
-    }
+    // "N" ist nur eine Einschaetzung, kein Ausschluss: Karam prueft selbst.
     const q = zielQuote(w, eintrag.optIdx, neuKz);
     if (sch.art === "normal" && q.echt < z.einst.mind - 0.0001) {
       probleme.push(w.spiel + ": dort nur " + rund2(q.echt).toFixed(2) +
@@ -266,9 +264,9 @@ function findeErsatz(z, kz, ausgeschlossen) {
   const drin = verbraucht(z);
   const kenn = verbrauchteKennungen(z);
   const raus = new Set(ausgeschlossen || []);
-  const frei = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
+  const frei = satzWetten().filter(w => !istVorbei(anstossFeld(w)))
     .filter(w => !drin.has(w.id) && !raus.has(w.id) && !kenn.has(spielKennung(w)));
-  const mitMarkt = frei.filter(w => verfuegbarkeit(w)[kz] !== "N");
+  const mitMarkt = frei;   // kein 100%-Ausschluss mehr, Karam prueft selbst
   const bewertet = [];
   for (const w of mitMarkt) {
     const optIdx = gewaehlteOption(w);
@@ -426,7 +424,20 @@ function meldung(text, art) {
 
 // ---------- Anzeige ----------
 
+function zeichneSatzwahl() {
+  const box = document.getElementById("satzwahl");
+  if (!box) return;
+  if (SAETZE.length <= 1) { box.innerHTML = ""; return; }
+  let html = '<div class="filterzeile f-satz"><span class="f-label">Foto-Satz</span><span class="f-knoepfe">';
+  for (const x of SAETZE) {
+    html += '<button class="' + (x.id === aktiverSatzId() ? "aktiv" : "") +
+      '" onclick="localStorage.setItem(\'kt_satz\',\'' + x.id + '\'); zeichne_();">' + x.titel + "</button>";
+  }
+  box.innerHTML = html + "</span></div>";
+}
+
 function zeichne_() {
+  zeichneSatzwahl();
   // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
   if (!document.getElementById("scheine")) {
     zeichneVerlauf();
@@ -435,6 +446,40 @@ function zeichne_() {
   }
   let z = liesZustand();
   if (!z) z = baueAlles();
+
+  // AUTO-ARCHIV: vergangene Wetten fliegen aus den Scheinen.
+  // Was du mit "In den Verlauf" gespeichert hast, bleibt fuer immer im Verlauf;
+  // hier im Bau verschwinden nur die abgelaufenen Bausteine.
+  let archiviert = 0, nachgerueckt = 0;
+  for (const sch of z.scheine) {
+    for (let i = sch.wetten.length - 1; i >= 0; i--) {
+      const w = wetteNachId(sch.wetten[i].id);
+      if (!w || istVorbei(anstossFeld(w))) {
+        sch.entfernt.push({ id: sch.wetten[i].id,
+          grund: "Spiel vorbei, automatisch archiviert", wann: new Date().toISOString() });
+        sch.wetten.splice(i, 1);
+        archiviert++;
+      }
+    }
+  }
+  if (archiviert) {
+    speichereZustand(z);
+    const gesperrt = [];
+    for (const sc of z.scheine) for (const en of sc.entfernt) gesperrt.push(en.id);
+    for (const sch of z.scheine) {
+      while (sch.wetten.length < 3) {
+        const suche = findeErsatz(z, sch.kz, gesperrt);
+        if (!suche.treffer) break;
+        sch.wetten.push(suche.treffer);
+        nachgerueckt++;
+        speichereZustand(z);
+      }
+    }
+    z.scheine = z.scheine.filter(sch => sch.wetten.length > 0);
+    speichereZustand(z);
+    meldung(archiviert + " abgelaufene Wette(n) automatisch archiviert, " +
+      nachgerueckt + " Ersatz nachgerueckt. Dein Verlauf in Mein Bereich bleibt unberuehrt.", "gut");
+  }
 
   // Einstellungen zurueckspiegeln
   document.getElementById("mind").value = z.einst.mind;
@@ -484,7 +529,8 @@ function scheinHtml(s, z) {
       "<td class='s-spiel'>" + w.spiel + '<div class="mini">' + w.liga + "</div></td>" +
       "<td class='s-wette'>" + w.wette.split("(")[0].trim() + " " + opt +
         ' <span class="reiter-chip">' + w.s + "</span>" +
-        (v === "D" ? '<div class="duenn">Markt dort duenn, pruefen</div>' : "") + "</td>" +
+        (v === "D" ? '<div class="duenn">Markt dort duenn, pruefen</div>' :
+         (v === "N" ? '<div class="duenn">Einschaetzung: evtl. nicht im Angebot, pruefen</div>' : "")) + "</td>" +
       "<td class='s-ziel'>" + q.roh.toFixed(2) + '<div class="mini">' + q.quelle + "</div></td>" +
       "<td class='s-mind'>" + mind.toFixed(2) + "</td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
@@ -561,7 +607,7 @@ function zeichneReste(z) {
   html += liste(z.uebrig, "Uebrig geblieben", "Erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.");
   html += liste(z.uebrigNiedrig, "Uebrig, zu niedrige Quote", "Unter der Mindestquote und keine drei fuer einen eigenen Schein.");
   html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
-  html += liste(z.keinMarkt, "Kein erlaubter Anbieter", "Keiner der angehakten Anbieter fuehrt diesen Markt.");
+  
   document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
 }
 
@@ -600,7 +646,7 @@ function scheinMerken(scheinId) {
              quote: rund2(q.echt), quelle: q.quelle };
   });
   const eintrag = {
-    zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz,
+    zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz, satz: aktiverSatzId(),
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   };
@@ -754,7 +800,7 @@ function verlaufLoeschen(i) {
 // ---------- Knoepfe ----------
 
 function neuBauen() {
-  localStorage.removeItem(ZUSTAND_SCHLUESSEL);
+  localStorage.removeItem(zustandSchluessel());
   baueAlles();
   meldung("Neu gebaut mit Mindestquote " + einstellungenLesen().mind.toFixed(2) + ".", "gut");
   zeichne_();

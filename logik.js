@@ -59,6 +59,24 @@ function jetztText() {
     ". " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
 }
 
+// ---------- Foto-Saetze ----------
+
+function aktiverSatzId() {
+  const gespeichert = localStorage.getItem("kt_satz");
+  if (gespeichert && SAETZE.some(x => x.id === gespeichert)) return gespeichert;
+  return SAETZE[SAETZE.length - 1].id;   // Standard: der neueste Satz
+}
+
+function satzWetten() {
+  const id = aktiverSatzId();
+  return WETTEN.filter(w => w.satz === id);
+}
+
+function satzWaehlen(id) {
+  localStorage.setItem("kt_satz", id);
+  if (typeof zeichne === "function" && document.getElementById("koerper")) zeichne();
+}
+
 // ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------
 // J = ja, D = duenn (nur Teile, oft nur Topspiele), N = vermutlich gar nicht.
 // Das ist Einschaetzung nach Liga-Stufe und Markttyp, kein Beleg.
@@ -308,7 +326,8 @@ const offeneDetails = new Set();
 
 // Grundmenge fuer ALLE Zaehler: dieselbe Sicht (vergangene raus, wenn Schalter an)
 function sichtBasis() {
-  return nurKommende ? WETTEN.filter(w => !istVorbei(anstossFeld(w))) : WETTEN.slice();
+  const basis = satzWetten();
+  return nurKommende ? basis.filter(w => !istVorbei(anstossFeld(w))) : basis;
 }
 
 function basisListe() {
@@ -319,7 +338,7 @@ function basisListe() {
 }
 
 function baueFilter() {
-  const vorbeiZahl = WETTEN.filter(w => istVorbei(anstossFeld(w))).length;
+  const vorbeiZahl = satzWetten().filter(w => istVorbei(anstossFeld(w))).length;
   const basis = sichtBasis();
 
   // Hilfsfunktion: eine Filterzeile mit Beschriftung links und Knoepfen rechts
@@ -342,6 +361,17 @@ function baueFilter() {
       knoepfe.appendChild(b);
     }
     box.appendChild(knoepfe);
+  }
+
+  // 0) Foto-Satz (nur zeigen, wenn es mehr als einen gibt)
+  const sf = document.getElementById("satzfilter");
+  if (sf) {
+    if (SAETZE.length > 1) {
+      zeile("satzfilter", "Foto-Satz",
+        SAETZE.map(x => ({ kz: x.id, text: x.titel })),
+        e => e.kz === aktiverSatzId(),
+        e => { satzWaehlen(e.kz); }, "f-satz");
+    } else { sf.innerHTML = ""; }
   }
 
   // 1) Wett-Art
@@ -488,12 +518,8 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   oben.appendChild(kopie);
   td.appendChild(oben);
 
-  if (v === "N") {
-    const kein = document.createElement("div");
-    kein.className = "keinmarkt";
-    kein.textContent = VERF_TEXT.N;
-    td.appendChild(kein);
-  } else {
+  if (false) { /* frueher wurde hier gesperrt; Karams Regel: nie zu 100 %
+    behaupten, dass es einen Markt nicht gibt - immer pruefen lassen */ } else {
     td.appendChild(eingabeFeld(w, opt, anbieter));
 
     const eigene = liesEingabe(w.id, opt, anbieter);
@@ -533,10 +559,12 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
     }
     td.appendChild(klein);
 
-    if (v === "D") {
+    if (v === "D" || v === "N") {
       const d = document.createElement("div");
       d.className = "duenn";
-      d.textContent = VERF_TEXT.D;
+      d.textContent = (v === "N")
+        ? "Einschaetzung: evtl. nicht im Angebot, bitte pruefen"
+        : VERF_TEXT.D;
       td.appendChild(d);
     }
   }
@@ -696,7 +724,7 @@ function baueZeile(w) {
     td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) +
       '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
   }
-  if (zu.verfN) td.innerHTML += '<div class="keinmarkt">Achtung: Markt dort vermutlich nicht vorhanden</div>';
+  if (zu.verfN) td.innerHTML += '<div class="duenn">Einschaetzung: evtl. nicht im Angebot, pruefen</div>';
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -746,9 +774,9 @@ function zeichne() {
     koerper.appendChild(baueZeile(w));
     if (offeneDetails.has(w.id)) koerper.appendChild(baueDetailZeile(w));
   }
-  const vorbeiZahl = WETTEN.filter(w => istVorbei(anstossFeld(w))).length;
-  let text = liste.length + " Wetten angezeigt. Gesamt: " + WETTEN.length +
-    ", davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
+  const vorbeiZahl = satzWetten().filter(w => istVorbei(anstossFeld(w))).length;
+  let text = liste.length + " Wetten angezeigt. Satz \"" + aktiverSatzId() + "\": " + satzWetten().length + " Wetten." +
+    " Davon " + vorbeiZahl + " schon angepfiffen/vorbei (" +
     (nurKommende ? "ausgeblendet, Knopf oben" : "eingeblendet, grau") + ").";
   if (aktiverReiter !== "ALLE") {
     const r = REITER.find(x => x[0] === aktiverReiter);
