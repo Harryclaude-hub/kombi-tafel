@@ -100,7 +100,7 @@ function baueAlles() {
   // 3. Normale Scheine: nach bestem Anbieter buendeln
   const topf = {};
   for (const kz of e.anbieter) topf[kz] = [];
-  for (const k of passt) topf[k.moeglich[0].kz].push(k);
+  for (const k of passt) topf[waehleAnbieter(k.moeglich, topf)].push(k);
 
   // Reste umverteilen, damit moeglichst wenig liegen bleibt
   for (let runde = 0; runde < 4; runde++) {
@@ -129,7 +129,7 @@ function baueAlles() {
   // 4. Zu-niedrig-Scheine: eigene 3er, nach bestem Anbieter gebuendelt
   const topfN = {};
   for (const kz of e.anbieter) topfN[kz] = [];
-  for (const k of zuNiedrig) topfN[k.alle[0].kz].push(k);
+  for (const k of zuNiedrig) topfN[waehleAnbieter(k.alle, topfN)].push(k);
   const uebrigN = [];
   for (const kz of e.anbieter) {
     const liste = mische(topfN[kz].slice(), e.saat + 7);
@@ -153,6 +153,24 @@ function baueAlles() {
   };
   speichereZustand(zustand);
   return zustand;
+}
+
+// Welcher Anbieter bekommt diese Wette?
+// Erst die beste Quote. Bei praktisch gleicher Quote (Unterschied unter 0,005,
+// das passiert staendig weil nur Interwetten eine Gebuehr hat) entscheidet:
+// 1. wer den Markt sicher fuehrt statt nur duenn,
+// 2. wer bisher am wenigsten Wetten bekommen hat.
+// So verteilen sich die Scheine ueber alle Anbieter statt alle bei einem zu landen.
+function waehleAnbieter(moeglich, topf) {
+  const beste = moeglich[0].q.echt;
+  const gleichauf = moeglich.filter(m => m.q.echt >= beste - 0.005);
+  gleichauf.sort((a, b) => {
+    if (a.duenn !== b.duenn) return a.duenn ? 1 : -1;
+    const la = (topf[a.kz] || []).length, lb = (topf[b.kz] || []).length;
+    if (la !== lb) return la - lb;
+    return b.q.echt - a.q.echt;
+  });
+  return gleichauf[0].kz;
 }
 
 function macheSchein(nr, kz, gruppe, art) {
