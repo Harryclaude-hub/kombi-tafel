@@ -148,6 +148,7 @@ function glockeUmschalten() {
   if (!glockeOffen) {
     if (panel) panel.remove();
     if (glockePoll) clearInterval(glockePoll);
+    if (typeof aufnahmeAbbrechen === "function") aufnahmeAbbrechen();
     return;
   }
   panel = document.createElement("div");
@@ -193,10 +194,18 @@ async function glockeThread(partnerId, username) {
   glockeLetzteId = 0;
   const ziel = document.getElementById("gp-inhalt");
   ziel.innerHTML = '<button class="gp-zurueck" onclick="glockeListe()">zurueck</button> ' +
-    "<b>" + username + '</b><div id="gp-liste" class="chatliste gp-liste"></div>' +
+    "<b>" + username + '</b> <span class="mini">&#128274; Ende-zu-Ende</span>' +
+    '<div id="gp-vorschau"></div>' +
+    '<div id="gp-liste" class="chatliste gp-liste"></div>' +
     '<div class="chateingabe"><input id="gp-text" placeholder="Nachricht..." ' +
     'onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
-    '<button class="haupt" onclick="glockeSenden()">Senden</button></div>';
+    '<button class="haupt" onclick="glockeSenden()">Senden</button></div>' +
+    '<div class="medienleiste">' +
+    '<label class="fotoknopf" title="Foto oder Datei senden (bis 50 MB)">&#128206; Datei' +
+    '<input type="file" style="display:none" onchange="glockeDatei(this)"></label>' +
+    '<button id="gp-ton" onclick="glockeTon()" title="Sprachnachricht">&#127908; Sprachnachricht</button>' +
+    '<button id="gp-video" onclick="glockeVideo()" title="Video aufnehmen">&#128249; Video</button>' +
+    "</div>";
   await glockeNachladen();
   if (glockePoll) clearInterval(glockePoll);
   glockePoll = setInterval(glockeNachladen, 10000);
@@ -208,15 +217,22 @@ async function glockeNachladen() {
   const neue = await supaDmLaden(glockePartner.partnerId, glockeLetzteId || null);
   if (!neue.length) return;
   const box = document.getElementById("gp-liste");
+  const key = await kryptoDm(glockePartner.partnerId);
+  const nachzuladen = [];
   for (const n of neue) {
     glockeLetzteId = Math.max(glockeLetzteId, n.id);
     const z = document.createElement("div");
     z.className = "chatzeile" + (n.von === u.id ? " vonmir" : "");
+    const m = (typeof medienLesen === "function") ? medienLesen(n.text) : null;
+    const inhalt = m ? medienPlatzhalter(m)
+      : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
     z.innerHTML = "<span class='mini'>" +
       new Date(n.created_at).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) +
-      "</span> " + n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      "</span> " + inhalt;
     box.appendChild(z);
+    if (m) nachzuladen.push(m);
   }
+  for (const m of nachzuladen) medienNachladen(key, m);
   box.scrollTop = box.scrollHeight;
   localStorage.setItem("kt_dm_gelesen_" + glockePartner.partnerId, String(glockeLetzteId));
   glockeZaehlen();
@@ -233,3 +249,58 @@ async function glockeSenden() {
 }
 
 document.addEventListener("DOMContentLoaded", glockeStart);
+
+// ---------- Medien senden (Ende-zu-Ende) ----------
+
+async function glockeMedienSenden(blob, art, name) {
+  if (!glockePartner) return;
+  const u = await supaNutzer();
+  const key = await kryptoDm(glockePartner.partnerId);
+  const r = await medienHochladen(key, medienDmPfad(u.id, glockePartner.partnerId), blob, art, name);
+  if (r.fehler) { alert("Nicht gesendet: " + r.fehler); return; }
+  const s = await supaDmSenden(glockePartner.partnerId, r.text);
+  if (s.error) { alert("Nicht gesendet: " + s.error.message); return; }
+  glockeNachladen();
+}
+
+async function glockeDatei(input) {
+  const datei = input.files && input.files[0];
+  input.value = "";
+  if (!datei) return;
+  const art = datei.type.startsWith("image/") ? "bild" : "datei";
+  await glockeMedienSenden(datei, art, datei.name);
+}
+
+async function glockeTon() {
+  const knopf = document.getElementById("gp-ton");
+  if (typeof aufnahmeStart !== "function") return;
+  if (aufnahmeLaeuft()) {
+    const blob = await aufnahmeStopp();
+    if (knopf) { knopf.innerHTML = "&#127908; Sprachnachricht"; knopf.classList.remove("aufnahme"); }
+    if (blob && blob.size) await glockeMedienSenden(blob, "ton", "Sprachnachricht.webm");
+    return;
+  }
+  const s = await aufnahmeStart("ton");
+  if (s.fehler) { alert(s.fehler); return; }
+  if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
+}
+
+async function glockeVideo() {
+  const knopf = document.getElementById("gp-video");
+  const schau = document.getElementById("gp-vorschau");
+  if (typeof aufnahmeStart !== "function") return;
+  if (aufnahmeLaeuft()) {
+    const blob = await aufnahmeStopp();
+    if (knopf) { knopf.innerHTML = "&#128249; Video"; knopf.classList.remove("aufnahme"); }
+    if (schau) schau.innerHTML = "";
+    if (blob && blob.size) await glockeMedienSenden(blob, "video", "Video.webm");
+    return;
+  }
+  const s = await aufnahmeStart("video");
+  if (s.fehler) { alert(s.fehler); return; }
+  if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
+  if (schau) {
+    schau.innerHTML = '<video id="gp-live" autoplay muted class="medienvideo"></video>';
+    document.getElementById("gp-live").srcObject = s.stream;
+  }
+}

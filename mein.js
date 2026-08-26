@@ -177,7 +177,13 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
 <div id="chatliste" class="chatliste"></div>
 <div class="chateingabe"><input id="chat_text" placeholder="Nachricht..."
   onkeydown="if(event.key==='Enter')tuChatSenden()">
-  <button class="haupt" onclick="tuChatSenden()">Senden</button></div>`;
+  <button class="haupt" onclick="tuChatSenden()">Senden</button></div>
+<div class="medienleiste">
+  <label class="fotoknopf">&#128206; Datei<input type="file" style="display:none" onchange="tuChatDatei(this)"></label>
+  <button id="bc-ton" onclick="tuChatTon()">&#127908; Sprachnachricht</button>
+  <button id="bc-video" onclick="tuChatVideo()">&#128249; Video</button>
+  <span id="bc-vorschau"></span>
+</div>`;
 
   binAdmin = await supaIstAdmin();
   await zeichneTabs();
@@ -1336,9 +1342,11 @@ async function ladeChat(komplett) {
     const wer = n.kt_profiles ? n.kt_profiles.username : "?";
     const zeile = document.createElement("div");
     zeile.className = "chatzeile" + (n.autor === ich.id ? " vonmir" : "");
+    const m = (typeof medienLesen === "function") ? medienLesen(n.text) : null;
     zeile.innerHTML = "<b>" + wer + "</b> <span class='mini'>" + zeitM(n.created_at) + "</span><br>" +
-      n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      (m ? medienPlatzhalter(m) : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
     box.appendChild(zeile);
+    if (m) kryptoBereich(aktiverBereich.id).then(k => medienNachladen(k, m));
   }
   box.scrollTop = box.scrollHeight;
   localStorage.setItem("kt_gelesen_" + aktiverBereich.id, String(letzteChatId));
@@ -1353,6 +1361,56 @@ async function tuChatSenden() {
   if (r.error) { meldungM("Nachricht nicht gesendet: " + r.error.message, "warn"); return; }
   feld.value = "";
   ladeChat(false);
+}
+
+// ---------- Medien im Bereichs-Chat ----------
+
+async function tuChatMedien(blob, art, name) {
+  const key = await kryptoBereich(aktiverBereich.id);
+  const r = await medienHochladen(key, medienBereichPfad(aktiverBereich.id), blob, art, name);
+  if (r.fehler) { meldungM("Nicht gesendet: " + r.fehler, "warn"); return; }
+  const s = await supaNachrichtSenden(aktiverBereich.id, r.text);
+  if (s.error) { meldungM("Nicht gesendet: " + s.error.message, "warn"); return; }
+  ladeChat(false);
+}
+
+async function tuChatDatei(input) {
+  const datei = input.files && input.files[0];
+  input.value = "";
+  if (!datei) return;
+  await tuChatMedien(datei, datei.type.startsWith("image/") ? "bild" : "datei", datei.name);
+}
+
+async function tuChatTon() {
+  const knopf = el("bc-ton");
+  if (aufnahmeLaeuft()) {
+    const blob = await aufnahmeStopp();
+    if (knopf) { knopf.innerHTML = "&#127908; Sprachnachricht"; knopf.classList.remove("aufnahme"); }
+    if (blob && blob.size) await tuChatMedien(blob, "ton", "Sprachnachricht.webm");
+    return;
+  }
+  const s = await aufnahmeStart("ton");
+  if (s.fehler) { meldungM(s.fehler, "warn"); return; }
+  if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
+}
+
+async function tuChatVideo() {
+  const knopf = el("bc-video");
+  const schau = el("bc-vorschau");
+  if (aufnahmeLaeuft()) {
+    const blob = await aufnahmeStopp();
+    if (knopf) { knopf.innerHTML = "&#128249; Video"; knopf.classList.remove("aufnahme"); }
+    if (schau) schau.innerHTML = "";
+    if (blob && blob.size) await tuChatMedien(blob, "video", "Video.webm");
+    return;
+  }
+  const s = await aufnahmeStart("video");
+  if (s.fehler) { meldungM(s.fehler, "warn"); return; }
+  if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
+  if (schau) {
+    schau.innerHTML = '<video id="bc-live" autoplay muted class="medienvideo"></video>';
+    document.getElementById("bc-live").srcObject = s.stream;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", startMein);

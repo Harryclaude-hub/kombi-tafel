@@ -490,3 +490,11 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .anmk-tasten button { font-size: 12px; margin-left: 4px; }
 .anmk-neu { margin-top: 4px; }
 .anmk-neu input { width: 60%; }
+
+/* Medien im Messenger (Design-Schicht) */
+.medienleiste { margin-top: 6px; }
+.medienleiste button, .medienleiste .fotoknopf { margin-right: 8px; }
+.medienleiste .aufnahme, button.aufnahme { background: #a00000; color: #fff; }
+.medienbild { max-width: 240px; max-height: 240px; display: block; margin-top: 4px; }
+.medienvideo { max-width: 280px; display: block; margin-top: 4px; }
+#gp-vorschau video { max-width: 100%; }
