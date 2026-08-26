@@ -136,7 +136,8 @@ async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
 }
 
 async function supaScheinAendern(id, felder) {
-  return await supa.from("kt_scheine").update(felder).eq("id", id);
+  // select() macht die 0-Zeilen-Falle sichtbar (RLS-Lektion, siehe unten)
+  return await supa.from("kt_scheine").update(felder).eq("id", id).select("id");
 }
 
 async function supaScheinLoeschen(id) {
@@ -321,5 +322,6 @@ async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, 
 }
 
 async function supaPersonBuchungLoeschen(id) {
-  return await supa.from("kt_person_zahlungen").delete().eq("id", id);
+  // select() macht die 0-Zeilen-Falle sichtbar (RLS-Lektion)
+  return await supa.from("kt_person_zahlungen").delete().eq("id", id).select("id");
 }

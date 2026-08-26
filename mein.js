@@ -420,12 +420,18 @@ function zeichneOrdnerBox(scheine) {
     let zeilen = "";
     for (const o of ordnerListe) {
       const n = zahl[o.id] || 0;
+      const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
+      let ende;
+      if (n === 0 && kasseN === 0) {
+        ende = '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">loeschen</button>';
+      } else {
+        const teile = [];
+        if (n > 0) teile.push(n + (n === 1 ? " Schein" : " Scheine"));
+        if (kasseN > 0) teile.push(kasseN + (kasseN === 1 ? " Kassen-Buchung" : " Kassen-Buchungen"));
+        ende = '<span class="mini">' + teile.join(" und ") + " drin - erst leeren, dann loeschen</span>";
+      }
       zeilen += '<div class="ordnerzeile"><input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '"> ' +
-        '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' +
-        (n === 0
-          ? '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">loeschen</button>'
-          : '<span class="mini">' + n + (n === 1 ? " Schein" : " Scheine") + " drin - erst leeren, dann loeschen</span>") +
-        "</div>";
+        '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' + ende + "</div>";
     }
     verwalten = '<details><summary>Ordner verwalten (anlegen, umbenennen, loeschen)</summary><div class="inhalt">' +
       '<input id="ordner_neu" placeholder="Neuer Ordner, z. B. ein Name"> ' +
@@ -461,6 +467,11 @@ async function tuOrdnerUmbenennen(id) {
 }
 
 async function tuOrdnerLoeschen(id) {
+  // Nie still die Geld-Aufzeichnungen einer Person mitreissen
+  if (personBuchungen.some(b => b.ordner === id)) {
+    meldungM("Nicht geloescht: in der Personen-Kasse dieser Person stehen noch Buchungen.", "warn");
+    return;
+  }
   const r = await supaOrdnerLoeschen(id);
   if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
   if (ordnerFilter === id) ordnerFilter = "alle";
@@ -568,8 +579,9 @@ function zeichneScheineDb(scheine) {
 async function tuStand(id, wert) {
   const r = await supaScheinAendern(id, { stand: wert });
   if (r.error) { meldungM("Nicht erlaubt: " + r.error.message, "warn"); return; }
-  const scheine = await supaScheineLaden(aktiverBereich.id);
-  zeichneKontoDb(scheine);
+  // Alles neu zeichnen: an "gewonnen" haengen das Wirklich-bekommen-Feld,
+  // die Personen-Kasse und die Warn-Badges.
+  zeichneBereich();
 }
 
 async function tuNotiz(id, wert) {
@@ -634,6 +646,7 @@ async function tuEchtZurueck(id, wert) {
   if (zahl !== null && (isNaN(zahl) || zahl < 0)) { meldungM("Bitte einen gueltigen Betrag eintragen.", "warn"); return; }
   const r = await supaScheinAendern(id, { echt_zurueck: zahl });
   if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  if (!r.data || !r.data.length) { meldungM("Nicht gespeichert: kein Schreibrecht oder Schein weg.", "warn"); return; }
   zeichneBereich();
 }
 
@@ -774,6 +787,7 @@ async function tuPersonBuchen(ordnerId) {
 async function tuPersonBuchungWeg(id) {
   const r = await supaPersonBuchungLoeschen(id);
   if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  if (!r.data || !r.data.length) { meldungM("Nicht geloescht: kein Schreibrecht oder Buchung schon weg.", "warn"); return; }
   zeichneBereich();
 }
 
