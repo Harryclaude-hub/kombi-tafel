@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Kombi-Bau</title>
-<link rel="stylesheet" href="stil.css?v=20260825j">
+<link rel="stylesheet" href="stil.css?v=20260825k">
 </head>
 <body>
 
@@ -30,17 +30,8 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
   <span class="f-label">Mindestquote</span>
   <span class="f-knoepfe">
     <input type="number" id="mind" value="1.80" step="0.05" min="1.01" class="einst">
-    <span class="mini">Gilt fuer jede einzelne Wette, nach Abzug der Gebuehr.</span>
-  </span>
-</div>
-<div class="filterzeile">
-  <span class="f-label">Welche Quoten</span>
-  <span class="f-knoepfe">
-    <select id="quellen" class="einst">
-      <option value="auchfoto">auch Foto-Quoten verwenden (zum Planen)</option>
-      <option value="geprueft">nur gepruefte Quoten (getippt oder Screenshot)</option>
-    </select>
-    <span class="mini">"Nur geprueft" ist ehrlich, aber leer solange du nichts eingetippt hast.</span>
+    <span class="mini">Gilt fuer jede einzelne Wette, und zwar die ECHTE Quote nach Gebuehr.
+    Traegst du spaeter eine kleinere ein, wird sie nicht uebernommen.</span>
   </span>
 </div>
 <div class="filterzeile">
@@ -50,23 +41,36 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
     <label><input type="checkbox" class="anbwahl" value="bw" checked> Bwin</label>
     <label><input type="checkbox" class="anbwahl" value="b3" checked> Bet365</label>
     <label><input type="checkbox" class="anbwahl" value="st" checked> Stake</label>
+    <span class="mini">Nur angehakte Anbieter kommen in Frage. Ein Schein liegt immer komplett bei einem.</span>
   </span>
 </div>
 <div class="filterzeile">
-  <span class="f-label">Aufteilung</span>
+  <span class="f-label">Bauen</span>
   <span class="f-knoepfe">
     <input type="hidden" id="mischzahl" value="1">
-    <button onclick="zeichneKombis()" class="haupt">Scheine bauen</button>
+    <button onclick="neuBauen()" class="haupt">Scheine neu bauen</button>
     <button onclick="neuMischen()">Anders mischen</button>
-    <span class="mini">"Anders mischen" wuerfelt die Zusammenstellung neu, gleiche Regeln.</span>
+    <span class="mini">Achtung: neu bauen wirft deine Rausnahmen weg. Die eingetragenen
+    Quoten bleiben erhalten.</span>
   </span>
 </div>
 </div>
 
+<div id="meldung" style="display:none"></div>
 <div id="uebersicht" class="stand"></div>
 
 <h2>Deine Scheine</h2>
+<p class="mini">Jede Zeile: die <b>Ziel-Quote</b> ist die beste bekannte (deine Eingabe, sonst Screenshot,
+sonst Foto). Daneben deine <b>Mindestquote</b>. Ins Feld <b>Deine Quote</b> traegst du ein, was die App
+wirklich anzeigt. Passt eine Wette nicht, waehle rechts einen Grund: sie fliegt raus und es
+<b>rueckt automatisch eine andere nach</b>, die beim selben Anbieter verfuegbar ist.</p>
 <div id="scheine"></div>
+
+<h2>Scheine mit zu niedrigen Quoten</h2>
+<p class="mini">Diese Wetten erreichen deine Mindestquote nicht. Sie sind trotzdem zu 3er-Scheinen
+zusammengestellt, damit du auf einen Blick siehst, welche sich nicht ausgehen. Hier wird beim
+Eintragen keine Mindestquote erzwungen.</p>
+<div id="niedrig"></div>
 
 <h2>Was nicht in einen Schein gepasst hat</h2>
 <div id="reste"></div>
@@ -84,10 +88,10 @@ wird. Die Reihenfolge der Scheine ist nach Gesamtquote sortiert, die hoechste zu
 Alle Angaben ohne Gewaehr, Quoten aendern sich laufend: vor dem Setzen in der App gegenpruefen.
 </div>
 
-<script src="daten.js?v=20260825j"></script>
-<script src="roh.js?v=20260825j"></script>
-<script src="recherche.js?v=20260825j"></script>
-<script src="logik.js?v=20260825j"></script>
-<script src="kombis.js?v=20260825j"></script>
+<script src="daten.js?v=20260825k"></script>
+<script src="roh.js?v=20260825k"></script>
+<script src="recherche.js?v=20260825k"></script>
+<script src="logik.js?v=20260825k"></script>
+<script src="kombis.js?v=20260825k"></script>
 </body>
 </html>

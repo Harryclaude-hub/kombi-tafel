@@ -217,3 +217,21 @@ button.merken { margin-left: 12px; font-size: 12px; padding: 2px 8px;
   border: 1px solid #1a7a1a; background: #fff; cursor: pointer; }
 #reste ul { margin: 3px 0 10px 20px; font-size: 12px; }
 #verlauf td { font-size: 12px; }
+
+/* ---- Kombi-Bau, Ausbau 25.08. ---- */
+.s-warn { color: #c8102e; font-weight: bold; font-size: 12px; }
+.niedrigkopf { background: #fdecec; }
+table.s-tab th { font-size: 10.5px; background: #f7f7f7; padding: 2px 8px; }
+tr.unterquote td { background: #fdf3f3; }
+td.s-ziel { text-align: right; font-weight: bold; white-space: nowrap; }
+td.s-mind { text-align: right; color: #666; white-space: nowrap; }
+td.s-eingabe input { width: 64px; font-size: 13px; padding: 1px 3px; border: 1px solid #888; }
+td.s-eingabe input.fehler { border: 2px solid #c8102e; background: #fdd; }
+td.s-raus select { font-size: 11px; }
+.unterrot { color: #c8102e; font-size: 10.5px; font-weight: bold; }
+.s-raus-liste { padding: 3px 8px; font-size: 11px; color: #c8102e; background: #fdf3f3; }
+label.fotoknopf { margin-left: 12px; font-size: 12px; padding: 2px 8px;
+  border: 1px solid #3366aa; color: #3366aa; cursor: pointer; }
+.s-foto { padding: 6px 8px; background: #f7f7f7; border-top: 1px solid #ddd; }
+.s-foto img { max-width: 100%; border: 1px solid #999; }
+img.minifoto { max-width: 120px; border: 1px solid #999; margin-top: 3px; }

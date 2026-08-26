@@ -1,142 +1,171 @@
 // ============================================================
-// KOMBI-BAU: baut aus den noch offenen Wetten 3er-Scheine.
+// KOMBI-BAU: baut aus den offenen Wetten 3er-Scheine und laesst
+// sie danach bearbeiten.
 //
-// Karams drei harte Regeln:
-//   1. Jede Einzelquote muss >= Mindestquote sein (nach Gebuehr!)
-//   2. Alle drei Wetten eines Scheins beim GLEICHEN Anbieter
-//   3. Jedes Spiel darf insgesamt nur EINMAL vorkommen
+// Karams Regeln:
+//   1. Jede echte Einzelquote (nach Gebuehr) >= Mindestquote
+//   2. Alle drei Wetten eines Scheins beim GLEICHEN Anbieter,
+//      und der Anbieter muss den Markt auch fuehren
+//   3. Jedes Spiel insgesamt nur EINMAL
+//   4. Wetten unter der Mindestquote werden NICHT weggeworfen,
+//      sondern kommen in eigene 3er-Scheine ("zu niedrig")
+//   5. Einzelne Wette rausnehmen -> es rueckt automatisch eine
+//      andere nach, die beim selben Anbieter verfuegbar ist
 //
-// Braucht daten.js, roh.js, recherche.js und logik.js.
+// Der Zustand liegt im localStorage, damit Rausnehmen und
+// Nachruecken erhalten bleiben.
 // ============================================================
 "use strict";
 
-// ---------- Welche Quote gilt fuer die Kombi-Rechnung ----------
-// modus "geprueft" = nur was du selbst getippt oder per Screenshot hast
-// modus "auchfoto" = zusaetzlich die Foto-Quote als Notbehelf
-function kombiQuote(w, optIdx, kz, modus) {
+const ZUSTAND_SCHLUESSEL = "scheinbau_v1";
+
+// ---------- Quellen fuer eine Quote ----------
+
+function zielQuote(w, optIdx, kz) {
+  // Die Quote, die du im besten Fall erwarten kannst:
+  // eigene Eingabe > Screenshot > Foto-Quote
   const opt = w.o[optIdx][0];
   const teiler = GEBUEHREN_TEILER[kz];
-
   const eigen = liesEingabe(w.id, opt, kz);
-  if (eigen) return { roh: eigen, echt: eigen / teiler, quelle: "getippt" };
-
+  if (eigen) return { roh: eigen, echt: eigen / teiler, quelle: "deine Eingabe", fest: true };
   const shot = screenshotQuote(w, optIdx, kz);
-  if (shot) return { roh: shot.wert, echt: shot.wert / teiler, quelle: "Screenshot" };
-
-  if (modus === "auchfoto") {
-    const ref = w.o[optIdx][1];
-    return { roh: ref, echt: ref / teiler, quelle: "Foto" };
-  }
-  return null;
+  if (shot) return { roh: shot.wert, echt: shot.wert / teiler, quelle: "Screenshot", fest: false };
+  const ref = w.o[optIdx][1];
+  return { roh: ref, echt: ref / teiler, quelle: "Foto " + ref.toFixed(2), fest: false };
 }
 
-// Spiel-Kennung: doppelte Spiele duerfen nur einmal verwendet werden
-function spielKennung(w) {
-  return w.doppel || (w.liga + "|" + w.spiel);
+function spielKennung(w) { return w.doppel || (w.liga + "|" + w.spiel); }
+
+function wetteNachId(id) { return WETTEN.find(w => w.id === id); }
+
+// ---------- Zustand ----------
+
+function liesZustand() {
+  try { return JSON.parse(localStorage.getItem(ZUSTAND_SCHLUESSEL) || "null"); }
+  catch (e) { return null; }
+}
+function speichereZustand(z) { localStorage.setItem(ZUSTAND_SCHLUESSEL, JSON.stringify(z)); }
+
+function einstellungenLesen() {
+  const anb = [];
+  document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
+  return {
+    mind: parseFloat(document.getElementById("mind").value) || 1.5,
+    anbieter: anb.length ? anb : ["iw", "bw", "b3", "st"],
+    saat: parseInt(document.getElementById("mischzahl").value, 10) || 1
+  };
 }
 
 // ---------- Der Bau ----------
 
-function baueScheine(einst) {
-  const mind = einst.mindestquote;
-  const modus = einst.quellen;
-  const erlaubt = einst.anbieter;   // Array von Kuerzeln
-
-  // 1. Alle noch offenen Wetten, sortiert nach Anstoss
+function baueAlles() {
+  const e = einstellungenLesen();
   const offen = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
     .sort((a, b) => liesAnstoss(anstossFeld(a)).zeit - liesAnstoss(anstossFeld(b)).zeit);
 
-  // 2. Fuer jede Wette: bei welchen Anbietern erfuellt sie die Mindestquote?
-  const kandidaten = [];
-  const rausgeflogen = [];
+  // 1. Doppelte Spiele: nur das erste behalten
+  const gesehen = new Set();
+  const einmalig = [];
+  const doppelt = [];
   for (const w of offen) {
+    const k = spielKennung(w);
+    if (gesehen.has(k)) { doppelt.push(w.id); continue; }
+    gesehen.add(k);
+    einmalig.push(w);
+  }
+
+  // 2. Je Wette: bei welchen erlaubten Anbietern gibt es den Markt?
+  //    Und liegt die Quote dort ueber der Mindestquote?
+  const passt = [];       // erfuellt die Mindestquote
+  const zuNiedrig = [];   // Markt da, aber Quote zu klein
+  const keinMarkt = [];   // kein erlaubter Anbieter fuehrt das
+  for (const w of einmalig) {
     const optIdx = gewaehlteOption(w);
     const v = verfuegbarkeit(w);
     const moeglich = [];
-    for (const kz of erlaubt) {
-      if (v[kz] === "N") continue;              // Markt gibt es dort nicht
-      const q = kombiQuote(w, optIdx, kz, modus);
-      if (q && q.echt >= mind - 0.0001) moeglich.push({ kz: kz, q: q });
+    for (const kz of e.anbieter) {
+      if (v[kz] === "N") continue;
+      moeglich.push({ kz: kz, q: zielQuote(w, optIdx, kz), duenn: v[kz] === "D" });
     }
-    if (moeglich.length === 0) {
-      rausgeflogen.push({ w: w, optIdx: optIdx, grund: grundFuerRaus(w, optIdx, erlaubt, modus, mind) });
-    } else {
-      moeglich.sort((a, b) => b.q.echt - a.q.echt);   // beste Quote zuerst
-      kandidaten.push({ w: w, optIdx: optIdx, moeglich: moeglich, kennung: spielKennung(w) });
-    }
+    if (!moeglich.length) { keinMarkt.push(w.id); continue; }
+    moeglich.sort((a, b) => b.q.echt - a.q.echt);
+    const ueber = moeglich.filter(m => m.q.echt >= e.mind - 0.0001);
+    if (ueber.length) passt.push({ id: w.id, optIdx: optIdx, moeglich: ueber, alle: moeglich });
+    else zuNiedrig.push({ id: w.id, optIdx: optIdx, moeglich: [], alle: moeglich });
   }
 
-  // 3. Doppelte Spiele: nur die erste Wette je Kennung behalten
-  const gesehen = new Set();
-  const eindeutig = [];
-  const doppelt = [];
-  for (const k of kandidaten) {
-    if (gesehen.has(k.kennung)) { doppelt.push(k); continue; }
-    gesehen.add(k.kennung);
-    eindeutig.push(k);
-  }
+  const scheine = [];
+  let lfd = 1;
 
-  // 4. Jede Wette ihrem besten erlaubten Anbieter zuordnen
+  // 3. Normale Scheine: nach bestem Anbieter buendeln
   const topf = {};
-  for (const kz of erlaubt) topf[kz] = [];
-  for (const k of eindeutig) topf[k.moeglich[0].kz].push(k);
+  for (const kz of e.anbieter) topf[kz] = [];
+  for (const k of passt) topf[k.moeglich[0].kz].push(k);
 
-  // 5. Reste umverteilen: wenn bei einem Anbieter 1 oder 2 uebrig blieben,
-  //    schau ob sie bei einem anderen Anbieter eine Dreiergruppe vollmachen.
-  for (let runde = 0; runde < 3; runde++) {
-    for (const kz of erlaubt) {
+  // Reste umverteilen, damit moeglichst wenig liegen bleibt
+  for (let runde = 0; runde < 4; runde++) {
+    for (const kz of e.anbieter) {
       const rest = topf[kz].length % 3;
-      if (rest === 0 || topf[kz].length === 0) continue;
-      // die letzten "rest" Stueck versuchen zu verschieben
+      if (!rest || !topf[kz].length) continue;
       for (let i = 0; i < rest; i++) {
         const k = topf[kz][topf[kz].length - 1];
         const ziel = k.moeglich.find(m => m.kz !== kz && topf[m.kz] && (topf[m.kz].length % 3) !== 0);
-        if (ziel) { topf[kz].pop(); topf[ziel.kz].push(k); }
-        else break;
+        if (ziel) { topf[kz].pop(); topf[ziel.kz].push(k); } else break;
       }
     }
   }
 
-  // 6. Je Anbieter Dreiergruppen bilden (Reihenfolge gemischt, aber wiederholbar)
-  const scheine = [];
   const uebrig = [];
-  for (const kz of erlaubt) {
-    const liste = mische(topf[kz].slice(), einst.mischzahl);
+  for (const kz of e.anbieter) {
+    const liste = mische(topf[kz].slice(), e.saat);
     let i = 0;
     while (i + 3 <= liste.length) {
-      const drei = liste.slice(i, i + 3);
-      const teile = drei.map(k => {
-        const m = k.moeglich.find(x => x.kz === kz);
-        return { w: k.w, optIdx: k.optIdx, q: m.q };
-      });
-      const gesamt = teile.reduce((p, t) => p * t.q.echt, 1);
-      const gesamtRoh = teile.reduce((p, t) => p * t.q.roh, 1);
-      scheine.push({ kz: kz, teile: teile, gesamt: gesamt, gesamtRoh: gesamtRoh });
+      scheine.push(macheSchein(lfd++, kz, liste.slice(i, i + 3), "normal"));
       i += 3;
     }
-    for (; i < liste.length; i++) uebrig.push({ kz: kz, k: liste[i] });
+    for (; i < liste.length; i++) uebrig.push({ kz: kz, id: liste[i].id });
   }
 
-  scheine.sort((a, b) => b.gesamt - a.gesamt);
-  return { scheine: scheine, uebrig: uebrig, rausgeflogen: rausgeflogen, doppelt: doppelt,
-           gesamtOffen: offen.length };
-}
-
-function grundFuerRaus(w, optIdx, erlaubt, modus, mind) {
-  const v = verfuegbarkeit(w);
-  let hatMarkt = false, hatQuote = false, beste = 0;
-  for (const kz of erlaubt) {
-    if (v[kz] === "N") continue;
-    hatMarkt = true;
-    const q = kombiQuote(w, optIdx, kz, modus);
-    if (q) { hatQuote = true; if (q.echt > beste) beste = q.echt; }
+  // 4. Zu-niedrig-Scheine: eigene 3er, nach bestem Anbieter gebuendelt
+  const topfN = {};
+  for (const kz of e.anbieter) topfN[kz] = [];
+  for (const k of zuNiedrig) topfN[k.alle[0].kz].push(k);
+  const uebrigN = [];
+  for (const kz of e.anbieter) {
+    const liste = mische(topfN[kz].slice(), e.saat + 7);
+    let i = 0;
+    while (i + 3 <= liste.length) {
+      scheine.push(macheSchein(lfd++, kz, liste.slice(i, i + 3), "niedrig"));
+      i += 3;
+    }
+    for (; i < liste.length; i++) uebrigN.push({ kz: kz, id: liste[i].id });
   }
-  if (!hatMarkt) return "kein Anbieter fuehrt diesen Markt";
-  if (!hatQuote) return "noch keine Quote geprueft";
-  return "beste echte Quote nur " + beste.toFixed(2) + ", unter der Mindestquote " + mind.toFixed(2);
+
+  const zustand = {
+    einst: e,
+    scheine: scheine,
+    uebrig: uebrig,
+    uebrigNiedrig: uebrigN,
+    doppelt: doppelt,
+    keinMarkt: keinMarkt,
+    gesamtOffen: offen.length,
+    gebautAm: new Date().toISOString()
+  };
+  speichereZustand(zustand);
+  return zustand;
 }
 
-// Wiederholbares Mischen: gleiche Mischzahl gibt gleiche Reihenfolge
+function macheSchein(nr, kz, gruppe, art) {
+  return {
+    nr: nr,
+    id: "S" + nr,
+    kz: kz,
+    art: art,                 // "normal" oder "niedrig"
+    wetten: gruppe.map(k => ({ id: k.id, optIdx: k.optIdx })),
+    entfernt: []              // {id, grund, wann}
+  };
+}
+
 function mische(liste, saat) {
   let s = saat || 1;
   const zufall = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
@@ -147,137 +176,307 @@ function mische(liste, saat) {
   return liste;
 }
 
-// ---------- Verlauf ----------
+// ---------- Wette rausnehmen und Ersatz nachruecken ----------
 
-function liesVerlauf() {
-  try { return JSON.parse(localStorage.getItem("verlauf") || "[]"); }
-  catch (e) { return []; }
+// Alle Wett-Ids, die gerade irgendwo verbaut sind
+function verbraucht(z) {
+  const s = new Set();
+  for (const sch of z.scheine) for (const w of sch.wetten) s.add(w.id);
+  // auch die Spiel-Kennungen sperren, damit kein doppeltes Spiel nachrueckt
+  return s;
 }
 
-function speichereVerlauf(v) { localStorage.setItem("verlauf", JSON.stringify(v)); }
+function verbrauchteKennungen(z) {
+  const s = new Set();
+  for (const sch of z.scheine) for (const w of sch.wetten) {
+    const ww = wetteNachId(w.id);
+    if (ww) s.add(spielKennung(ww));
+  }
+  return s;
+}
 
-function scheinSpeichern(schein, einsatz) {
-  const v = liesVerlauf();
-  const jetzt = new Date();
-  v.unshift({
-    zeit: jetzt.toISOString(),
-    kz: schein.kz,
-    anbieter: anbieterName(schein.kz),
-    einsatz: einsatz,
-    quote: rund2(schein.gesamt),
-    moeglich: rund2(einsatz * schein.gesamt),
-    wetten: schein.teile.map(t => ({
-      id: t.w.id, spiel: t.w.spiel, wette: t.w.wette,
-      linie: t.w.o[t.optIdx][0], quote: rund2(t.q.echt), quelle: t.q.quelle
-    })),
-    stand: "offen"
-  });
-  speichereVerlauf(v);
+function findeErsatz(z, kz, ausgeschlossen) {
+  const e = z.einst;
+  const drin = verbraucht(z);
+  const kenn = verbrauchteKennungen(z);
+  const raus = new Set(ausgeschlossen || []);
+  const kandidaten = WETTEN.filter(w => !istVorbei(anstossFeld(w)))
+    .filter(w => !drin.has(w.id) && !raus.has(w.id) && !kenn.has(spielKennung(w)))
+    .filter(w => verfuegbarkeit(w)[kz] !== "N");
+  const bewertet = [];
+  for (const w of kandidaten) {
+    const optIdx = gewaehlteOption(w);
+    const q = zielQuote(w, optIdx, kz);
+    if (q.echt >= e.mind - 0.0001) bewertet.push({ w: w, optIdx: optIdx, echt: q.echt });
+  }
+  if (!bewertet.length) return null;
+  bewertet.sort((a, b) => liesAnstoss(anstossFeld(a.w)).zeit - liesAnstoss(anstossFeld(b.w)).zeit);
+  return { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx };
+}
+
+function wetteRaus(scheinId, wettId, grund) {
+  const z = liesZustand();
+  if (!z) return;
+  const sch = z.scheine.find(s => s.id === scheinId);
+  if (!sch) return;
+  const pos = sch.wetten.findIndex(w => w.id === wettId);
+  if (pos < 0) return;
+
+  sch.entfernt.push({ id: wettId, grund: grund, wann: new Date().toISOString() });
+  sch.wetten.splice(pos, 1);
+  speichereZustand(z);
+
+  // Ersatz suchen, der beim GLEICHEN Anbieter verfuegbar ist
+  const ausgeschlossen = [];
+  for (const s of z.scheine) for (const en of s.entfernt) ausgeschlossen.push(en.id);
+  const ersatz = findeErsatz(z, sch.kz, ausgeschlossen);
+  if (ersatz) {
+    sch.wetten.splice(pos, 0, ersatz);
+    speichereZustand(z);
+    meldung("Ersatz nachgerueckt: " + wetteNachId(ersatz.id).spiel + " (bei " +
+      anbieterName(sch.kz) + " verfuegbar, ueber der Mindestquote).", "gut");
+  } else {
+    meldung("Kein Ersatz gefunden, der bei " + anbieterName(sch.kz) +
+      " verfuegbar ist und die Mindestquote schafft. Der Schein hat jetzt nur noch " +
+      sch.wetten.length + " Wetten.", "warn");
+  }
+  zeichne_();
+}
+
+// ---------- Eigene Quote eintragen, mit Pruefung ----------
+
+function quoteEintragen(scheinId, wettId, feld) {
+  const z = liesZustand();
+  const sch = z.scheine.find(s => s.id === scheinId);
+  const eintrag = sch.wetten.find(w => w.id === wettId);
+  const w = wetteNachId(wettId);
+  const opt = w.o[eintrag.optIdx][0];
+  const roh = parseFloat(feld.value);
+
+  if (!feld.value) {                       // geleert: Eingabe loeschen
+    speichereEingabe(wettId, opt, sch.kz, "");
+    zeichne_();
+    return;
+  }
+  if (!roh || roh <= 1) { feld.classList.add("fehler"); return; }
+
+  const echt = roh / GEBUEHREN_TEILER[sch.kz];
+  if (sch.art === "normal" && echt < z.einst.mind - 0.0001) {
+    feld.classList.add("fehler");
+    meldung("Nicht uebernommen: " + roh.toFixed(2) + " bei " + anbieterName(sch.kz) +
+      " sind real nur " + rund2(echt).toFixed(2) + ", das liegt unter deiner Mindestquote " +
+      z.einst.mind.toFixed(2) + ". Entweder du nimmst die Wette raus, oder du senkst oben die Mindestquote.",
+      "warn");
+    return;
+  }
+  feld.classList.remove("fehler");
+  speichereEingabe(wettId, opt, sch.kz, String(roh));
+  merkeGeprueft(wettId, sch.kz);
+  zeichne_();
+}
+
+// ---------- Foto zum Schein ----------
+
+function fotoSchluessel(scheinId) { return "foto_" + scheinId; }
+
+function fotoHochladen(scheinId, input) {
+  const datei = input.files && input.files[0];
+  if (!datei) return;
+  const leser = new FileReader();
+  leser.onload = ev => {
+    const bild = new Image();
+    bild.onload = () => {
+      // Verkleinern, damit es in den Speicher passt
+      const maxB = 700;
+      const faktor = Math.min(1, maxB / bild.width);
+      const c = document.createElement("canvas");
+      c.width = Math.round(bild.width * faktor);
+      c.height = Math.round(bild.height * faktor);
+      c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+      const daten = c.toDataURL("image/jpeg", 0.7);
+      try {
+        localStorage.setItem(fotoSchluessel(scheinId), daten);
+        localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
+        meldung("Foto gespeichert (" + Math.round(daten.length / 1024) + " KB, verkleinert auf " +
+          c.width + " Pixel Breite).", "gut");
+        zeichne_();
+      } catch (err) {
+        meldung("Foto zu gross fuer den Speicher. Loesch aeltere Fotos oder mach einen Ausschnitt.", "warn");
+      }
+    };
+    bild.src = ev.target.result;
+  };
+  leser.readAsDataURL(datei);
+}
+
+function fotoLoeschen(scheinId) {
+  localStorage.removeItem(fotoSchluessel(scheinId));
+  localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
+  zeichne_();
+}
+
+// ---------- Meldungen ----------
+
+function meldung(text, art) {
+  const box = document.getElementById("meldung");
+  box.className = (art === "warn") ? "warnkern" : "merk";
+  box.innerHTML = text;
+  box.style.display = "block";
 }
 
 // ---------- Anzeige ----------
 
-let letzteScheine = null;
+function zeichne_() {
+  let z = liesZustand();
+  if (!z) z = baueAlles();
 
-function einstellungenLesen() {
-  const anb = [];
-  document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
-  return {
-    mindestquote: parseFloat(document.getElementById("mind").value) || 1.5,
-    quellen: document.getElementById("quellen").value,
-    anbieter: anb.length ? anb : ["iw", "bw", "b3", "st"],
-    mischzahl: parseInt(document.getElementById("mischzahl").value, 10) || 1
-  };
-}
+  // Einstellungen zurueckspiegeln
+  document.getElementById("mind").value = z.einst.mind;
+  document.querySelectorAll(".anbwahl").forEach(c => { c.checked = z.einst.anbieter.includes(c.value); });
 
-function zeichneKombis() {
-  const einst = einstellungenLesen();
-  const erg = baueScheine(einst);
-  letzteScheine = erg.scheine;
+  const normal = z.scheine.filter(s => s.art === "normal");
+  const niedrig = z.scheine.filter(s => s.art === "niedrig");
+  const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
-  // Kopfzahlen
-  const anzahlWetten = erg.scheine.length * 3;
   document.getElementById("uebersicht").innerHTML =
-    "<b>" + erg.scheine.length + " Scheine</b> aus " + anzahlWetten + " Wetten gebaut. " +
-    "Offen waren " + erg.gesamtOffen + " Wetten: " +
-    erg.rausgeflogen.length + " unter der Mindestquote oder ohne Quote, " +
-    erg.doppelt.length + " als Doppel-Spiel aussortiert, " +
-    erg.uebrig.length + " blieben uebrig (weniger als drei beim selben Anbieter).";
+    "<b>" + normal.length + " Scheine ueber der Mindestquote</b> (" + z.einst.mind.toFixed(2) + ")" +
+    ", dazu <b>" + niedrig.length + " Scheine mit zu niedrigen Quoten</b>. " +
+    verbaut + " Wetten verbaut von " + z.gesamtOffen + " offenen. " +
+    z.doppelt.length + " Doppel-Spiele und " + z.keinMarkt.length +
+    " ohne passenden Anbieter aussortiert, " + (z.uebrig.length + z.uebrigNiedrig.length) +
+    " blieben uebrig.";
 
-  // Scheine
-  let html = "";
-  if (erg.scheine.length === 0) {
-    html = '<div class="warnkern">Keine Scheine moeglich. Entweder ist die Mindestquote zu hoch, ' +
-      'oder es sind noch zu wenige Quoten geprueft. Stell oben auf "auch Foto-Quoten verwenden", ' +
-      'dann siehst du, was mit den Zahlen vom Foto-Tag ginge.</div>';
-  }
-  erg.scheine.forEach((s, nr) => {
-    const einsatzId = "e_" + nr;
-    html += '<div class="schein"><div class="s-kopf">Schein ' + (nr + 1) +
-      ' <span class="s-anb">' + anbieterName(s.kz) + "</span>" +
-      '<span class="s-quote">Gesamtquote <b>' + rund2(s.gesamt).toFixed(2) + "</b>" +
-      (GEBUEHREN_TEILER[s.kz] !== 1
-        ? ' <span class="mini">(angezeigt waeren ' + rund2(s.gesamtRoh).toFixed(2) + ")</span>" : "") +
-      "</span></div><table class='s-tab'>";
-    for (const t of s.teile) {
-      html += "<tr><td class='s-zeit'>" + zeitText(anstossFeld(t.w)) + "</td>" +
-        "<td class='s-liga'>" + t.w.liga + "</td>" +
-        "<td class='s-spiel'>" + t.w.spiel + "</td>" +
-        "<td class='s-wette'>" + t.w.wette.split("(")[0].trim() + " " + t.w.o[t.optIdx][0] + "</td>" +
-        "<td class='s-q'><b>" + rund2(t.q.echt).toFixed(2) + "</b>" +
-        '<div class="mini">' + t.q.quelle +
-        (GEBUEHREN_TEILER[s.kz] !== 1 ? ", angezeigt " + t.q.roh.toFixed(2) : "") + "</div></td>" +
-        "<td class='s-reiter'><span class='reiter-chip'>" + t.w.s + "</span></td></tr>";
-    }
-    html += "</table><div class='s-fuss'>Einsatz " +
-      '<input type="number" step="0.5" min="0" class="einsatz" id="' + einsatzId +
-      '" value="10" oninput="rechneGewinn(' + nr + ')"> &euro; ' +
-      '&nbsp;&rarr;&nbsp; moeglicher Gewinn <b id="g_' + nr + '">' +
-      rund2(10 * s.gesamt).toFixed(2) + " &euro;</b>" +
-      '<button class="merken" onclick="scheinMerken(' + nr + ')">In den Verlauf</button></div></div>';
-  });
-  document.getElementById("scheine").innerHTML = html;
+  document.getElementById("scheine").innerHTML =
+    (normal.length ? normal.map(s => scheinHtml(s, z)).join("") :
+      '<div class="warnkern">Keine Scheine ueber der Mindestquote. Senk sie oben, oder trag ' +
+      'in der Kombi-Tafel echte Quoten ein.</div>');
 
-  // Uebrige und aussortierte
-  let rest = "";
-  if (erg.uebrig.length) {
-    rest += "<h3>Uebrig geblieben (" + erg.uebrig.length + ")</h3><p class='mini'>" +
-      "Diese Wetten erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.</p><ul>";
-    for (const u of erg.uebrig)
-      rest += "<li>" + u.k.w.spiel + " <span class='mini'>(" + u.k.w.wette + ", waere " +
-        anbieterName(u.kz) + ")</span></li>";
-    rest += "</ul>";
-  }
-  if (erg.doppelt.length) {
-    rest += "<h3>Als Doppel-Spiel aussortiert (" + erg.doppelt.length + ")</h3>" +
-      "<p class='mini'>Dieses Spiel steckt schon mit einer anderen Wette in einem Schein. " +
-      "Zwei Wetten auf dasselbe Spiel haengen zusammen und wuerden gemeinsam fallen.</p><ul>";
-    for (const d of erg.doppelt)
-      rest += "<li>" + d.w.spiel + " <span class='mini'>(" + d.w.wette + ")</span></li>";
-    rest += "</ul>";
-  }
-  if (erg.rausgeflogen.length) {
-    rest += "<h3>Nicht verwendbar (" + erg.rausgeflogen.length + ")</h3><ul>";
-    for (const r of erg.rausgeflogen)
-      rest += "<li>" + r.w.spiel + " <span class='mini'>(" + r.w.wette + "): " + r.grund + "</span></li>";
-    rest += "</ul>";
-  }
-  document.getElementById("reste").innerHTML = rest;
+  document.getElementById("niedrig").innerHTML =
+    (niedrig.length ? niedrig.map(s => scheinHtml(s, z)).join("") :
+      '<p class="mini">Keine Wetten unter der Mindestquote.</p>');
 
+  zeichneReste(z);
   zeichneVerlauf();
 }
 
-function rechneGewinn(nr) {
-  const s = letzteScheine[nr];
-  const e = parseFloat(document.getElementById("e_" + nr).value) || 0;
-  document.getElementById("g_" + nr).textContent = rund2(e * s.gesamt).toFixed(2) + " €";
+function scheinHtml(s, z) {
+  const mind = z.einst.mind;
+  let gesamt = 1, gesamtRoh = 1, alleFest = true;
+  const zeilen = s.wetten.map(eintrag => {
+    const w = wetteNachId(eintrag.id);
+    if (!w) return "";
+    const q = zielQuote(w, eintrag.optIdx, s.kz);
+    const v = verfuegbarkeit(w)[s.kz];
+    gesamt *= q.echt; gesamtRoh *= q.roh;
+    if (!q.fest) alleFest = false;
+    const unter = q.echt < mind - 0.0001;
+    const opt = w.o[eintrag.optIdx][0];
+    const eigen = liesEingabe(w.id, opt, s.kz);
+    return "<tr" + (unter ? ' class="unterquote"' : "") + ">" +
+      "<td class='s-zeit'>" + zeitText(anstossFeld(w)) + "</td>" +
+      "<td class='s-spiel'>" + w.spiel + '<div class="mini">' + w.liga + "</div></td>" +
+      "<td class='s-wette'>" + w.wette.split("(")[0].trim() + " " + opt +
+        ' <span class="reiter-chip">' + w.s + "</span>" +
+        (v === "D" ? '<div class="duenn">Markt dort duenn, pruefen</div>' : "") + "</td>" +
+      "<td class='s-ziel'>" + q.roh.toFixed(2) + '<div class="mini">' + q.quelle + "</div></td>" +
+      "<td class='s-mind'>" + mind.toFixed(2) + "</td>" +
+      "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
+        (eigen ? "value='" + eigen + "' " : "") +
+        "onchange=\"quoteEintragen('" + s.id + "','" + w.id + "',this)\">" +
+        '<div class="' + (unter ? "unterrot" : "real") + '">real ' + rund2(q.echt).toFixed(2) +
+        (unter ? " zu niedrig" : "") + "</div></td>" +
+      "<td class='s-raus'>" +
+        "<select onchange=\"if(this.value){wetteRaus('" + s.id + "','" + w.id + "',this.value);}\">" +
+        "<option value=''>raus...</option>" +
+        "<option>Quote passt nicht mehr</option>" +
+        "<option>Anbieter hat die Wette nicht</option>" +
+        "<option>Spiel abgelaufen</option>" +
+        "<option>will ich nicht</option></select></td></tr>";
+  }).join("");
+
+  const foto = localStorage.getItem(fotoSchluessel(s.id));
+  const fotoZeit = localStorage.getItem(fotoSchluessel(s.id) + "_zeit");
+  const kopfKlasse = (s.art === "niedrig") ? "s-kopf niedrigkopf" : "s-kopf";
+
+  return '<div class="schein"><div class="' + kopfKlasse + '">' +
+    "Schein " + s.nr + ' <span class="s-anb">' + anbieterName(s.kz) + "</span>" +
+    (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
+    '<span class="s-quote">' + s.wetten.length + "er, Gesamtquote <b>" + rund2(gesamt).toFixed(2) + "</b>" +
+    (GEBUEHREN_TEILER[s.kz] !== 1 ? ' <span class="mini">(Schein zeigt ' + rund2(gesamtRoh).toFixed(2) + ")</span>" : "") +
+    (alleFest ? ' <span class="mini gruen">alle Quoten selbst geprueft</span>'
+              : ' <span class="mini">teils noch Foto-Quoten</span>') +
+    "</span></div>" +
+    "<table class='s-tab'><thead><tr><th>Anstoss</th><th>Spiel</th><th>Wette</th>" +
+    "<th>Ziel-Quote</th><th>mind.</th><th>Deine Quote</th><th></th></tr></thead><tbody>" +
+    zeilen + "</tbody></table>" +
+    (s.entfernt.length ? '<div class="s-raus-liste">Rausgenommen: ' +
+      s.entfernt.map(e => (wetteNachId(e.id) ? wetteNachId(e.id).spiel : e.id) +
+        " (" + e.grund + ")").join(", ") + "</div>" : "") +
+    "<div class='s-fuss'>Einsatz <input type='number' step='0.5' min='0' class='einsatz' " +
+      "id='e_" + s.id + "' value='10' oninput=\"rechneGewinn('" + s.id + "'," + gesamt + ")\"> &euro;" +
+      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(10 * gesamt).toFixed(2) + " &euro;</b>" +
+      '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
+      '<label class="fotoknopf">Foto vom Wettschein' +
+        '<input type="file" accept="image/*" style="display:none" ' +
+        'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
+    "</div>" +
+    (foto ? '<div class="s-foto"><img src="' + foto + '" alt="Wettschein">' +
+      '<div class="mini">hochgeladen ' + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "") +
+      ' <button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button></div></div>' : "") +
+    "</div>";
 }
 
-function scheinMerken(nr) {
-  const s = letzteScheine[nr];
-  const e = parseFloat(document.getElementById("e_" + nr).value) || 0;
-  if (!e) { alert("Bitte zuerst einen Einsatz eintragen."); return; }
-  scheinSpeichern(s, e);
+function zeichneReste(z) {
+  let html = "";
+  const liste = (arr, titel, hinweis) => {
+    if (!arr.length) return "";
+    let h = "<h3>" + titel + " (" + arr.length + ")</h3><p class='mini'>" + hinweis + "</p><ul>";
+    for (const x of arr) {
+      const w = wetteNachId(x.id || x);
+      if (w) h += "<li>" + w.spiel + " <span class='mini'>(" + w.wette + ")</span></li>";
+    }
+    return h + "</ul>";
+  };
+  html += liste(z.uebrig, "Uebrig geblieben", "Erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.");
+  html += liste(z.uebrigNiedrig, "Uebrig, zu niedrige Quote", "Unter der Mindestquote und keine drei fuer einen eigenen Schein.");
+  html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
+  html += liste(z.keinMarkt, "Kein erlaubter Anbieter", "Keiner der angehakten Anbieter fuehrt diesen Markt.");
+  document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
+}
+
+function rechneGewinn(scheinId, gesamt) {
+  const e = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
+  document.getElementById("g_" + scheinId).textContent = rund2(e * gesamt).toFixed(2) + " €";
+}
+
+// ---------- Verlauf ----------
+
+function liesVerlauf() {
+  try { return JSON.parse(localStorage.getItem("verlauf") || "[]"); } catch (e) { return []; }
+}
+function speichereVerlauf(v) { localStorage.setItem("verlauf", JSON.stringify(v)); }
+
+function scheinMerken(scheinId) {
+  const z = liesZustand();
+  const s = z.scheine.find(x => x.id === scheinId);
+  const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
+  if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
+  let gesamt = 1;
+  const wetten = s.wetten.map(eintrag => {
+    const w = wetteNachId(eintrag.id);
+    const q = zielQuote(w, eintrag.optIdx, s.kz);
+    gesamt *= q.echt;
+    return { id: w.id, spiel: w.spiel, wette: w.wette, linie: w.o[eintrag.optIdx][0],
+             quote: rund2(q.echt), quelle: q.quelle };
+  });
+  const v = liesVerlauf();
+  v.unshift({
+    zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz,
+    anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
+    moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen"
+  });
+  speichereVerlauf(v);
+  meldung("Schein " + s.nr + " im Verlauf gespeichert.", "gut");
   zeichneVerlauf();
 }
 
@@ -285,44 +484,38 @@ function zeichneVerlauf() {
   const v = liesVerlauf();
   const ziel = document.getElementById("verlauf");
   if (!v.length) {
-    ziel.innerHTML = "<p class='mini'>Noch keine Scheine gemerkt. Bau oben Scheine und " +
-      "druecke bei den Scheinen, die du wirklich setzt, auf \"In den Verlauf\".</p>";
+    ziel.innerHTML = "<p class='mini'>Noch nichts gemerkt. Bei jedem Schein, den du wirklich " +
+      "setzt, auf \"In den Verlauf\" druecken.</p>";
     return;
   }
   const summe = v.reduce((p, x) => p + (x.einsatz || 0), 0);
-  const offen = v.filter(x => x.stand === "offen").length;
-  let html = "<p><b>" + v.length + " Scheine im Verlauf</b>, davon " + offen +
-    " offen. Eingesetzt insgesamt: <b>" + summe.toFixed(2) + " &euro;</b></p>";
+  let html = "<p><b>" + v.length + " Scheine</b>, eingesetzt insgesamt <b>" + summe.toFixed(2) + " &euro;</b></p>";
   html += "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Moeglich</th><th>Stand</th><th></th></tr></thead><tbody>";
   v.forEach((x, i) => {
     const d = new Date(x.zeit);
+    const foto = x.scheinId ? localStorage.getItem(fotoSchluessel(x.scheinId)) : null;
     html += "<tr><td class='mini'>" + String(d.getDate()).padStart(2, "0") + "." +
-      String(d.getMonth() + 1).padStart(2, "0") + ". " +
-      String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + "</td>" +
-      "<td>" + x.anbieter + "</td><td class='mini'>" +
-      x.wetten.map(t => t.spiel + " (" + t.wette + ")").join("<br>") + "</td>" +
+      String(d.getMonth() + 1).padStart(2, "0") + ". " + String(d.getHours()).padStart(2, "0") +
+      ":" + String(d.getMinutes()).padStart(2, "0") + "</td><td>" + x.anbieter + "</td>" +
+      "<td class='mini'>" + x.wetten.map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
+      (foto ? '<div><img src="' + foto + '" class="minifoto"></div>' : "") + "</td>" +
       "<td><b>" + x.quote.toFixed(2) + "</b></td><td>" + x.einsatz.toFixed(2) + " &euro;</td>" +
       "<td>" + x.moeglich.toFixed(2) + " &euro;</td>" +
       "<td><select onchange='standAendern(" + i + ", this.value)'>" +
       ["offen", "gewonnen", "verloren"].map(o =>
         "<option" + (x.stand === o ? " selected" : "") + ">" + o + "</option>").join("") +
-      "</select></td>" +
-      "<td><button onclick='verlaufLoeschen(" + i + ")'>weg</button></td></tr>";
+      "</select></td><td><button onclick='verlaufLoeschen(" + i + ")'>weg</button></td></tr>";
   });
   html += "</tbody></table>";
-
-  // Bilanz
-  const gew = v.filter(x => x.stand === "gewonnen");
-  const ver = v.filter(x => x.stand === "verloren");
+  const gew = v.filter(x => x.stand === "gewonnen"), ver = v.filter(x => x.stand === "verloren");
   if (gew.length || ver.length) {
     const ein = gew.concat(ver).reduce((p, x) => p + x.einsatz, 0);
     const aus = gew.reduce((p, x) => p + x.moeglich, 0);
     const saldo = aus - ein;
-    html += "<div class='" + (saldo >= 0 ? "merk" : "warn") + "'><b>Bilanz der abgeschlossenen Scheine:</b> " +
-      gew.length + " gewonnen, " + ver.length + " verloren. Eingesetzt " + ein.toFixed(2) +
-      " &euro;, zurueck " + aus.toFixed(2) + " &euro;, Saldo <b>" +
-      (saldo >= 0 ? "+" : "") + saldo.toFixed(2) + " &euro;</b></div>";
+    html += "<div class='" + (saldo >= 0 ? "merk" : "warn") + "'><b>Bilanz:</b> " + gew.length +
+      " gewonnen, " + ver.length + " verloren. Eingesetzt " + ein.toFixed(2) + " &euro;, zurueck " +
+      aus.toFixed(2) + " &euro;, Saldo <b>" + (saldo >= 0 ? "+" : "") + saldo.toFixed(2) + " &euro;</b></div>";
   }
   ziel.innerHTML = html;
 }
@@ -331,18 +524,23 @@ function standAendern(i, wert) {
   const v = liesVerlauf();
   if (v[i]) { v[i].stand = wert; speichereVerlauf(v); zeichneVerlauf(); }
 }
-
 function verlaufLoeschen(i) {
-  const v = liesVerlauf();
-  v.splice(i, 1);
-  speichereVerlauf(v);
-  zeichneVerlauf();
+  const v = liesVerlauf(); v.splice(i, 1); speichereVerlauf(v); zeichneVerlauf();
+}
+
+// ---------- Knoepfe ----------
+
+function neuBauen() {
+  localStorage.removeItem(ZUSTAND_SCHLUESSEL);
+  baueAlles();
+  meldung("Neu gebaut mit Mindestquote " + einstellungenLesen().mind.toFixed(2) + ".", "gut");
+  zeichne_();
 }
 
 function neuMischen() {
   const f = document.getElementById("mischzahl");
   f.value = (parseInt(f.value, 10) || 1) + 1;
-  zeichneKombis();
+  neuBauen();
 }
 
-document.addEventListener("DOMContentLoaded", zeichneKombis);
+document.addEventListener("DOMContentLoaded", zeichne_);
