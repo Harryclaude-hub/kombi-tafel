@@ -19,6 +19,7 @@ async function glockeStart() {
     knopf.addEventListener("click", (ev) => { ev.preventDefault(); glockeUmschalten(); });
     const fk = document.getElementById("nav_freunde");
     if (fk) fk.addEventListener("click", (ev) => { ev.preventDefault(); freundePanelUmschalten(); });
+    if (typeof anrufBereit === "function") anrufBereit();
     await glockeZaehlen();
     setInterval(glockeZaehlen, 30000);
   } catch (e) { /* Glocke stoert nie die Seite */ }
@@ -205,6 +206,8 @@ async function glockeThread(partnerId, username) {
     '<input type="file" style="display:none" onchange="glockeDatei(this)"></label>' +
     '<button id="gp-ton" onclick="glockeTon()" title="Sprachnachricht">&#127908; Sprachnachricht</button>' +
     '<button id="gp-video" onclick="glockeVideo()" title="Video aufnehmen">&#128249; Video</button>' +
+    '<button onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, false)" title="Anrufen">&#128222; Anrufen</button>' +
+    '<button onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, true)" title="Video-Anruf">&#128222;&#128249; Video-Anruf</button>' +
     "</div>";
   await glockeNachladen();
   if (glockePoll) clearInterval(glockePoll);

@@ -498,3 +498,10 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .medienbild { max-width: 240px; max-height: 240px; display: block; margin-top: 4px; }
 .medienvideo { max-width: 280px; display: block; margin-top: 4px; }
 #gp-vorschau video { max-width: 100%; }
+
+/* Anruf-Panel (Design-Schicht) */
+#anrufpanel { position: fixed; bottom: 20px; right: 20px; width: 320px; max-width: 90vw;
+  background: #1a2c50; color: #fff; padding: 14px; z-index: 80; border: 2px solid #000; }
+#anrufpanel .anruf-tasten { margin-top: 10px; }
+#anrufpanel button { margin-right: 8px; }
+#anrufpanel video, #anrufpanel audio { width: 100%; margin-top: 8px; }
