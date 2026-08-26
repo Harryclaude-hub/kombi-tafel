@@ -355,6 +355,27 @@ function quoteEintragen(scheinId, wettId, feld) {
 
 function fotoSchluessel(scheinId) { return "foto_" + scheinId; }
 
+// Der Name des Fotos: Anbieter, Datum, Gesamtquote des Scheins
+function fotoName(scheinId) {
+  const z = liesZustand();
+  const sch = z ? z.scheine.find(x => x.id === scheinId) : null;
+  const d = new Date();
+  const datum = String(d.getDate()).padStart(2, "0") + "." +
+    String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+  if (!sch) return "Schein " + datum;
+  let gesamt = 1;
+  for (const eintrag of sch.wetten) {
+    const w = wetteNachId(eintrag.id);
+    if (w) gesamt *= zielQuote(w, eintrag.optIdx, sch.kz).echt;
+  }
+  return anbieterName(sch.kz) + " " + datum + " Quote " + rund2(gesamt).toFixed(2);
+}
+
+// Dateiname zum Herunterladen (ohne Leerzeichen)
+function fotoDateiname(name) {
+  return name.replace(/ /g, "_").replace("Quote_", "Q") + ".jpg";
+}
+
 function fotoHochladen(scheinId, input) {
   const datei = input.files && input.files[0];
   if (!datei) return;
@@ -371,10 +392,12 @@ function fotoHochladen(scheinId, input) {
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
       const daten = c.toDataURL("image/jpeg", 0.7);
       try {
+        const name = fotoName(scheinId);
         localStorage.setItem(fotoSchluessel(scheinId), daten);
         localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
-        meldung("Foto gespeichert (" + Math.round(daten.length / 1024) + " KB, verkleinert auf " +
-          c.width + " Pixel Breite).", "gut");
+        localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
+        meldung("Foto gespeichert und benannt: <b>" + name + "</b> (" +
+          Math.round(daten.length / 1024) + " KB).", "gut");
         zeichne_();
       } catch (err) {
         meldung("Foto zu gross fuer den Speicher. Loesch aeltere Fotos oder mach einen Ausschnitt.", "warn");
@@ -388,6 +411,7 @@ function fotoHochladen(scheinId, input) {
 function fotoLoeschen(scheinId) {
   localStorage.removeItem(fotoSchluessel(scheinId));
   localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
+  localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
   zeichne_();
 }
 
@@ -403,6 +427,12 @@ function meldung(text, art) {
 // ---------- Anzeige ----------
 
 function zeichne_() {
+  // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
+  if (!document.getElementById("scheine")) {
+    zeichneVerlauf();
+    zeichneKonto();
+    return;
+  }
   let z = liesZustand();
   if (!z) z = baueAlles();
 
@@ -506,9 +536,14 @@ function scheinHtml(s, z) {
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
     "</div>" +
-    (foto ? '<div class="s-foto"><img src="' + foto + '" alt="Wettschein">' +
-      '<div class="mini">hochgeladen ' + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "") +
-      ' <button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button></div></div>' : "") +
+    (foto ? (function () {
+      const name = localStorage.getItem(fotoSchluessel(s.id) + "_name") || "Wettschein";
+      return '<div class="s-foto"><div class="fotoname">' + name + "</div>" +
+        '<img src="' + foto + '" alt="' + name + '">' +
+        '<div class="mini">hochgeladen ' + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "") +
+        ' &nbsp;<a href="' + foto + '" download="' + fotoDateiname(name) + '">unter diesem Namen herunterladen</a>' +
+        ' &nbsp;<button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button></div></div>';
+    })() : "") +
     "</div>";
 }
 
@@ -568,17 +603,18 @@ function scheinMerken(scheinId) {
   v.unshift({
     zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz,
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
-    moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen"
+    moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   });
   speichereVerlauf(v);
-  meldung("Schein " + s.nr + " im Verlauf gespeichert.", "gut");
+  meldung("Schein " + s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
 }
 
 function zeichneVerlauf() {
-  const v = liesVerlauf();
   const ziel = document.getElementById("verlauf");
+  if (!ziel) return;
+  const v = liesVerlauf();
   if (!v.length) {
     ziel.innerHTML = "<p class='mini'>Noch nichts gemerkt. Bei jedem Schein, den du wirklich " +
       "setzt, auf \"In den Verlauf\" druecken.</p>";
@@ -587,7 +623,7 @@ function zeichneVerlauf() {
   const summe = v.reduce((p, x) => p + (x.einsatz || 0), 0);
   let html = "<p><b>" + v.length + " Scheine</b>, eingesetzt insgesamt <b>" + summe.toFixed(2) + " &euro;</b></p>";
   html += "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Wetten</th><th>Quote</th>" +
-    "<th>Einsatz</th><th>Moeglich</th><th>Stand</th><th></th></tr></thead><tbody>";
+    "<th>Einsatz</th><th>Moeglich</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   v.forEach((x, i) => {
     const d = new Date(x.zeit);
     const foto = x.scheinId ? localStorage.getItem(fotoSchluessel(x.scheinId)) : null;
@@ -595,13 +631,18 @@ function zeichneVerlauf() {
       String(d.getMonth() + 1).padStart(2, "0") + ". " + String(d.getHours()).padStart(2, "0") +
       ":" + String(d.getMinutes()).padStart(2, "0") + "</td><td>" + x.anbieter + "</td>" +
       "<td class='mini'>" + x.wetten.map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
-      (foto ? '<div><img src="' + foto + '" class="minifoto"></div>' : "") + "</td>" +
+      (foto ? '<div class="fotoname mini">' +
+        (localStorage.getItem(fotoSchluessel(x.scheinId) + "_name") || "") + "</div>" +
+        '<div><img src="' + foto + '" class="minifoto"></div>' : "") + "</td>" +
       "<td><b>" + x.quote.toFixed(2) + "</b></td><td>" + x.einsatz.toFixed(2) + " &euro;</td>" +
       "<td>" + x.moeglich.toFixed(2) + " &euro;</td>" +
       "<td><select onchange='standAendern(" + i + ", this.value)'>" +
       ["offen", "gewonnen", "verloren"].map(o =>
         "<option" + (x.stand === o ? " selected" : "") + ">" + o + "</option>").join("") +
-      "</select></td><td><button onclick='verlaufLoeschen(" + i + ")'>weg</button></td></tr>";
+      "</select></td>" +
+      "<td class='notizzelle'><textarea class='notizfeld' placeholder='Notiz...' " +
+      "onchange='notizSpeichern(" + i + ", this.value)'>" + (x.notiz || "") + "</textarea></td>" +
+      "<td><button onclick='verlaufLoeschen(" + i + ")'>weg</button></td></tr>";
   });
   html += "</tbody></table>";
   const gew = v.filter(x => x.stand === "gewonnen"), ver = v.filter(x => x.stand === "verloren");
@@ -674,6 +715,11 @@ function zeichneKonto() {
     (gEntschieden ? " (Rendite " + (rendite >= 0 ? "+" : "") + rendite.toFixed(1) + " %)" : "") +
     ". Noch im Spiel: <b>" + gSpiel.toFixed(2) + " &euro;</b>.</div>";
   ziel.innerHTML = html;
+}
+
+function notizSpeichern(i, wert) {
+  const v = liesVerlauf();
+  if (v[i]) { v[i].notiz = wert; speichereVerlauf(v); }
 }
 
 function standAendern(i, wert) {

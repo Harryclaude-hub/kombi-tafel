@@ -295,3 +295,10 @@ p { margin: 8px 0; }
 .navleiste a.navknopf:hover { background: #eee; }
 .navleiste a.navknopf.aktiv { background: #000; color: #fff; }
 .navleiste a.navknopf.aktiv:hover { background: #000; }
+
+/* ---- Mein Bereich: Notizen und Fotonamen ---- */
+.notizzelle { min-width: 160px; }
+textarea.notizfeld { width: 100%; min-height: 44px; font-size: 13px;
+  font-family: inherit; border: 1px solid #888; padding: 3px 5px; }
+.fotoname { font-weight: bold; font-size: 12.5px; }
+.s-foto .fotoname { margin-bottom: 3px; }
