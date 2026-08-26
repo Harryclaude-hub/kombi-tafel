@@ -202,3 +202,62 @@ async function supaDmSenden(partnerId, text) {
   const u = await supaNutzer();
   return await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: text });
 }
+
+
+// ---------- Buchhaltung ----------
+
+async function supaBuchungenLaden(bereichId) {
+  const r = await supa.from("kt_buchungen").select("*")
+    .eq("bereich", bereichId).order("datum", { ascending: true });
+  return r.data || [];
+}
+
+async function supaBuchen(bereichId, datum, konto, person, art, betrag, notiz) {
+  const u = await supaNutzer();
+  return await supa.from("kt_buchungen").insert({
+    bereich: bereichId, autor: u.id, datum: datum, konto: konto,
+    person: person, art: art, betrag: betrag, notiz: notiz || ""
+  });
+}
+
+async function supaBuchungLoeschen(id) {
+  return await supa.from("kt_buchungen").delete().eq("id", id);
+}
+
+async function supaBalancenLaden(bereichId) {
+  const r = await supa.from("kt_balancen").select("*")
+    .eq("bereich", bereichId).order("datum", { ascending: true });
+  return r.data || [];
+}
+
+async function supaBalanceSetzen(bereichId, datum, betrag) {
+  const u = await supaNutzer();
+  return await supa.from("kt_balancen").upsert({
+    bereich: bereichId, datum: datum, betrag: betrag, autor: u.id
+  });
+}
+
+async function supaBalanceLoeschen(bereichId, datum) {
+  return await supa.from("kt_balancen").delete()
+    .eq("bereich", bereichId).eq("datum", datum);
+}
+
+// ---------- Foto-Satz-Uploads ----------
+
+async function supaSatzUploadsLaden(bereichId) {
+  const r = await supa.from("kt_satz_uploads")
+    .select("id, satz_datum, status, created_at")
+    .eq("bereich", bereichId).order("satz_datum", { ascending: false });
+  return r.data || [];
+}
+
+async function supaSatzFotoHochladen(bereichId, satzDatum, fotoDataUrl) {
+  const u = await supaNutzer();
+  return await supa.from("kt_satz_uploads").insert({
+    bereich: bereichId, autor: u.id, satz_datum: satzDatum, foto: fotoDataUrl
+  });
+}
+
+async function supaSatzUploadLoeschen(id) {
+  return await supa.from("kt_satz_uploads").delete().eq("id", id);
+}

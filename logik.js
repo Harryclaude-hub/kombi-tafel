@@ -368,7 +368,7 @@ function baueFilter() {
   // 0) Foto-Satz (nur zeigen, wenn es mehr als einen gibt)
   const sf = document.getElementById("satzfilter");
   if (sf) {
-    if (SAETZE.length > 1) {
+    if (SAETZE.length >= 1) {
       zeile("satzfilter", "Foto-Satz",
         SAETZE.map(x => ({ kz: x.id, text: x.titel })),
         e => e.kz === aktiverSatzId(),

@@ -150,6 +150,8 @@ async function zeigeApp() {
 <div id="freunde"></div>
 <div id="teilen"></div>
 <div id="importkasten"></div>
+<div id="fotosaetze"></div>
+<div id="buchhaltung"></div>
 <h2>Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
@@ -167,6 +169,8 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   await zeichneTeilen();
   zeichneImport();
   await zeichneBereich();
+  await zeichneFotoSaetze();
+  await zeichneBuchhaltung();
 }
 
 async function zeichneTabs() {
@@ -461,6 +465,215 @@ async function tuKopieren(id) {
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
     : "In deinen Bereich kopiert.", r.error ? "warn" : "gut");
+}
+
+// ---------- Foto-Saetze hochladen ----------
+
+async function zeichneFotoSaetze() {
+  const box = el("fotosaetze");
+  if (!box) return;
+  const schreib = darfSchreiben();
+  const uploads = await supaSatzUploadsLaden(aktiverBereich.id);
+  const gruppen = {};
+  for (const u of uploads) {
+    gruppen[u.satz_datum] = gruppen[u.satz_datum] || { n: 0, wartet: 0 };
+    gruppen[u.satz_datum].n++;
+    if (u.status === "wartet") gruppen[u.satz_datum].wartet++;
+  }
+  let liste = "";
+  for (const datum of Object.keys(gruppen)) {
+    const g = gruppen[datum];
+    liste += "<li><b>Satz vom " + datum + "</b>: " + g.n + " Foto(s), " +
+      (g.wartet ? '<span class="rot">' + g.wartet + " warten auf Einlesen durch Claude</span>"
+                : '<span class="gruen">eingelesen</span>') + "</li>";
+  }
+  const heute = new Date().toISOString().slice(0, 10);
+  box.innerHTML = '<details><summary>Foto-Saetze: neue Kombi-Fotos hochladen (anklicken)</summary>' +
+    '<div class="inhalt">' +
+    '<p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum. Du laedst die Fotos ' +
+    "hier hoch, Claude liest sie beim naechsten Auftrag ein und legt daraus den neuen Satz in " +
+    "der Kombi-Tafel an. <b>Saetze mischen sich nie.</b></p>" +
+    (schreib
+      ? '<label>Datum des Satzes: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
+        '<label class="fotoknopf">Fotos hochladen' +
+        '<input type="file" accept="image/*" multiple style="display:none" ' +
+        'onchange="tuSatzFotos(this)"></label>'
+      : '<p class="mini">Nur mit Schreibrecht (eigener Bereich oder Mitarbeiten).</p>') +
+    (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Saetze hochgeladen.</p>') +
+    "</div></details>";
+}
+
+async function tuSatzFotos(input) {
+  const datum = el("satz_datum").value;
+  if (!datum) { meldungM("Bitte zuerst das Datum des Satzes waehlen.", "warn"); return; }
+  const dateien = Array.from(input.files || []);
+  if (!dateien.length) return;
+  let ok = 0;
+  for (const datei of dateien) {
+    const dataUrl = await verkleinereBild(datei, 1100);
+    if (!dataUrl) continue;
+    const r = await supaSatzFotoHochladen(aktiverBereich.id, datum, dataUrl);
+    if (!r.error) ok++;
+    else meldungM("Foto nicht gespeichert: " + r.error.message, "warn");
+  }
+  meldungM(ok + " von " + dateien.length + " Fotos zum Satz vom " + datum +
+    " hochgeladen. Claude liest sie beim naechsten Auftrag ein.", ok ? "gut" : "warn");
+  zeichneFotoSaetze();
+}
+
+function verkleinereBild(datei, maxBreite) {
+  return new Promise(fertig => {
+    const leser = new FileReader();
+    leser.onload = ev => {
+      const bild = new Image();
+      bild.onload = () => {
+        const faktor = Math.min(1, maxBreite / bild.width);
+        const c = document.createElement("canvas");
+        c.width = Math.round(bild.width * faktor);
+        c.height = Math.round(bild.height * faktor);
+        c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+        fertig(c.toDataURL("image/jpeg", 0.8));
+      };
+      bild.onerror = () => fertig(null);
+      bild.src = ev.target.result;
+    };
+    leser.readAsDataURL(datei);
+  });
+}
+
+// ---------- Buchhaltung ----------
+
+async function zeichneBuchhaltung() {
+  const box = el("buchhaltung");
+  if (!box) return;
+  const schreib = darfSchreiben();
+  const buchungen = await supaBuchungenLaden(aktiverBereich.id);
+  const balancen = await supaBalancenLaden(aktiverBereich.id);
+  const heute = new Date().toISOString().slice(0, 10);
+
+  // Karams Formel: Gewinn = Balance + Auszahlungen - Einzahlungen - Startkapital
+  const summe = art => buchungen.filter(b => b.art === art)
+    .reduce((p, b) => p + parseFloat(b.betrag), 0);
+  const einz = summe("einzahlung"), ausz = summe("auszahlung"), start = summe("startkapital");
+  const letzteBalance = balancen.length ? parseFloat(balancen[balancen.length - 1].betrag) : null;
+  const gewinn = (letzteBalance === null) ? null : letzteBalance + ausz - einz - start;
+
+  let html = '<details open><summary>Buchhaltung (anklicken)</summary><div class="inhalt">' +
+    '<div class="kern"><b>Die Methode (deine zwei Listen):</b> Liste 1 sammelt jede Ein- und ' +
+    "Auszahlung mit Datum, Konto, Person und Betrag, dazu das Startkapital. Liste 2 ist die " +
+    "taegliche <b>Gesamtbalance aller Accounts zusammen</b>. Der Gewinn rechnet sich: " +
+    "<b>aktuelle Gesamtbalance + alle Auszahlungen &minus; alle Einzahlungen &minus; Startkapital</b>.</div>";
+
+  // Ergebnis-Kasten
+  if (gewinn === null) {
+    html += '<div class="warnkern">Noch keine Tagesbalance eingetragen. Trag unten die heutige ' +
+      "Gesamtbalance aller Accounts ein, dann rechnet der Gewinn.</div>";
+  } else {
+    html += '<div class="' + (gewinn >= 0 ? "merk" : "warn") + '"><b>Reiner Gewinn nach der Formel:</b> ' +
+      letzteBalance.toFixed(2) + " (Balance vom " + balancen[balancen.length - 1].datum + ") + " +
+      ausz.toFixed(2) + " (Auszahlungen) &minus; " + einz.toFixed(2) + " (Einzahlungen) &minus; " +
+      start.toFixed(2) + " (Startkapital) = <b>" + (gewinn >= 0 ? "+" : "") + gewinn.toFixed(2) +
+      " &euro;</b></div>";
+  }
+
+  // Monats-Uebersicht (kumuliert bis Monatsende, plus Monatsgewinn)
+  if (balancen.length) {
+    const monate = [...new Set(balancen.map(b => b.datum.slice(0, 7)))].sort();
+    let vorher = null;
+    html += "<h3>Monate</h3><table><thead><tr><th>Monat</th><th>letzte Balance</th>" +
+      "<th>Auszahlungen bis dahin</th><th>Einzahlungen bis dahin</th>" +
+      "<th>Gewinn gesamt</th><th>Gewinn im Monat</th></tr></thead><tbody>";
+    for (const m of monate) {
+      const ende = m + "-31";
+      const bal = balancen.filter(b => b.datum <= ende);
+      const letzte = parseFloat(bal[bal.length - 1].betrag);
+      const a = buchungen.filter(b => b.art === "auszahlung" && b.datum <= ende)
+        .reduce((p, b) => p + parseFloat(b.betrag), 0);
+      const e = buchungen.filter(b => b.art === "einzahlung" && b.datum <= ende)
+        .reduce((p, b) => p + parseFloat(b.betrag), 0);
+      const st = buchungen.filter(b => b.art === "startkapital" && b.datum <= ende)
+        .reduce((p, b) => p + parseFloat(b.betrag), 0);
+      const g = letzte + a - e - st;
+      const imMonat = (vorher === null) ? g : g - vorher;
+      html += "<tr><td><b>" + m + "</b></td><td>" + letzte.toFixed(2) + " &euro;</td>" +
+        "<td>" + a.toFixed(2) + " &euro;</td><td>" + e.toFixed(2) + " &euro;</td>" +
+        "<td class='" + (g >= 0 ? "gruen" : "rot") + "'><b>" + (g >= 0 ? "+" : "") + g.toFixed(2) + " &euro;</b></td>" +
+        "<td class='" + (imMonat >= 0 ? "gruen" : "rot") + "'>" + (imMonat >= 0 ? "+" : "") + imMonat.toFixed(2) + " &euro;</td></tr>";
+      vorher = g;
+    }
+    html += "</tbody></table>";
+  }
+
+  // Liste 1: Buchungen
+  html += "<h3>Liste 1: Ein- und Auszahlungen</h3>";
+  if (schreib) {
+    html += '<div class="buch-eingabe">' +
+      '<input type="date" id="bu_datum" value="' + heute + '">' +
+      '<select id="bu_art"><option value="einzahlung">Einzahlung</option>' +
+      '<option value="auszahlung">Auszahlung</option>' +
+      '<option value="startkapital">Startkapital</option></select>' +
+      '<select id="bu_konto"><option>Interwetten</option><option>Bwin</option>' +
+      '<option>Bet365</option><option>Stake</option><option>Sonstiges</option></select>' +
+      '<input id="bu_person" placeholder="Person" value="' + ich.username + '" style="width:110px">' +
+      '<input type="number" step="0.01" min="0.01" id="bu_betrag" placeholder="Betrag" style="width:90px">' +
+      '<button class="haupt" onclick="tuBuchen()">Eintragen</button></div>';
+  }
+  if (buchungen.length) {
+    html += "<table><thead><tr><th>Datum</th><th>Art</th><th>Konto</th><th>Person</th>" +
+      "<th>Betrag</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
+    for (const b of buchungen.slice().reverse()) {
+      html += "<tr><td>" + b.datum + "</td><td>" + b.art + "</td><td>" + b.konto + "</td>" +
+        "<td>" + b.person + "</td><td>" + parseFloat(b.betrag).toFixed(2) + " &euro;</td>" +
+        (schreib ? "<td><button onclick=\"tuBuchungWeg('" + b.id + "')\">weg</button></td>" : "") + "</tr>";
+    }
+    html += "</tbody></table>";
+  } else html += '<p class="mini">Noch keine Buchungen.</p>';
+
+  // Liste 2: Tagesbalancen
+  html += "<h3>Liste 2: taegliche Gesamtbalance</h3>" +
+    '<p class="mini">Ein Wert pro Tag: alle Account-Staende zusammengezaehlt. ' +
+    "Gleicher Tag nochmal eingetragen ueberschreibt den Wert.</p>";
+  if (schreib) {
+    html += '<div class="buch-eingabe">' +
+      '<input type="date" id="ba_datum" value="' + heute + '">' +
+      '<input type="number" step="0.01" id="ba_betrag" placeholder="Gesamtbalance" style="width:130px">' +
+      '<button class="haupt" onclick="tuBalance()">Speichern</button></div>';
+  }
+  if (balancen.length) {
+    html += "<table><thead><tr><th>Datum</th><th>Gesamtbalance</th>" +
+      (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
+    for (const b of balancen.slice().reverse().slice(0, 31)) {
+      html += "<tr><td>" + b.datum + "</td><td><b>" + parseFloat(b.betrag).toFixed(2) + " &euro;</b></td>" +
+        (schreib ? "<td><button onclick=\"tuBalanceWeg('" + b.datum + "')\">weg</button></td>" : "") + "</tr>";
+    }
+    html += "</tbody></table>";
+  } else html += '<p class="mini">Noch keine Balancen.</p>';
+
+  box.innerHTML = html + "</div></details>";
+}
+
+async function tuBuchen() {
+  const betrag = parseFloat(el("bu_betrag").value);
+  if (!betrag || betrag <= 0) { meldungM("Bitte einen Betrag eintragen.", "warn"); return; }
+  const r = await supaBuchen(aktiverBereich.id, el("bu_datum").value, el("bu_konto").value,
+    el("bu_person").value.trim(), el("bu_art").value, betrag, "");
+  if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  zeichneBuchhaltung();
+}
+
+async function tuBuchungWeg(id) { await supaBuchungLoeschen(id); zeichneBuchhaltung(); }
+
+async function tuBalance() {
+  const betrag = parseFloat(el("ba_betrag").value);
+  if (isNaN(betrag)) { meldungM("Bitte die Gesamtbalance eintragen.", "warn"); return; }
+  const r = await supaBalanceSetzen(aktiverBereich.id, el("ba_datum").value, betrag);
+  if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  zeichneBuchhaltung();
+}
+
+async function tuBalanceWeg(datum) {
+  await supaBalanceLoeschen(aktiverBereich.id, datum);
+  zeichneBuchhaltung();
 }
 
 // ---------- Chat ----------
