@@ -338,3 +338,25 @@ td.s-spiel, td.s-liga, td.s-zeit { line-height: 1.4; }
   h2 { page-break-after: avoid; }
   th { position: static; }                 /* klebende Kopfzeile stoert beim Druck */
 }
+
+/* ============================================================
+   FARB-SCHICHT 26.08.: dunkelblauer Kopf, blaue Akzente.
+   Weiss/schwarz bleibt Grundlage, gruen/rot behalten ihre
+   Bedeutung. Komplett loeschbar.
+   ============================================================ */
+:root { --blau: #1a2c50; --blauhell: #eef1f7; }
+h1 { color: var(--blau); border-bottom: 3px solid var(--blau); padding-bottom: 4px; }
+h2 { color: var(--blau); border-bottom: 2px solid var(--blau); }
+.navleiste a.navknopf { border-color: var(--blau); color: var(--blau); }
+.navleiste a.navknopf:hover { background: var(--blauhell); }
+.navleiste a.navknopf.aktiv { background: var(--blau); color: #fff; }
+.navleiste a.navknopf.aktiv:hover { background: var(--blau); }
+thead th { background: var(--blauhell); border-bottom: 2px solid var(--blau); }
+.s-kopf { background: var(--blauhell); border-bottom: 1px solid var(--blau); }
+.niedrigkopf { background: #fdecec; border-bottom: 1px solid #c8102e; }
+details summary { background: var(--blauhell); border-left: 4px solid var(--blau); }
+.filterbox { border-color: var(--blau); }
+.filterzeile .f-label { color: var(--blau); }
+#filter button.aktiv { background: var(--blau); border-color: var(--blau); }
+.bildtrenner td { background: var(--blau) !important; }
+tr.detail td { background: #f6f8fc; }
