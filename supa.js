@@ -282,7 +282,7 @@ async function supaOrdnerAnlegen(bereichId, name) {
   const r = await supa.from("kt_ordner").insert({ bereich: bereichId, name: sauber })
     .select("id, name").single();
   if (r.error) {
-    if (String(r.error.message).includes("duplicate")) return { fehler: "Diesen Ordner gibt es schon." };
+    if (String(r.error.message).includes("duplicate")) return { fehler: "Diese Person gibt es schon." };
     return { fehler: r.error.message };
   }
   return { ok: true, ordner: r.data };
@@ -294,10 +294,10 @@ async function supaOrdnerUmbenennen(id, name) {
   // RLS-Lektion: verbotenes UPDATE gibt keinen Fehler, nur 0 Zeilen - deshalb select()
   const r = await supa.from("kt_ordner").update({ name: sauber }).eq("id", id).select("id").maybeSingle();
   if (r.error) {
-    if (String(r.error.message).includes("duplicate")) return { fehler: "Diesen Ordner gibt es schon." };
+    if (String(r.error.message).includes("duplicate")) return { fehler: "Diese Person gibt es schon." };
     return { fehler: r.error.message };
   }
-  if (!r.data) return { fehler: "Nicht erlaubt oder Ordner weg." };
+  if (!r.data) return { fehler: "Nicht erlaubt oder Person weg." };
   return { ok: true };
 }
 

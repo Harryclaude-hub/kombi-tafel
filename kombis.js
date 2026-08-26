@@ -688,7 +688,7 @@ function textSicher(t) {
 async function ordnerWahlZeigen(scheinId, bereichId) {
   const box = document.getElementById("ordnerwahl_" + scheinId);
   if (!box) return;
-  box.innerHTML = '<div class="ordnerpflicht mini">Ordner werden geladen...</div>';
+  box.innerHTML = '<div class="ordnerpflicht mini">Personen werden geladen...</div>';
   const liste = await supaOrdnerLaden(bereichId);
   let knoepfe = "";
   for (const o of liste) {
@@ -716,7 +716,7 @@ function ordnerGewaehlt(scheinId, bereichId, ordnerId) {
 async function ordnerNeuUndSpeichern(scheinId, bereichId) {
   const feld = document.getElementById("neuordner_" + scheinId);
   const r = await supaOrdnerAnlegen(bereichId, feld ? feld.value : "");
-  if (r.fehler) { meldung("Ordner nicht angelegt: " + r.fehler, "warn"); return; }
+  if (r.fehler) { meldung("Person nicht hinzugefuegt: " + r.fehler, "warn"); return; }
   scheinInsKonto(scheinId, bereichId, r.ordner.id);
 }
 

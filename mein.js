@@ -457,7 +457,7 @@ function tuOrdnerFilter(wert) {
 
 async function tuOrdnerAnlegen() {
   const r = await supaOrdnerAnlegen(aktiverBereich.id, el("ordner_neu").value);
-  if (r.fehler) { meldungM("Ordner nicht angelegt: " + r.fehler, "warn"); return; }
+  if (r.fehler) { meldungM("Person nicht hinzugefuegt: " + r.fehler, "warn"); return; }
   meldungM('Person <b>' + textSicherM(r.ordner.name) + "</b> hinzugefuegt.", "gut");
   zeichneBereich();
 }
