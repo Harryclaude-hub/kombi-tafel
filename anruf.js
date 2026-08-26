@@ -25,7 +25,11 @@ async function anrufBereit() {
     if (!u || anrufEigenerKanal) return;
     anrufEigenerKanal = supa.channel("kt-anruf-" + u.id, { config: { broadcast: { self: true } } });
     anrufEigenerKanal.on("broadcast", { event: "signal" }, p => anrufSignal(p.payload));
-    anrufEigenerKanal.subscribe();
+    anrufEigenerKanal.subscribe(status => {
+      // ZWEI Kanaele mit demselben Topic vertragen sich nicht - der eigene
+      // Hoerer-Kanal ist deshalb auch der Sende-Kanal an mich selbst.
+      if (status === "SUBSCRIBED") _anrufKanaele[u.id] = anrufEigenerKanal;
+    });
   } catch (e) { /* Anrufe stoeren nie die Seite */ }
 }
 
