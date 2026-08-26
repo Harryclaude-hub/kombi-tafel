@@ -147,6 +147,7 @@ async function zeigeApp() {
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button></div>
 <div id="bereichtabs" class="navleiste"></div>
+<div id="adminbereich"></div>
 <div id="freunde"></div>
 <div id="teilen"></div>
 <div id="importkasten"></div>
@@ -154,10 +155,12 @@ async function zeigeApp() {
 <div id="buchhaltung"></div>
 <h2>Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
-<h2>Konto-Ordner</h2>
-<p class="mini">Deine Unterordner: je ein Account oder eine Person, bei der du Kombinationen
-gesetzt hast. Jede Kombination gehoert in einen Ordner - die Buchhaltung oben bleibt EINE
-gemeinsame, die Ordner sortieren nur die Scheine.</p>
+<h2>Personen</h2>
+<p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
+gesetzt hast. Jede Kombination gehoert zu einer Person - die Buchhaltung oben bleibt EINE
+gemeinsame. <b>Nicht verwechseln:</b> die Foto-Ordner oben auf der Kombi-Tafel sind fuer
+alle gleich und aendern sich nur, wenn ein Admin neue Fotos bringt. Personen gehoeren
+nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
@@ -170,7 +173,9 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   onkeydown="if(event.key==='Enter')tuChatSenden()">
   <button class="haupt" onclick="tuChatSenden()">Senden</button></div>`;
 
+  binAdmin = await supaIstAdmin();
   await zeichneTabs();
+  await zeichneAdmin();
   await zeichneFreunde();
   await zeichneTeilen();
   zeichneImport();
@@ -367,7 +372,7 @@ async function tuImport() {
   if (ok === lokal.length) {
     localStorage.removeItem("verlauf");
     meldungM("Alle " + ok + " Scheine uebernommen und lokal aufgeraeumt. Sie liegen unter " +
-      "\"ohne Ordner\" - bitte in der Tabelle den Konto-Ordnern zuordnen.", "gut");
+      "\"ohne Person\" - bitte in der Tabelle den Personen zuordnen.", "gut");
   } else {
     meldungM("Nur " + ok + " von " + lokal.length + " uebernommen; die lokalen bleiben zur Sicherheit liegen.", "warn");
   }
@@ -413,7 +418,7 @@ function zeichneOrdnerBox(scheine) {
       textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")" +
       (warn ? ' <span class="warnbadge">!</span>' : "") + "</button> ";
   }
-  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Ordner (' + ohne + ")</button></div>";
+  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")</button></div>";
 
   let verwalten = "";
   if (schreib) {
@@ -433,17 +438,16 @@ function zeichneOrdnerBox(scheine) {
       zeilen += '<div class="ordnerzeile"><input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '"> ' +
         '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' + ende + "</div>";
     }
-    verwalten = '<details><summary>Ordner verwalten (anlegen, umbenennen, loeschen)</summary><div class="inhalt">' +
-      '<input id="ordner_neu" placeholder="Neuer Ordner, z. B. ein Name"> ' +
-      '<button class="haupt" onclick="tuOrdnerAnlegen()">Ordner anlegen</button>' +
-      (zeilen ? "<div>" + zeilen + "</div>" : "") +
-      "</div></details>";
+    verwalten = '<p><input id="ordner_neu" placeholder="Neue Person, z. B. ein Name"> ' +
+      '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufuegen</button></p>' +
+      (zeilen ? '<details><summary>Personen verwalten (umbenennen, loeschen)</summary>' +
+        '<div class="inhalt"><div>' + zeilen + "</div></div></details>" : "");
   }
   box.innerHTML = filter + verwalten +
     (irgendwoWarnung ? '<p class="mini rot"><b>Ein rotes ! heisst:</b> die Personen-Kasse dieser Person ' +
       "geht sich nicht aus. Person anklicken und nachsehen.</p>" : "") +
     (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
-      " ohne Ordner</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
+      " ohne Person</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
 }
 
 function tuOrdnerFilter(wert) {
@@ -454,7 +458,7 @@ function tuOrdnerFilter(wert) {
 async function tuOrdnerAnlegen() {
   const r = await supaOrdnerAnlegen(aktiverBereich.id, el("ordner_neu").value);
   if (r.fehler) { meldungM("Ordner nicht angelegt: " + r.fehler, "warn"); return; }
-  meldungM('Ordner <b>' + textSicherM(r.ordner.name) + "</b> angelegt.", "gut");
+  meldungM('Person <b>' + textSicherM(r.ordner.name) + "</b> hinzugefuegt.", "gut");
   zeichneBereich();
 }
 
@@ -462,7 +466,7 @@ async function tuOrdnerUmbenennen(id) {
   const feld = el("ob_neu_" + id);
   const r = await supaOrdnerUmbenennen(id, feld ? feld.value : "");
   if (r.fehler) { meldungM("Nicht umbenannt: " + r.fehler, "warn"); return; }
-  meldungM("Ordner umbenannt.", "gut");
+  meldungM("Person umbenannt.", "gut");
   zeichneBereich();
 }
 
@@ -475,7 +479,7 @@ async function tuOrdnerLoeschen(id) {
   const r = await supaOrdnerLoeschen(id);
   if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
   if (ordnerFilter === id) ordnerFilter = "alle";
-  meldungM("Ordner geloescht.", "gut");
+  meldungM("Person geloescht.", "gut");
   zeichneBereich();
 }
 
@@ -544,13 +548,13 @@ function zeichneScheineDb(scheine) {
   if (!scheine.length) { el("scheine_db").innerHTML = '<p class="mini">Noch keine Scheine hier. ' +
     'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" druecken.</p>'; return; }
   const schreib = darfSchreiben();
-  let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Konto-Ordner</th><th>Wetten</th><th>Quote</th>" +
+  let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Person</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Moeglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
     const ordnerZelle = schreib
       ? "<select onchange=\"tuScheinOrdner('" + s.id + "', this.value)\">" +
-        "<option value=''" + (!s.ordner ? " selected" : "") + ">ohne Ordner</option>" +
+        "<option value=''" + (!s.ordner ? " selected" : "") + ">ohne Person</option>" +
         ordnerListe.map(o => "<option value='" + o.id + "'" + (s.ordner === o.id ? " selected" : "") +
           ">" + textSicherM(o.name) + "</option>").join("") + "</select>"
       : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?") : "<span class='mini'>ohne</span>");
@@ -600,7 +604,7 @@ async function tuKopieren(id) {
   if (!s) return;
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
-    : "In deinen Bereich kopiert - er liegt dort unter \"ohne Ordner\", bitte einem deiner Konto-Ordner zuordnen.",
+    : "In deinen Bereich kopiert - er liegt dort unter \"ohne Person\", bitte einer deiner Personen zuordnen.",
     r.error ? "warn" : "gut");
 }
 
@@ -791,13 +795,67 @@ async function tuPersonBuchungWeg(id) {
   zeichneBereich();
 }
 
+// ---------- Admin-Bereich ----------
+// Nur Accounts mit rolle=admin in kt_profiles (hochstufen geht NUR direkt
+// in der Datenbank). Admins sehen alle User und koennen sie restlos
+// loeschen - mit Zwei-Klick-Sicherung, nie mit einem Versehen.
+
+let binAdmin = false;
+
+async function zeichneAdmin() {
+  const box = el("adminbereich");
+  if (!box) return;
+  if (!binAdmin) { box.innerHTML = ""; return; }
+  const r = await supaAdminUserliste();
+  if (r.error) {
+    box.innerHTML = '<p class="mini rot">Admin-Liste nicht ladbar: ' + textSicherM(r.error.message) + "</p>";
+    return;
+  }
+  let zeilen = "";
+  for (const u of (r.data || [])) {
+    zeilen += "<tr><td>" + textSicherM(u.username || "(kein Name)") +
+      (u.rolle === "admin" ? ' <span class="mini">(Admin)</span>' : "") + "</td>" +
+      "<td>" + textSicherM(u.email || "") + "</td>" +
+      "<td class='mini'>" + zeitM(u.registriert) + "</td>" +
+      "<td class='mini'>" + (u.zuletzt ? zeitM(u.zuletzt) : "-") + "</td>" +
+      "<td>" + u.scheine + "</td>" +
+      "<td>" + (u.id === ich.id
+        ? "<span class='mini'>das bist du</span>"
+        : (u.rolle === "admin" ? ""
+          : '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">loeschen</button>')) +
+      "</td></tr>";
+  }
+  box.innerHTML = '<details class="adminkasten"><summary>Admin-Bereich: alle User (nur Admins sehen das)</summary>' +
+    '<div class="inhalt"><p class="mini">Loeschen entfernt das Konto RESTLOS - samt allem, was der User ' +
+    "angelegt hat, auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrueckt werden.</p>" +
+    "<table><thead><tr><th>Benutzername</th><th>E-Mail</th><th>registriert</th><th>zuletzt da</th>" +
+    "<th>Scheine</th><th></th></tr></thead><tbody>" + zeilen + "</tbody></table></div></details>";
+}
+
+async function tuAdminLoeschen(id) {
+  const knopf = el("adminweg_" + id);
+  if (knopf && knopf.dataset.sicher !== "1") {
+    knopf.dataset.sicher = "1";
+    knopf.textContent = "Wirklich? Alles weg!";
+    knopf.classList.add("adminrot");
+    return;
+  }
+  const r = await supaAdminUserLoeschen(id);
+  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  meldungM("User restlos geloescht.", "gut");
+  zeichneAdmin();
+}
+
 // ---------- Foto-Saetze hochladen ----------
 
 async function zeichneFotoSaetze() {
   const box = el("fotosaetze");
   if (!box) return;
-  const schreib = darfSchreiben();
-  const uploads = await supaSatzUploadsLaden(aktiverBereich.id);
+  // Die Foto-Ordner der Kombi-Tafel sind fuer ALLE gleich (Homebase).
+  // Neue Fotos hochladen duerfen nur Admins - alle anderen sehen den
+  // Abschnitt gar nicht.
+  if (!binAdmin) { box.innerHTML = ""; return; }
+  const uploads = await supaSatzUploadsLaden();
   const gruppen = {};
   for (const u of uploads) {
     gruppen[u.satz_datum] = gruppen[u.satz_datum] || { n: 0, wartet: 0 };
@@ -814,15 +872,14 @@ async function zeichneFotoSaetze() {
   const heute = new Date().toISOString().slice(0, 10);
   box.innerHTML = '<details><summary>Foto-Saetze: neue Kombi-Fotos hochladen (anklicken)</summary>' +
     '<div class="inhalt">' +
-    '<p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum. Du laedst die Fotos ' +
-    "hier hoch, Claude liest sie beim naechsten Auftrag ein und legt daraus den neuen Satz in " +
-    "der Kombi-Tafel an. <b>Saetze mischen sich nie.</b></p>" +
-    (schreib
-      ? '<label>Datum des Satzes: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
-        '<label class="fotoknopf">Fotos hochladen' +
-        '<input type="file" accept="image/*" multiple style="display:none" ' +
-        'onchange="tuSatzFotos(this)"></label>'
-      : '<p class="mini">Nur mit Schreibrecht (eigener Bereich oder Mitarbeiten).</p>') +
+    '<p class="mini">Nur fuer Admins: jede Foto-Lieferung ist ein eigener Ordner mit Datum, ' +
+    "fuer ALLE Nutzer gleich (die Homebase). Du laedst die Fotos hier hoch, Claude liest sie " +
+    "beim naechsten Auftrag ein und legt daraus den neuen Satz in der Kombi-Tafel an. " +
+    "<b>Saetze mischen sich nie.</b> Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>" +
+    '<label>Datum des Satzes: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
+    '<label class="fotoknopf">Fotos hochladen' +
+    '<input type="file" accept="image/*" multiple style="display:none" ' +
+    'onchange="tuSatzFotos(this)"></label>' +
     (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Saetze hochgeladen.</p>') +
     "</div></details>";
 }
@@ -836,7 +893,7 @@ async function tuSatzFotos(input) {
   for (const datei of dateien) {
     const dataUrl = await verkleinereBild(datei, 1100);
     if (!dataUrl) continue;
-    const r = await supaSatzFotoHochladen(aktiverBereich.id, datum, dataUrl);
+    const r = await supaSatzFotoHochladen(ich.id, datum, dataUrl);
     if (!r.error) ok++;
     else meldungM("Foto nicht gespeichert: " + r.error.message, "warn");
   }

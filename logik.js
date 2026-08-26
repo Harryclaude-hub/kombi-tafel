@@ -121,7 +121,7 @@ function zeichneOrdnerLeiste() {
     "Offener Ordner: <b>" + satz.titel + "</b>" +
     '<span class="ordnerzahl">' + anzahl + " Wetten, " + offen + " offen</span></div>" +
     '<div class="ordnerknoepfe">' +
-    '<a class="ordnerknopf" href="mein.html#fotos">Neue Fotos hochladen</a>' +
+    '<a class="ordnerknopf" href="mein.html#fotos" id="fotoadminknopf" style="display:none">Neue Fotos hochladen</a>' +
     '<button class="ordnerknopf" onclick="ordnerPanel(\'wechseln\')">Ordner wechseln (' +
       SAETZE.length + ")</button>" +
     '<button class="ordnerknopf" onclick="ordnerPanel(\'anpassen\')">Farbe, Emoji, Notiz</button>' +
@@ -169,6 +169,15 @@ function zeichneOrdnerLeiste() {
   }
 
   box.innerHTML = html + "</div>";
+
+  // Die Foto-Ordner sind die Homebase: fuer alle gleich, neue kommen nur von
+  // Admins. Der Hochladen-Knopf wird deshalb nur fuer Admins eingeblendet.
+  if (typeof supaIstAdmin === "function" && window.supa) {
+    supaIstAdmin().then(ja => {
+      const k = document.getElementById("fotoadminknopf");
+      if (k && ja) k.style.display = "";
+    }).catch(() => {});
+  }
 }
 
 // ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------

@@ -82,7 +82,7 @@ function uebersetzeFehler(m) {
 async function supaMeinProfil() {
   const u = await supaNutzer();
   if (!u) return null;
-  const r = await supa.from("kt_profiles").select("id, username").eq("id", u.id).maybeSingle();
+  const r = await supa.from("kt_profiles").select("id, username, rolle").eq("id", u.id).maybeSingle();
   return r.data || null;
 }
 
@@ -246,10 +246,11 @@ async function supaBalanceLoeschen(bereichId, datum) {
 
 // ---------- Foto-Satz-Uploads ----------
 
-async function supaSatzUploadsLaden(bereichId) {
+async function supaSatzUploadsLaden() {
+  // Nur Admins sehen die Uploads (RLS); sie sehen ALLE, egal welcher Admin hochlud
   const r = await supa.from("kt_satz_uploads")
     .select("id, satz_datum, status, created_at")
-    .eq("bereich", bereichId).order("satz_datum", { ascending: false });
+    .order("satz_datum", { ascending: false });
   return r.data || [];
 }
 
@@ -324,4 +325,21 @@ async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, 
 async function supaPersonBuchungLoeschen(id) {
   // select() macht die 0-Zeilen-Falle sichtbar (RLS-Lektion)
   return await supa.from("kt_person_zahlungen").delete().eq("id", id).select("id");
+}
+
+// ---------- Admin ----------
+// Karams Rolle steht in kt_profiles.rolle; hochgestuft wird nur direkt in
+// der Datenbank, nie ueber die Oberflaeche.
+
+async function supaIstAdmin() {
+  const p = await supaMeinProfil();
+  return !!(p && p.rolle === "admin");
+}
+
+async function supaAdminUserliste() {
+  return await supa.rpc("kt_admin_userliste");
+}
+
+async function supaAdminUserLoeschen(zielId) {
+  return await supa.rpc("kt_admin_user_loeschen", { ziel: zielId });
 }

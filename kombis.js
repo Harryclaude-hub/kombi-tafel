@@ -696,10 +696,10 @@ async function ordnerWahlZeigen(scheinId, bereichId) {
       textSicher(o.name) + "</button> ";
   }
   box.innerHTML = '<div class="ordnerpflicht"><b>Bei wem hast du diesen Schein gesetzt?</b> ' +
-    '<span class="mini">Jede Kombination gehoert in einen Konto-Ordner, damit du in Mein Bereich ' +
-    "siehst, bei welchem Account sie lief. Die Buchhaltung bleibt eine gemeinsame.</span><br>" +
-    (liste.length ? knoepfe : '<span class="mini">Du hast noch keine Ordner - leg gleich hier den ersten an.</span> ') +
-    '<input id="neuordner_' + scheinId + '" placeholder="Neuer Ordner, z. B. ein Name"> ' +
+    '<span class="mini">Jede Kombination gehoert zu einer Person, damit du in Mein Bereich ' +
+    "siehst, bei wem sie lief. Die Buchhaltung bleibt eine gemeinsame.</span><br>" +
+    (liste.length ? knoepfe : '<span class="mini">Du hast noch keine Personen - leg gleich hier die erste an.</span> ') +
+    '<input id="neuordner_' + scheinId + '" placeholder="Neue Person, z. B. ein Name"> ' +
     '<button class="haupt" onclick="ordnerNeuUndSpeichern(\'' + scheinId + "','" + bereichId + '\')">Anlegen und speichern</button> ' +
     '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
 }
@@ -740,7 +740,7 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
       return;
     }
     ordnerWahlZu(scheinId);
-    meldung("Schein " + b.s.nr + " in dein Konto gespeichert und dem Konto-Ordner zugeordnet: " +
+    meldung("Schein " + b.s.nr + " in dein Konto gespeichert und der Person zugeordnet: " +
       '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");
     zeichneKonto();
   });

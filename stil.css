@@ -460,3 +460,7 @@ tr.ohneordner td { background: #fff8e1; }
 .kassenformular { margin: 10px 0; padding: 8px; background: #f2f5fb; }
 .warnbadge { display: inline-block; background: #a00000; color: #fff;
   border-radius: 50%; min-width: 16px; padding: 0 5px; font-weight: bold; }
+
+/* Admin-Bereich (Design-Schicht, loeschbar) */
+.adminkasten { border: 2px solid #a00000; padding: 4px 10px; margin: 8px 0; }
+button.adminrot { background: #a00000; color: #fff; border-color: #a00000; }
