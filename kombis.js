@@ -173,6 +173,54 @@ function waehleAnbieter(moeglich, topf) {
   return gleichauf[0].kz;
 }
 
+// Erkennungsmarke statt fremdem Logo: eigene Marke in der bekannten Hausfarbe.
+// Fremde Firmenlogos werden bewusst NICHT eingebunden (Urheberrecht, und sie
+// wuerden von den Anbieter-Servern geladen, was hier ohnehin blockiert ist).
+function marke(kz) {
+  return '<span class="marke m-' + kz + '">' + anbieterName(kz) + "</span>";
+}
+
+// Anbieter eines Scheins wechseln, mit Pruefung aller drei Wetten
+function anbieterWechseln(scheinId, neuKz) {
+  if (!neuKz) return;
+  const z = liesZustand();
+  const sch = z.scheine.find(s => s.id === scheinId);
+  if (!sch || sch.kz === neuKz) return;
+
+  const probleme = [];
+  for (const eintrag of sch.wetten) {
+    const w = wetteNachId(eintrag.id);
+    if (!w) continue;
+    const v = verfuegbarkeit(w)[neuKz];
+    if (v === "N") {
+      probleme.push(w.spiel + ": " + anbieterName(neuKz) + " fuehrt diesen Markt vermutlich nicht");
+      continue;
+    }
+    const q = zielQuote(w, eintrag.optIdx, neuKz);
+    if (sch.art === "normal" && q.echt < z.einst.mind - 0.0001) {
+      probleme.push(w.spiel + ": dort nur " + rund2(q.echt).toFixed(2) +
+        ", unter deiner Mindestquote " + z.einst.mind.toFixed(2));
+    }
+  }
+
+  const alt = sch.kz;
+  sch.kz = neuKz;
+  speichereZustand(z);
+
+  if (probleme.length) {
+    meldung("Schein " + sch.nr + " steht jetzt auf " + anbieterName(neuKz) +
+      ", aber <b>" + probleme.length + " von " + sch.wetten.length +
+      " Wetten passen dort nicht</b>:<ul><li>" + probleme.join("</li><li>") +
+      "</li></ul>Die betroffenen Zeilen sind rot. Nimm sie mit dem Menue rechts raus, " +
+      "dann rueckt automatisch etwas Passendes nach. Oder stell zurueck auf " +
+      anbieterName(alt) + ".", "warn");
+  } else {
+    meldung("Schein " + sch.nr + " steht jetzt auf <b>" + anbieterName(neuKz) +
+      "</b>. Alle " + sch.wetten.length + " Wetten sind dort verfuegbar und ueber der Mindestquote.", "gut");
+  }
+  zeichne_();
+}
+
 function macheSchein(nr, kz, gruppe, art) {
   return {
     nr: nr,
@@ -385,6 +433,7 @@ function zeichne_() {
 
   zeichneReste(z);
   zeichneVerlauf();
+  zeichneKonto();
 }
 
 function scheinHtml(s, z) {
@@ -426,8 +475,12 @@ function scheinHtml(s, z) {
   const fotoZeit = localStorage.getItem(fotoSchluessel(s.id) + "_zeit");
   const kopfKlasse = (s.art === "niedrig") ? "s-kopf niedrigkopf" : "s-kopf";
 
+  const wahl = '<select class="anbwechsel" onchange="anbieterWechseln(\'' + s.id + "', this.value)\">" +
+    ANBIETER.map(a => "<option value='" + a.kz + "'" + (a.kz === s.kz ? " selected" : "") +
+      ">" + a.name + "</option>").join("") + "</select>";
+
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
-    "Schein " + s.nr + ' <span class="s-anb">' + anbieterName(s.kz) + "</span>" +
+    "Schein " + s.nr + " " + marke(s.kz) + wahl +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
       ' Wetten, kein Dreier mehr</span>' : "") +
@@ -520,6 +573,7 @@ function scheinMerken(scheinId) {
   speichereVerlauf(v);
   meldung("Schein " + s.nr + " im Verlauf gespeichert.", "gut");
   zeichneVerlauf();
+  zeichneKonto();
 }
 
 function zeichneVerlauf() {
@@ -562,12 +616,72 @@ function zeichneVerlauf() {
   ziel.innerHTML = html;
 }
 
+// Kontostand je Anbieter aus dem Verlauf
+function zeichneKonto() {
+  const ziel = document.getElementById("konto");
+  if (!ziel) return;
+  const v = liesVerlauf();
+  if (!v.length) {
+    ziel.innerHTML = "<p class='mini'>Noch keine Scheine im Verlauf. Sobald du Scheine merkst " +
+      "und ihren Stand setzt, rechnet hier dein Konto je Anbieter mit.</p>";
+    return;
+  }
+  const konto = {};
+  for (const a of ANBIETER) konto[a.kz] = { n: 0, offen: 0, gew: 0, ver: 0,
+    eingesetzt: 0, imSpiel: 0, zurueck: 0 };
+  for (const x of v) {
+    const k = konto[x.kz];
+    if (!k) continue;
+    k.n++;
+    k.eingesetzt += x.einsatz;
+    if (x.stand === "offen") { k.offen++; k.imSpiel += x.einsatz; }
+    else if (x.stand === "gewonnen") { k.gew++; k.zurueck += x.moeglich; }
+    else k.ver++;
+  }
+  let html = "<table><thead><tr><th>Anbieter</th><th>Scheine</th><th>offen</th>" +
+    "<th>gewonnen</th><th>verloren</th><th>eingesetzt</th><th>zurueck</th>" +
+    "<th>Saldo</th><th>noch im Spiel</th></tr></thead><tbody>";
+  let gEin = 0, gZur = 0, gSpiel = 0, gN = 0, gOffen = 0, gGew = 0, gVer = 0;
+  for (const a of ANBIETER) {
+    const k = konto[a.kz];
+    if (!k.n) continue;
+    const entschieden = k.eingesetzt - k.imSpiel;
+    const saldo = k.zurueck - entschieden;
+    gEin += k.eingesetzt; gZur += k.zurueck; gSpiel += k.imSpiel;
+    gN += k.n; gOffen += k.offen; gGew += k.gew; gVer += k.ver;
+    html += "<tr><td>" + marke(a.kz) + "</td><td>" + k.n + "</td><td>" + k.offen + "</td>" +
+      "<td class='gruen'>" + k.gew + "</td><td class='rot'>" + k.ver + "</td>" +
+      "<td>" + k.eingesetzt.toFixed(2) + " &euro;</td><td>" + k.zurueck.toFixed(2) + " &euro;</td>" +
+      "<td class='" + (saldo >= 0 ? "e-gew" : "e-ver") + "'><b>" + (saldo >= 0 ? "+" : "") +
+      saldo.toFixed(2) + " &euro;</b></td><td>" + k.imSpiel.toFixed(2) + " &euro;</td></tr>";
+  }
+  const gEntschieden = gEin - gSpiel;
+  const gSaldo = gZur - gEntschieden;
+  html += "</tbody><tfoot><tr><td><b>Gesamt</b></td><td><b>" + gN + "</b></td><td><b>" + gOffen +
+    "</b></td><td class='gruen'><b>" + gGew + "</b></td><td class='rot'><b>" + gVer + "</b></td>" +
+    "<td><b>" + gEin.toFixed(2) + " &euro;</b></td><td><b>" + gZur.toFixed(2) + " &euro;</b></td>" +
+    "<td class='" + (gSaldo >= 0 ? "e-gew" : "e-ver") + "'><b>" + (gSaldo >= 0 ? "+" : "") +
+    gSaldo.toFixed(2) + " &euro;</b></td><td><b>" + gSpiel.toFixed(2) + " &euro;</b></td></tr></tfoot></table>";
+
+  const quote = (gGew + gVer) ? (gGew / (gGew + gVer) * 100) : 0;
+  const rendite = gEntschieden ? (gSaldo / gEntschieden * 100) : 0;
+  html += "<div class='" + (gSaldo >= 0 ? "merk" : "warn") + "'>" +
+    "<b>Dein Stand:</b> " + gN + " Scheine gesetzt, davon " + gOffen + " noch offen. " +
+    "Von den entschiedenen hast du <b>" + gGew + " von " + (gGew + gVer) + "</b> getroffen (" +
+    quote.toFixed(0) + " %). Eingesetzt <b>" + gEntschieden.toFixed(2) + " &euro;</b>, " +
+    "zurueckbekommen <b>" + gZur.toFixed(2) + " &euro;</b>, macht <b>" +
+    (gSaldo >= 0 ? "+" : "") + gSaldo.toFixed(2) + " &euro;</b>" +
+    (gEntschieden ? " (Rendite " + (rendite >= 0 ? "+" : "") + rendite.toFixed(1) + " %)" : "") +
+    ". Noch im Spiel: <b>" + gSpiel.toFixed(2) + " &euro;</b>.</div>";
+  ziel.innerHTML = html;
+}
+
 function standAendern(i, wert) {
   const v = liesVerlauf();
-  if (v[i]) { v[i].stand = wert; speichereVerlauf(v); zeichneVerlauf(); }
+  if (v[i]) { v[i].stand = wert; speichereVerlauf(v); zeichneVerlauf(); zeichneKonto(); }
 }
 function verlaufLoeschen(i) {
-  const v = liesVerlauf(); v.splice(i, 1); speichereVerlauf(v); zeichneVerlauf();
+  const v = liesVerlauf(); v.splice(i, 1); speichereVerlauf(v); zeichneVerlauf(); zeichneKonto();
 }
 
 // ---------- Knoepfe ----------
