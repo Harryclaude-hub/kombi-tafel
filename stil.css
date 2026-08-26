@@ -278,10 +278,9 @@ td.anbieter .fotoklein { font-size: 11px; }
 #zaehler, .stand { font-size: 13px; }
 .fuss { font-size: 12.5px; }
 
-/* Textzeilen nicht ueber die ganze Breite ziehen lassen */
+/* Volle Seitenbreite: Karam will keine weisse Luecke rechts (26.08.) */
 p, .kern, .warnkern, .zeitkern, .fuellkern, .unter, .ansichten,
-.merk, .warn, #meldung { max-width: 880px; }
-details .inhalt p { max-width: 840px; }
+.merk, .warn, #meldung, details .inhalt p { max-width: none; }
 p { margin: 8px 0; }
 .kern, .warnkern, .zeitkern, .fuellkern { padding: 8px 12px; margin: 10px 0; }
 .kern ol, .fuellkern ol { margin: 6px 0 6px 22px; }
