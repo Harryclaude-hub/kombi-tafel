@@ -251,3 +251,47 @@ select.anbwechsel { margin-left: 8px; font-size: 11px; padding: 1px 3px; }
 #konto td, #konto th { font-size: 12px; text-align: right; }
 #konto td:first-child, #konto th:first-child { text-align: left; }
 #konto tfoot td { border-top: 2px solid #000; background: #f2f2f2; }
+
+/* ============================================================
+   DESIGN-SCHICHT 25.08. (Karams Wunsch): Kopf-Knoepfe,
+   groessere Schrift, Zeilenabstand 1,5, kuerzere Textzeilen.
+   Reine Optik. Dieser Block kann komplett geloescht werden,
+   ohne dass irgendeine Funktion bricht.
+   ============================================================ */
+
+/* Schrift zwei Stufen groesser, Zeilenabstand 1,5 */
+body { font-size: 15px; line-height: 1.5; }
+p, li, .kern, .warnkern, .zeitkern, .fuellkern, .merk, .warn,
+details .inhalt { line-height: 1.5; }
+h1 { font-size: 26px; }
+h2 { font-size: 19px; }
+h3 { font-size: 15px; }
+.unter { font-size: 14.5px; }
+th, td { font-size: 13.5px; padding: 4px 7px; }
+.mini { font-size: 11px; }
+details summary { font-size: 15px; padding: 7px 10px; }
+details .inhalt { font-size: 14px; }
+.filterzeile button { font-size: 13px; padding: 4px 10px; }
+.filterzeile .f-label { font-size: 13px; flex-basis: 150px; }
+td.anbieter .realgross { font-size: 18px; }
+td.anbieter .fotoklein { font-size: 11px; }
+#zaehler, .stand { font-size: 13px; }
+.fuss { font-size: 12.5px; }
+
+/* Textzeilen nicht ueber die ganze Breite ziehen lassen */
+p, .kern, .warnkern, .zeitkern, .fuellkern, .unter, .ansichten,
+.merk, .warn, #meldung { max-width: 880px; }
+details .inhalt p { max-width: 840px; }
+p { margin: 8px 0; }
+.kern, .warnkern, .zeitkern, .fuellkern { padding: 8px 12px; margin: 10px 0; }
+.kern ol, .fuellkern ol { margin: 6px 0 6px 22px; }
+.kern li, .fuellkern li { margin: 4px 0; }
+
+/* Die Kopfleiste: echte Knoepfe statt Textlinks */
+.navleiste { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px 0; }
+.navleiste a.navknopf { display: inline-block; padding: 8px 18px;
+  border: 2px solid #000; background: #fff; color: #000;
+  font-weight: bold; font-size: 14.5px; text-decoration: none; }
+.navleiste a.navknopf:hover { background: #eee; }
+.navleiste a.navknopf.aktiv { background: #000; color: #fff; }
+.navleiste a.navknopf.aktiv:hover { background: #000; }
