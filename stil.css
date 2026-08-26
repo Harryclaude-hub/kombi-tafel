@@ -474,3 +474,19 @@ tr.fertigzeile td { background: #ffe9cc; }
 .fertigmark { color: #b35a00; font-weight: bold; }
 .kassewahl { margin: 8px 0; padding: 6px 8px; background: #f4f4f4; }
 .kassewahl label { margin-right: 12px; white-space: nowrap; }
+
+/* Freunde-Dashboard und Anmerkungen (Design-Schicht) */
+#freundepanel { position: fixed; top: 70px; right: 12px; width: 380px; max-width: 92vw;
+  max-height: 75vh; overflow-y: auto; background: #fff; border: 2px solid #1a2c50;
+  padding: 0 12px 12px 12px; z-index: 60; }
+#freundepanel h4 { margin: 12px 0 6px 0; border-bottom: 1px solid #ccc; }
+.fp-freund { margin: 5px 0; }
+details.anmk { margin-top: 6px; }
+details.anmk summary { cursor: pointer; }
+details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
+.anmk-zeile { border-left: 3px solid #b35a00; background: #fff8f0; padding: 4px 8px; margin: 4px 0; }
+.anmk-zeile.anmk-aus { opacity: 0.55; border-left-color: #999; }
+.anmk-tasten { margin-left: 8px; }
+.anmk-tasten button { font-size: 12px; margin-left: 4px; }
+.anmk-neu { margin-top: 4px; }
+.anmk-neu input { width: 60%; }

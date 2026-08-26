@@ -81,6 +81,7 @@ Alle anderen Seiten (Tafel, Kombi-Bau, Schule) brauchen kein Konto.</p>`;
 async function tuAnmelden() {
   const r = await supaAnmelden(el("an_user").value, el("an_pw").value);
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
+  if (r.hinweis) { alert(r.hinweis); }
   location.reload();
 }
 
@@ -146,6 +147,11 @@ async function zeigeApp() {
   el("inhalt").innerHTML = `
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button></div>
+<p class="mini">&#128274; <b>Ende-zu-Ende verschluesselt:</b> Nachrichten, Scheine, Personen-Namen,
+Notizen und Anmerkungen liegen nur verschluesselt in der Datenbank - lesbar allein fuer dich und
+die, denen du teilst. Wichtig: setzt du dein Passwort auf einem NEUEN Geraet zurueck, sind alte
+Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der Buchhaltung (Betraege, Daten) bleiben
+Zahlen, damit die Tabellen rechnen koennen.</p>
 <div id="bereichtabs" class="navleiste"></div>
 <div id="adminbereich"></div>
 <div id="freunde"></div>
@@ -337,7 +343,14 @@ async function tuTeilen() {
   if (p.id === ich.id) { meldungM("Mit dir selbst musst du nicht teilen.", "warn"); return; }
   const r = await supaTeilen(p.id, el("teilen_rolle").value);
   if (r.error) { meldungM("Teilen fehlgeschlagen: " + r.error.message, "warn"); return; }
-  meldungM("Geteilt mit <b>" + p.username + "</b>. Der Bereich taucht ab sofort in dessen Konto auf.", "gut");
+  if (r.ohneSchluessel) {
+    meldungM("Geteilt mit <b>" + p.username + "</b> - aber OHNE Verschluesselungs-Schluessel: " +
+      "er hat sich noch nie mit der neuen Version angemeldet. Sobald er das getan hat, hier " +
+      "einfach noch einmal Teilen druecken, dann kann er alles lesen.", "warn");
+  } else {
+    meldungM("Geteilt mit <b>" + p.username + "</b> - samt Schluessel, Ende-zu-Ende. " +
+      "Der Bereich taucht ab sofort in dessen Konto auf.", "gut");
+  }
   zeichneTeilen();
 }
 
@@ -509,6 +522,7 @@ async function zeichneBereich() {
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
   personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
+  anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
   kasseScheine = scheine;
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);
@@ -578,7 +592,8 @@ function zeichneScheineDb(scheine) {
       "<td>" + ordnerZelle + "</td>" +
       "<td class='mini'>" + (d.wetten || []).map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
       (s.foto ? '<div class="fotoname mini">' + (s.foto_name || "") + "</div>" +
-        '<div><img src="' + s.foto + '" class="minifoto"></div>' : "") + "</td>" +
+        '<div><img src="' + s.foto + '" class="minifoto"></div>' : "") +
+      anmerkungenBlock(s) + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + echtZelle(s, schreib) + "</td>" +
@@ -606,7 +621,8 @@ async function tuStand(id, wert) {
 }
 
 async function tuNotiz(id, wert) {
-  const r = await supaScheinAendern(id, { notiz: wert });
+  const key = await kryptoBereich(aktiverBereich.id);
+  const r = await supaScheinAendern(id, { notiz: await e2eZu(key, wert) || "" });
   if (r.error) meldungM("Notiz nicht gespeichert: " + r.error.message, "warn");
 }
 
@@ -976,6 +992,58 @@ async function tuPersonBuchungWeg(id) {
   zeichneBereich();
 }
 
+// ---------- Anmerkungen: Freunde-Notizzettel an Scheinen ----------
+// Wer zuschauen darf, darf anmerken - auch nur-lesen-Freunde. Eine
+// Anmerkung aendert NICHTS am Schein; der Besitzer kann sie ausblenden.
+
+let anmerkungenListe = [];
+
+function anmerkungenBlock(s) {
+  const binBesitzer = aktiverBereich.rolle === "ich";
+  let alle = anmerkungenListe.filter(a => a.schein === s.id);
+  if (!binBesitzer) alle = alle.filter(a => !a.versteckt);
+  const sichtbar = alle.filter(a => !a.versteckt);
+  let inhalt = "";
+  for (const a of alle) {
+    const wer = (a.kt_profiles && a.kt_profiles.username) ? a.kt_profiles.username : "?";
+    inhalt += '<div class="anmk-zeile' + (a.versteckt ? " anmk-aus" : "") + '">' +
+      "<b>" + textSicherM(wer) + "</b> <span class='mini'>" + zeitM(a.created_at) + "</span><br>" +
+      textSicherM(a.text) +
+      "<span class='anmk-tasten'>" +
+      (binBesitzer ? '<button onclick="tuAnmerkungAus(' + a.id + ',' + (a.versteckt ? "false" : "true") + ')">' +
+        (a.versteckt ? "wieder zeigen" : "ausblenden") + "</button>" : "") +
+      (a.autor === ich.id ? '<button onclick="tuAnmerkungWeg(' + a.id + ')">weg</button>' : "") +
+      "</span></div>";
+  }
+  inhalt += '<div class="anmk-neu"><input id="anmk_' + s.id + '" placeholder="Anmerkung schreiben (aendert nichts am Schein)...">' +
+    '<button class="haupt" onclick="tuAnmerken(\'' + s.id + '\')">Anmerken</button></div>';
+  return '<details class="anmk"' + '><summary' + (sichtbar.length ? ' class="anmk-marke"' : "") + ">Anmerkungen (" +
+    sichtbar.length + ")</summary>" + inhalt + "</details>";
+}
+
+async function tuAnmerken(scheinId) {
+  const feld = el("anmk_" + scheinId);
+  const text = feld ? feld.value.trim() : "";
+  if (!text) { meldungM("Bitte zuerst etwas schreiben.", "warn"); return; }
+  const r = await supaAnmerken(aktiverBereich.id, scheinId, text);
+  if (r.error) { meldungM("Anmerkung nicht gespeichert: " + r.error.message, "warn"); return; }
+  meldungM("Anmerkung gespeichert - der Schein selbst bleibt unveraendert.", "gut");
+  zeichneBereich();
+}
+
+async function tuAnmerkungAus(id, ja) {
+  const r = await supaAnmerkungVerstecken(id, ja);
+  if (r.error) { meldungM("Nicht geaendert: " + r.error.message, "warn"); return; }
+  if (!r.data || !r.data.length) { meldungM("Nicht erlaubt (nur der Besitzer blendet aus).", "warn"); return; }
+  zeichneBereich();
+}
+
+async function tuAnmerkungWeg(id) {
+  const r = await supaAnmerkungLoeschen(id);
+  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  zeichneBereich();
+}
+
 // ---------- Admin-Bereich ----------
 // Nur Accounts mit rolle=admin in kt_profiles (hochstufen geht NUR direkt
 // in der Datenbank). Admins sehen alle User und koennen sie restlos
@@ -1002,8 +1070,10 @@ async function zeichneAdmin() {
       "<td>" + u.scheine + "</td>" +
       "<td>" + (u.id === ich.id
         ? "<span class='mini'>das bist du</span>"
-        : (u.rolle === "admin" ? ""
-          : '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">loeschen</button>')) +
+        : (u.rolle === "admin"
+          ? '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'user\')">Admin-Rolle nehmen</button>'
+          : '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'admin\')">zum Admin machen</button> ' +
+            '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">loeschen</button>')) +
       "</td></tr>";
   }
   box.innerHTML = '<details class="adminkasten"><summary>Admin-Bereich: alle User (nur Admins sehen das)</summary>' +
@@ -1011,6 +1081,22 @@ async function zeichneAdmin() {
     "angelegt hat, auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrueckt werden.</p>" +
     "<table><thead><tr><th>Benutzername</th><th>E-Mail</th><th>registriert</th><th>zuletzt da</th>" +
     "<th>Scheine</th><th></th></tr></thead><tbody>" + zeilen + "</tbody></table></div></details>";
+}
+
+async function tuAdminRolle(id, neu) {
+  const knopf = el("adminrolle_" + id);
+  if (knopf && knopf.dataset.sicher !== "1") {
+    knopf.dataset.sicher = "1";
+    knopf.textContent = (neu === "admin") ? "Wirklich zum Admin machen?" : "Wirklich Rolle nehmen?";
+    knopf.classList.add("adminrot");
+    return;
+  }
+  const r = await supaAdminRolle(id, neu);
+  if (r.error) { meldungM("Rolle nicht geaendert: " + r.error.message, "warn"); return; }
+  meldungM(neu === "admin"
+    ? "Der Nutzer ist jetzt Admin: er sieht die Userliste und darf Foto-Saetze hochladen."
+    : "Admin-Rolle entfernt - er ist wieder normaler Nutzer.", "gut");
+  zeichneAdmin();
 }
 
 async function tuAdminLoeschen(id) {

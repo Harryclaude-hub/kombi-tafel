@@ -38,6 +38,8 @@ async function supaRegistrieren(username, email, passwort) {
   if (a.error) return { fehler: uebersetzeFehler(a.error.message) };
   const p = await supa.from("kt_profiles").insert({ id: a.data.user.id, username: username });
   if (p.error) return { fehler: "Konto angelegt, aber der Benutzername liess sich nicht speichern: " + p.error.message };
+  // Ende-zu-Ende: Schluesselpaar + Bereichsschluessel anlegen
+  if (typeof kryptoEinrichten === "function") await kryptoEinrichten(passwort);
   return { ok: true };
 }
 
@@ -50,7 +52,12 @@ async function supaAnmelden(userOderMail, passwort) {
   }
   const a = await supa.auth.signInWithPassword({ email: email, password: passwort });
   if (a.error) return { fehler: uebersetzeFehler(a.error.message) };
-  return { ok: true };
+  let hinweis = null;
+  if (typeof kryptoEinrichten === "function") {
+    const k = await kryptoEinrichten(passwort);
+    hinweis = k.hinweis || null;
+  }
+  return { ok: true, hinweis: hinweis };
 }
 
 async function supaAbmelden() { await supa.auth.signOut(); }
@@ -64,7 +71,9 @@ async function supaPasswortVergessen(email) {
 
 async function supaPasswortNeu(passwort) {
   const r = await supa.auth.updateUser({ password: passwort });
-  return r.error ? { fehler: uebersetzeFehler(r.error.message) } : { ok: true };
+  if (r.error) return { fehler: uebersetzeFehler(r.error.message) };
+  if (typeof kryptoEinrichten === "function") await kryptoEinrichten(passwort);
+  return { ok: true };
 }
 
 function uebersetzeFehler(m) {
@@ -109,7 +118,23 @@ async function supaBereicheFuerMich() {
 
 async function supaTeilen(gastId, rolle) {
   const u = await supaNutzer();
-  return await supa.from("kt_freigaben").upsert({ owner: u.id, gast: gastId, rolle: rolle });
+  // Ende-zu-Ende: der Gast bekommt den Bereichsschluessel, verschluesselt
+  // fuer SEIN Schluesselpaar. Hat er noch keins (nie mit der neuen Version
+  // angemeldet), wird ohne Schluessel geteilt - dann einfach spaeter noch
+  // einmal Teilen druecken.
+  let schluessel = null;
+  if (typeof kryptoMeinPriv === "function") {
+    const gp = await supa.from("kt_profiles").select("pubkey").eq("id", gastId).maybeSingle();
+    const priv = await kryptoMeinPriv();
+    const raw = localStorage.getItem("kt_e2e_bereich");
+    if (gp.data && gp.data.pubkey && priv && raw) {
+      const paar = await kryPaarSchluessel(priv, gp.data.pubkey);
+      schluessel = await kryAes(paar, raw);
+    }
+  }
+  const r = await supa.from("kt_freigaben").upsert({ owner: u.id, gast: gastId, rolle: rolle, schluessel: schluessel });
+  r.ohneSchluessel = !schluessel;
+  return r;
 }
 
 async function supaTeilenBeenden(gastId) {
@@ -122,15 +147,33 @@ async function supaTeilenBeenden(gastId) {
 async function supaScheineLaden(bereichId) {
   const r = await supa.from("kt_scheine").select("*")
     .eq("bereich", bereichId).order("created_at", { ascending: false });
-  return r.data || [];
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const s of liste) {
+    if (s.daten && s.daten.e2e) {
+      const klar = await e2eAuf(key, s.daten.e2e);
+      try { s.daten = JSON.parse(klar); }
+      catch (e) { s.daten = { kz: "?", anbieter: "?", wetten: [], einsatz: 0, quote: 0, moeglich: 0 }; }
+    }
+    if (s.foto) {
+      s.foto = await e2eAuf(key, s.foto);
+      if (s.foto && !s.foto.startsWith("data:")) s.foto = null;
+    }
+    if (s.notiz) s.notiz = await e2eAuf(key, s.notiz);
+  }
+  return liste;
 }
 
 async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
   const u = await supaNutzer();
+  const key = await kryptoBereich(bereichId);
   return await supa.from("kt_scheine").insert({
-    bereich: bereichId, angelegt_von: u.id, daten: daten,
-    foto: foto || null, foto_name: fotoName || null,
-    stand: daten.stand || "offen", notiz: daten.notiz || "",
+    bereich: bereichId, angelegt_von: u.id,
+    daten: key ? { e2e: await e2eZu(key, JSON.stringify(daten)) } : daten,
+    foto: foto ? await e2eZu(key, foto) : null,
+    foto_name: fotoName || null,
+    stand: daten.stand || "offen",
+    notiz: await e2eZu(key, daten.notiz || "") || "",
     ordner: ordnerId || null
   });
 }
@@ -152,12 +195,16 @@ async function supaNachrichtenLaden(bereichId, abId) {
     .eq("bereich", bereichId).order("id", { ascending: true }).limit(200);
   if (abId) q = q.gt("id", abId);
   const r = await q;
-  return r.data || [];
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const n of liste) n.text = await e2eAuf(key, n.text);
+  return liste;
 }
 
 async function supaNachrichtSenden(bereichId, text) {
   const u = await supaNutzer();
-  return await supa.from("kt_nachrichten").insert({ bereich: bereichId, autor: u.id, text: text });
+  const key = await kryptoBereich(bereichId);
+  return await supa.from("kt_nachrichten").insert({ bereich: bereichId, autor: u.id, text: await e2eZu(key, text) });
 }
 
 
@@ -197,12 +244,17 @@ async function supaDmLaden(partnerId, abId) {
     .order("id", { ascending: true }).limit(200);
   if (abId) q = q.gt("id", abId);
   const r = await q;
-  return r.data || [];
+  const liste = r.data || [];
+  const key = await kryptoDm(partnerId);
+  for (const n of liste) n.text = await e2eAuf(key, n.text);
+  return liste;
 }
 
 async function supaDmSenden(partnerId, text) {
   const u = await supaNutzer();
-  return await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: text });
+  const key = await kryptoDm(partnerId);
+  if (!key) return { error: { message: "Dein Freund hat noch keinen Schluessel - er muss sich einmal mit der neuen Version anmelden." } };
+  return await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: await e2eZu(key, text) });
 }
 
 
@@ -211,14 +263,19 @@ async function supaDmSenden(partnerId, text) {
 async function supaBuchungenLaden(bereichId) {
   const r = await supa.from("kt_buchungen").select("*")
     .eq("bereich", bereichId).order("datum", { ascending: true });
-  return r.data || [];
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const b of liste) { if (b.notiz) b.notiz = await e2eAuf(key, b.notiz); if (b.person) b.person = await e2eAuf(key, b.person); if (b.konto) b.konto = await e2eAuf(key, b.konto); }
+  return liste;
 }
 
 async function supaBuchen(bereichId, datum, konto, person, art, betrag, notiz) {
   const u = await supaNutzer();
+  const key = await kryptoBereich(bereichId);
   return await supa.from("kt_buchungen").insert({
-    bereich: bereichId, autor: u.id, datum: datum, konto: konto,
-    person: person, art: art, betrag: betrag, notiz: notiz || ""
+    bereich: bereichId, autor: u.id, datum: datum,
+    konto: await e2eZu(key, konto), person: await e2eZu(key, person),
+    art: art, betrag: betrag, notiz: await e2eZu(key, notiz || "") || ""
   });
 }
 
@@ -271,20 +328,30 @@ async function supaSatzUploadLoeschen(id) {
 
 async function supaOrdnerLaden(bereichId) {
   const r = await supa.from("kt_ordner").select("id, name")
-    .eq("bereich", bereichId).order("name", { ascending: true });
-  return r.data || [];
+    .eq("bereich", bereichId).order("created_at", { ascending: true });
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const o of liste) o.name = await e2eAuf(key, o.name);
+  liste.sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+  return liste;
 }
 
 async function supaOrdnerAnlegen(bereichId, name) {
   const sauber = (name || "").trim();
   if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
   if (sauber.length > 60) return { fehler: "Hoechstens 60 Zeichen." };
-  const r = await supa.from("kt_ordner").insert({ bereich: bereichId, name: sauber })
+  // Namen sind verschluesselt - Doppelte prueft deshalb der Client
+  const alle = await supaOrdnerLaden(bereichId);
+  if (alle.some(o => String(o.name).toLowerCase() === sauber.toLowerCase()))
+    return { fehler: "Diese Person gibt es schon." };
+  const key = await kryptoBereich(bereichId);
+  const r = await supa.from("kt_ordner").insert({ bereich: bereichId, name: await e2eZu(key, sauber) })
     .select("id, name").single();
   if (r.error) {
     if (String(r.error.message).includes("duplicate")) return { fehler: "Diese Person gibt es schon." };
     return { fehler: r.error.message };
   }
+  r.data.name = sauber;
   return { ok: true, ordner: r.data };
 }
 
@@ -292,7 +359,9 @@ async function supaOrdnerUmbenennen(id, name) {
   const sauber = (name || "").trim();
   if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
   // RLS-Lektion: verbotenes UPDATE gibt keinen Fehler, nur 0 Zeilen - deshalb select()
-  const r = await supa.from("kt_ordner").update({ name: sauber }).eq("id", id).select("id").maybeSingle();
+  const alt = await supa.from("kt_ordner").select("bereich").eq("id", id).maybeSingle();
+  const key = alt.data ? await kryptoBereich(alt.data.bereich) : null;
+  const r = await supa.from("kt_ordner").update({ name: await e2eZu(key, sauber) }).eq("id", id).select("id").maybeSingle();
   if (r.error) {
     if (String(r.error.message).includes("duplicate")) return { fehler: "Diese Person gibt es schon." };
     return { fehler: r.error.message };
@@ -310,15 +379,19 @@ async function supaOrdnerLoeschen(id) {
 async function supaPersonBuchungenLaden(bereichId) {
   const r = await supa.from("kt_person_zahlungen").select("*")
     .eq("bereich", bereichId).order("datum", { ascending: true }).order("id", { ascending: true });
-  return r.data || [];
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const b of liste) if (b.notiz) b.notiz = await e2eAuf(key, b.notiz);
+  return liste;
 }
 
 async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, betrag, notiz) {
   const u = await supaNutzer();
+  const key = await kryptoBereich(bereichId);
   return await supa.from("kt_person_zahlungen").insert({
     bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
     weg: weg, art: art, anbieter: art === "erhalten" ? null : anbieter,
-    betrag: betrag, notiz: notiz || ""
+    betrag: betrag, notiz: await e2eZu(key, notiz || "") || ""
   });
 }
 
@@ -342,4 +415,41 @@ async function supaAdminUserliste() {
 
 async function supaAdminUserLoeschen(zielId) {
   return await supa.rpc("kt_admin_user_loeschen", { ziel: zielId });
+}
+
+// ---------- Anmerkungen (Freunde-Notizzettel an Scheinen) ----------
+// Aendern NICHTS am Schein. Auch nur-lesen-Freunde duerfen anmerken;
+// ausblenden darf nur der Bereichs-Besitzer. Texte sind Ende-zu-Ende.
+
+async function supaAnmerkungenLaden(bereichId) {
+  const r = await supa.from("kt_anmerkungen")
+    .select("id, schein, autor, text, versteckt, created_at, kt_profiles!kt_anmerkungen_autor_fkey(username)")
+    .eq("bereich", bereichId).order("id", { ascending: true });
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const a of liste) a.text = await e2eAuf(key, a.text);
+  return liste;
+}
+
+async function supaAnmerken(bereichId, scheinId, text) {
+  const u = await supaNutzer();
+  const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: "Kein Bereichs-Schluessel - der Besitzer muss dir einmal neu teilen." } };
+  return await supa.from("kt_anmerkungen").insert({
+    bereich: bereichId, schein: scheinId, autor: u.id, text: await e2eZu(key, text)
+  });
+}
+
+async function supaAnmerkungVerstecken(id, ja) {
+  return await supa.from("kt_anmerkungen").update({ versteckt: !!ja }).eq("id", id).select("id");
+}
+
+async function supaAnmerkungLoeschen(id) {
+  return await supa.from("kt_anmerkungen").delete().eq("id", id).select("id");
+}
+
+// ---------- Admin: Rolle setzen (promoten) ----------
+
+async function supaAdminRolle(zielId, neu) {
+  return await supa.rpc("kt_admin_rolle_setzen", { ziel: zielId, neu: neu });
 }
