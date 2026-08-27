@@ -1802,27 +1802,43 @@ function pruefAlles(scheine) {
   } else {
     geprueft.push("jede Wette steckt noch in ihrem Foto-Ordner");
   }
+  const fehlt = {};      // je Ordner: welche Spiele stecken nicht mehr drin
+  const vermischt = {};  // je Ordner: Wetten, die in einem anderen Ordner liegen
+  const anders = [];     // Spielname in der Kombination gegen den im Ordner
   for (const s of scheine) {
     const d = s.daten || {};
     if (!satzGeladen[d.satz]) continue;
     for (const t of d.wetten || []) {
       const w = pruefWette(t.id);
       if (!w) {
-        add("warnung", "Foto-Ordner", "<b>" + textSicherM(t.spiel || t.id) + "</b> aus <b>" +
-          textSicherM(pruefSatzTitel(d.satz)) + "</b> gibt es dort nicht mehr. Die Kombination bleibt " +
-          "gültig, lässt sich aber nicht mehr gegen das Foto nachrechnen.");
+        (fehlt[d.satz] = fehlt[d.satz] || []).push(t.spiel || t.id);
         continue;
       }
       if (w.satz && d.satz && w.satz !== d.satz) {
-        add("fehler", "Foto-Ordner", "<b>" + textSicherM(t.spiel || t.id) + "</b> ist in der Kombination " +
-          "dem Ordner <b>" + textSicherM(pruefSatzTitel(d.satz)) + "</b> zugeordnet, liegt aber in <b>" +
-          textSicherM(pruefSatzTitel(w.satz)) + "</b>. Hier sind zwei Lieferungen vermischt.");
+        (vermischt[d.satz] = vermischt[d.satz] || []).push({ spiel: t.spiel || t.id, wo: w.satz });
       }
-      if (w.spiel && t.spiel && w.spiel !== t.spiel) {
-        add("warnung", "Foto-Ordner", "Bei einer Wette steht in der Kombination <b>" +
-          textSicherM(t.spiel) + "</b>, im Ordner aber <b>" + textSicherM(w.spiel) + "</b>.");
-      }
+      if (w.spiel && t.spiel && w.spiel !== t.spiel) anders.push({ hier: t.spiel, dort: w.spiel });
     }
+  }
+  const beispiele = liste => liste.slice(0, 3).map(x => textSicherM(x)).join(", ") +
+    (liste.length > 3 ? " und " + (liste.length - 3) + " weitere" : "");
+  for (const [satz, liste] of Object.entries(fehlt)) {
+    const einzeln = Array.from(new Set(liste));
+    add("warnung", "Foto-Ordner", "<b>" + einzeln.length + " Wette(n)</b> aus <b>" +
+      textSicherM(pruefSatzTitel(satz)) + "</b> stecken dort nicht mehr drin (" + beispiele(einzeln) + "). " +
+      "Die Kombinationen bleiben gültig und richtig gerechnet, lassen sich aber nicht mehr gegen das " +
+      "Foto nachprüfen. Das passiert, wenn der Ordner nach dem Bauen noch einmal eingelesen wurde.");
+  }
+  for (const [satz, liste] of Object.entries(vermischt)) {
+    add("fehler", "Foto-Ordner", "<b>" + liste.length + " Wette(n)</b> sind dem Ordner <b>" +
+      textSicherM(pruefSatzTitel(satz)) + "</b> zugeordnet, liegen aber in <b>" +
+      textSicherM(pruefSatzTitel(liste[0].wo)) + "</b> (" + beispiele(liste.map(x => x.spiel)) + "). " +
+      "Hier sind zwei Lieferungen vermischt.");
+  }
+  if (anders.length) {
+    add("warnung", "Foto-Ordner", "Bei <b>" + anders.length + " Wette(n)</b> steht in der Kombination " +
+      "ein anderer Spielname als im Ordner, zum Beispiel <b>" + textSicherM(anders[0].hier) +
+      "</b> gegen <b>" + textSicherM(anders[0].dort) + "</b>.");
   }
 
   // ---- 5. Ziel je Kombination ----
@@ -1859,15 +1875,15 @@ function pruefAlles(scheine) {
     for (const t of (s.daten || {}).wetten || []) {
       const spiel = String(t.spiel || "").toLowerCase().trim();
       if (!spiel) continue;
-      proPerson[p][spiel] = proPerson[p][spiel] || new Set();
-      proPerson[p][spiel].add(stamm);
+      proPerson[p][spiel] = proPerson[p][spiel] || { staemme: new Set(), name: t.spiel };
+      proPerson[p][spiel].staemme.add(stamm);
     }
   }
   for (const [p, spiele] of Object.entries(proPerson)) {
-    for (const [spiel, staemme] of Object.entries(spiele)) {
-      if (staemme.size > 1) {
+    for (const eintrag of Object.values(spiele)) {
+      if (eintrag.staemme.size > 1) {
         add("warnung", "Doppelt", "Bei <b>" + textSicherM(p === "-" ? "ohne Person" : ordnerNameM(p)) +
-          "</b> läuft <b>" + textSicherM(spiel) + "</b> in " + staemme.size +
+          "</b> läuft <b>" + textSicherM(eintrag.name) + "</b> in " + eintrag.staemme.size +
           " verschiedenen Kombinationen. Deine Regel ist: jedes Spiel nur einmal. " +
           "(Teile derselben Kombination bei mehreren Anbietern zählen hier nicht mit.)");
       }
