@@ -505,3 +505,16 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 #anrufpanel .anruf-tasten { margin-top: 10px; }
 #anrufpanel button { margin-right: 8px; }
 #anrufpanel video, #anrufpanel audio { width: 100%; margin-top: 8px; }
+
+/* Mein Bereich in Bloecken + Admin-Seite (Design-Schicht, loeschbar) */
+.mb-navi { margin: 12px 0; border-bottom: 3px solid #1a2c50; padding-bottom: 0; }
+.mb-navi button { font-size: 16px; padding: 10px 22px; margin: 0 6px 0 0;
+  border: 2px solid #1a2c50; border-bottom: none; background: #f2f5fb; cursor: pointer; }
+.mb-navi button.aktiv { background: #1a2c50; color: #fff; font-weight: bold; }
+.mb-block { display: none; }
+.mb-block.offen { display: block; }
+.e2ehinweis { margin: 6px 0; }
+.e2ehinweis summary { cursor: pointer; }
+.navknopf.adminknopf, a.adminknopf { background: #7a0000; color: #fff; border-color: #7a0000; }
+.kopfzeile a.adminknopf { display: inline-block; padding: 6px 14px; margin-left: 10px;
+  text-decoration: none; }

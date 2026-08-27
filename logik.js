@@ -121,7 +121,7 @@ function zeichneOrdnerLeiste() {
     "Offener Ordner: <b>" + satz.titel + "</b>" +
     '<span class="ordnerzahl">' + anzahl + " Wetten, " + offen + " offen</span></div>" +
     '<div class="ordnerknoepfe">' +
-    '<a class="ordnerknopf" href="mein.html#fotos" id="fotoadminknopf" style="display:none">Neue Fotos hochladen</a>' +
+    '<a class="ordnerknopf" href="admin.html" id="fotoadminknopf" style="display:none">Neue Fotos hochladen</a>' +
     '<button class="ordnerknopf" onclick="ordnerPanel(\'wechseln\')">Ordner wechseln (' +
       SAETZE.length + ")</button>" +
     '<button class="ordnerknopf" onclick="ordnerPanel(\'anpassen\')">Farbe, Emoji, Notiz</button>' +

@@ -139,6 +139,7 @@ async function tuUsernameSetzen() {
 // ---------- Die App ----------
 
 async function zeigeApp() {
+  binAdmin = await supaIstAdmin();
   const geteilt = await supaBereicheFuerMich();
   meineBereiche = [{ id: ich.id, username: ich.username, rolle: "ich" }]
     .concat(geteilt.map(g => ({ id: g.owner, username: g.kt_profiles.username, rolle: g.rolle })));
@@ -146,31 +147,41 @@ async function zeigeApp() {
 
   el("inhalt").innerHTML = `
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
-  <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button></div>
-<p class="mini">&#128274; <b>Ende-zu-Ende verschluesselt:</b> Nachrichten, Scheine, Personen-Namen,
-Notizen und Anmerkungen liegen nur verschluesselt in der Datenbank - lesbar allein fuer dich und
-die, denen du teilst. Wichtig: setzt du dein Passwort auf einem NEUEN Geraet zurueck, sind alte
-Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der Buchhaltung (Betraege, Daten) bleiben
-Zahlen, damit die Tabellen rechnen koennen.</p>
+  <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button>
+  ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">Admin-Bereich</a>' : ""}</div>
+<details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschluesselt - was heisst das?</summary>
+Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschluesselt in der
+Datenbank - lesbar allein fuer dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
+einem NEUEN Geraet zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
+Buchhaltung (Betraege, Daten) bleiben Zahlen, damit die Tabellen rechnen koennen.</details>
 <div id="bereichtabs" class="navleiste"></div>
-<div id="adminbereich"></div>
-<div id="freunde"></div>
-<div id="teilen"></div>
-<div id="importkasten"></div>
-<div id="fotosaetze"></div>
-<div id="buchhaltung"></div>
-<h2>Konto dieses Bereichs</h2>
-<div id="konto_db"></div>
+<div id="mb_navi" class="mb-navi"></div>
+
+<div id="blk_kombis" class="mb-block">
 <h2>Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
-gesetzt hast. Jede Kombination gehoert zu einer Person - die Buchhaltung oben bleibt EINE
-gemeinsame. <b>Nicht verwechseln:</b> die Foto-Ordner oben auf der Kombi-Tafel sind fuer
-alle gleich und aendern sich nur, wenn ein Admin neue Fotos bringt. Personen gehoeren
-nur dir.</p>
+gesetzt hast. Jede Kombination gehoert zu einer Person. <b>Nicht verwechseln:</b> die
+Foto-Ordner oben auf der Kombi-Tafel sind fuer alle gleich und aendern sich nur, wenn ein
+Admin neue Fotos bringt. Personen gehoeren nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="scheine_db"></div>
+<h2>Konto dieses Bereichs</h2>
+<div id="konto_db"></div>
+<div id="importkasten"></div>
+</div>
+
+<div id="blk_buch" class="mb-block">
+<div id="buchhaltung"></div>
+</div>
+
+<div id="blk_freunde" class="mb-block">
+<div id="freunde"></div>
+<div id="teilen"></div>
+</div>
+
+<div id="blk_chat" class="mb-block">
 <h2>Chat dieses Bereichs</h2>
 <p class="mini">Alle, die diesen Bereich sehen koennen, koennen hier schreiben. So benachrichtigt
 ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p>
@@ -183,21 +194,52 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   <button id="bc-ton" onclick="tuChatTon()">&#127908; Sprachnachricht</button>
   <button id="bc-video" onclick="tuChatVideo()">&#128249; Video</button>
   <span id="bc-vorschau"></span>
+</div>
 </div>`;
 
-  binAdmin = await supaIstAdmin();
+  zeichneMbNavi();
   await zeichneTabs();
-  await zeichneAdmin();
   await zeichneFreunde();
   await zeichneTeilen();
   zeichneImport();
   await zeichneBereich();
-  await zeichneFotoSaetze();
   await zeichneBuchhaltung();
-  if (location.hash === "#fotos") {
-    const d = el("fotosaetze").querySelector("details");
-    if (d) { d.open = true; d.scrollIntoView(); }
+}
+
+// ---------- Die vier Bloecke von Mein Bereich ----------
+// Immer nur EIN Block sichtbar - das entwirrt die Seite (Karams Wunsch
+// vom 26.08.). Der zuletzt offene Block wird gemerkt.
+
+const MB_BLOECKE = [
+  ["kombis", "Kombinationen und Personen"],
+  ["buch", "Buchhaltung"],
+  ["freunde", "Freunde und Teilen"],
+  ["chat", "Chat"]
+];
+
+function mbAktiverBlock() {
+  const b = localStorage.getItem("kt_mb_block") || "kombis";
+  return MB_BLOECKE.some(x => x[0] === b) ? b : "kombis";
+}
+
+function mbBlockZeigen(kurz) {
+  localStorage.setItem("kt_mb_block", kurz);
+  for (const [k] of MB_BLOECKE) {
+    const blk = el("blk_" + k);
+    if (blk) blk.classList.toggle("offen", k === kurz);
   }
+  const navi = el("mb_navi");
+  if (navi) for (const knopf of navi.querySelectorAll("button")) {
+    knopf.classList.toggle("aktiv", knopf.dataset.blk === kurz);
+  }
+}
+
+function zeichneMbNavi() {
+  const navi = el("mb_navi");
+  if (!navi) return;
+  navi.innerHTML = MB_BLOECKE.map(([k, titel]) =>
+    '<button data-blk="' + k + '" onclick="mbBlockZeigen(\'' + k + '\')">' + titel + "</button>").join("");
+  mbBlockZeigen(mbAktiverBlock());
 }
 
 async function zeichneTabs() {
@@ -1067,143 +1109,8 @@ async function tuAnmerkungWeg(id) {
 
 let binAdmin = false;
 
-async function zeichneAdmin() {
-  const box = el("adminbereich");
-  if (!box) return;
-  if (!binAdmin) { box.innerHTML = ""; return; }
-  const r = await supaAdminUserliste();
-  if (r.error) {
-    box.innerHTML = '<p class="mini rot">Admin-Liste nicht ladbar: ' + textSicherM(r.error.message) + "</p>";
-    return;
-  }
-  let zeilen = "";
-  for (const u of (r.data || [])) {
-    zeilen += "<tr><td>" + textSicherM(u.username || "(kein Name)") +
-      (u.rolle === "admin" ? ' <span class="mini">(Admin)</span>' : "") + "</td>" +
-      "<td>" + textSicherM(u.email || "") + "</td>" +
-      "<td class='mini'>" + zeitM(u.registriert) + "</td>" +
-      "<td class='mini'>" + (u.zuletzt ? zeitM(u.zuletzt) : "-") + "</td>" +
-      "<td>" + u.scheine + "</td>" +
-      "<td>" + (u.id === ich.id
-        ? "<span class='mini'>das bist du</span>"
-        : (u.rolle === "admin"
-          ? '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'user\')">Admin-Rolle nehmen</button>'
-          : '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'admin\')">zum Admin machen</button> ' +
-            '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">loeschen</button>')) +
-      "</td></tr>";
-  }
-  box.innerHTML = '<details class="adminkasten"><summary>Admin-Bereich: alle User (nur Admins sehen das)</summary>' +
-    '<div class="inhalt"><p class="mini">Loeschen entfernt das Konto RESTLOS - samt allem, was der User ' +
-    "angelegt hat, auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrueckt werden.</p>" +
-    "<table><thead><tr><th>Benutzername</th><th>E-Mail</th><th>registriert</th><th>zuletzt da</th>" +
-    "<th>Scheine</th><th></th></tr></thead><tbody>" + zeilen + "</tbody></table></div></details>";
-}
-
-async function tuAdminRolle(id, neu) {
-  const knopf = el("adminrolle_" + id);
-  if (knopf && knopf.dataset.sicher !== "1") {
-    knopf.dataset.sicher = "1";
-    knopf.textContent = (neu === "admin") ? "Wirklich zum Admin machen?" : "Wirklich Rolle nehmen?";
-    knopf.classList.add("adminrot");
-    return;
-  }
-  const r = await supaAdminRolle(id, neu);
-  if (r.error) { meldungM("Rolle nicht geaendert: " + r.error.message, "warn"); return; }
-  meldungM(neu === "admin"
-    ? "Der Nutzer ist jetzt Admin: er sieht die Userliste und darf Foto-Saetze hochladen."
-    : "Admin-Rolle entfernt - er ist wieder normaler Nutzer.", "gut");
-  zeichneAdmin();
-}
-
-async function tuAdminLoeschen(id) {
-  const knopf = el("adminweg_" + id);
-  if (knopf && knopf.dataset.sicher !== "1") {
-    knopf.dataset.sicher = "1";
-    knopf.textContent = "Wirklich? Alles weg!";
-    knopf.classList.add("adminrot");
-    return;
-  }
-  const r = await supaAdminUserLoeschen(id);
-  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
-  meldungM("User restlos geloescht.", "gut");
-  zeichneAdmin();
-}
-
-// ---------- Foto-Saetze hochladen ----------
-
-async function zeichneFotoSaetze() {
-  const box = el("fotosaetze");
-  if (!box) return;
-  // Die Foto-Ordner der Kombi-Tafel sind fuer ALLE gleich (Homebase).
-  // Neue Fotos hochladen duerfen nur Admins - alle anderen sehen den
-  // Abschnitt gar nicht.
-  if (!binAdmin) { box.innerHTML = ""; return; }
-  const uploads = await supaSatzUploadsLaden();
-  const gruppen = {};
-  for (const u of uploads) {
-    gruppen[u.satz_datum] = gruppen[u.satz_datum] || { n: 0, wartet: 0 };
-    gruppen[u.satz_datum].n++;
-    if (u.status === "wartet") gruppen[u.satz_datum].wartet++;
-  }
-  let liste = "";
-  for (const datum of Object.keys(gruppen)) {
-    const g = gruppen[datum];
-    liste += "<li><b>Satz vom " + datum + "</b>: " + g.n + " Foto(s), " +
-      (g.wartet ? '<span class="rot">' + g.wartet + " warten auf Einlesen durch Claude</span>"
-                : '<span class="gruen">eingelesen</span>') + "</li>";
-  }
-  const heute = new Date().toISOString().slice(0, 10);
-  box.innerHTML = '<details><summary>Foto-Saetze: neue Kombi-Fotos hochladen (anklicken)</summary>' +
-    '<div class="inhalt">' +
-    '<p class="mini">Nur fuer Admins: jede Foto-Lieferung ist ein eigener Ordner mit Datum, ' +
-    "fuer ALLE Nutzer gleich (die Homebase). Du laedst die Fotos hier hoch, Claude liest sie " +
-    "beim naechsten Auftrag ein und legt daraus den neuen Satz in der Kombi-Tafel an. " +
-    "<b>Saetze mischen sich nie.</b> Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>" +
-    '<label>Datum des Satzes: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
-    '<label class="fotoknopf">Fotos hochladen' +
-    '<input type="file" accept="image/*" multiple style="display:none" ' +
-    'onchange="tuSatzFotos(this)"></label>' +
-    (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Saetze hochgeladen.</p>') +
-    "</div></details>";
-}
-
-async function tuSatzFotos(input) {
-  const datum = el("satz_datum").value;
-  if (!datum) { meldungM("Bitte zuerst das Datum des Satzes waehlen.", "warn"); return; }
-  const dateien = Array.from(input.files || []);
-  if (!dateien.length) return;
-  let ok = 0;
-  for (const datei of dateien) {
-    const dataUrl = await verkleinereBild(datei, 1100);
-    if (!dataUrl) continue;
-    const r = await supaSatzFotoHochladen(ich.id, datum, dataUrl);
-    if (!r.error) ok++;
-    else meldungM("Foto nicht gespeichert: " + r.error.message, "warn");
-  }
-  meldungM(ok + " von " + dateien.length + " Fotos zum Satz vom " + datum +
-    " hochgeladen. Claude liest sie beim naechsten Auftrag ein.", ok ? "gut" : "warn");
-  zeichneFotoSaetze();
-}
-
-function verkleinereBild(datei, maxBreite) {
-  return new Promise(fertig => {
-    const leser = new FileReader();
-    leser.onload = ev => {
-      const bild = new Image();
-      bild.onload = () => {
-        const faktor = Math.min(1, maxBreite / bild.width);
-        const c = document.createElement("canvas");
-        c.width = Math.round(bild.width * faktor);
-        c.height = Math.round(bild.height * faktor);
-        c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
-        fertig(c.toDataURL("image/jpeg", 0.8));
-      };
-      bild.onerror = () => fertig(null);
-      bild.src = ev.target.result;
-    };
-    leser.readAsDataURL(datei);
-  });
-}
+// Admin-Funktionen und Foto-Saetze leben jetzt auf der eigenen Seite
+// admin.html (admin.js) - hier gibt es nur noch den Verweis-Knopf oben.
 
 // ---------- Buchhaltung ----------
 
