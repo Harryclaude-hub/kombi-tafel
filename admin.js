@@ -121,10 +121,22 @@ async function tuSatzFotos(input) {
     if (!r.error) ok++;
     else meldungA("Foto nicht gespeichert: " + sicherA(r.error.message), "warn");
   }
+  // Der Ordner entsteht automatisch mit dem Datum als Namen
+  let neuerOrdner = false;
+  if (ok) {
+    const daSaetze = await supaSaetzeLaden();
+    if (!daSaetze.some(s => s.id === datum)) {
+      const d = datum.split("-");
+      const r = await supaSatzAnlegen(datum, "Fotos vom " + d[2] + "." + d[1] + "." + d[0]);
+      neuerOrdner = !r.error;
+    }
+  }
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
     " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
-    ". Jetzt oben auf <b>Jetzt im Programm einlesen</b> drücken.", ok || doppelt ? "gut" : "warn");
+    (neuerOrdner ? ". <b>Ordner automatisch angelegt.</b>" : ".") +
+    " Jetzt auf <b>Jetzt im Programm einlesen</b> drücken.", ok || doppelt ? "gut" : "warn");
   adminFotoSaetze();
+  adminSaetze();
 }
 
 // ---------- Fotos ansehen und loeschen ----------
@@ -203,18 +215,31 @@ async function tuAlleFotosWeg(datum) {
 
 // Kleine Fotos vor der Erkennung hochskalieren - winzige Schrift ist der
 // Hauptgrund fuer verlorene Zeilen (15 statt 50!)
+// Bild fuer die Erkennung aufbereiten: gross genug, Graustufen, mehr
+// Kontrast. Das ist der groesste Hebel dafuer, dass JEDE Zeile ankommt.
 function bildVergroessern(dataUrl, mindestBreite) {
   return new Promise(fertig => {
     const bild = new Image();
     bild.onload = () => {
-      if (bild.width >= mindestBreite) { fertig(dataUrl); return; }
-      const faktor = mindestBreite / bild.width;
+      const faktor = Math.max(1, Math.min(4, mindestBreite / bild.width));
       const c = document.createElement("canvas");
       c.width = Math.round(bild.width * faktor);
       c.height = Math.round(bild.height * faktor);
       const g = c.getContext("2d");
       g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
       g.drawImage(bild, 0, 0, c.width, c.height);
+      try {
+        const d = g.getImageData(0, 0, c.width, c.height);
+        const p = d.data;
+        for (let i = 0; i < p.length; i += 4) {
+          const grau = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+          // Kontrast anheben: helles heller, dunkles dunkler
+          const stark = Math.max(0, Math.min(255, (grau - 128) * 1.6 + 128));
+          p[i] = p[i + 1] = p[i + 2] = stark;
+        }
+        g.putImageData(d, 0, 0);
+      } catch (e) { /* ohne Aufbereitung weiter */ }
       fertig(c.toDataURL("image/png"));
     };
     bild.onerror = () => fertig(dataUrl);
@@ -347,6 +372,17 @@ function felderAusWorten(words) {
   }
   if (akt.trim()) felder.push(akt.trim());
   return felder;
+}
+
+// Sieht eine nicht verwertbare Rohzeile trotzdem nach einer Wett-Zeile aus?
+// (dann wird sie in die Vorschau uebernommen statt weggeworfen)
+function zeileSiehtNachWetteAus(text) {
+  const t = String(text || "").trim();
+  if (t.length < 12) return false;
+  const hatZahl = /\d{1,3}[.,]\d{1,2}(?!\d)/.test(t);
+  const hatSpiel = /\bvs?\.?\b/i.test(t);
+  const hatZeit = /\d{1,2}[:.]\d{2}/.test(t);
+  return (hatZahl && (hatSpiel || hatZeit)) || (hatSpiel && hatZeit);
 }
 
 function satzFelderParsen(felder, erbe) {
@@ -483,9 +519,12 @@ async function satzEinlesen(datum) {
     einleseBalken(box, nr, uploads.length, 0, "Foto wird vorbereitet...");
     let lines = [];
     try {
-      const gross = await bildVergroessern(up.foto, 1600);
+      const gross = await bildVergroessern(up.foto, 2400);
       const nrJetzt = nr;
-      const erg = await Tesseract.recognize(gross, "deu", { logger: m => {
+      const erg = await Tesseract.recognize(gross, "deu", {
+        tessedit_pageseg_mode: "6",          // gleichmaessiger Textblock (Tabelle)
+        preserve_interword_spaces: "1",
+        logger: m => {
         if (m.status === "recognizing text") {
           einleseBalken(box, nrJetzt, uploads.length, Math.round((m.progress || 0) * 100), "Zeilen werden gelesen...");
         } else if (m.status && m.progress !== undefined) {
@@ -504,17 +543,35 @@ async function satzEinlesen(datum) {
     }
     const geparst = [];
     let erbe = null;
+    let unklar = 0;
     for (const line of lines) {
-      const p = satzFelderParsen(felderAusWorten(line.words), erbe);
+      const felder = felderAusWorten(line.words);
+      const rohText = (line.text || felder.join(" ")).replace(/\s+/g, " ").trim();
+      const p = satzFelderParsen(felder, erbe);
       if (p) {
         p.wette = wetteReparieren(p.wette);
         p.s = artErkennen(p.wette);
         p.gruende = pruefGruende(p, datum);
         if (p.geerbt) p.gruende.push("Anstoß aus der Vorzeile geerbt - prüfen");
+        p.roh = rohText;
         erbe = { an: p.an_zeit, von: p.von };
         geparst.push(p);
+      } else if (zeileSiehtNachWetteAus(rohText)) {
+        // KEINE Zeile verschwindet still: unvollstaendig uebernehmen und
+        // rot markieren, damit Karam sie von Hand fertig macht
+        unklar++;
+        const zahl = (rohText.match(/(\d{1,3})[.,](\d{1,2})(?!\d)/g) || []).pop();
+        geparst.push({
+          von: erbe ? erbe.von : "", an_zeit: (erbe && erbe.an) || (datum + "T12:00"),
+          liga: "", spiel: rohText.slice(0, 90), wette: "", s: "SIEG",
+          quote: zahl ? parseFloat(zahl.replace(",", ".")) : 0,
+          roh: rohText,
+          gruende: ["NICHT sicher erkannt - bitte Spiel, Wette und Quote von Hand eintragen oder Zeile löschen"]
+        });
       }
     }
+    if (unklar) meldungA("Foto " + nr + ": " + unklar + " Zeile(n) konnten nicht sauber gelesen " +
+      "werden - sie stehen ROT in der Vorschau, damit nichts verloren geht.", "warn");
     for (const z of geparst) {
       const k = zeilenSchluessel(z);
       if (gesehen.has(k)) continue;   // Fotos ueberlappen sich oft - Doppelte fliegen raus
@@ -537,8 +594,10 @@ function vorschauZeigen() {
   let zeilen = "";
   vorschauZeilen.forEach((z, i) => {
     const gruende = (z.gruende || []).concat(verdacht[i] ? ["möglicherweise doppelt"] : []);
-    zeilen += "<tr" + (gruende.length ? " class='ohneordner'" : "") + ">" +
-      "<td class='mini'>" + (gruende.length ? sicherA(gruende.join(", ")) : "") + "</td>" +
+    const unvollstaendig = !z.wette || !z.quote || z.quote < 1.01;
+    zeilen += "<tr" + (unvollstaendig ? " class='rohzeile'" : (gruende.length ? " class='ohneordner'" : "")) + ">" +
+      "<td class='mini'" + (z.roh ? ' title="' + sicherA(z.roh) + '"' : "") + ">" +
+      (gruende.length ? sicherA(gruende.join(", ")) : "") + "</td>" +
       '<td><input value="' + sicherA(z.an_zeit) + '" onchange="vsFeld(' + i + ',\'an_zeit\',this.value)" size="16"></td>' +
       '<td><input value="' + sicherA(z.von) + '" onchange="vsFeld(' + i + ',\'von\',this.value)" size="5"></td>' +
       '<td><input value="' + sicherA(z.liga) + '" onchange="vsFeld(' + i + ',\'liga\',this.value)" size="20"></td>' +
@@ -549,8 +608,12 @@ function vorschauZeigen() {
       '<td><input value="' + z.quote + '" onchange="vsFeld(' + i + ',\'quote\',this.value)" size="5"></td>' +
       '<td><button onclick="vsWeg(' + i + ')">weg</button></td></tr>';
   });
-  box.innerHTML = '<div class="kern"><b>Vorschau: ' + vorschauZeilen.length + " Wetten erkannt (Satz vom " +
-    sicherA(vorschauDatum) + ").</b> <b class='rot'>Zähle auf den Fotos nach, ob die Anzahl stimmt!</b> " +
+  const fertigN = vorschauZeilen.filter(z => z.wette && z.quote >= 1.01).length;
+  const offenN = vorschauZeilen.length - fertigN;
+  box.innerHTML = '<div class="kern"><b>Vorschau: ' + vorschauZeilen.length + " Zeilen aus den Fotos (Satz vom " +
+    sicherA(vorschauDatum) + ") - davon <span class='gruen'>" + fertigN + " vollständig</span>" +
+    (offenN ? " und <span class='rot'>" + offenN + " zum Nacharbeiten (rot)</span>" : "") + ".</b> " +
+    "<b class='rot'>Zähle auf den Fotos nach, ob die Anzahl stimmt!</b> " +
     "Fehlen Zeilen, ist das Foto zu klein oder unscharf - am besten Bildschirm-Screenshots in voller " +
     "Größe hochladen, notfalls die Tabelle in mehreren Ausschnitten. Bitte kurz vergleichen - jede Zelle " +
     "lässt sich direkt ändern. <b>Gelbe Zeilen</b> haben gleiche Zeit und Quote wie eine andere - " +
@@ -646,9 +709,15 @@ async function adminSaetze() {
     for (const s of saetze) {
       const n = wetten.filter(w => w.satz === s.id).length;
       const f = uploads.filter(u => u.satz_datum === s.id).length;
-      ueber += "<tr data-such=\"" + sicherA((s.titel + " " + s.id).toLowerCase()) + "\"><td><b>" + sicherA(s.titel) + "</b> <span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
+      const istOffen = localStorage.getItem("kt_satz") === s.id;
+      ueber += "<tr data-such=\"" + sicherA((s.titel + " " + s.id).toLowerCase()) + "\"" +
+        (istOffen ? " class='fertigzeile'" : "") + "><td><b>" + sicherA(s.titel) + "</b> " +
+        (istOffen ? '<span class="fertigbadge">offener Ordner</span> ' : "") +
+        "<span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
         "<td>" + n + "</td><td>" + f + "</td>" +
-        '<td><button onclick="satzAufklappen(\'' + sicherA(s.id) + '\')">öffnen und bearbeiten</button></td></tr>';
+        '<td><button class="haupt" onclick="satzAktivieren(\'' + sicherA(s.id) + '\')" ' +
+        'title="Diesen Ordner überall als offenen Ordner setzen">&#9989; Aktivieren</button> ' +
+        '<button onclick="satzAufklappen(\'' + sicherA(s.id) + '\')">öffnen und bearbeiten</button></td></tr>';
     }
     ueber += "</tbody></table>";
   } else {
@@ -690,6 +759,16 @@ function satzSuche(wert) {
   for (const el2 of document.querySelectorAll("[data-such]")) {
     el2.style.display = (!s || el2.dataset.such.includes(s)) ? "" : "none";
   }
+}
+
+// Ein Klick macht diesen Ordner überall zum offenen Ordner
+function satzAktivieren(id) {
+  localStorage.setItem("kt_satz", id);
+  meldungA("<b>Ordner aktiviert.</b> Er ist ab sofort überall der offene Ordner: " +
+    '<a href="index.html"><b>zur Kombi-Tafel</b></a> &nbsp; ' +
+    '<a href="kombis.html"><b>zum Kombi-Bau</b></a> &nbsp; ' +
+    '<a href="original.html"><b>zur Original-Tabelle</b></a>', "gut");
+  adminSaetze();
 }
 
 function satzAufklappen(id) {

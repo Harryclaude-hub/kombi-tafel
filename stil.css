@@ -592,3 +592,7 @@ input:focus, select:focus, textarea:focus { border-color: #1a2c50; outline: none
 .navleiste a.navknopf.installknopf:hover { background: #146014; }
 .navleiste a.navknopf.updateknopf { background: #a00000; color: #fff; border-color: #a00000; }
 .navleiste a.navknopf.updateknopf:hover { background: #7a0000; }
+
+/* Nicht sicher erkannte Zeilen in der Vorschau (Design-Schicht) */
+tr.rohzeile td { background: #fdeaea; }
+tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
