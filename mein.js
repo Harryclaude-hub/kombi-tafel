@@ -1,6 +1,6 @@
 // ============================================================
 // MEIN BEREICH: Konto, Bereiche, Teilen, Chat.
-// Braucht supa.js. Rein fuer mein.html.
+// Braucht supa.js. Rein für mein.html.
 // ============================================================
 "use strict";
 
@@ -67,7 +67,7 @@ function zeigeAnmeldung() {
   <div class="auth-kasten">
     <h2>Neues Konto</h2>
     <label>Benutzername<br><input id="reg_user" autocomplete="username"></label>
-    <label>E-Mail <span class="mini">(nur fuers Passwort-Zuruecksetzen, keine Bestaetigung noetig)</span><br>
+    <label>E-Mail <span class="mini">(nur fürs Passwort-Zurücksetzen, keine Bestaetigung noetig)</span><br>
       <input id="reg_mail" type="email" autocomplete="email"></label>
     <label>Passwort <span class="mini">(mindestens 6 Zeichen)</span><br>
       <input id="reg_pw" type="password" autocomplete="new-password"> ${augeHtml("reg_pw")}</label>
@@ -96,7 +96,7 @@ async function tuVergessen() {
   if (!mail) return;
   const r = await supaPasswortVergessen(mail.trim());
   meldungM(r.fehler ? r.fehler :
-    "Wenn die E-Mail ein Konto hat, ist ein Link zum Zuruecksetzen unterwegs. " +
+    "Wenn die E-Mail ein Konto hat, ist ein Link zum Zurücksetzen unterwegs. " +
     "Schau auch im Spam-Ordner.", r.fehler ? "warn" : "gut");
 }
 
@@ -113,14 +113,14 @@ async function tuPasswortNeu() {
   const r = await supaPasswortNeu(el("neu_pw").value);
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
   history.replaceState(null, "", location.pathname);
-  meldungM("Passwort geaendert. Du bist angemeldet.", "gut");
+  meldungM("Passwort geändert. Du bist angemeldet.", "gut");
   startMein();
 }
 
 function zeigeUsernameWahl() {
   el("inhalt").innerHTML = `
 <div class="auth"><div class="auth-kasten">
-  <h2>Benutzernamen waehlen</h2>
+  <h2>Benutzernamen wählen</h2>
   <p class="mini">Dein Konto existiert, hat aber noch keinen Benutzernamen.</p>
   <label>Benutzername<br><input id="uw_user"></label>
   <button class="haupt" onclick="tuUsernameSetzen()">Speichern</button>
@@ -149,20 +149,20 @@ async function zeigeApp() {
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button>
   ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">Admin-Bereich</a>' : ""}</div>
-<details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschluesselt - was heisst das?</summary>
-Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschluesselt in der
-Datenbank - lesbar allein fuer dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
-einem NEUEN Geraet zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
-Buchhaltung (Betraege, Daten) bleiben Zahlen, damit die Tabellen rechnen koennen.</details>
+<details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschlüsselt - was heisst das?</summary>
+Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschlüsselt in der
+Datenbank - lesbar allein für dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
+einem NEUEN Gerät zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
+Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können.</details>
 <div id="bereichtabs" class="navleiste"></div>
 <div id="mb_navi" class="mb-navi"></div>
 
 <div id="blk_kombis" class="mb-block">
 <h2>Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
-gesetzt hast. Jede Kombination gehoert zu einer Person. <b>Nicht verwechseln:</b> die
-Foto-Ordner oben auf der Kombi-Tafel sind fuer alle gleich und aendern sich nur, wenn ein
-Admin neue Fotos bringt. Personen gehoeren nur dir.</p>
+gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b> die
+Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur, wenn ein
+Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
@@ -183,7 +183,7 @@ Admin neue Fotos bringt. Personen gehoeren nur dir.</p>
 
 <div id="blk_chat" class="mb-block">
 <h2>Chat dieses Bereichs</h2>
-<p class="mini">Alle, die diesen Bereich sehen koennen, koennen hier schreiben. So benachrichtigt
+<p class="mini">Alle, die diesen Bereich sehen können, können hier schreiben. So benachrichtigt
 ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p>
 <div id="chatliste" class="chatliste"></div>
 <div class="chateingabe"><input id="chat_text" placeholder="Nachricht..."
@@ -206,7 +206,7 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   await zeichneBuchhaltung();
 }
 
-// ---------- Die vier Bloecke von Mein Bereich ----------
+// ---------- Die vier Blöcke von Mein Bereich ----------
 // Immer nur EIN Block sichtbar - das entwirrt die Seite (Karams Wunsch
 // vom 26.08.). Der zuletzt offene Block wird gemerkt.
 
@@ -286,7 +286,7 @@ async function zeichneFreunde() {
       (neu ? ' <span class="badge">' + neu + "</span>" : "") + "</button> ";
   }
   box.innerHTML = '<details open><summary>Freunde und Nachrichten (anklicken)</summary><div class="inhalt">' +
-    '<p class="mini">Freunde adden geht OHNE deinen Bereich zu teilen: ihr koennt euch dann ' +
+    '<p class="mini">Freunde adden geht OHNE deinen Bereich zu teilen: ihr könnt euch dann ' +
     "Direktnachrichten schicken. Teilen kannst du danach immer noch, musst du aber nicht.</p>" +
     '<input id="freund_user" placeholder="Benutzername"> ' +
     '<button class="haupt" onclick="tuFreundAdden()">Als Freund adden</button>' +
@@ -298,7 +298,7 @@ async function zeichneFreunde() {
 async function tuFreundAdden() {
   const r = await supaKontaktAdden(el("freund_user").value.trim());
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
-  meldungM("<b>" + r.profil.username + "</b> ist jetzt dein Freund. Ihr koennt euch schreiben.", "gut");
+  meldungM("<b>" + r.profil.username + "</b> ist jetzt dein Freund. Ihr könnt euch schreiben.", "gut");
   zeichneFreunde();
 }
 
@@ -369,7 +369,7 @@ async function zeichneTeilen() {
   if (aktiverBereich.rolle !== "ich") { box.innerHTML = ""; return; }
   const liste = await supaFreigabenVonMir();
   let html = '<details><summary>Bereich teilen (anklicken)</summary><div class="inhalt">' +
-    '<p class="mini">Such den Benutzernamen und waehle: <b>Mitarbeiten</b> (Close Friend, darf ' +
+    '<p class="mini">Such den Benutzernamen und wähle: <b>Mitarbeiten</b> (Close Friend, darf ' +
     "alles wie du) oder <b>Nur zuschauen</b> (Friend, darf lesen und kopieren).</p>" +
     '<input id="teilen_user" placeholder="Benutzername"> ' +
     '<select id="teilen_rolle"><option value="close">Mitarbeiten (Close Friend)</option>' +
@@ -397,29 +397,29 @@ async function tuTeilen() {
   const r = await supaTeilen(p.id, el("teilen_rolle").value);
   if (r.error) { meldungM("Teilen fehlgeschlagen: " + r.error.message, "warn"); return; }
   if (r.ohneSchluessel) {
-    meldungM("Geteilt mit <b>" + p.username + "</b> - aber OHNE Verschluesselungs-Schluessel: " +
+    meldungM("Geteilt mit <b>" + p.username + "</b> - aber OHNE Verschlüsselungs-Schlüssel: " +
       "er hat sich noch nie mit der neuen Version angemeldet. Sobald er das getan hat, hier " +
-      "einfach noch einmal Teilen druecken, dann kann er alles lesen.", "warn");
+      "einfach noch einmal Teilen drücken, dann kann er alles lesen.", "warn");
   } else {
-    meldungM("Geteilt mit <b>" + p.username + "</b> - samt Schluessel, Ende-zu-Ende. " +
+    meldungM("Geteilt mit <b>" + p.username + "</b> - samt Schlüssel, Ende-zu-Ende. " +
       "Der Bereich taucht ab sofort in dessen Konto auf.", "gut");
   }
   zeichneTeilen();
 }
 
-async function tuRolle(gastId, rolle) { await supaTeilen(gastId, rolle); meldungM("Rolle geaendert.", "gut"); }
+async function tuRolle(gastId, rolle) { await supaTeilen(gastId, rolle); meldungM("Rolle geändert.", "gut"); }
 async function tuTeilenEnde(gastId) { await supaTeilenBeenden(gastId); zeichneTeilen(); meldungM("Teilen beendet.", "gut"); }
 
-// ---------- Lokale Scheine uebernehmen ----------
+// ---------- Lokale Scheine übernehmen ----------
 
 function zeichneImport() {
   const box = el("importkasten");
   let lokal = [];
   try { lokal = JSON.parse(localStorage.getItem("verlauf") || "[]"); } catch (e) {}
   if (aktiverBereich.rolle !== "ich" || !lokal.length) { box.innerHTML = ""; return; }
-  box.innerHTML = '<div class="kern">Auf diesem Geraet liegen noch <b>' + lokal.length +
+  box.innerHTML = '<div class="kern">Auf diesem Gerät liegen noch <b>' + lokal.length +
     " lokal gespeicherte Scheine</b> aus der Zeit ohne Konto. " +
-    '<button class="haupt" onclick="tuImport()">In mein Konto uebernehmen</button></div>';
+    '<button class="haupt" onclick="tuImport()">In mein Konto übernehmen</button></div>';
 }
 
 async function tuImport() {
@@ -437,10 +437,10 @@ async function tuImport() {
   }
   if (ok === lokal.length) {
     localStorage.removeItem("verlauf");
-    meldungM("Alle " + ok + " Scheine uebernommen und lokal aufgeraeumt. Sie liegen unter " +
+    meldungM("Alle " + ok + " Scheine übernommen und lokal aufgeraeumt. Sie liegen unter " +
       "\"ohne Person\" - bitte in der Tabelle den Personen zuordnen.", "gut");
   } else {
-    meldungM("Nur " + ok + " von " + lokal.length + " uebernommen; die lokalen bleiben zur Sicherheit liegen.", "warn");
+    meldungM("Nur " + ok + " von " + lokal.length + " übernommen; die lokalen bleiben zur Sicherheit liegen.", "warn");
   }
   zeigeApp();
 }
@@ -503,19 +503,19 @@ function zeichneOrdnerBox(scheine) {
       const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
       let ende;
       if (n === 0 && kasseN === 0) {
-        ende = '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">loeschen</button>';
+        ende = '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">löschen</button>';
       } else {
         const teile = [];
         if (n > 0) teile.push(n + (n === 1 ? " Schein" : " Scheine"));
         if (kasseN > 0) teile.push(kasseN + (kasseN === 1 ? " Kassen-Buchung" : " Kassen-Buchungen"));
-        ende = '<span class="mini">' + teile.join(" und ") + " drin - erst leeren, dann loeschen</span>";
+        ende = '<span class="mini">' + teile.join(" und ") + " drin - erst leeren, dann löschen</span>";
       }
       zeilen += '<div class="ordnerzeile"><input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '"> ' +
         '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' + ende + "</div>";
     }
     verwalten = '<p><input id="ordner_neu" placeholder="Neue Person, z. B. ein Name"> ' +
       '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufuegen</button></p>' +
-      (zeilen ? '<details><summary>Personen verwalten (umbenennen, loeschen)</summary>' +
+      (zeilen ? '<details><summary>Personen verwalten (umbenennen, löschen)</summary>' +
         '<div class="inhalt"><div>' + zeilen + "</div></div></details>" : "");
   }
   const wartendGesamt = Object.values(wartend).reduce((p, x) => p + x, 0) + ohneWartend;
@@ -551,13 +551,13 @@ async function tuOrdnerUmbenennen(id) {
 async function tuOrdnerLoeschen(id) {
   // Nie still die Geld-Aufzeichnungen einer Person mitreissen
   if (personBuchungen.some(b => b.ordner === id)) {
-    meldungM("Nicht geloescht: in der Personen-Kasse dieser Person stehen noch Buchungen.", "warn");
+    meldungM("Nicht gelöscht: in der Personen-Kasse dieser Person stehen noch Buchungen.", "warn");
     return;
   }
   const r = await supaOrdnerLoeschen(id);
-  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  if (r.error) { meldungM("Nicht gelöscht: " + r.error.message, "warn"); return; }
   if (ordnerFilter === id) ordnerFilter = "alle";
-  meldungM("Person geloescht.", "gut");
+  meldungM("Person gelöscht.", "gut");
   zeichneBereich();
 }
 
@@ -604,7 +604,7 @@ function zeichneKontoDb(scheine) {
   if (!kz_.length) { el("konto_db").innerHTML = '<p class="mini">Noch keine Scheine in diesem Bereich.</p>'; return; }
   let gEin = 0, gZur = 0, gSpiel = 0, gGew = 0, gVer = 0, gN = 0, gOffen = 0;
   let html = "<table><thead><tr><th>Anbieter</th><th>Scheine</th><th>offen</th><th>gewonnen</th>" +
-    "<th>verloren</th><th>eingesetzt</th><th>zurueck</th><th>Saldo</th><th>im Spiel</th></tr></thead><tbody>";
+    "<th>verloren</th><th>eingesetzt</th><th>zurück</th><th>Saldo</th><th>im Spiel</th></tr></thead><tbody>";
   for (const kz of kz_) {
     const k = konto[kz];
     const saldo = k.zur - (k.ein - k.imSpiel);
@@ -626,10 +626,10 @@ function zeichneKontoDb(scheine) {
 
 function zeichneScheineDb(scheine) {
   if (!scheine.length) { el("scheine_db").innerHTML = '<p class="mini">Noch keine Scheine hier. ' +
-    'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" druecken.</p>'; return; }
+    'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" drücken.</p>'; return; }
   const schreib = darfSchreiben();
   let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Person</th><th>Wetten</th><th>Quote</th>" +
-    "<th>Einsatz</th><th>Moeglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
+    "<th>Einsatz</th><th>Möglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
     const ordnerZelle = schreib
@@ -668,14 +668,14 @@ function zeichneScheineDb(scheine) {
 async function tuStand(id, wert) {
   const r = await supaScheinAendern(id, { stand: wert });
   if (r.error) { meldungM("Nicht erlaubt: " + r.error.message, "warn"); return; }
-  // Alles neu zeichnen: an "gewonnen" haengen das Wirklich-bekommen-Feld,
+  // Alles neu zeichnen: an "gewonnen" hängen das Wirklich-bekommen-Feld,
   // die Personen-Kasse und die Warn-Badges.
   zeichneBereich();
 }
 
 async function tuNotiz(id, wert) {
   const key = await kryptoBereich(aktiverBereich.id);
-  if (!key) { meldungM("Notiz nicht gespeichert: kein Schluessel fuer diesen Bereich.", "warn"); return; }
+  if (!key) { meldungM("Notiz nicht gespeichert: kein Schlüssel für diesen Bereich.", "warn"); return; }
   const r = await supaScheinAendern(id, { notiz: await e2eZu(key, wert) || "" });
   if (r.error) meldungM("Notiz nicht gespeichert: " + r.error.message, "warn");
 }
@@ -690,7 +690,7 @@ async function tuKopieren(id) {
   const s = scheine.find(x => x.id === id);
   if (!s) return;
   if (s.daten && s.daten.gesperrt) {
-    meldungM("Nicht kopiert: dieser Schein liess sich nicht entschluesseln (Schluessel fehlt).", "warn");
+    meldungM("Nicht kopiert: dieser Schein liess sich nicht entschlüsseln (Schlüssel fehlt).", "warn");
     return;
   }
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
@@ -703,7 +703,7 @@ async function tuKopieren(id) {
 // Jede Person (Konto-Ordner) hat vier Zahlungswege: PayPal, Paysafe,
 // Neteller, Skrill. Karam schreibt manuell: was auf einen Weg ERHALTEN
 // wurde, was davon ZU einem Wettanbieter eingezahlt und was VOM Anbieter
-// zurueckgeholt wurde. Das Programm rechnet gegen die Kombinationen der
+// zurückgeholt wurde. Das Programm rechnet gegen die Kombinationen der
 // Person und warnt, wenn etwas keinen Sinn ergibt. Die Zwei-Listen-
 // Buchhaltung oben bleibt davon unberuehrt.
 
@@ -718,7 +718,7 @@ function wegName(w) { const x = KASSE_WEGE.find(k => k[0] === w); return x ? x[1
 function artName(a) { const x = KASSE_ARTEN.find(k => k[0] === a); return x ? x[1] : a; }
 
 // Was kam bei einem gewonnenen Schein WIRKLICH zurueck? Solange nichts
-// eingetragen ist, rechnen wir mit "moeglich" (also ohne Gebuehren).
+// eingetragen ist, rechnen wir mit "moeglich" (also ohne Gebühren).
 function echtZurueckWert(s) {
   return (s.echt_zurueck !== null && s.echt_zurueck !== undefined)
     ? Number(s.echt_zurueck) : (s.daten.moeglich || 0);
@@ -727,19 +727,26 @@ function echtZurueckWert(s) {
 function echtZelle(s, schreib) {
   if (s.stand !== "gewonnen") return "<span class='mini'>-</span>";
   const moeglich = s.daten.moeglich || 0;
+  const analyse = s.daten.fotoAnalyse || null;
   const hat = s.echt_zurueck !== null && s.echt_zurueck !== undefined;
   const gebuehr = hat ? (moeglich - Number(s.echt_zurueck)) : 0;
   const gebuehrText = (hat && gebuehr > 0.004)
-    ? "<div class='mini rot'>Gebuehren: " + gebuehr.toFixed(2) + " &euro;</div>" : "";
+    ? "<div class='mini rot'>Gebühren: " + gebuehr.toFixed(2) + " &euro;</div>" : "";
+  // Das Foto vom Wettschein hat den echten Auszahlungsbetrag schon gelesen:
+  // er steht als Vorschlag im Feld, bis Karam etwas anderes eintraegt.
+  const vorschlag = (analyse && analyse.gewinn) ? analyse.gewinn : moeglich;
+  const fotoText = (analyse && !hat)
+    ? "<div class='mini'>Foto sagt: " + Number(analyse.gewinn).toFixed(2) + " &euro;" +
+      (analyse.gebuehr > 0 ? " (Gebühr " + Number(analyse.gebuehr).toFixed(2) + " &euro;)" : "") + "</div>" : "";
   if (!schreib) return (hat ? Number(s.echt_zurueck).toFixed(2) + " &euro;" : "<span class='mini'>-</span>") + gebuehrText;
   return "<input type='number' step='0.01' min='0' class='einsatz' value='" +
-    (hat ? Number(s.echt_zurueck) : "") + "' placeholder='" + moeglich.toFixed(2) + "' " +
-    "onchange=\"tuEchtZurueck('" + s.id + "', this.value)\"> &euro;" + gebuehrText;
+    (hat ? Number(s.echt_zurueck) : "") + "' placeholder='" + Number(vorschlag).toFixed(2) + "' " +
+    "onchange=\"tuEchtZurueck('" + s.id + "', this.value)\"> &euro;" + gebuehrText + fotoText;
 }
 
 async function tuEchtZurueck(id, wert) {
   const zahl = wert === "" ? null : parseFloat(wert);
-  if (zahl !== null && (isNaN(zahl) || zahl < 0)) { meldungM("Bitte einen gueltigen Betrag eintragen.", "warn"); return; }
+  if (zahl !== null && (isNaN(zahl) || zahl < 0)) { meldungM("Bitte einen gültigen Betrag eintragen.", "warn"); return; }
   const r = await supaScheinAendern(id, { echt_zurueck: zahl });
   if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
   if (!r.data || !r.data.length) { meldungM("Nicht gespeichert: kein Schreibrecht oder Schein weg.", "warn"); return; }
@@ -747,7 +754,7 @@ async function tuEchtZurueck(id, wert) {
 }
 
 // Prueft eine Person: Stand je Zahlungsweg und rechnerisches Guthaben je
-// Anbieter. Negativ heisst: die Zahlen koennen so nicht stimmen.
+// Anbieter. Negativ heisst: die Zahlen können so nicht stimmen.
 function personPruefen(ordnerId, scheine) {
   const buch = personBuchungen.filter(b => b.ordner === ordnerId);
   const meine = scheine.filter(s => s.ordner === ordnerId);
@@ -786,8 +793,8 @@ function personPruefen(ordnerId, scheine) {
     const a = anbieter[kz];
     a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen;
     if (a.guthaben < -0.004) probleme.push("Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
-      a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurueckgeholt als eingezahlt und gewonnen. " +
-      "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehoert zu einer anderen Person.");
+      a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurückgeholt als eingezahlt und gewonnen. " +
+      "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehört zu einer anderen Person.");
   }
   const eingesamt = buch.filter(b => b.art === "zum_anbieter").reduce((p, b) => p + Number(b.betrag), 0);
   const erhaltengesamt = buch.filter(b => b.art === "erhalten").reduce((p, b) => p + Number(b.betrag), 0);
@@ -855,7 +862,7 @@ function zeichnePersonenKasse(scheine) {
 
   let html = '<div class="kassenkasten"><h3>Personen-Kasse: ' + textSicherM(person.name) + "</h3>";
   if (p.probleme.length) {
-    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte pruefen:</b><ul>' +
+    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
       p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
   } else if (p.buch.length) {
     html += '<p class="mini gruen"><b>Alles geht sich aus:</b> Buchungen und Kombinationen passen zusammen.</p>';
@@ -872,7 +879,7 @@ function zeichnePersonenKasse(scheine) {
 
   // Was gezeigt wird (Ansicht UND PDF) - z. B. kein Neteller: Haken weg
   const zg = kasseZeigen(person.id);
-  html += '<div class="kassewahl mini"><b>Zeigen (gilt auch fuers PDF):</b> ';
+  html += '<div class="kassewahl mini"><b>Zeigen (gilt auch fürs PDF):</b> ';
   for (const [w, nameW] of KASSE_WEGE) {
     html += '<label><input type="checkbox"' + (zg.wege[w] !== false ? " checked" : "") +
       ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
@@ -884,7 +891,7 @@ function zeichnePersonenKasse(scheine) {
   html += '<button onclick="tuKassePdf(\'' + person.id + '\')">Als PDF herunterladen</button></div>';
 
   html += "<table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
-    "<th>zurueck</th><th>Stand jetzt</th></tr></thead><tbody>";
+    "<th>zurück</th><th>Stand jetzt</th></tr></thead><tbody>";
   for (const [w, nameW] of KASSE_WEGE) {
     if (zg.wege[w] === false) continue;
     const x = p.wege[w];
@@ -894,8 +901,8 @@ function zeichnePersonenKasse(scheine) {
   }
   html += "</tbody></table>";
 
-  html += "<table><thead><tr><th>Anbieter</th><th>eingezahlt</th><th>zurueckgeholt</th>" +
-    "<th>eingesetzt</th><th>im Spiel (wartet)</th><th>moeglich offen</th><th>wirklich gewonnen</th>" +
+  html += "<table><thead><tr><th>Anbieter</th><th>eingezahlt</th><th>zurückgeholt</th>" +
+    "<th>eingesetzt</th><th>im Spiel (wartet)</th><th>möglich offen</th><th>wirklich gewonnen</th>" +
     "<th>fertig</th><th>Ergebnis ab</th><th>rechnerisch dort</th></tr></thead><tbody>";
   for (const kz of ["iw", "bw", "b3", "st"]) {
     if (zg.anbieter[kz] === false) continue;
@@ -949,7 +956,7 @@ async function tuPersonBuchen(ordnerId) {
   const betrag = parseFloat(el("pk_betrag").value);
   if (!betrag || betrag <= 0) { meldungM("Bitte einen Betrag eintragen.", "warn"); return; }
   const datum = el("pk_datum").value;
-  if (!datum) { meldungM("Bitte ein Datum waehlen.", "warn"); return; }
+  if (!datum) { meldungM("Bitte ein Datum wählen.", "warn"); return; }
   const art = el("pk_art").value;
   // Buchhaltungsfehler frueh erwischen: reicht das Geld dafuer ueberhaupt?
   // Erster Klick warnt nur, zweiter Klick ("Trotzdem eintragen") bucht.
@@ -964,11 +971,11 @@ async function tuPersonBuchen(ordnerId) {
     } else if (art === "vom_anbieter") {
       const g = p.anbieter[el("pk_anbieter").value].guthaben;
       if (g < betrag - 0.004) problem = "Beim Anbieter sind rechnerisch nur " + g.toFixed(2) +
-        " Euro, du willst aber " + betrag.toFixed(2) + " Euro zurueckholen.";
+        " Euro, du willst aber " + betrag.toFixed(2) + " Euro zurückholen.";
     }
     if (problem) {
       meldungM("<b>Passt rechnerisch nicht:</b> " + problem +
-        " Vermutlich fehlt eine Buchung davor. Wenn es trotzdem stimmt, druecke noch einmal.", "warn");
+        " Vermutlich fehlt eine Buchung davor. Wenn es trotzdem stimmt, drücke noch einmal.", "warn");
       knopf.dataset.trotzdem = "1";
       knopf.textContent = "Trotzdem eintragen";
       return;
@@ -987,13 +994,13 @@ function tuKassePdf(ordnerId) {
   const p = personPruefen(ordnerId, kasseScheine);
   const zg = kasseZeigen(ordnerId);
   const jetzt = new Date();
-  let h = "<h1>Uebersicht: " + textSicherM(person.name) + "</h1>" +
+  let h = "<h1>Übersicht: " + textSicherM(person.name) + "</h1>" +
     "<p>Stand: " + kasseZeit(jetzt) + " Uhr</p>" +
     "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " Euro</b><br>" +
     "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " Euro</b></p>";
 
   h += "<h2>Zahlungswege</h2><table><tr><th>Zahlungsweg</th><th>erhalten</th>" +
-    "<th>zum Anbieter</th><th>zurueck</th><th>Stand jetzt</th></tr>";
+    "<th>zum Anbieter</th><th>zurück</th><th>Stand jetzt</th></tr>";
   for (const [w, nameW] of KASSE_WEGE) {
     if (zg.wege[w] === false) continue;
     const x = p.wege[w];
@@ -1002,8 +1009,8 @@ function tuKassePdf(ordnerId) {
   }
   h += "</table>";
 
-  h += "<h2>Anbieter</h2><table><tr><th>Anbieter</th><th>eingezahlt</th><th>zurueckgeholt</th>" +
-    "<th>eingesetzt</th><th>im Spiel</th><th>moeglich offen</th><th>wirklich gewonnen</th>" +
+  h += "<h2>Anbieter</h2><table><tr><th>Anbieter</th><th>eingezahlt</th><th>zurückgeholt</th>" +
+    "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>wirklich gewonnen</th>" +
     "<th>Ergebnis ab</th><th>rechnerisch dort</th></tr>";
   for (const [kz, nameA] of KASSE_ANBIETER) {
     if (zg.anbieter[kz] === false) continue;
@@ -1019,7 +1026,7 @@ function tuKassePdf(ordnerId) {
     zg.anbieter[s.daten.kz] !== false);
   if (offene.length) {
     h += "<h2>Offene Kombinationen</h2><table><tr><th>Anbieter</th><th>Spiele</th><th>Quote</th>" +
-      "<th>Einsatz</th><th>moeglich</th><th>Stand</th></tr>";
+      "<th>Einsatz</th><th>möglich</th><th>Stand</th></tr>";
     for (const s of offene) {
       const e = scheinEnde(s);
       h += "<tr><td>" + textSicherM(s.daten.anbieter || s.daten.kz) + "</td>" +
@@ -1033,7 +1040,7 @@ function tuKassePdf(ordnerId) {
 
   const f = window.open("", "_blank");
   if (!f) { meldungM("Das PDF-Fenster wurde vom Browser geblockt - bitte Pop-ups erlauben.", "warn"); return; }
-  f.document.write("<html><head><title>Uebersicht " + textSicherM(person.name) + "</title><style>" +
+  f.document.write("<html><head><title>Übersicht " + textSicherM(person.name) + "</title><style>" +
     "body{font-family:Arial,sans-serif;color:#000;background:#fff;margin:24px;}" +
     "h1{font-size:22px;margin:0 0 4px 0;} h2{font-size:16px;margin:18px 0 6px 0;}" +
     "table{border-collapse:collapse;width:100%;} th,td{border:1px solid #000;padding:4px 8px;" +
@@ -1045,14 +1052,14 @@ function tuKassePdf(ordnerId) {
 
 async function tuPersonBuchungWeg(id) {
   const r = await supaPersonBuchungLoeschen(id);
-  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
-  if (!r.data || !r.data.length) { meldungM("Nicht geloescht: kein Schreibrecht oder Buchung schon weg.", "warn"); return; }
+  if (r.error) { meldungM("Nicht gelöscht: " + r.error.message, "warn"); return; }
+  if (!r.data || !r.data.length) { meldungM("Nicht gelöscht: kein Schreibrecht oder Buchung schon weg.", "warn"); return; }
   zeichneBereich();
 }
 
 // ---------- Anmerkungen: Freunde-Notizzettel an Scheinen ----------
 // Wer zuschauen darf, darf anmerken - auch nur-lesen-Freunde. Eine
-// Anmerkung aendert NICHTS am Schein; der Besitzer kann sie ausblenden.
+// Anmerkung ändert NICHTS am Schein; der Besitzer kann sie ausblenden.
 
 let anmerkungenListe = [];
 
@@ -1073,7 +1080,7 @@ function anmerkungenBlock(s) {
       (a.autor === ich.id ? '<button onclick="tuAnmerkungWeg(' + a.id + ')">weg</button>' : "") +
       "</span></div>";
   }
-  inhalt += '<div class="anmk-neu"><input id="anmk_' + s.id + '" placeholder="Anmerkung schreiben (aendert nichts am Schein)...">' +
+  inhalt += '<div class="anmk-neu"><input id="anmk_' + s.id + '" placeholder="Anmerkung schreiben (ändert nichts am Schein)...">' +
     '<button class="haupt" onclick="tuAnmerken(\'' + s.id + '\')">Anmerken</button></div>';
   return '<details class="anmk"' + '><summary' + (sichtbar.length ? ' class="anmk-marke"' : "") + ">Anmerkungen (" +
     sichtbar.length + ")</summary>" + inhalt + "</details>";
@@ -1091,25 +1098,25 @@ async function tuAnmerken(scheinId) {
 
 async function tuAnmerkungAus(id, ja) {
   const r = await supaAnmerkungVerstecken(id, ja);
-  if (r.error) { meldungM("Nicht geaendert: " + r.error.message, "warn"); return; }
+  if (r.error) { meldungM("Nicht geändert: " + r.error.message, "warn"); return; }
   if (!r.data || !r.data.length) { meldungM("Nicht erlaubt (nur der Besitzer blendet aus).", "warn"); return; }
   zeichneBereich();
 }
 
 async function tuAnmerkungWeg(id) {
   const r = await supaAnmerkungLoeschen(id);
-  if (r.error) { meldungM("Nicht geloescht: " + r.error.message, "warn"); return; }
+  if (r.error) { meldungM("Nicht gelöscht: " + r.error.message, "warn"); return; }
   zeichneBereich();
 }
 
 // ---------- Admin-Bereich ----------
 // Nur Accounts mit rolle=admin in kt_profiles (hochstufen geht NUR direkt
-// in der Datenbank). Admins sehen alle User und koennen sie restlos
-// loeschen - mit Zwei-Klick-Sicherung, nie mit einem Versehen.
+// in der Datenbank). Admins sehen alle User und können sie restlos
+// löschen - mit Zwei-Klick-Sicherung, nie mit einem Versehen.
 
 let binAdmin = false;
 
-// Admin-Funktionen und Foto-Saetze leben jetzt auf der eigenen Seite
+// Admin-Funktionen und Foto-Sätze leben jetzt auf der eigenen Seite
 // admin.html (admin.js) - hier gibt es nur noch den Verweis-Knopf oben.
 
 // ---------- Buchhaltung ----------
@@ -1132,7 +1139,7 @@ async function zeichneBuchhaltung() {
   let html = '<details open><summary>Buchhaltung (anklicken)</summary><div class="inhalt">' +
     '<div class="kern"><b>Die Methode (deine zwei Listen):</b> Liste 1 sammelt jede Ein- und ' +
     "Auszahlung mit Datum, Konto, Person und Betrag, dazu das Startkapital. Liste 2 ist die " +
-    "taegliche <b>Gesamtbalance aller Accounts zusammen</b>. Der Gewinn rechnet sich: " +
+    "tägliche <b>Gesamtbalance aller Accounts zusammen</b>. Der Gewinn rechnet sich: " +
     "<b>aktuelle Gesamtbalance + alle Auszahlungen &minus; alle Einzahlungen &minus; Startkapital</b>.</div>";
 
   // Ergebnis-Kasten
@@ -1147,7 +1154,7 @@ async function zeichneBuchhaltung() {
       " &euro;</b></div>";
   }
 
-  // Monats-Uebersicht (kumuliert bis Monatsende, plus Monatsgewinn)
+  // Monats-Übersicht (kumuliert bis Monatsende, plus Monatsgewinn)
   if (balancen.length) {
     const monate = [...new Set(balancen.map(b => b.datum.slice(0, 7)))].sort();
     let vorher = null;
@@ -1201,7 +1208,7 @@ async function zeichneBuchhaltung() {
   } else html += '<p class="mini">Noch keine Buchungen.</p>';
 
   // Liste 2: Tagesbalancen
-  html += "<h3>Liste 2: taegliche Gesamtbalance</h3>" +
+  html += "<h3>Liste 2: tägliche Gesamtbalance</h3>" +
     '<p class="mini">Ein Wert pro Tag: alle Account-Staende zusammengezaehlt. ' +
     "Gleicher Tag nochmal eingetragen ueberschreibt den Wert.</p>";
   if (schreib) {

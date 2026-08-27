@@ -5,12 +5,12 @@
 "use strict";
 
 // Stand der Daten (wird oben auf der Seite angezeigt)
-const DATEN_STAND = "Fotos vom 24.08.2026, eingepflegt 24.08.2026. Gebuehren-Recherche: Stand 24.08.2026.";
+const DATEN_STAND = "Fotos vom 24.08.2026, eingepflegt 24.08.2026. Gebühren-Recherche: Stand 24.08.2026.";
 
 // ---------- Rechnen ----------
 
 function echteQuote(anbieter, eingabe) {
-  // echte Quote = Schaufenster-Quote geteilt durch den Gebuehren-Teiler
+  // echte Quote = Schaufenster-Quote geteilt durch den Gebühren-Teiler
   const t = GEBUEHREN_TEILER[anbieter];
   if (!eingabe || eingabe <= 1) return null;
   return eingabe / t;
@@ -29,7 +29,7 @@ function liesAnstoss(an) {
   return { zeit: d, unklar: unklar };
 }
 
-// Welche Zeitangabe gilt fuer diese Wette: korrigierte, sonst die aus dem Foto
+// Welche Zeitangabe gilt für diese Wette: korrigierte, sonst die aus dem Foto
 function anstossFeld(w) { return w.anKorrigiert || w.an; }
 
 function zeitText(an) {
@@ -59,7 +59,7 @@ function jetztText() {
     ". " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
 }
 
-// ---------- Foto-Saetze ----------
+// ---------- Foto-Sätze ----------
 
 function aktiverSatzId() {
   const gespeichert = localStorage.getItem("kt_satz");
@@ -74,7 +74,7 @@ function satzWetten() {
 
 function satzWaehlen(id) {
   localStorage.setItem("kt_satz", id);
-  location.reload();   // alle Seiten haengen am aktiven Ordner
+  location.reload();   // alle Seiten hängen am aktiven Ordner
 }
 
 // ---------- Ordner-Deko: Farbe, Emoji, Notiz je Satz ----------
@@ -103,7 +103,7 @@ function ordnerPanel(art) {
   zeichneOrdnerLeiste();
 }
 
-// Die Leiste ganz oben: der offene Ordner, seine Knoepfe, sein Verlauf
+// Die Leiste ganz oben: der offene Ordner, seine Knöpfe, sein Verlauf
 function zeichneOrdnerLeiste() {
   const box = document.getElementById("ordnerleiste");
   if (!box) return;
@@ -170,8 +170,8 @@ function zeichneOrdnerLeiste() {
 
   box.innerHTML = html + "</div>";
 
-  // Die Foto-Ordner sind die Homebase: fuer alle gleich, neue kommen nur von
-  // Admins. Der Hochladen-Knopf wird deshalb nur fuer Admins eingeblendet.
+  // Die Foto-Ordner sind die Homebase: für alle gleich, neue kommen nur von
+  // Admins. Der Hochladen-Knopf wird deshalb nur für Admins eingeblendet.
   if (typeof supaIstAdmin === "function" && window.supa) {
     supaIstAdmin().then(ja => {
       const k = document.getElementById("fotoadminknopf");
@@ -180,9 +180,9 @@ function zeichneOrdnerLeiste() {
   }
 }
 
-// ---------- Markt-Einschaetzung (wer hat die Wette ueberhaupt) ----------
+// ---------- Markt-Einschätzung (wer hat die Wette ueberhaupt) ----------
 // J = ja, D = duenn (nur Teile, oft nur Topspiele), N = vermutlich gar nicht.
-// Das ist Einschaetzung nach Liga-Stufe und Markttyp, kein Beleg.
+// Das ist Einschätzung nach Liga-Stufe und Markttyp, kein Beleg.
 
 const STUFEN = {
   "UEFA Conference League":"A","K League 1":"A","Liga Profesional de Futbol":"A",
@@ -226,8 +226,8 @@ function verfuegbarkeit(w) {
 }
 
 // Start-Vorgabe (solange keine Live-Quoten getippt sind):
-// KEINE Aussage ueber die beste Quote! Nur: wo zuerst schauen.
-// Reihenfolge nach der 80-Kriterien-Recherche. Interwetten immer zuletzt (Gebuehr).
+// KEINE Aussage über die beste Quote! Nur: wo zuerst schauen.
+// Reihenfolge nach der 80-Kriterien-Recherche. Interwetten immer zuletzt (Gebühr).
 function standardAnbieter(w) {
   const typ = marktTyp(w);
   const rang = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
@@ -267,7 +267,7 @@ function speichereEingabe(id, opt, anbieter, wert) {
   }
 }
 
-// Wann wurde bei diesem Anbieter fuer diese Wette zuletzt nachgeschaut
+// Wann wurde bei diesem Anbieter für diese Wette zuletzt nachgeschaut
 function liesGeprueft(id, anbieter) {
   const t = localStorage.getItem("p_" + id + "_" + anbieter);
   if (!t) return null;
@@ -293,8 +293,8 @@ function gewaehlteOption(w) {
 
 const ANBIETER = [
   // suche: %s wird durch den ersten Teamnamen ersetzt.
-  // direkt = die Adresse springt wirklich in die Suche (geprueft).
-  // sonst oeffnet sich die Sportwetten-Startseite und du fuegst den Namen
+  // direkt = die Adresse springt wirklich in die Suche (geprüft).
+  // sonst öffnet sich die Sportwetten-Startseite und du fuegst den Namen
   // oben in die Lupe ein (Kopier-Knopf steht in der Zelle).
   { kz: "iw", name: "Interwetten", url: "https://www.interwetten.com/de/sportwetten",
     suche: "https://www.interwetten.com/de/sportwetten", direkt: false },
@@ -329,9 +329,9 @@ function liveBester(w, optIdx) {
   return anzahl > 0 ? { kz: bester, echt: wert, anzahl: anzahl } : null;
 }
 
-// Rangliste der vier Anbieter fuer DIESE Wette, bester zuerst.
+// Rangliste der vier Anbieter für DIESE Wette, bester zuerst.
 // Getippte echte Quoten zaehlen zuerst (absteigend); ohne Eingaben entscheidet
-// die Markt-Verfuegbarkeit und dann die Standard-Reihenfolge der Recherche.
+// die Markt-Verfügbarkeit und dann die Standard-Reihenfolge der Recherche.
 function rangliste(w) {
   const optIdx = gewaehlteOption(w);
   const opt = w.o[optIdx][0];
@@ -401,7 +401,7 @@ function vergleichsLink(w) {
 const KATEGORIEN = [
   ["ALLE", "Alle"],
   ["SIEG", "Sieg + Handicap"],
-  ["TORE", "Tore Ueber/Unter"],
+  ["TORE", "Tore Über/Unter"],
   ["ECKEN", "Ecken"],
   ["BTTS", "Beide treffen"],
   ["HTFT", "Halbzeit/Endstand"],
@@ -419,7 +419,7 @@ let aktiverReiter = "ALLE";
 const REITER = [
   ["SIEG",   "Siegwette"],
   ["ASIA",   "Asiatische Linien"],
-  ["TORE",   "Tore Ueber/Unter"],
+  ["TORE",   "Tore Über/Unter"],
   ["ECKEN",  "Ecken"],
   ["BTTS",   "Beide treffen"],
   ["HZ-END", "Halbzeit/Endstand"],
@@ -429,7 +429,7 @@ const REITER = [
 let nurKommende = true;
 const offeneDetails = new Set();
 
-// Grundmenge fuer ALLE Zaehler: dieselbe Sicht (vergangene raus, wenn Schalter an)
+// Grundmenge für ALLE Zaehler: dieselbe Sicht (vergangene raus, wenn Schalter an)
 function sichtBasis() {
   const basis = satzWetten();
   return nurKommende ? basis.filter(w => !istVorbei(anstossFeld(w))) : basis;
@@ -488,7 +488,7 @@ function baueFilter() {
   zeile("rangfilter", "Anbieter-Rang",
     [[1, "1. Bester"], [2, "2. Zweitbester"], [3, "3. Drittbester"], [4, "4. Viertbester"]]
       .map(([r, name]) => ({ kz: r, text: name,
-        titel: "Zeigt fuer jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste" })),
+        titel: "Zeigt für jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste" })),
     e => e.kz === aktiverRang,
     e => { aktiverRang = e.kz; zeichne(); }, "f-rang");
 
@@ -509,21 +509,21 @@ function baueFilter() {
     e => { nurKommende = e.kz; zeichne(); }, "f-zeit");
 }
 
-// ---------- Erklaerung je Wette ----------
+// ---------- Erklärung je Wette ----------
 
 function erklaerung(w, optIdx) {
   const o = w.o[optIdx][0];
   const heim = w.wette.startsWith("HOME");
   const seite = heim ? "Heimteam" : "Auswaertsteam";
   if (w.kat === "TENNIS") return w.wette.replace(" ML", "") + " muss das Match gewinnen. Kein Unentschieden moeglich.";
-  if (w.kat === "BTTS") return "Beide Teams muessen mindestens 1 Tor schiessen. 1:1 gewinnt, 3:0 verliert.";
-  if (w.kat === "HTFT") return "Auswaertsteam muss zur Halbzeit fuehren UND am Ende gewinnen. Beides noetig.";
+  if (w.kat === "BTTS") return "Beide Teams müssen mindestens 1 Tor schiessen. 1:1 gewinnt, 3:0 verliert.";
+  if (w.kat === "HTFT") return "Auswaertsteam muss zur Halbzeit führen UND am Ende gewinnen. Beides noetig.";
   if (w.kat === "DNB") return "Der genannte Verein muss gewinnen. Bei Unentschieden: Einsatz zurueck.";
-  if (w.kat === "ECKEN") return "Beide Teams zusammen hoechstens 8 Ecken. Tore egal.";
+  if (w.kat === "ECKEN") return "Beide Teams zusammen höchstens 8 Ecken. Tore egal.";
   if (w.kat === "TORE") {
-    const ueber = w.wette.startsWith("OVER");
+    const über = w.wette.startsWith("OVER");
     const l = parseFloat(o);
-    let text = ueber ? ("Es muessen mehr als " + o + " Tore fallen.") : ("Es duerfen hoechstens " + o + " Tore fallen (weniger als " + o + ").");
+    let text = über ? ("Es müssen mehr als " + o + " Tore fallen.") : ("Es duerfen höchstens " + o + " Tore fallen (weniger als " + o + ").");
     if (Number.isInteger(l)) text += " Bei genau " + o + " Toren: Geld zurueck.";
     else if (l % 0.5 !== 0) text += " Viertel-Linie: Einsatz wird auf zwei Linien geteilt, halbe Gewinne/Verluste moeglich.";
     return text;
@@ -537,21 +537,21 @@ function erklaerung(w, optIdx) {
 }
 
 const ANBIETER_GRUND = {
-  iw: "Gebuehr: jede Quote zaehlt real nur durch 1,05 geteilt (nur bei Gewinn faellig).",
-  bw: "Keine Gebuehr (Bwin uebernimmt die 5 % seit Mai 2026 selbst).",
-  b3: "Keine Gebuehr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
-  st: "Keine Gebuehr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
+  iw: "Gebühr: jede Quote zählt real nur durch 1,05 geteilt (nur bei Gewinn faellig).",
+  bw: "Keine Gebühr (Bwin uebernimmt die 5 % seit Mai 2026 selbst).",
+  b3: "Keine Gebühr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
+  st: "Keine Gebühr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
 };
-const VERF_LANG = { J: "Markt: vorhanden", D: "Markt: nur duenn (pruefen)", N: "Markt: vermutlich NICHT vorhanden" };
+const VERF_LANG = { J: "Markt: vorhanden", D: "Markt: nur duenn (prüfen)", N: "Markt: vermutlich NICHT vorhanden" };
 
-// Wer koennte bei DIESEM Markttyp besser sein als der Start-Tipp (Durchschnitts-Erfahrung)
+// Wer könnte bei DIESEM Markttyp besser sein als der Start-Tipp (Durchschnitts-Erfahrung)
 function alternativText(w) {
   const typ = marktTyp(w);
   const stufe = STUFEN[w.liga] || "B";
   if (typ === "ASIAN" || typ === "CORNER" || stufe === "C")
     return "Stake: hat bei Nischenligen, Viertel-Linien und Ecken im Schnitt die niedrigste Marge der vier (ca. 4,6 %). Wenn Krypto ok ist, dort zuerst gegenpruefen.";
   if (typ === "TENNIS")
-    return "Stake: bei Tennis-Quoten oft gleichauf oder besser; kleine Turniere fuehrt Bet365 aber haeufiger.";
+    return "Stake: bei Tennis-Quoten oft gleichauf oder besser; kleine Turniere führt Bet365 aber haeufiger.";
   if (stufe === "A")
     return "Bwin: bei Standardmaerkten grosser Ligen oft gleichauf mit Bet365, dazu Boost-Aktionen. Gegenpruefen lohnt.";
   return "Bwin oder Stake: bei Standardmaerkten liegen alle drei nah beieinander, der Vergleichslink entscheidet.";
@@ -559,13 +559,13 @@ function alternativText(w) {
 
 // ---------- Zellen bauen ----------
 
-const VERF_TEXT = { J: "", D: "Markt duenn, pruefen", N: "kein Markt (vermutl.)" };
+const VERF_TEXT = { J: "", D: "Markt duenn, prüfen", N: "kein Markt (vermutl.)" };
 
 function eingabeFeld(w, opt, anbieter) {
   const inp = document.createElement("input");
   inp.type = "number"; inp.step = "0.01"; inp.min = "1";
   inp.placeholder = "Quote";
-  inp.title = "Nur die Quote eintippen, die die App fuer GENAU diese Wette anzeigt, z. B. 2.30. Nichts umrechnen, kein Einsatz. Anleitung: Kasten oben.";
+  inp.title = "Nur die Quote eintippen, die die App für GENAU diese Wette anzeigt, z. B. 2.30. Nichts umrechnen, kein Einsatz. Anleitung: Kasten oben.";
   const v = liesEingabe(w.id, opt, anbieter);
   if (v) inp.value = v;
   inp.oninput = () => {
@@ -584,15 +584,15 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   const ref = w.o[optIdx][1];
   const v = verfuegbarkeit(w)[anbieter];
 
-  // Kopfzeile der Zelle: Link zum Anbieter, dazu Kopier-Knopf fuer den Teamnamen
+  // Kopfzeile der Zelle: Link zum Anbieter, dazu Kopier-Knopf für den Teamnamen
   const oben = document.createElement("div");
   oben.className = "z-kopf";
   const lnk = document.createElement("a");
   lnk.href = anbieterSuchLink(a, w);
   lnk.target = "_blank";
   lnk.rel = "noopener";
-  lnk.className = "oeffnen";
-  lnk.textContent = a.direkt ? "Suche oeffnen" : "Seite oeffnen";
+  lnk.className = "öffnen";
+  lnk.textContent = a.direkt ? "Suche öffnen" : "Seite öffnen";
   lnk.title = a.direkt
     ? ("Oeffnet die Suche nach \"" + suchName(w) + "\" direkt bei " + a.name)
     : ("Oeffnet " + a.name + ". Dort oben die Lupe antippen und \"" + suchName(w) + "\" einfuegen (Kopier-Knopf daneben).");
@@ -613,7 +613,7 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   td.appendChild(oben);
 
   if (false) { /* frueher wurde hier gesperrt; Karams Regel: nie zu 100 %
-    behaupten, dass es einen Markt nicht gibt - immer pruefen lassen */ } else {
+    behaupten, dass es einen Markt nicht gibt - immer prüfen lassen */ } else {
     td.appendChild(eingabeFeld(w, opt, anbieter));
 
     const eigene = liesEingabe(w.id, opt, anbieter);
@@ -644,12 +644,12 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
       const unt = echt - ref;
       const vorz = (unt > 0.001) ? "+" : "";
       klein.innerHTML = "Foto " + ref.toFixed(2) + " &nbsp;(" + vorz + unt.toFixed(2) + ")" +
-        (teiler !== 1 ? '<div class="abzug">angezeigt ' + roh.toFixed(2) + ", minus Gebuehr</div>" : "") +
+        (teiler !== 1 ? '<div class="abzug">angezeigt ' + roh.toFixed(2) + ", minus Gebühr</div>" : "") +
         (shot ? '<div class="abzug">aus Screenshot ' + shot.zeit + "</div>" : "");
     } else {
-      const waere = rund2(ref / teiler);
+      const wäre = rund2(ref / teiler);
       klein.innerHTML = "Foto " + ref.toFixed(2) +
-        (teiler !== 1 ? '<div class="abzug">waere real ' + waere.toFixed(2) + "</div>" : "");
+        (teiler !== 1 ? '<div class="abzug">wäre real ' + wäre.toFixed(2) + "</div>" : "");
     }
     td.appendChild(klein);
 
@@ -657,7 +657,7 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
       const d = document.createElement("div");
       d.className = "duenn";
       d.textContent = (v === "N")
-        ? "Einschaetzung: evtl. nicht im Angebot, bitte pruefen"
+        ? "Einschätzung: evtl. nicht im Angebot, bitte prüfen"
         : VERF_TEXT.D;
       td.appendChild(d);
     }
@@ -666,8 +666,8 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   // Zeitstempel: wann zuletzt bei diesem Anbieter nachgeschaut
   const gep = liesGeprueft(w.id, anbieter);
   const zeile = document.createElement("div");
-  zeile.className = gep ? "geprueft" : "real";
-  zeile.textContent = gep ? ("geprueft " + gep) : "noch nicht geprueft";
+  zeile.className = gep ? "geprüft" : "real";
+  zeile.textContent = gep ? ("geprüft " + gep) : "noch nicht geprüft";
   td.appendChild(zeile);
 
   if (zu.kz === anbieter) {
@@ -685,7 +685,7 @@ function zelleAnbieter(w, optIdx, anbieter, zu) {
   return td;
 }
 
-// Aufklapp-Zeile mit Erklaerung, Begruendung, Links und Zeitstempeln
+// Aufklapp-Zeile mit Erklärung, Begründung, Links und Zeitstempeln
 function baueDetailZeile(w) {
   const optIdx = gewaehlteOption(w);
   const opt = w.o[optIdx][0];
@@ -709,26 +709,26 @@ function baueDetailZeile(w) {
 
   td.innerHTML =
     "<b>Was die Wette heisst:</b> " + erklaerung(w, optIdx) +
-    "<br><b>Warum dieser Start-Tipp:</b> Start-Tipp ist KEINE Aussage ueber die beste Live-Quote, " +
-    "sondern nur: dort zuerst schauen (keine Gebuehr, Markt vorhanden). Die echte beste Quote entsteht " +
-    "erst aus deinen getippten Zahlen oder ueber den Vergleichs-Link." +
+    "<br><b>Warum dieser Start-Tipp:</b> Start-Tipp ist KEINE Aussage über die beste Live-Quote, " +
+    "sondern nur: dort zuerst schauen (keine Gebühr, Markt vorhanden). Die echte beste Quote entsteht " +
+    "erst aus deinen getippten Zahlen oder über den Vergleichs-Link." +
     (function () {
       const r = rechercheFuer(w, optIdx);
       if (!r) return "";
       return "<br><b>Fremdvergleich (nur zur Einordnung, NICHT zum Wetten):</b> " +
         (r.wert ? r.wert.toFixed(2) : "Linie nicht gelistet") +
         ", gesucht am " + r.zeit + ". " + r.notiz +
-        ' <a href="' + r.url + '" target="_blank" rel="noopener">Quelle oeffnen</a>' +
+        ' <a href="' + r.url + '" target="_blank" rel="noopener">Quelle öffnen</a>' +
         "<br><small>Das ist die beste Quote des Quotenvergleichs, NICHT die eines bestimmten " +
         "der vier Anbieter. Interwetten und Stake sind dort nicht gelistet.</small>";
     })() +
     "<br><b>Gegenpruefen bei:</b> " + alternativText(w) +
-    "<br><b>Interwetten-Schwelle:</b> lohnt nur, wenn die Anzeige dort ueber beste andere Quote mal 1,05 liegt." +
+    "<br><b>Interwetten-Schwelle:</b> lohnt nur, wenn die Anzeige dort über beste andere Quote mal 1,05 liegt." +
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
-    "alle Anbieter-Quoten fuer dieses Spiel suchen</a> (oeffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
-    "<br><b>Die vier Anbieter fuer diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
+    "alle Anbieter-Quoten für dieses Spiel suchen</a> (öffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
+    "<br><b>Die vier Anbieter für diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
     "<b>Datenstand dieser Zeile:</b> abgetippt aus dem Foto vom 24.08.2026 (Foto-Quote " + w.o[optIdx][1].toFixed(2) +
-    "). Markt-Angaben: Einschaetzung vom 24.08.2026, kein Beleg. Angezeigt: " + jetztText() + ".";
+    "). Markt-Angaben: Einschätzung vom 24.08.2026, kein Beleg. Angezeigt: " + jetztText() + ".";
   tr.appendChild(td);
   return tr;
 }
@@ -818,7 +818,7 @@ function baueZeile(w) {
     td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) +
       '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
   }
-  if (zu.verfN) td.innerHTML += '<div class="duenn">Einschaetzung: evtl. nicht im Angebot, pruefen</div>';
+  if (zu.verfN) td.innerHTML += '<div class="duenn">Einschätzung: evtl. nicht im Angebot, prüfen</div>';
   tr.appendChild(td);
 
   td = document.createElement("td");
@@ -887,7 +887,7 @@ function zeichne() {
 }
 
 // Nur zeichnen, wenn die Tafel-Elemente vorhanden sind.
-// (kombis.html laedt diese Datei nur wegen der Rechenfunktionen.)
+// (kombis.html lädt diese Datei nur wegen der Rechenfunktionen.)
 document.addEventListener("DOMContentLoaded", () => {
   zeichneOrdnerLeiste();
   if (document.getElementById("koerper")) zeichne();

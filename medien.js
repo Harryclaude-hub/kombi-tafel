@@ -1,12 +1,12 @@
 // ============================================================
 // MEDIEN: Fotos, Dateien, Sprach- und Video-Nachrichten im
-// Messenger - alles Ende-zu-Ende verschluesselt.
+// Messenger - alles Ende-zu-Ende verschlüsselt.
 //
 // Ablauf: Datei -> AES-GCM verschluesseln (iv vorangestellt) ->
 // als Datenmuell in den Speicher (Bucket kt-medien) -> in der
 // Nachricht steht nur ein verschluesselter Verweis:
 //   [[medien]]{"art":"bild|datei|ton|video","pfad":"...","name":"...","groesse":123}
-// Beim Anzeigen wird heruntergeladen, entschluesselt und als
+// Beim Anzeigen wird heruntergeladen, entschlüsselt und als
 // Blob-URL gezeigt. GRENZE des Gratis-Speichers: 50 MB je Datei,
 // 1 GB insgesamt - das ist eine Supabase-Grenze, keine Wahl.
 // ============================================================
@@ -50,10 +50,10 @@ function medienBereichPfad(bereichId) {
 
 // Hochladen + Verweistext bauen. art: bild | datei | ton | video
 async function medienHochladen(key, pfad, blobOderDatei, art, name) {
-  if (!key) return { fehler: "Kein Schluessel - der Partner braucht einmal die neue Version." };
+  if (!key) return { fehler: "Kein Schlüssel - der Partner braucht einmal die neue Version." };
   if (blobOderDatei.size > MEDIEN_MAX)
     return { fehler: "Zu gross: " + Math.round(blobOderDatei.size / 1024 / 1024) +
-      " MB. Der Gratis-Speicher erlaubt hoechstens 50 MB je Datei." };
+      " MB. Der Gratis-Speicher erlaubt höchstens 50 MB je Datei." };
   const buf = await blobOderDatei.arrayBuffer();
   const paket = await medienVerschluesseln(key, buf);
   const up = await supa.storage.from("kt-medien").upload(pfad, paket, {
@@ -112,7 +112,7 @@ function medienPlatzhalter(m) {
   const name = medienSicher(m.name || "Datei");
   return '<span class="medien" id="' + id + '">' +
     "[" + (m.art === "bild" ? "Foto" : m.art === "ton" ? "Sprachnachricht" :
-           m.art === "video" ? "Video" : "Datei") + " laedt: " + name + "]</span>";
+           m.art === "video" ? "Video" : "Datei") + " lädt: " + name + "]</span>";
 }
 
 async function medienNachladen(key, m) {

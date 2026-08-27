@@ -1,6 +1,6 @@
 // ============================================================
 // SCHULE: erzeugt die visuellen Ergebnis-Tafeln.
-// Reine Anzeige-Logik, keine Berechnung fuer die Kombi-Tafel.
+// Reine Anzeige-Logik, keine Berechnung für die Kombi-Tafel.
 // ============================================================
 "use strict";
 
@@ -8,7 +8,7 @@ const EINSATZ = 10;
 const TESTQUOTE = 2.00;
 
 // Was passiert bei einem Ergebnis? Rueckgabe: Anteil des Einsatzes,
-// der zurueckkommt, plus Kurzwort.
+// der zurückkommt, plus Kurzwort.
 //   1    = voller Gewinn
 //   0.5  = halber Gewinn (halbe Haelfte gewinnt, halbe zurueck)
 //   0    = Einsatz zurueck
@@ -116,7 +116,7 @@ function baueTeilung() {
   ziel.innerHTML = html;
 }
 
-// Ueber/Unter-Tafel
+// Über/Unter-Tafel
 const TORLINIEN = [
   ["1.50", "Ab 2 Toren gewonnen"],
   ["2.00", "Ab 3 gewonnen, bei genau 2 Geld zurueck"],
@@ -142,7 +142,7 @@ function bewerteTore(linie, tore) {
 function baueToreTafel() {
   const ziel = document.getElementById("toretafel");
   const anzahl = [0, 1, 2, 3, 4, 5];
-  let html = '<table class="ergebnistafel"><thead><tr><th>OVER (Ueber) Linie</th>';
+  let html = '<table class="ergebnistafel"><thead><tr><th>OVER (Über) Linie</th>';
   for (const t of anzahl) html += "<th>" + t + " Tore</th>";
   html += "<th>Bedeutung</th></tr></thead><tbody>";
   for (const [l, txt] of TORLINIEN) {

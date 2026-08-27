@@ -518,3 +518,9 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .navknopf.adminknopf, a.adminknopf { background: #7a0000; color: #fff; border-color: #7a0000; }
 .kopfzeile a.adminknopf { display: inline-block; padding: 6px 14px; margin-left: 10px;
   text-decoration: none; }
+
+/* Foto-Lesen (Design-Schicht) */
+.lesekasten { border: 2px solid #1a7a1a; background: #f3faf3; padding: 10px 12px; margin-top: 8px; }
+.lesekasten.lesewarn { border-color: #a00000; background: #fdf2f2; }
+.lesekasten table td { padding: 3px 10px 3px 0; }
+.lesekasten button { margin-top: 6px; }

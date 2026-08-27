@@ -1,11 +1,11 @@
 // ============================================================
-// ANRUF: 1:1-Anrufe zwischen Freunden, direkt von Geraet zu
-// Geraet (WebRTC). Ton und Bild laufen IMMER verschluesselt
-// direkt zwischen den beiden Geraeten (DTLS-SRTP, fester Teil
+// ANRUF: 1:1-Anrufe zwischen Freunden, direkt von Gerät zu
+// Gerät (WebRTC). Ton und Bild laufen IMMER verschlüsselt
+// direkt zwischen den beiden Geräten (DTLS-SRTP, fester Teil
 // von WebRTC) - unsere Datenbank sieht sie nie.
-// Nur das "Klingeln" (der Verbindungsaufbau) laeuft ueber
-// Supabase Realtime, und diese Signale verpacken wir zusaetzlich
-// Ende-zu-Ende mit dem Freundschafts-Schluessel.
+// Nur das "Klingeln" (der Verbindungsaufbau) laeuft über
+// Supabase Realtime, und diese Signale verpacken wir zusätzlich
+// Ende-zu-Ende mit dem Freundschafts-Schlüssel.
 // ============================================================
 "use strict";
 
@@ -27,7 +27,7 @@ async function anrufBereit() {
     anrufEigenerKanal.on("broadcast", { event: "signal" }, p => anrufSignal(p.payload));
     anrufEigenerKanal.subscribe(status => {
       // ZWEI Kanaele mit demselben Topic vertragen sich nicht - der eigene
-      // Hoerer-Kanal ist deshalb auch der Sende-Kanal an mich selbst.
+      // Hörer-Kanal ist deshalb auch der Sende-Kanal an mich selbst.
       if (status === "SUBSCRIBED") _anrufKanaele[u.id] = anrufEigenerKanal;
     });
   } catch (e) { /* Anrufe stoeren nie die Seite */ }
@@ -37,8 +37,8 @@ function anrufKanalZu(zielId) {
   return new Promise(fertig => {
     if (_anrufKanaele[zielId]) { fertig(_anrufKanaele[zielId]); return; }
     // self:true auch beim Sende-Kanal: noetig, damit Sender- und
-    // Hoerer-Kanal desselben Clients sich erreichen (Test und Sonderfaelle);
-    // im normalen Zwei-Geraete-Anruf ohne Wirkung (kein Hoerer hier).
+    // Hörer-Kanal desselben Clients sich erreichen (Test und Sonderfaelle);
+    // im normalen Zwei-Geräte-Anruf ohne Wirkung (kein Hörer hier).
     const k = supa.channel("kt-anruf-" + zielId, { config: { broadcast: { self: true } } });
     k.subscribe(status => {
       if (status === "SUBSCRIBED") { _anrufKanaele[zielId] = k; fertig(k); }
@@ -75,8 +75,8 @@ async function anrufSignal(roh) {
       '<button class="haupt" onclick="anrufAnnehmen()">Annehmen</button> ' +
       '<button onclick="anrufAblehnen()">Ablehnen</button>');
   } else if (s.typ === "annahme") {
-    // Nur der Angerufene selbst darf antworten - sonst koennte ein Dritter
-    // mit Schluessel die Verbindung uebernehmen.
+    // Nur der Angerufene selbst darf antworten - sonst könnte ein Dritter
+    // mit Schlüssel die Verbindung übernehmen.
     if (anrufPc && anrufPartner && roh.von === anrufPartner.id) await anrufPc.setRemoteDescription(s.answer);
   } else if (s.typ === "eis") {
     if (anrufPc && anrufPartner && roh.von === anrufPartner.id) { try { await anrufPc.addIceCandidate(s.eis); } catch (e) {} }

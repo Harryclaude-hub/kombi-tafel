@@ -1,7 +1,7 @@
 // ============================================================
 // GLOCKE: der Nachrichten-Knopf oben rechts, auf jeder Seite.
-// Klick oeffnet ein kleines Nachrichten-Fenster (wie ein Messenger)
-// nur fuer Direktnachrichten mit Freunden. Die tiefe Kommunikation
+// Klick öffnet ein kleines Nachrichten-Fenster (wie ein Messenger)
+// nur für Direktnachrichten mit Freunden. Die tiefe Kommunikation
 // je Bereich bleibt im Bereichs-Chat in "Mein Bereich".
 // ============================================================
 "use strict";
@@ -22,7 +22,7 @@ async function glockeStart() {
     if (typeof anrufBereit === "function") anrufBereit();
     await glockeZaehlen();
     setInterval(glockeZaehlen, 30000);
-  } catch (e) { /* Glocke stoert nie die Seite */ }
+  } catch (e) { /* Glocke stört nie die Seite */ }
 }
 
 // ---------- Freunde-Dashboard (oben rechts) ----------
@@ -49,7 +49,7 @@ function freundePanelUmschalten() {
   panel = document.createElement("div");
   panel.id = "freundepanel";
   panel.innerHTML = '<div class="gp-kopf">Freunde <button class="gp-zu" ' +
-    'onclick="freundePanelUmschalten()">schliessen</button></div><div id="fp-inhalt">Laedt...</div>';
+    'onclick="freundePanelUmschalten()">schliessen</button></div><div id="fp-inhalt">Lädt...</div>';
   document.body.appendChild(panel);
   freundeZeichnen();
 }
@@ -63,7 +63,7 @@ async function freundeZeichnen() {
   if (!ziel) return;
   const u = await supaNutzer();
   if (!u) {
-    ziel.innerHTML = '<p class="mini">Fuer Freunde brauchst du ein Konto: ' +
+    ziel.innerHTML = '<p class="mini">Für Freunde brauchst du ein Konto: ' +
       '<a href="mein.html">anmelden oder registrieren</a>.</p>';
     return;
   }
@@ -155,7 +155,7 @@ function glockeUmschalten() {
   panel = document.createElement("div");
   panel.id = "glockenpanel";
   panel.innerHTML = '<div class="gp-kopf">Nachrichten <button class="gp-zu" ' +
-    'onclick="glockeUmschalten()">schliessen</button></div><div id="gp-inhalt">Laedt...</div>';
+    'onclick="glockeUmschalten()">schliessen</button></div><div id="gp-inhalt">Lädt...</div>';
   document.body.appendChild(panel);
   glockeListe();
 }
@@ -172,7 +172,7 @@ async function glockeListe() {
     return;
   }
   const kontakte = await supaKontakteLaden();
-  if (glockePartner) return;   // ein Thread hat inzwischen uebernommen
+  if (glockePartner) return;   // ein Thread hat inzwischen übernommen
   if (!kontakte.length) {
     ziel.innerHTML = '<p class="mini">Keine Nachrichten. Freunde addest du in ' +
       '<a href="mein.html">Mein Bereich</a> unter "Freunde und Nachrichten".</p>';
@@ -188,7 +188,7 @@ async function glockeListe() {
       k.username + '\')">' + k.username +
       (neu ? ' <span class="badge">' + neu + "</span>" : "") + "</button>";
   }
-  if (glockePartner) return;   // ein Thread hat inzwischen uebernommen
+  if (glockePartner) return;   // ein Thread hat inzwischen übernommen
   ziel.innerHTML = html;
 }
 
@@ -196,7 +196,7 @@ async function glockeThread(partnerId, username) {
   glockePartner = { partnerId: partnerId, username: username };
   glockeLetzteId = 0;
   const ziel = document.getElementById("gp-inhalt");
-  ziel.innerHTML = '<button class="gp-zurueck" onclick="glockeListe()">zurueck</button> ' +
+  ziel.innerHTML = '<button class="gp-zurueck" onclick="glockeListe()">zurück</button> ' +
     "<b>" + username + '</b> <span class="mini">&#128274; Ende-zu-Ende</span>' +
     '<div id="gp-vorschau"></div>' +
     '<div id="gp-liste" class="chatliste gp-liste"></div>' +

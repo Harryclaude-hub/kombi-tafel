@@ -1,7 +1,7 @@
 // ============================================================
 // ADMIN: die eigene Admin-Seite (admin.html).
-// Zwei Bloecke: Foto-Saetze der Homebase hochladen und alle
-// User verwalten. Die Datenbank prueft jede Aktion selbst
+// Zwei Blöcke: Foto-Sätze der Homebase hochladen und alle
+// User verwalten. Die Datenbank prüft jede Aktion selbst
 // (RLS + Admin-RPCs) - die Seite ist nur die Oberflaeche.
 // ============================================================
 "use strict";
@@ -42,28 +42,28 @@ async function startAdmin() {
   }
   const admin = await supaIstAdmin();
   if (!admin) {
-    ziel.innerHTML = '<div class="warnkern"><b>Nur fuer Admins.</b> Dein Konto hat keine Admin-Rolle - ' +
-      "hier gibt es fuer dich nichts zu sehen.</div>";
+    ziel.innerHTML = '<div class="warnkern"><b>Nur für Admins.</b> Dein Konto hat keine Admin-Rolle - ' +
+      "hier gibt es für dich nichts zu sehen.</div>";
     return;
   }
   adminIch = u;
   ziel.innerHTML = `
-<h2>Foto-Saetze der Homebase hochladen</h2>
-<p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum, fuer ALLE Nutzer gleich
-(die Homebase). Du laedst die Fotos hier hoch, Claude liest sie beim naechsten Auftrag ein und
-legt daraus den neuen Satz in der Kombi-Tafel an. <b>Saetze mischen sich nie.</b>
+<h2>Foto-Sätze der Homebase hochladen</h2>
+<p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum, für ALLE Nutzer gleich
+(die Homebase). Du laedst die Fotos hier hoch, Claude liest sie beim nächsten Auftrag ein und
+legt daraus den neuen Satz in der Kombi-Tafel an. <b>Sätze mischen sich nie.</b>
 Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>
 <div id="adm_fotos"></div>
 <h2>Alle User</h2>
-<p class="mini">Loeschen entfernt ein Konto RESTLOS - samt allem, was der User angelegt hat,
-auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrueckt werden.
+<p class="mini">Löschen entfernt ein Konto RESTLOS - samt allem, was der User angelegt hat,
+auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrückt werden.
 Admins ernennst du mit "zum Admin machen" - auch das fragt zweimal.</p>
 <div id="adm_user"></div>`;
   await adminFotoSaetze();
   await adminUserliste();
 }
 
-// ---------- Foto-Saetze ----------
+// ---------- Foto-Sätze ----------
 
 async function adminFotoSaetze() {
   const box = elA("adm_fotos");
@@ -90,12 +90,12 @@ async function adminFotoSaetze() {
     '<label class="fotoknopf">Fotos hochladen' +
     '<input type="file" accept="image/*" multiple style="display:none" ' +
     'onchange="tuSatzFotos(this)"></label>' +
-    (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Saetze hochgeladen.</p>');
+    (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Sätze hochgeladen.</p>');
 }
 
 async function tuSatzFotos(input) {
   const datum = elA("satz_datum").value;
-  if (!datum) { meldungA("Bitte zuerst das Datum des Satzes waehlen.", "warn"); return; }
+  if (!datum) { meldungA("Bitte zuerst das Datum des Satzes wählen.", "warn"); return; }
   const dateien = Array.from(input.files || []);
   input.value = "";
   if (!dateien.length) return;
@@ -108,7 +108,7 @@ async function tuSatzFotos(input) {
     else meldungA("Foto nicht gespeichert: " + sicherA(r.error.message), "warn");
   }
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
-    " hochgeladen. Claude liest sie beim naechsten Auftrag ein.", ok ? "gut" : "warn");
+    " hochgeladen. Claude liest sie beim nächsten Auftrag ein.", ok ? "gut" : "warn");
   adminFotoSaetze();
 }
 
@@ -156,7 +156,7 @@ async function adminUserliste() {
         : (u.rolle === "admin"
           ? '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'user\')">Admin-Rolle nehmen</button>'
           : '<button id="adminrolle_' + u.id + '" onclick="tuAdminRolle(\'' + u.id + '\', \'admin\')">zum Admin machen</button> ' +
-            '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">loeschen</button>')) +
+            '<button id="adminweg_' + u.id + '" onclick="tuAdminLoeschen(\'' + u.id + '\')">löschen</button>')) +
       "</td></tr>";
   }
   box.innerHTML = "<table><thead><tr><th>Benutzername</th><th>E-Mail</th><th>registriert</th>" +
@@ -172,9 +172,9 @@ async function tuAdminRolle(id, neu) {
     return;
   }
   const r = await supaAdminRolle(id, neu);
-  if (r.error) { meldungA("Rolle nicht geaendert: " + sicherA(r.error.message), "warn"); return; }
+  if (r.error) { meldungA("Rolle nicht geändert: " + sicherA(r.error.message), "warn"); return; }
   meldungA(neu === "admin"
-    ? "Der Nutzer ist jetzt Admin: er sieht diese Seite und darf Foto-Saetze hochladen."
+    ? "Der Nutzer ist jetzt Admin: er sieht diese Seite und darf Foto-Sätze hochladen."
     : "Admin-Rolle entfernt - er ist wieder normaler Nutzer.", "gut");
   adminUserliste();
 }
@@ -188,8 +188,8 @@ async function tuAdminLoeschen(id) {
     return;
   }
   const r = await supaAdminUserLoeschen(id);
-  if (r.error) { meldungA("Nicht geloescht: " + sicherA(r.error.message), "warn"); return; }
-  meldungA("User restlos geloescht.", "gut");
+  if (r.error) { meldungA("Nicht gelöscht: " + sicherA(r.error.message), "warn"); return; }
+  meldungA("User restlos gelöscht.", "gut");
   adminUserliste();
 }
 

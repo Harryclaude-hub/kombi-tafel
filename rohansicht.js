@@ -42,7 +42,7 @@ function zeichneOriginal() {
 
   // Nur der offene Ordner; die Gruppen ("Bilder") ergeben sich aus den id-Praefixen
   const basis = (typeof satzWetten === "function") ? satzWetten() : WETTEN;
-  // Extra-Zeilen (Storno, Ueberlappung) gehoeren nur zum Foto-Satz vom 24.08.
+  // Extra-Zeilen (Storno, Überlappung) gehören nur zum Foto-Satz vom 24.08.
   const extraZeigen = (typeof aktiverSatzId !== "function" || aktiverSatzId() === "2026-08-24");
   const gruppen = [];
   for (const w of basis) {
@@ -85,7 +85,7 @@ function zeichneOriginal() {
     ? (basis.length + " Wetten in diesem Ordner.")
     :
     WETTEN.length + " Wetten aus 4 Fotos, dazu 1 stornierte Zeile (durchgestrichen) und " +
-    "1 Foto-Ueberlappung (nur zur Vollstaendigkeit, zaehlt nicht doppelt).";
+    "1 Foto-Überlappung (nur zur Vollstaendigkeit, zählt nicht doppelt).";
 }
 
 document.addEventListener("DOMContentLoaded", zeichneOriginal);

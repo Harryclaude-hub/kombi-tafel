@@ -1,8 +1,8 @@
 // ============================================================
 // SUPA: Verbindung zur Datenbank (Supabase-Projekt der Kombi-Tafel).
-// Der Schluessel hier ist der oeffentliche anon-Schluessel; was
+// Der Schlüssel hier ist der oeffentliche anon-Schlüssel; was
 // jeder darf, regeln die RLS-Regeln in der Datenbank, nicht dieser
-// Schluessel. (Karams Regel: RLS schuetzt, nicht die Sichtbarkeit.)
+// Schlüssel. (Karams Regel: RLS schuetzt, nicht die Sichtbarkeit.)
 // ============================================================
 "use strict";
 
@@ -38,7 +38,7 @@ async function supaRegistrieren(username, email, passwort) {
   if (a.error) return { fehler: uebersetzeFehler(a.error.message) };
   const p = await supa.from("kt_profiles").insert({ id: a.data.user.id, username: username });
   if (p.error) return { fehler: "Konto angelegt, aber der Benutzername liess sich nicht speichern: " + p.error.message };
-  // Ende-zu-Ende: Schluesselpaar + Bereichsschluessel anlegen
+  // Ende-zu-Ende: Schlüsselpaar + Bereichsschlüssel anlegen
   if (typeof kryptoEinrichten === "function") await kryptoEinrichten(passwort);
   return { ok: true };
 }
@@ -82,7 +82,7 @@ function uebersetzeFehler(m) {
   if (m.includes("at least 6 characters")) return "Das Passwort braucht mindestens 6 Zeichen.";
   if (m.includes("already registered")) return "Diese E-Mail hat schon ein Konto.";
   if (m.includes("rate limit") || m.includes("Too many")) return "Zu viele Versuche, kurz warten.";
-  if (m.includes("valid email")) return "Das ist keine gueltige E-Mail-Adresse.";
+  if (m.includes("valid email")) return "Das ist keine gültige E-Mail-Adresse.";
   return m;
 }
 
@@ -118,10 +118,10 @@ async function supaBereicheFuerMich() {
 
 async function supaTeilen(gastId, rolle) {
   const u = await supaNutzer();
-  // Ende-zu-Ende: der Gast bekommt den Bereichsschluessel, verschluesselt
-  // fuer SEIN Schluesselpaar. Hat er noch keins (nie mit der neuen Version
-  // angemeldet), wird ohne Schluessel geteilt - dann einfach spaeter noch
-  // einmal Teilen druecken.
+  // Ende-zu-Ende: der Gast bekommt den Bereichsschlüssel, verschlüsselt
+  // für SEIN Schlüsselpaar. Hat er noch keins (nie mit der neuen Version
+  // angemeldet), wird ohne Schlüssel geteilt - dann einfach später noch
+  // einmal Teilen drücken.
   let schluessel = null;
   if (typeof kryptoMeinPriv === "function") {
     const gp = await supa.from("kt_profiles").select("pubkey").eq("id", gastId).maybeSingle();
@@ -255,7 +255,7 @@ async function supaDmLaden(partnerId, abId) {
 async function supaDmSenden(partnerId, text) {
   const u = await supaNutzer();
   const key = await kryptoDm(partnerId);
-  if (!key) return { error: { message: "Dein Freund hat noch keinen Schluessel - er muss sich einmal mit der neuen Version anmelden." } };
+  if (!key) return { error: { message: "Dein Freund hat noch keinen Schlüssel - er muss sich einmal mit der neuen Version anmelden." } };
   return await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: await e2eZu(key, text) });
 }
 
@@ -325,7 +325,7 @@ async function supaSatzUploadLoeschen(id) {
   return await supa.from("kt_satz_uploads").delete().eq("id", id);
 }
 
-// ---------- Konto-Ordner (Unterordner fuer die Kombinationen) ----------
+// ---------- Konto-Ordner (Unterordner für die Kombinationen) ----------
 // Karams Regel: jeder Ordner ist ein Account/eine Person, bei der gesetzt
 // wurde. Die Buchhaltung bleibt EINE - die Ordner sortieren nur die Scheine.
 
@@ -339,15 +339,15 @@ async function supaOrdnerLaden(bereichId) {
   return liste;
 }
 
-// Ohne Schluessel wird NICHTS gespeichert - sonst laege der Klartext
+// Ohne Schlüssel wird NICHTS gespeichert - sonst laege der Klartext
 // unbemerkt in der Datenbank (Review-Fund vom 26.08.).
-const OHNE_SCHLUESSEL = "Kein Verschluesselungs-Schluessel fuer diesen Bereich - der Besitzer muss dir einmal neu teilen.";
+const OHNE_SCHLUESSEL = "Kein Verschlüsselungs-Schlüssel für diesen Bereich - der Besitzer muss dir einmal neu teilen.";
 
 async function supaOrdnerAnlegen(bereichId, name) {
   const sauber = (name || "").trim();
   if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
   if (sauber.length > 60) return { fehler: "Hoechstens 60 Zeichen." };
-  // Namen sind verschluesselt - Doppelte prueft deshalb der Client
+  // Namen sind verschlüsselt - Doppelte prüft deshalb der Client
   const alle = await supaOrdnerLaden(bereichId);
   if (alle.some(o => String(o.name).toLowerCase() === sauber.toLowerCase()))
     return { fehler: "Diese Person gibt es schon." };
@@ -412,7 +412,7 @@ async function supaPersonBuchungLoeschen(id) {
 
 // ---------- Admin ----------
 // Karams Rolle steht in kt_profiles.rolle; hochgestuft wird nur direkt in
-// der Datenbank, nie ueber die Oberflaeche.
+// der Datenbank, nie über die Oberflaeche.
 
 async function supaIstAdmin() {
   const p = await supaMeinProfil();
@@ -444,7 +444,7 @@ async function supaAnmerkungenLaden(bereichId) {
 async function supaAnmerken(bereichId, scheinId, text) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
-  if (!key) return { error: { message: "Kein Bereichs-Schluessel - der Besitzer muss dir einmal neu teilen." } };
+  if (!key) return { error: { message: "Kein Bereichs-Schlüssel - der Besitzer muss dir einmal neu teilen." } };
   return await supa.from("kt_anmerkungen").insert({
     bereich: bereichId, schein: scheinId, autor: u.id, text: await e2eZu(key, text)
   });

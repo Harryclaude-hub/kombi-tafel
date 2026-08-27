@@ -6,22 +6,22 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Kombi-Bau</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-<link rel="stylesheet" href="stil.css?v=20260826u">
+<link rel="stylesheet" href="stil.css?v=20260826v">
 </head>
 <body>
 
 <h1>Kombi-Bau</h1>
-<div class="navleiste"><img src="logo.svg" class="logo" alt="Kombi-Tafel"><a href="index.html" class="navknopf">Kombi-Tafel</a><a href="kombis.html" class="navknopf aktiv">Kombi-Bau</a><a href="schule.html" class="navknopf">Wett-Schule</a><a href="original.html" class="navknopf">Original-Tabelle</a><a href="hilfe.html" class="navknopf">Erkl&auml;rungen</a><a href="mein.html" class="navknopf">Mein Bereich</a><a href="#" class="navknopf glocke" id="nav_freunde" title="Freunde">&#128101; Freunde</a><a href="mein.html" class="navknopf glocke" id="nav_nachrichten" title="Nachrichten">&#128172;<span class="badge" style="display:none"></span></a></div>
+<div class="navleiste"><img src="logo.svg" class="logo" alt="Kombi-Tafel"><a href="index.html" class="navknopf">Kombi-Tafel</a><a href="kombis.html" class="navknopf aktiv">Kombi-Bau</a><a href="schule.html" class="navknopf">Wett-Schule</a><a href="original.html" class="navknopf">Original-Tabelle</a><a href="hilfe.html" class="navknopf">Erklärungen</a><a href="mein.html" class="navknopf">Mein Bereich</a><a href="#" class="navknopf glocke" id="nav_freunde" title="Freunde">&#128101; Freunde</a><a href="mein.html" class="navknopf glocke" id="nav_nachrichten" title="Nachrichten">&#128172;<span class="badge" style="display:none"></span></a></div>
 <div class="unter">Baut aus den noch offenen Wetten fertige 3er-Scheine.</div>
 
 <div class="kern"><b>Die drei Regeln, nach denen gebaut wird:</b>
 <ol>
-<li>Jede Einzelquote liegt <b>ueber deiner Mindestquote</b>, und zwar die ECHTE Quote
-nach Gebuehr. Bei Interwetten wird also erst durch 1,05 geteilt und dann verglichen.</li>
+<li>Jede Einzelquote liegt <b>über deiner Mindestquote</b>, und zwar die ECHTE Quote
+nach Gebühr. Bei Interwetten wird also erst durch 1,05 geteilt und dann verglichen.</li>
 <li>Alle drei Wetten eines Scheins liegen beim <b>gleichen Anbieter</b>. Du gehst also
 einmal auf eine Seite und gibst dort den ganzen Schein ein.</li>
 <li>Jedes <b>Spiel kommt insgesamt nur einmal</b> vor. Steckt Jablonec schon in Schein 2,
-taucht es in keinem weiteren auf, auch nicht mit einer anderen Wette. Sonst haengen
+taucht es in keinem weiteren auf, auch nicht mit einer anderen Wette. Sonst hängen
 zwei Scheine aneinander und fallen gemeinsam.</li>
 </ol></div>
 
@@ -33,8 +33,8 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
   <span class="f-label">Mindestquote</span>
   <span class="f-knoepfe">
     <input type="number" id="mind" value="1.80" step="0.05" min="1.01" class="einst">
-    <span class="mini">Gilt fuer jede einzelne Wette, und zwar die ECHTE Quote nach Gebuehr.
-    Traegst du spaeter eine kleinere ein, wird sie nicht uebernommen.</span>
+    <span class="mini">Gilt für jede einzelne Wette, und zwar die ECHTE Quote nach Gebühr.
+    Traegst du später eine kleinere ein, wird sie nicht übernommen.</span>
   </span>
 </div>
 <div class="filterzeile">
@@ -65,12 +65,12 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
 
 <h2>Deine Scheine</h2>
 <p class="mini"><b>Anbieter wechseln:</b> oben in jedem Schein kannst du den Anbieter umstellen.
-Das Programm prueft dann sofort, ob alle drei Wetten dort verfuegbar sind und die Mindestquote
+Das Programm prüft dann sofort, ob alle drei Wetten dort verfügbar sind und die Mindestquote
 schaffen, und markiert rot, was nicht passt.</p>
 <p class="mini">Jede Zeile: die <b>Ziel-Quote</b> ist die beste bekannte (deine Eingabe, sonst Screenshot,
 sonst Foto). Daneben deine <b>Mindestquote</b>. Ins Feld <b>Deine Quote</b> traegst du ein, was die App
-wirklich anzeigt. Passt eine Wette nicht, waehle rechts einen Grund: sie fliegt raus und es
-<b>rueckt automatisch eine andere nach</b>, die beim selben Anbieter verfuegbar ist.</p>
+wirklich anzeigt. Passt eine Wette nicht, wähle rechts einen Grund: sie fliegt raus und es
+<b>rueckt automatisch eine andere nach</b>, die beim selben Anbieter verfügbar ist.</p>
 <div id="scheine"></div>
 
 <h2>Scheine mit zu niedrigen Quoten</h2>
@@ -89,21 +89,23 @@ Hier im Kombi-Bau wird nur gebaut und gesetzt.</div>
 
 <div class="fuss">
 Gesamtquote = die drei echten Einzelquoten malgenommen. Bei Interwetten ist jede Einzelquote
-schon durch 1,05 geteilt, deshalb steht in Klammern zusaetzlich, was der Wettschein dort anzeigen
+schon durch 1,05 geteilt, deshalb steht in Klammern zusätzlich, was der Wettschein dort anzeigen
 wird. Die Reihenfolge der Scheine ist nach Gesamtquote sortiert, die hoechste zuerst.
-Alle Angaben ohne Gewaehr, Quoten aendern sich laufend: vor dem Setzen in der App gegenpruefen.
+Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der App gegenpruefen.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="krypto.js?v=20260826u"></script>
-<script src="medien.js?v=20260826u"></script>
-<script src="anruf.js?v=20260826u"></script>
-<script src="supa.js?v=20260826u"></script>
-<script src="glocke.js?v=20260826u"></script>
-<script src="daten.js?v=20260826u"></script>
-<script src="roh.js?v=20260826u"></script>
-<script src="recherche.js?v=20260826u"></script>
-<script src="logik.js?v=20260826u"></script>
-<script src="kombis.js?v=20260826u"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="scheinlesen.js?v=20260826v"></script>
+<script src="krypto.js?v=20260826v"></script>
+<script src="medien.js?v=20260826v"></script>
+<script src="anruf.js?v=20260826v"></script>
+<script src="supa.js?v=20260826v"></script>
+<script src="glocke.js?v=20260826v"></script>
+<script src="daten.js?v=20260826v"></script>
+<script src="roh.js?v=20260826v"></script>
+<script src="recherche.js?v=20260826v"></script>
+<script src="logik.js?v=20260826v"></script>
+<script src="kombis.js?v=20260826v"></script>
 </body>
 </html>

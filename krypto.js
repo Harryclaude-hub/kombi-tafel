@@ -1,16 +1,16 @@
 // ============================================================
 // KRYPTO: die Ende-zu-Ende-Schicht der Kombi-Tafel.
 // Alles mit dem eingebauten WebCrypto des Browsers, KEINE fremde
-// Bibliothek. Die Datenbank sieht nur verschluesselte Pakete.
+// Bibliothek. Die Datenbank sieht nur verschlüsselte Pakete.
 //
 // Bausteine:
-//  - PBKDF2: aus dem Login-Passwort wird ein Schutz-Schluessel
+//  - PBKDF2: aus dem Login-Passwort wird ein Schutz-Schlüssel
 //    (der Server sieht das Passwort beim Ableiten nie).
-//  - ECDH P-256: jeder Nutzer hat ein Schluesselpaar. Der
-//    OEFFENTLICHE Teil steht fuer alle lesbar in kt_profiles,
-//    der PRIVATE liegt nur auf dem Geraet (localStorage) und als
+//  - ECDH P-256: jeder Nutzer hat ein Schlüsselpaar. Der
+//    OEFFENTLICHE Teil steht für alle lesbar in kt_profiles,
+//    der PRIVATE liegt nur auf dem Gerät (localStorage) und als
 //    passwort-verschluesselter Safe in kt_schluessel.
-//  - AES-GCM: verschluesselt die eigentlichen Inhalte.
+//  - AES-GCM: verschlüsselt die eigentlichen Inhalte.
 //
 // Format eines verschluesselten Textes:
 //   "e2e1:" + base64(iv) + ":" + base64(geheimtext)
@@ -18,15 +18,15 @@
 // bleibt lesbar - nichts Bestehendes geht kaputt.
 //
 // HARTE REGELN (Lehren aus dem Review vom 26.08.):
-//  1. Geraete-Schluessel sind IMMER an die User-ID gebunden
+//  1. Geräte-Schlüssel sind IMMER an die User-ID gebunden
 //     (kt_e2e_priv_<uid>). Ein zweites Konto im selben Browser
-//     darf NIE die Schluessel des ersten adoptieren.
-//  2. Ein lokaler Schluessel wird nur uebernommen, wenn sein
+//     darf NIE die Schlüssel des ersten adoptieren.
+//  2. Ein lokaler Schlüssel wird nur übernommen, wenn sein
 //     abgeleiteter Public-Teil zum pubkey des Kontos passt.
-//  3. Beim Ueberschreiben lokaler Schluessel (Passwort-Reset auf
-//     einem anderen Geraet) werden die alten ARCHIVIERT und beim
+//  3. Beim Ueberschreiben lokaler Schlüssel (Passwort-Reset auf
+//     einem anderen Gerät) werden die alten ARCHIVIERT und beim
 //     Entschluesseln als Rettung mitprobiert - alte Daten bleiben
-//     auf diesem Geraet lesbar.
+//     auf diesem Gerät lesbar.
 // ============================================================
 "use strict";
 
@@ -49,7 +49,7 @@ function kryB64zu(s) {
   return b;
 }
 
-// ---------- Passwort -> Schutz-Schluessel ----------
+// ---------- Passwort -> Schutz-Schlüssel ----------
 
 async function kryptoPassSchluessel(passwort, salzText) {
   const enc = new TextEncoder();
@@ -91,7 +91,7 @@ async function kryPrivImport(b64) {
   return crypto.subtle.importKey("pkcs8", kryB64zu(b64), { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
 }
 
-// Public-Teil aus einem privaten Schluessel ableiten (ueber jwk)
+// Public-Teil aus einem privaten Schlüssel ableiten (über jwk)
 async function kryPubAusPriv(privB64) {
   try {
     const priv = await kryPrivImport(privB64);
@@ -102,20 +102,20 @@ async function kryPubAusPriv(privB64) {
   } catch (e) { return null; }
 }
 
-// Regel 2: gehoert dieser lokale private Schluessel zu diesem Konto?
+// Regel 2: gehört dieser lokale private Schlüssel zu diesem Konto?
 async function kryPasstZuKonto(privB64, pubB64) {
   if (!privB64 || !pubB64) return false;
   return (await kryPubAusPriv(privB64)) === pubB64;
 }
 
-// Gemeinsamer AES-Schluessel zweier Schluesselpaare (mein privat + sein public)
+// Gemeinsamer AES-Schlüssel zweier Schluesselpaare (mein privat + sein public)
 async function kryPaarSchluessel(privKey, pubB64) {
   const pub = await kryPubImport(pubB64);
   return crypto.subtle.deriveKey({ name: "ECDH", public: pub }, privKey,
     { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
-// Bereichsschluessel: einfacher AES-Schluessel als rohe Bytes
+// Bereichsschlüssel: einfacher AES-Schlüssel als rohe Bytes
 async function kryBereichNeu() {
   const k = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   return kryB64(await crypto.subtle.exportKey("raw", k));
@@ -125,7 +125,7 @@ async function kryBereichImport(rawB64) {
   return crypto.subtle.importKey("raw", kryB64zu(rawB64), { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
-// ---------- Geraete-Speicher, an die User-ID gebunden (Regel 1) ----------
+// ---------- Geräte-Speicher, an die User-ID gebunden (Regel 1) ----------
 
 function kryLokalPriv(uid) { return localStorage.getItem("kt_e2e_priv_" + uid); }
 function kryLokalBereich(uid) { return localStorage.getItem("kt_e2e_bereich_" + uid); }
@@ -135,7 +135,7 @@ function kryLokalSetzen(uid, privB64, bereichB64) {
   localStorage.setItem("kt_e2e_bereich_" + uid, bereichB64);
 }
 
-// Regel 3: alte Schluessel nie verwerfen, sondern archivieren
+// Regel 3: alte Schlüssel nie verwerfen, sondern archivieren
 function kryArchivLesen(uid) {
   try { return JSON.parse(localStorage.getItem("kt_e2e_alt_" + uid) || "[]"); } catch (e) { return []; }
 }
@@ -153,7 +153,7 @@ let _kryPriv = null;                 // CryptoKey, importiert
 let _kryPrivUid = null;
 const _kryBereiche = {};             // bereichId -> CryptoKey
 const _kryDm = {};                   // partnerId -> CryptoKey
-let _kryAltKeys = null;              // [CryptoKey] der archivierten Bereichsschluessel
+let _kryAltKeys = null;              // [CryptoKey] der archivierten Bereichsschlüssel
 
 function kryptoCacheLeeren() {
   _kryPriv = null; _kryPrivUid = null; _kryAltKeys = null;
@@ -185,8 +185,8 @@ async function kryptoEinrichten(passwort) {
   let hinweis = null;
   let privB64 = null, bereichB64 = null;
 
-  // Uebergang von der ersten Fassung: unbenamste Geraete-Schluessel nur
-  // uebernehmen, wenn sie nachweislich zu DIESEM Konto gehoeren (Regel 2)
+  // Uebergang von der ersten Fassung: unbenamste Geräte-Schlüssel nur
+  // übernehmen, wenn sie nachweislich zu DIESEM Konto gehören (Regel 2)
   const altPriv = localStorage.getItem("kt_e2e_priv");
   if (altPriv && kontoPub && !kryLokalPriv(u.id) && await kryPasstZuKonto(altPriv, kontoPub)) {
     kryLokalSetzen(u.id, altPriv, localStorage.getItem("kt_e2e_bereich") || "");
@@ -198,19 +198,19 @@ async function kryptoEinrichten(passwort) {
     privB64 = await kryAesAuf(kpass, safe.keysafe.iv, safe.keysafe.ct);
     if (privB64 === null) {
       // Safe passt nicht zum Passwort (Reset). Lokale Kopie nur, wenn sie
-      // wirklich zu diesem Konto gehoert (Regel 2).
+      // wirklich zu diesem Konto gehört (Regel 2).
       const lok = kryLokalPriv(u.id);
       if (lok && await kryPasstZuKonto(lok, kontoPub)) privB64 = lok;
-      else hinweis = "Neues Schluesselpaar angelegt (Passwort wurde zurueckgesetzt): alte verschluesselte Nachrichten sind auf diesem Geraet nicht mehr lesbar.";
+      else hinweis = "Neues Schlüsselpaar angelegt (Passwort wurde zurückgesetzt): alte verschlüsselte Nachrichten sind auf diesem Gerät nicht mehr lesbar.";
     }
     if (safe.bereichsafe) {
       bereichB64 = await kryAesAuf(kpass, safe.bereichsafe.iv, safe.bereichsafe.ct);
-      // Bereichsschluessel-Rettung haengt an der (verifizierten) priv-Rettung
+      // Bereichsschlüssel-Rettung hängt an der (verifizierten) priv-Rettung
       if (bereichB64 === null && privB64 === kryLokalPriv(u.id)) bereichB64 = kryLokalBereich(u.id);
     }
   } else {
-    // Kein Safe: nur eine verifizierte lokale Kopie zaehlt - NIEMALS
-    // fremde Geraete-Schluessel adoptieren (Regel 1 und 2).
+    // Kein Safe: nur eine verifizierte lokale Kopie zählt - NIEMALS
+    // fremde Geräte-Schlüssel adoptieren (Regel 1 und 2).
     const lok = kryLokalPriv(u.id);
     if (lok && await kryPasstZuKonto(lok, kontoPub)) {
       privB64 = lok;
@@ -228,13 +228,13 @@ async function kryptoEinrichten(passwort) {
   }
   if (!bereichB64) bereichB64 = await kryBereichNeu();
 
-  // Regel 3: weichen die neuen Schluessel von den lokalen ab, die alten
-  // archivieren - alte Daten bleiben auf diesem Geraet lesbar.
+  // Regel 3: weichen die neuen Schlüssel von den lokalen ab, die alten
+  // archivieren - alte Daten bleiben auf diesem Gerät lesbar.
   const vorherPriv = kryLokalPriv(u.id), vorherBereich = kryLokalBereich(u.id);
   if (vorherBereich && vorherBereich !== bereichB64) {
     kryArchivieren(u.id, vorherPriv || "", vorherBereich);
-    if (!hinweis) hinweis = "Das Passwort wurde auf einem anderen Geraet zurueckgesetzt. " +
-      "Die alten Schluessel dieses Geraets wurden gesichert - alte Daten bleiben HIER lesbar.";
+    if (!hinweis) hinweis = "Das Passwort wurde auf einem anderen Gerät zurückgesetzt. " +
+      "Die alten Schlüssel dieses Geräts wurden gesichert - alte Daten bleiben HIER lesbar.";
   }
 
   kryLokalSetzen(u.id, privB64, bereichB64);
@@ -248,7 +248,7 @@ async function kryptoEinrichten(passwort) {
   return { ok: true, hinweis: hinweis };
 }
 
-// ---------- Schluessel fuer Bereiche und Freunde ----------
+// ---------- Schlüssel für Bereiche und Freunde ----------
 
 async function kryptoBereich(bereichId) {
   if (_kryBereiche[bereichId]) return _kryBereiche[bereichId];
@@ -259,7 +259,7 @@ async function kryptoBereich(bereichId) {
     const raw = kryLokalBereich(u.id);
     if (raw) key = await kryBereichImport(raw);
   } else {
-    // Gast: Freigabe traegt den Bereichsschluessel, verschluesselt fuer mich
+    // Gast: Freigabe trägt den Bereichsschlüssel, verschlüsselt für mich
     const f = await supa.from("kt_freigaben").select("schluessel")
       .eq("owner", bereichId).eq("gast", u.id).maybeSingle();
     const priv = await kryptoMeinPriv();
@@ -287,7 +287,7 @@ async function kryptoDm(partnerId) {
   return key;
 }
 
-// Archivierte Bereichsschluessel dieses Geraets (Rettung nach Reset)
+// Archivierte Bereichsschlüssel dieses Geräts (Rettung nach Reset)
 async function kryptoAltSchluessel() {
   if (_kryAltKeys) return _kryAltKeys;
   const u = await supaNutzer();
@@ -316,10 +316,10 @@ async function e2eAuf(key, s) {
     const klar = await kryAesAuf(key, teile[0], teile[1]);
     if (klar !== null) return klar;
   }
-  // Rettung: archivierte Schluessel dieses Geraets probieren (Regel 3)
+  // Rettung: archivierte Schlüssel dieses Geräts probieren (Regel 3)
   for (const alt of await kryptoAltSchluessel()) {
     const klar = await kryAesAuf(alt, teile[0], teile[1]);
     if (klar !== null) return klar;
   }
-  return key ? "[verschluesselt - Schluessel passt nicht]" : "[verschluesselt - Schluessel fehlt]";
+  return key ? "[verschlüsselt - Schlüssel passt nicht]" : "[verschlüsselt - Schlüssel fehlt]";
 }
