@@ -197,6 +197,19 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   <button id="bc-video" onclick="tuChatVideo()">&#128249; Video</button>
   <span id="bc-vorschau"></span>
 </div>
+</div>
+
+<div id="blk_pruefen" class="mb-block">
+<h2>&#128269; Nachrechnen</h2>
+<p class="mini">Hier wird jede Zahl noch einmal nachgerechnet: passt die Gesamtquote zu den
+Einzelquoten, ist die Gebühr des Anbieters wirklich abgezogen, hängt jede Kombination an einer
+Person, stecken die Wetten noch im richtigen Foto-Ordner, und reicht das Geld, das die Person
+eingezahlt hat, für das, was gesetzt wurde. Nichts davon wird geschätzt.</p>
+<div id="pruefbericht"></div>
+<h2>&#128193; Bilanz je Foto-Ordner</h2>
+<p class="mini">Ein Foto-Ordner ist eine Lieferung Wettscheine. Hier siehst du pro Ordner
+jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen ist.</p>
+<div id="ordnerbilanz"></div>
 </div>`;
 
   zeichneMbNavi();
@@ -302,7 +315,8 @@ const MB_BLOECKE = [
   ["kombis", "&#127919; Kombinationen und Personen"],
   ["buch", "&#128210; Buchhaltung"],
   ["freunde", "&#128101; Freunde und Teilen"],
-  ["chat", "&#128172; Chat"]
+  ["chat", "&#128172; Chat"],
+  ["pruefen", "&#128269; Nachrechnen"]
 ];
 
 function mbAktiverBlock() {
@@ -692,6 +706,7 @@ async function zeichneBereich() {
   kasseScheine = scheine;
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);
+  zeichnePruefung(scheine);
   const gefiltert = (ordnerFilter === "alle") ? scheine
     : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
     : scheine.filter(s => s.ordner === ordnerFilter);
@@ -1647,3 +1662,362 @@ async function tuChatVideo() {
 }
 
 document.addEventListener("DOMContentLoaded", startMein);
+
+
+// ============================================================
+// NACHRECHNEN: der Zusammenhang zwischen einer Kombination, ihren
+// Einsaetzen, dem Foto-Ordner, aus dem sie gebaut wurde, und der
+// Person, der sie gehoert.
+//
+// Grundsatz: nichts wird geschaetzt. Jede Meldung kommt aus einer
+// eigenen Rechnung, und im Text steht immer, was gegen was geprueft
+// wurde - damit du selbst nachvollziehen kannst, ob die Meldung
+// stimmt, statt sie glauben zu muessen.
+// ============================================================
+
+const PRUEF_SPIELRAUM = 0.015;   // 1,5 % beim Multiplizieren von Quoten
+const PRUEF_CENT = 0.02;         // 2 Cent bei Euro-Betraegen
+const PRUEF_ZIEL = 400;          // Karams Ziel je Kombination
+
+function pruefWette(id) {
+  return (typeof WETTEN !== "undefined") ? WETTEN.find(w => w.id === id) : null;
+}
+function pruefTeiler(kz) {
+  return (typeof GEBUEHREN_TEILER !== "undefined" && GEBUEHREN_TEILER[kz]) || 1;
+}
+function pruefSatzTitel(id) {
+  if (typeof SAETZE !== "undefined") {
+    const s = SAETZE.find(x => x.id === id);
+    if (s) return s.titel;
+  }
+  return id || "ohne Ordner";
+}
+function pruefStamm(s) {
+  return String((s.daten && s.daten.scheinId) || s.id).split("_")[0];
+}
+function pruefKurz(s) {
+  const d = s.daten || {};
+  return (d.anbieter || d.kz || "?") + ", " +
+    ((d.wetten || []).map(t => t.spiel).filter(Boolean).join(" / ") || "ohne Spiele");
+}
+
+function pruefAlles(scheine) {
+  const funde = [];
+  const add = (stufe, gruppe, text) => funde.push({ stufe: stufe, gruppe: gruppe, text: text });
+  const geprueft = [];
+
+  // ---- 1. Jede Kombination gehoert zu einer Person ----
+  geprueft.push("jede Kombination hat eine Person");
+  const ohne = scheine.filter(s => !s.ordner);
+  if (ohne.length) {
+    add("fehler", "Person", "<b>" + ohne.length + " Kombination(en) hängen an keiner Person.</b> " +
+      "Ohne Person lässt sich nicht sagen, wessen Geld gesetzt wurde: " +
+      ohne.slice(0, 5).map(s => textSicherM(pruefKurz(s))).join(" &middot; ") +
+      (ohne.length > 5 ? " &middot; ..." : ""));
+  }
+  const fremd = scheine.filter(s => s.ordner && !ordnerListe.some(o => o.id === s.ordner));
+  if (fremd.length) {
+    add("fehler", "Person", "<b>" + fremd.length + " Kombination(en) zeigen auf eine gelöschte Person.</b> " +
+      "Ordne sie neu zu, sonst fehlen sie in jeder Personen-Statistik.");
+  }
+
+  // ---- 2. Rechnung im Schein selbst ----
+  geprueft.push("Gesamtquote = alle Einzelquoten multipliziert");
+  geprueft.push("möglicher Gewinn = Einsatz × Gesamtquote");
+  for (const s of scheine) {
+    const d = s.daten || {};
+    const wetten = d.wetten || [];
+    if (!wetten.length) {
+      add("fehler", "Rechnung", "Eine Kombination bei <b>" + textSicherM(d.anbieter || d.kz || "?") +
+        "</b> hat gar keine Wetten gespeichert.");
+      continue;
+    }
+    let produkt = 1;
+    let luecke = false;
+    for (const t of wetten) {
+      const q = Number(t.quote);
+      if (!q) { luecke = true; break; }
+      produkt *= q;
+    }
+    if (luecke) {
+      add("fehler", "Rechnung", "Bei <b>" + textSicherM(pruefKurz(s)) + "</b> fehlt bei mindestens " +
+        "einer Wette die Quote - die Gesamtquote kann nicht stimmen.");
+      continue;
+    }
+    const steht = Number(d.quote) || 0;
+    if (Math.abs(produkt - steht) > Math.max(PRUEF_CENT, produkt * PRUEF_SPIELRAUM)) {
+      add("fehler", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b>: gespeicherte Gesamtquote <b>" +
+        steht.toFixed(2) + "</b>, die Einzelquoten (" +
+        wetten.map(t => Number(t.quote).toFixed(2)).join(" &times; ") + ") ergeben aber <b>" +
+        rundM(produkt).toFixed(2) + "</b>.");
+    }
+    const sollGewinn = (Number(d.einsatz) || 0) * steht;
+    if (Math.abs(sollGewinn - (Number(d.moeglich) || 0)) > PRUEF_CENT) {
+      add("fehler", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b>: möglicher Gewinn steht mit <b>" +
+        (Number(d.moeglich) || 0).toFixed(2) + " &euro;</b>, Einsatz " + (Number(d.einsatz) || 0).toFixed(2) +
+        " &euro; &times; Quote " + steht.toFixed(2) + " ergibt aber <b>" + rundM(sollGewinn).toFixed(2) + " &euro;</b>.");
+    }
+    if (!Number(d.einsatz)) {
+      add("warnung", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b> ist ohne Einsatz gespeichert - " +
+        "sie zählt in keiner Statistik mit.");
+    }
+  }
+
+  // ---- 3. Gebuehr des Anbieters wirklich abgezogen ----
+  geprueft.push("Gebühr des Anbieters ist von jeder Quote abgezogen");
+  for (const s of scheine) {
+    const d = s.daten || {};
+    const teiler = pruefTeiler(d.kz);
+    if (teiler === 1) continue;
+    for (const t of d.wetten || []) {
+      const w = pruefWette(t.id);
+      if (!w || !Array.isArray(w.o)) continue;
+      const foto = w.o.map(x => x[1]).filter(x => x);
+      // Steht die gespeicherte Quote GENAU auf einer Quote aus dem Foto,
+      // dann wurde nicht durch den Gebuehren-Teiler geteilt.
+      if (foto.some(r => Math.abs(r - Number(t.quote)) < 0.005)) {
+        add("fehler", "Gebühr", "<b>" + textSicherM(d.anbieter || d.kz) + " / " + textSicherM(t.spiel || "") +
+          "</b>: gespeichert ist <b>" + Number(t.quote).toFixed(2) + "</b> - das ist genau die Quote vom Schein. " +
+          "Bei " + textSicherM(d.anbieter || d.kz) + " gehen " + Math.round((teiler - 1) * 100) +
+          " Prozent Gebühr weg, echt wären <b>" + (Number(t.quote) / teiler).toFixed(2) + "</b>.");
+      }
+    }
+  }
+
+  // ---- 4. Stecken die Wetten noch im Foto-Ordner? ----
+  const satzGeladen = {};
+  for (const s of scheine) {
+    const satz = (s.daten || {}).satz;
+    if (!satz || satzGeladen[satz] !== undefined) continue;
+    satzGeladen[satz] = (typeof WETTEN !== "undefined") && WETTEN.some(w => w.satz === satz);
+  }
+  const nichtGeladen = Object.keys(satzGeladen).filter(k => !satzGeladen[k]);
+  if (nichtGeladen.length) {
+    add("warnung", "Foto-Ordner", "Zu " + nichtGeladen.length + " Foto-Ordner(n) liegen gerade keine " +
+      "Wetten vor (" + nichtGeladen.map(k => textSicherM(pruefSatzTitel(k))).join(", ") + "). " +
+      "Die Kombinationen daraus lassen sich nicht gegen ihre Herkunft prüfen. Das passiert, wenn " +
+      "ein Ordner gelöscht wurde oder die Fotos noch nicht eingelesen sind.");
+  } else {
+    geprueft.push("jede Wette steckt noch in ihrem Foto-Ordner");
+  }
+  for (const s of scheine) {
+    const d = s.daten || {};
+    if (!satzGeladen[d.satz]) continue;
+    for (const t of d.wetten || []) {
+      const w = pruefWette(t.id);
+      if (!w) {
+        add("warnung", "Foto-Ordner", "<b>" + textSicherM(t.spiel || t.id) + "</b> aus <b>" +
+          textSicherM(pruefSatzTitel(d.satz)) + "</b> gibt es dort nicht mehr. Die Kombination bleibt " +
+          "gültig, lässt sich aber nicht mehr gegen das Foto nachrechnen.");
+        continue;
+      }
+      if (w.satz && d.satz && w.satz !== d.satz) {
+        add("fehler", "Foto-Ordner", "<b>" + textSicherM(t.spiel || t.id) + "</b> ist in der Kombination " +
+          "dem Ordner <b>" + textSicherM(pruefSatzTitel(d.satz)) + "</b> zugeordnet, liegt aber in <b>" +
+          textSicherM(pruefSatzTitel(w.satz)) + "</b>. Hier sind zwei Lieferungen vermischt.");
+      }
+      if (w.spiel && t.spiel && w.spiel !== t.spiel) {
+        add("warnung", "Foto-Ordner", "Bei einer Wette steht in der Kombination <b>" +
+          textSicherM(t.spiel) + "</b>, im Ordner aber <b>" + textSicherM(w.spiel) + "</b>.");
+      }
+    }
+  }
+
+  // ---- 5. Ziel je Kombination ----
+  geprueft.push("jede Kombination erreicht das Ziel von " + PRUEF_ZIEL + " Euro");
+  const gruppen = {};
+  for (const s of scheine) {
+    const d = s.daten || {};
+    const k = (d.satz || "?") + "|" + pruefStamm(s) + "|" + (s.ordner || "-");
+    gruppen[k] = gruppen[k] || { einsatz: 0, teile: 0, offen: 0, person: s.ordner, beispiel: s };
+    gruppen[k].einsatz += Number(d.einsatz) || 0;
+    gruppen[k].teile++;
+    if (s.stand === "offen") gruppen[k].offen++;
+  }
+  const zuKlein = Object.values(gruppen).filter(g => g.offen && g.einsatz < PRUEF_ZIEL - 0.5);
+  for (const g of zuKlein.slice(0, 8)) {
+    add("hinweis", "Ziel", "<b>" + textSicherM(pruefKurz(g.beispiel)) + "</b>" +
+      (g.person ? " (" + textSicherM(ordnerNameM(g.person)) + ")" : "") + ": erst <b>" +
+      rundM(g.einsatz).toFixed(2) + " &euro;</b> von " + PRUEF_ZIEL + " &euro;" +
+      (g.teile > 1 ? " in " + g.teile + " Teilen" : "") + " - es fehlen " +
+      rundM(PRUEF_ZIEL - g.einsatz).toFixed(2) + " &euro;.");
+  }
+  if (zuKlein.length > 8) {
+    add("hinweis", "Ziel", "... und " + (zuKlein.length - 8) + " weitere Kombination(en) unter " + PRUEF_ZIEL + " Euro.");
+  }
+
+  // ---- 6. Dasselbe Spiel mehrfach bei derselben Person ----
+  geprueft.push("kein Spiel doppelt in zwei Kombinationen derselben Person");
+  const proPerson = {};
+  for (const s of scheine) {
+    if (s.stand !== "offen") continue;
+    const p = s.ordner || "-";
+    const stamm = pruefStamm(s);
+    proPerson[p] = proPerson[p] || {};
+    for (const t of (s.daten || {}).wetten || []) {
+      const spiel = String(t.spiel || "").toLowerCase().trim();
+      if (!spiel) continue;
+      proPerson[p][spiel] = proPerson[p][spiel] || new Set();
+      proPerson[p][spiel].add(stamm);
+    }
+  }
+  for (const [p, spiele] of Object.entries(proPerson)) {
+    for (const [spiel, staemme] of Object.entries(spiele)) {
+      if (staemme.size > 1) {
+        add("warnung", "Doppelt", "Bei <b>" + textSicherM(p === "-" ? "ohne Person" : ordnerNameM(p)) +
+          "</b> läuft <b>" + textSicherM(spiel) + "</b> in " + staemme.size +
+          " verschiedenen Kombinationen. Deine Regel ist: jedes Spiel nur einmal. " +
+          "(Teile derselben Kombination bei mehreren Anbietern zählen hier nicht mit.)");
+      }
+    }
+  }
+
+  // ---- 7. Reicht das Geld der Person? ----
+  geprueft.push("das Geld der Person deckt, was gesetzt wurde");
+  for (const o of ordnerListe) {
+    const p = personPruefen(o.id, scheine);
+    for (const problem of (p.probleme || [])) {
+      add("fehler", "Geld", "<b>" + textSicherM(o.name) + ":</b> " + problem);
+    }
+    const gesetzt = personEinsatz(o.id, scheine);
+    if (gesetzt > 0 && p.erhaltengesamt === 0 && p.eingesamt === 0) {
+      add("warnung", "Geld", "<b>" + textSicherM(o.name) + "</b> hat " + rundM(gesetzt).toFixed(2) +
+        " &euro; gesetzt, aber in der Kasse steht kein einziger Eingang. Trag nach, was du " +
+        "bekommen und eingezahlt hast, sonst rechnet die Statistik ins Leere.");
+    }
+  }
+
+  // ---- 8. Fertig gespielt, aber ohne Ergebnis ----
+  geprueft.push("kein fertiges Spiel wartet auf dein Ergebnis");
+  const wartet = scheine.filter(s => s.stand === "offen" && scheinWartet(s));
+  if (wartet.length) {
+    add("hinweis", "Ergebnisse", "<b>" + wartet.length + " Kombination(en)</b> sind durchgespielt und " +
+      "warten auf deine Meldung gewonnen oder verloren. Solange bleiben sie als \"im Spiel\" gerechnet.");
+  }
+
+  return { funde: funde, geprueft: geprueft };
+}
+
+function pruefStufeText(st) {
+  return st === "fehler" ? "Fehler" : (st === "warnung" ? "Auffällig" : "Hinweis");
+}
+
+function zeichnePruefung(scheine) {
+  const box = el("pruefbericht");
+  if (!box) return;
+  const r = pruefAlles(scheine);
+  const zahl = st => r.funde.filter(f => f.stufe === st).length;
+
+  let h = '<div class="pruefkopf">' +
+    '<span class="pruefzahl ' + (zahl("fehler") ? "rot" : "gruen") + '">' + zahl("fehler") + " Fehler</span>" +
+    '<span class="pruefzahl ' + (zahl("warnung") ? "gelb" : "gruen") + '">' + zahl("warnung") + " auffällig</span>" +
+    '<span class="pruefzahl grau">' + zahl("hinweis") + " Hinweise</span>" +
+    '<span class="mini">' + scheine.length + " Kombinationen, " + ordnerListe.length +
+    " Personen nachgerechnet</span></div>";
+
+  if (!r.funde.length) {
+    h += '<div class="pruefzeile gut"><b>&#9989; Alles nachgerechnet, nichts gefunden.</b> ' +
+      "Quoten, Gebühren, Einsätze, Zuordnungen und Geldstände passen zusammen.</div>";
+  } else {
+    for (const stufe of ["fehler", "warnung", "hinweis"]) {
+      const liste = r.funde.filter(f => f.stufe === stufe);
+      if (!liste.length) continue;
+      h += '<div class="pruefgruppe">' + liste.map(f =>
+        '<div class="pruefzeile ' + stufe + '"><span class="pruefmarke">' + f.gruppe + "</span>" +
+        f.text + "</div>").join("") + "</div>";
+    }
+  }
+  h += '<details class="pruefwas"><summary>Was genau wurde geprüft? (' + r.geprueft.length + " Regeln)</summary>" +
+    "<ul>" + r.geprueft.map(x => "<li>" + x + "</li>").join("") + "</ul>" +
+    '<p class="mini">Nicht geprüft werden kann, ob eine Quote im Wettbüro wirklich so stand - dafür ' +
+    "gibt es das Foto zum Schein. Geprüft wird alles, was das Programm selbst nachrechnen kann.</p></details>";
+  box.innerHTML = h;
+  zeichneOrdnerBilanz(scheine);
+}
+
+// ---------- Bilanz je Foto-Ordner ----------
+// Ein Foto-Ordner ist eine Lieferung. Karams Frage dazu: was ist aus dieser
+// Lieferung geworden - jeder Einsatz, wie er gespielt wurde, und wie viel
+// Geld insgesamt hineingegangen ist.
+
+function zeichneOrdnerBilanz(scheine) {
+  const box = el("ordnerbilanz");
+  if (!box) return;
+  if (!scheine.length) {
+    box.innerHTML = '<p class="mini">Noch keine Kombinationen gespeichert - hier steht die Bilanz, ' +
+      "sobald du die erste in den Verlauf legst.</p>";
+    return;
+  }
+  const ordner = {};
+  for (const s of scheine) {
+    const d = s.daten || {};
+    const id = d.satz || "ohne";
+    ordner[id] = ordner[id] || { scheine: [], einsatz: 0, moeglich: 0, gewonnen: 0, zurueck: 0,
+      verloren: 0, offen: 0, imSpiel: 0, personen: {}, anbieter: {} };
+    const o = ordner[id];
+    const einsatz = Number(d.einsatz) || 0;
+    o.scheine.push(s);
+    o.einsatz += einsatz;
+    o.moeglich += Number(d.moeglich) || 0;
+    const p = s.ordner || "-";
+    o.personen[p] = (o.personen[p] || 0) + einsatz;
+    const kz = d.kz || "?";
+    o.anbieter[kz] = (o.anbieter[kz] || 0) + einsatz;
+    if (s.stand === "offen") { o.offen++; o.imSpiel += einsatz; }
+    else if (s.stand === "gewonnen") { o.gewonnen++; o.zurueck += echtZurueckWert(s); }
+    else if (s.stand === "verloren") { o.verloren++; }
+  }
+
+  let h = "";
+  for (const [id, o] of Object.entries(ordner)) {
+    const fertig = o.gewonnen + o.verloren;
+    const eingesetztFertig = o.scheine.filter(s => s.stand === "gewonnen" || s.stand === "verloren")
+      .reduce((p, s) => p + (Number((s.daten || {}).einsatz) || 0), 0);
+    const bilanz = o.zurueck - eingesetztFertig;
+    h += '<details class="bilanzordner"><summary><b>' + textSicherM(pruefSatzTitel(id)) + "</b> &middot; " +
+      o.scheine.length + " Kombination(en) &middot; insgesamt <b>" + rundM(o.einsatz).toFixed(2) +
+      " &euro;</b> hineingespielt" + (fertig ? " &middot; abgerechnet <b class='" +
+      (bilanz >= 0 ? "gruen" : "rot") + "'>" + (bilanz >= 0 ? "+" : "") + rundM(bilanz).toFixed(2) +
+      " &euro;</b>" : "") + "</summary>";
+
+    h += '<div class="bilanzzahlen">' +
+      zeile2("Insgesamt hineingespielt", rundM(o.einsatz).toFixed(2) + " &euro;") +
+      zeile2("Steckt noch in offenen Wetten", rundM(o.imSpiel).toFixed(2) + " &euro; (" + o.offen + ")") +
+      zeile2("Schon abgerechnet (Einsatz)", rundM(eingesetztFertig).toFixed(2) + " &euro; (" + fertig + ")") +
+      zeile2("Davon zurückbekommen", rundM(o.zurueck).toFixed(2) + " &euro;") +
+      zeile2("<b>Ergebnis der fertigen Wetten</b>", "<b>" + (bilanz >= 0 ? "+" : "") +
+        rundM(bilanz).toFixed(2) + " &euro;</b>") +
+      "</div>";
+
+    const personZeilen = Object.entries(o.personen).map(([p, betrag]) =>
+      "<tr><td>" + textSicherM(p === "-" ? "ohne Person" : ordnerNameM(p)) + "</td><td>" +
+      rundM(betrag).toFixed(2) + " &euro;</td></tr>").join("");
+    const anbZeilen = Object.entries(o.anbieter).map(([kz, betrag]) =>
+      "<tr><td>" + textSicherM(anbieterNameM(kz)) + "</td><td>" +
+      rundM(betrag).toFixed(2) + " &euro;</td></tr>").join("");
+    h += '<div class="bilanzpaar">' +
+      '<table class="tab"><thead><tr><th>Für welche Person</th><th>Einsatz</th></tr></thead><tbody>' +
+      personZeilen + "</tbody></table>" +
+      '<table class="tab"><thead><tr><th>Bei welchem Anbieter</th><th>Einsatz</th></tr></thead><tbody>' +
+      anbZeilen + "</tbody></table></div>";
+
+    h += '<table class="tab bilanzscheine"><thead><tr><th>Wann</th><th>Person</th><th>Anbieter</th>' +
+      "<th>Spiele</th><th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th></tr></thead><tbody>";
+    for (const s of o.scheine.slice().sort((a, b) => String(b.daten.zeit || "").localeCompare(String(a.daten.zeit || "")))) {
+      const d = s.daten || {};
+      h += "<tr><td>" + textSicherM(zeitM(d.zeit) || "") + "</td>" +
+        "<td>" + textSicherM(s.ordner ? ordnerNameM(s.ordner) : "-") + "</td>" +
+        "<td>" + textSicherM(d.anbieter || d.kz || "?") + "</td>" +
+        "<td>" + (d.wetten || []).map(t => textSicherM(t.spiel || "") +
+          ' <span class="mini">' + textSicherM(t.wette || "") + " @ " +
+          (Number(t.quote) || 0).toFixed(2) + "</span>").join("<br>") + "</td>" +
+        "<td><b>" + (Number(d.quote) || 0).toFixed(2) + "</b></td>" +
+        "<td>" + (Number(d.einsatz) || 0).toFixed(2) + " &euro;</td>" +
+        "<td>" + (Number(d.moeglich) || 0).toFixed(2) + " &euro;</td>" +
+        "<td>" + (s.stand === "offen" ? (scheinWartet(s) ? "fertig, Ergebnis offen" : "läuft")
+          : textSicherM(s.stand)) + "</td></tr>";
+    }
+    h += "</tbody></table></details>";
+  }
+  box.innerHTML = h;
+}

@@ -622,3 +622,46 @@ tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
 .flusskarte .fk-raus { stroke: #b35a00; stroke-width: 2; stroke-dasharray: 5 4; }
 .flussliste { margin: 6px 0 6px 18px; }
 .flussliste li { margin: 3px 0; }
+
+
+/* ---------- Nachrechnen (Design-Schicht, gefahrlos loeschbar) ---------- */
+.pruefkopf { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.pruefzahl { border-radius:999px; padding:3px 12px; font-weight:600; font-size:13px; }
+.pruefzahl.rot { background:#fdecea; color:#a2231b; }
+.pruefzahl.gelb { background:#fff5e0; color:#8a5a00; }
+.pruefzahl.gruen { background:#e8f6ec; color:#1c6b34; }
+.pruefzahl.grau { background:#eef1f6; color:#41506b; }
+.pruefgruppe { margin-bottom:10px; }
+.pruefzeile { border-radius:10px; padding:9px 12px; margin-bottom:6px; font-size:14px; line-height:1.45;
+  border-left:4px solid #ccc; background:#f7f9fc; }
+.pruefzeile.fehler { border-left-color:#c0392b; background:#fdecea; }
+.pruefzeile.warnung { border-left-color:#e08a00; background:#fff8ec; }
+.pruefzeile.hinweis { border-left-color:#5a7ab5; background:#f2f6fd; }
+.pruefzeile.gut { border-left-color:#2e9e52; background:#e8f6ec; }
+.pruefmarke { display:inline-block; background:rgba(0,0,0,.07); border-radius:6px; padding:1px 7px;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-right:8px; }
+.pruefwas { margin-top:10px; font-size:13px; }
+.pruefwas ul { margin:6px 0 4px 18px; }
+.bilanzordner { border:1px solid var(--rand,#d8dee9); border-radius:12px; padding:10px 14px; margin-bottom:10px; }
+.bilanzordner summary { cursor:pointer; font-size:14px; }
+.bilanzzahlen { margin:10px 0; }
+.bilanzpaar { display:flex; flex-wrap:wrap; gap:14px; }
+.bilanzpaar table { flex:1 1 240px; }
+.bilanzscheine { margin-top:12px; }
+.bilanzscheine td { vertical-align:top; }
+
+/* ---------- Bildschirm-Ausschnitt ---------- */
+.ausschnittbuehne { position:fixed; inset:0; z-index:9000; background:rgba(12,18,32,.94);
+  display:flex; flex-direction:column; }
+.ausschnittkopf { color:#fff; padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px;
+  align-items:center; background:#16233d; }
+.ausschnittkopf .mini { color:#b9c6de; }
+.ausschnittknoepfe { margin-left:auto; display:flex; gap:8px; }
+.ausschnittflaeche { flex:1; position:relative; overflow:auto; display:flex;
+  align-items:flex-start; justify-content:center; padding:12px; }
+.ausschnittflaeche img { max-width:100%; max-height:calc(100vh - 90px); cursor:crosshair;
+  user-select:none; box-shadow:0 0 0 1px rgba(255,255,255,.2); }
+.ausschnittrahmen { position:absolute; border:2px dashed #ffd34d; background:rgba(255,211,77,.16);
+  pointer-events:none; }
+.ausschnittmass { position:absolute; background:#ffd34d; color:#2a1f00; font-size:11px;
+  font-weight:700; padding:1px 6px; border-radius:5px; pointer-events:none; }

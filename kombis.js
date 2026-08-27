@@ -368,7 +368,24 @@ function quoteEintragen(scheinId, wettId, feld) {
 
 function fotoSchluessel(scheinId) { return "foto_" + scheinId; }
 
-// Der Name des Fotos: Anbieter, Datum, Gesamtquote des Scheins
+// Kurzform eines Spielnamens fuer den Bildnamen:
+// "Bayern München - Borussia Dortmund" -> "Bay-Bor"
+function spielKuerzel(spiel) {
+  const seiten = String(spiel || "").split(/\s+(?:-|–|—|vs\.?|gegen)\s+/i);
+  const kurz = seiten.map(seite => {
+    const woerter = seite.trim().replace(/[^A-Za-zÄÖÜäöüß0-9 ]/g, "").split(/\s+/).filter(Boolean);
+    if (!woerter.length) return "";
+    // Vereinskuerzel wie FC, SV, TSV sagen nichts - das erste echte Wort zaehlt.
+    const wort = woerter.find(x => x.length > 2 && !/^(fc|sv|sc|ac|as|ss|vfb|vfl|tsv|rb|psv|afc)$/i.test(x)) || woerter[0];
+    return wort.slice(0, 3);
+  }).filter(Boolean);
+  return kurz.join("-") || "Spiel";
+}
+
+// Der Name des Bildes: Anbieter, Teams abgekuerzt, Einsatz, die einzelnen
+// Quoten NACH Gebuehr, die Gesamtquote und das Datum. "netto" heisst:
+// die Gebuehr des Anbieters ist schon abgezogen - der Schein selbst zeigt
+// hoehere Zahlen.
 function fotoName(scheinId) {
   const z = liesZustand();
   const sch = z ? z.scheine.find(x => x.id === scheinId) : null;
@@ -377,11 +394,52 @@ function fotoName(scheinId) {
     String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
   if (!sch) return "Schein " + datum;
   let gesamt = 1;
+  const kuerzel = [];
+  const quoten = [];
   for (const eintrag of sch.wetten) {
     const w = wetteNachId(eintrag.id);
-    if (w) gesamt *= zielQuote(w, eintrag.optIdx, sch.kz).echt;
+    if (!w) continue;
+    const q = zielQuote(w, eintrag.optIdx, sch.kz);
+    gesamt *= q.echt;
+    kuerzel.push(spielKuerzel(w.spiel));
+    quoten.push(rund2(q.echt).toFixed(2));
   }
-  return anbieterName(sch.kz) + " " + datum + " Quote " + rund2(gesamt).toFixed(2);
+  const feld = document.getElementById("e_" + scheinId);
+  let einsatz = feld ? parseFloat(feld.value) : parseFloat(sch.einsatz);
+  if (isNaN(einsatz)) einsatz = parseFloat(einsatzWert(sch, z)) || 0;
+  const netto = (GEBUEHREN_TEILER[sch.kz] !== 1) ? "netto" : "";
+  return anbieterName(sch.kz) + " " + kuerzel.join("_") +
+    " " + rund2(einsatz).toFixed(2) + "EUR" +
+    (quoten.length ? " " + quoten.join("x") : "") +
+    " Q" + rund2(gesamt).toFixed(2) + netto + " " + datum;
+}
+
+// Ein fertiges Bild (Ausschnitt oder Foto) dem Schein zuordnen.
+// Passt es nicht in den Speicher, wird es schrittweise kleiner gerechnet,
+// statt mit einem Fehler abzubrechen.
+function fotoAusCanvas(c, scheinId, herkunft) {
+  const name = fotoName(scheinId);
+  let daten = c.toDataURL("image/jpeg", 0.82);
+  for (let versuch = 0; versuch < 4; versuch++) {
+    try {
+      localStorage.setItem(fotoSchluessel(scheinId), daten);
+      localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
+      localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
+      meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
+        Math.round(daten.length / 1024) + " KB).", "gut");
+      zeichne_();
+      return true;
+    } catch (err) {
+      const k = document.createElement("canvas");
+      k.width = Math.max(1, Math.round(c.width * 0.75));
+      k.height = Math.max(1, Math.round(c.height * 0.75));
+      k.getContext("2d").drawImage(c, 0, 0, k.width, k.height);
+      c = k;
+      daten = c.toDataURL("image/jpeg", 0.7);
+    }
+  }
+  meldung("Das Bild passt nicht in den Speicher. Lösch ältere Bilder oder nimm einen kleineren Ausschnitt.", "warn");
+  return false;
 }
 
 // Dateiname zum Herunterladen (ohne Leerzeichen)
@@ -588,9 +646,12 @@ function scheinHtml(s, z) {
       (s.wetten.length !== 3 || s.art === "eigen" || s.teil
         ? '<button class="aufloesen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
         : "") +
-      '<label class="fotoknopf">Foto vom Wettschein' +
+      '<label class="fotoknopf">&#128247; Foto vom Wettschein' +
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
+      '<button class="fotoknopf" onclick="ausschnittStarten(\'' + s.id + '\')" ' +
+        'title="Schneidet einen Bereich direkt vom Bildschirm aus - ohne Umweg über eine Datei auf dem Laptop.">' +
+        "&#9986; Bildschirm-Ausschnitt</button>" +
     "</div>" +
     '<div class="zielzeile" id="ziel_' + s.id + '">' + gruppenText(z, s.nr) + "</div>" +
     '<div class="ordnerwahl" id="ordnerwahl_' + s.id + '"></div>' +
