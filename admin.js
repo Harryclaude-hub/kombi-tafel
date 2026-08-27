@@ -132,34 +132,56 @@ async function tuSatzFotos(input) {
 // alle eines Datums auf einmal, um mit dem gleichen Datum komplett neu
 // anzufangen. (Satz löschen entfernt die Fotos absichtlich NICHT.)
 
-async function fotosZeigen(datum) {
-  const box = elA("fotoliste_" + datum);
-  if (!box) return;
-  if (box.innerHTML) { box.innerHTML = ""; return; }   // zweiter Klick klappt zu
-  box.innerHTML = '<p class="mini">Lade Fotos...</p>';
+async function fotoKachelnHtml(datum) {
   const uploads = await supaSatzUploadsVoll(datum);
-  if (!uploads.length) { box.innerHTML = '<p class="mini">Keine Fotos mehr zu diesem Datum.</p>'; return; }
+  if (!uploads.length) return '<p class="mini">Keine Fotos mehr zu diesem Datum.</p>';
+  // Doppelt hochgeladene erkennen: gleicher Fingerabdruck = gleiches Foto
+  const haeufig = {};
+  for (const up of uploads) {
+    up._hash = await fotoFingerabdruck(up.foto);
+    haeufig[up._hash] = (haeufig[up._hash] || 0) + 1;
+  }
   let h = '<div class="fotogitter">';
   for (const up of uploads) {
-    h += '<div class="fotokachel"><img src="' + up.foto + '" alt="Foto">' +
+    const doppelt = up._hash && haeufig[up._hash] > 1;
+    h += '<div class="fotokachel' + (doppelt ? " fotodoppelt" : "") + '"><img src="' + up.foto + '" alt="Foto">' +
       '<div class="mini">' + (up.status === "wartet" ? '<span class="rot">wartet</span>' : '<span class="gruen">eingelesen</span>') +
+      (doppelt ? ' <b class="rot">DOPPELT hochgeladen!</b>' : "") +
       ' <button onclick="tuFotoWeg(\'' + up.id + '\', \'' + sicherA(datum) + '\')">dieses Foto löschen</button></div></div>';
   }
   h += "</div>" +
     '<p><button id="allefotosweg_' + sicherA(datum) + '" onclick="tuAlleFotosWeg(\'' + sicherA(datum) + '\')">' +
     "ALLE " + uploads.length + " Fotos vom " + sicherA(datum) + " löschen</button> " +
     '<span class="mini">Danach kannst du zum gleichen Datum komplett neue Fotos hochladen.</span></p>';
-  box.innerHTML = h;
+  return h;
+}
+
+async function fotosZeigen(datum) {
+  const box = elA("fotoliste_" + datum);
+  if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ""; return; }   // zweiter Klick klappt zu
+  box.innerHTML = '<p class="mini">Lade Fotos...</p>';
+  box.innerHTML = await fotoKachelnHtml(datum);
+}
+
+// Fotos direkt im geoeffneten Satz (Saetze bearbeiten)
+async function satzFotosLaden(datum) {
+  const box = elA("satzfotos_" + datum);
+  if (!box || box.dataset.geladen === "1") return;
+  box.dataset.geladen = "1";
+  box.innerHTML = '<p class="mini">Lade Fotos...</p>';
+  box.innerHTML = "<h3>Fotos dieses Satzes</h3>" + await fotoKachelnHtml(datum);
 }
 
 async function tuFotoWeg(id, datum) {
   const r = await supaSatzUploadLoeschen(id);
   if (r.error || !r.data || !r.data.length) { meldungA("Foto nicht gelöscht (nur Admins).", "warn"); return; }
   meldungA("Foto gelöscht.", "gut");
-  const box = elA("fotoliste_" + datum);
-  if (box) box.innerHTML = "";
   await adminFotoSaetze();
-  fotosZeigen(datum);
+  const oben = elA("fotoliste_" + datum);
+  if (oben) { oben.innerHTML = ""; fotosZeigen(datum); }
+  const imSatz = elA("satzfotos_" + datum);
+  if (imSatz) { imSatz.dataset.geladen = ""; satzFotosLaden(datum); }
 }
 
 async function tuAlleFotosWeg(datum) {
@@ -175,6 +197,8 @@ async function tuAlleFotosWeg(datum) {
   meldungA(((r.data && r.data.length) || 0) + " Fotos vom " + sicherA(datum) +
     " gelöscht. Du kannst jetzt zum gleichen Datum frisch hochladen.", "gut");
   adminFotoSaetze();
+  const imSatz = elA("satzfotos_" + datum);
+  if (imSatz) { imSatz.dataset.geladen = ""; satzFotosLaden(datum); }
 }
 
 async function fotoFingerabdruck(dataUrl) {
@@ -596,10 +620,11 @@ async function adminSaetze() {
         '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5">' + mehr + "</td>" +
         '<td><button onclick="tuWetteWeg(' + w.id + ')">weg</button></td></tr>';
     }
-    html += '<details class="satzkasten" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '" id="satzdetails_' + sicherA(s.id) + '"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
+    html += '<details class="satzkasten" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '" id="satzdetails_' + sicherA(s.id) + '" ontoggle="if(this.open)satzFotosLaden(\'' + sicherA(s.id) + '\')"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
       '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK)</th><th>gemeldet</th><th>Liga</th>' +
       "<th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" + zeilen +
       "</tbody></table></div>" +
+      '<div id="satzfotos_' + sicherA(s.id) + '"></div>' +
       '<p><button onclick="tuWetteNeu(\'' + sicherA(s.id) + '\')">Wette hinzufügen</button> ' +
       '<button id="satzweg_' + sicherA(s.id) + '" onclick="tuSatzWeg(\'' + sicherA(s.id) + '\')">ganzen Satz löschen</button></p>' +
       "</details>";

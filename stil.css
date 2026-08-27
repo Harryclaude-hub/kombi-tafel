@@ -538,3 +538,6 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .fotogitter { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0; }
 .fotokachel { border: 1px solid #999; padding: 6px; max-width: 300px; }
 .fotokachel img { max-width: 100%; display: block; margin-bottom: 4px; }
+
+/* Doppelt hochgeladene Fotos (Design-Schicht) */
+.fotokachel.fotodoppelt { border: 3px solid #a00000; background: #fdf2f2; }
