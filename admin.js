@@ -228,6 +228,7 @@ document.addEventListener("DOMContentLoaded", startAdmin);
 let vorschauZeilen = [];
 let vorschauDatum = null;
 let vorschauUploads = [];
+let vsTrotzdem = false;
 
 const S_WAHL = ["SIEG", "ASIA", "TORE", "ECKEN", "BTTS", "HZ-END", "DNB", "DC", "TENNIS"];
 
@@ -283,13 +284,17 @@ function satzFelderParsen(felder) {
     spiel = rest[0];
   }
   if (!wette && spiel) { wette = spiel; }
-  let s = "SIEG";
-  if (/[+-]\s?\d+[.,]?\d*\s*A[HIl]?/i.test(wette) || /\([+-]/.test(wette)) s = "ASIA";
-  else if (/DN[BE]/i.test(wette)) s = "DNB";
-  else if (/\(DC/i.test(wette)) s = "DC";
-  else if (/ber\s|under|over|tore/i.test(wette)) s = "TORE";
-  else if (/eck|corner/i.test(wette)) s = "ECKEN";
-  return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette, s: s, quote: quote };
+  return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette,
+    s: artErkennen(wette), quote: quote };
+}
+
+function artErkennen(wette) {
+  if (/[+-]\s?\d+[.,]?\d*\s*A[HIl]?/i.test(wette) || /\([+-]/.test(wette) || /\d[.,]5\s*AH/i.test(wette)) return "ASIA";
+  if (/DN[BE]/i.test(wette)) return "DNB";
+  if (/\(DC/i.test(wette)) return "DC";
+  if (/ber\s|under|over|tore/i.test(wette)) return "TORE";
+  if (/eck|corner/i.test(wette)) return "ECKEN";
+  return "SIEG";
 }
 
 // Bekannte Lesefehler der Texterkennung deterministisch reparieren
@@ -318,14 +323,17 @@ function pruefGruende(z, satzDatum) {
   if (teamNorm.length >= 4 && !spielNorm.includes(teamNorm.slice(0, Math.min(8, teamNorm.length))))
     g.push("Wett-Team steht nicht im Spiel");
   if (z.quote > 50) g.push("sehr hohe Quote");
+  if (z.quote < 1.15) g.push("sehr niedrige Quote - Lesefehler?");
   return g;
 }
 
 function zeilenSchluessel(z) {
-  // Zeit + Quote + Art + Spiel-Anfang: faengt auch Zeilen, die die
-  // Texterkennung auf zwei Fotos leicht unterschiedlich gelesen hat
-  const spiel4 = z.spiel.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
-  return z.an_zeit + "|" + z.quote + "|" + z.s + "|" + spiel4;
+  // Uhrzeit (ohne Datum!) + Quote + Art + Spiel-Anfang: faengt auch
+  // Zeilen, bei denen die Texterkennung das DATUM vertippt hat, und
+  // solche, die auf zwei Fotos leicht unterschiedlich gelesen wurden
+  const spiel6 = z.spiel.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
+  const uhr = String(z.an_zeit).slice(11, 16);
+  return uhr + "|" + z.quote + "|" + z.s + "|" + spiel6;
 }
 
 // Moegliche Doppelte (gleiche Zeit + gleiche Quote) fuer die Vorschau markieren
@@ -350,6 +358,7 @@ async function satzEinlesen(datum) {
   if (!uploads.length) { box.innerHTML = '<div class="warnkern">Keine Fotos zu diesem Datum.</div>'; return; }
   vorschauDatum = datum;
   vorschauUploads = uploads;
+  vsTrotzdem = false;
   const gesehen = new Set();
   vorschauZeilen = [];
   let nr = 0;
@@ -374,6 +383,7 @@ async function satzEinlesen(datum) {
       const p = satzFelderParsen(felderAusWorten(line.words));
       if (p) {
         p.wette = wetteReparieren(p.wette);
+        p.s = artErkennen(p.wette);
         p.gruende = pruefGruende(p, datum);
         geparst.push(p);
       }
@@ -432,7 +442,7 @@ function vsFeld(i, feld, wert) {
   vorschauZeilen[i][feld] = (feld === "quote") ? (parseFloat(String(wert).replace(",", ".")) || 0) : wert;
 }
 
-function vsWeg(i) { vorschauZeilen.splice(i, 1); vorschauZeigen(); }
+function vsWeg(i) { vorschauZeilen.splice(i, 1); vsTrotzdem = false; vorschauZeigen(); }
 
 function vsNeueZeile() {
   vorschauZeilen.push({ von: "", an_zeit: vorschauDatum + "T12:00", liga: "", spiel: "", wette: "", s: "SIEG", quote: 2.0 });
@@ -447,6 +457,17 @@ async function vsUebernehmen() {
     return;
   }
   if (!vorschauZeilen.length) { meldungA("Keine Zeilen zum Übernehmen.", "warn"); return; }
+  // Gelbe Zeilen (Prüf-Gründe) nicht einfach durchwinken: erst warnen,
+  // erst der zweite Klick übernimmt wirklich (Karams Zwei-Klick-Regel)
+  const gelb = vorschauZeilen.filter((z, i) => (z.gruende && z.gruende.length) || vsDoppelVerdacht()[i]).length;
+  if (gelb && !vsTrotzdem) {
+    vsTrotzdem = true;
+    meldungA("<b>" + gelb + " gelbe Zeile(n) mit Prüf-Hinweis!</b> Bitte erst mit den Fotos " +
+      "vergleichen und korrigieren oder mit weg entfernen. Wenn wirklich alles stimmt: " +
+      "den grünen Knopf noch einmal drücken.", "warn");
+    return;
+  }
+  vsTrotzdem = false;
   const d = vorschauDatum.split("-");
   const titel = "Fotos vom " + d[2] + "." + d[1] + "." + d[0];
   const s = await supaSatzAnlegen(vorschauDatum, titel);
