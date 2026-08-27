@@ -658,7 +658,10 @@ function einsatzWert(s, z) {
 function gruppeGesetzt(z, nr) {
   return gruppeScheine(z, nr).reduce((p, s) => {
     const feld = document.getElementById("e_" + s.id);
-    const wert = feld ? parseFloat(feld.value) : parseFloat(s.einsatz);
+    // Feld noch nicht gezeichnet: den vorbelegten Wert nehmen, damit die
+    // Ziel-Zeile von Anfang an stimmt
+    let wert = feld ? parseFloat(feld.value) : parseFloat(s.einsatz);
+    if (isNaN(wert)) wert = parseFloat(einsatzWert(s, z));
     return p + (isNaN(wert) ? 0 : wert);
   }, 0);
 }
