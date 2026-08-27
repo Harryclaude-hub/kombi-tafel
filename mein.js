@@ -284,15 +284,20 @@ async function ladeDm(komplett) {
   const neue = await supaDmLaden(dmPartner.partnerId, letzteDmId || null);
   if (!neue.length) return;
   const box = el("dmliste");
+  const dmKey = await kryptoDm(dmPartner.partnerId);
+  const nachzuladen = [];
   for (const n of neue) {
     letzteDmId = Math.max(letzteDmId, n.id);
     const zeile = document.createElement("div");
     zeile.className = "chatzeile" + (n.von === ich.id ? " vonmir" : "");
+    const m = (typeof medienLesen === "function") ? medienLesen(n.text) : null;
     zeile.innerHTML = "<b>" + (n.von === ich.id ? ich.username : dmPartner.username) + "</b> " +
       "<span class='mini'>" + zeitM(n.created_at) + "</span><br>" +
-      n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      (m ? medienPlatzhalter(m) : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
     box.appendChild(zeile);
+    if (m) nachzuladen.push(m);
   }
+  for (const m of nachzuladen) medienNachladen(dmKey, m);
   box.scrollTop = box.scrollHeight;
   localStorage.setItem("kt_dm_gelesen_" + dmPartner.partnerId, String(letzteDmId));
 }
@@ -628,6 +633,7 @@ async function tuStand(id, wert) {
 
 async function tuNotiz(id, wert) {
   const key = await kryptoBereich(aktiverBereich.id);
+  if (!key) { meldungM("Notiz nicht gespeichert: kein Schluessel fuer diesen Bereich.", "warn"); return; }
   const r = await supaScheinAendern(id, { notiz: await e2eZu(key, wert) || "" });
   if (r.error) meldungM("Notiz nicht gespeichert: " + r.error.message, "warn");
 }
@@ -641,6 +647,10 @@ async function tuKopieren(id) {
   const scheine = await supaScheineLaden(aktiverBereich.id);
   const s = scheine.find(x => x.id === id);
   if (!s) return;
+  if (s.daten && s.daten.gesperrt) {
+    meldungM("Nicht kopiert: dieser Schein liess sich nicht entschluesseln (Schluessel fehlt).", "warn");
+    return;
+  }
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
     : "In deinen Bereich kopiert - er liegt dort unter \"ohne Person\", bitte einer deiner Personen zuordnen.",
@@ -1383,13 +1393,14 @@ async function tuChatDatei(input) {
 
 async function tuChatTon() {
   const knopf = el("bc-ton");
-  if (aufnahmeLaeuft()) {
+  if (aufnahmeLaeuft() && !aufnahmeLaeuft("bc-ton")) { meldungM("Es laeuft schon eine andere Aufnahme.", "warn"); return; }
+  if (aufnahmeLaeuft("bc-ton")) {
     const blob = await aufnahmeStopp();
     if (knopf) { knopf.innerHTML = "&#127908; Sprachnachricht"; knopf.classList.remove("aufnahme"); }
     if (blob && blob.size) await tuChatMedien(blob, "ton", "Sprachnachricht.webm");
     return;
   }
-  const s = await aufnahmeStart("ton");
+  const s = await aufnahmeStart("ton", "bc-ton");
   if (s.fehler) { meldungM(s.fehler, "warn"); return; }
   if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
 }
@@ -1397,14 +1408,15 @@ async function tuChatTon() {
 async function tuChatVideo() {
   const knopf = el("bc-video");
   const schau = el("bc-vorschau");
-  if (aufnahmeLaeuft()) {
+  if (aufnahmeLaeuft() && !aufnahmeLaeuft("bc-video")) { meldungM("Es laeuft schon eine andere Aufnahme.", "warn"); return; }
+  if (aufnahmeLaeuft("bc-video")) {
     const blob = await aufnahmeStopp();
     if (knopf) { knopf.innerHTML = "&#128249; Video"; knopf.classList.remove("aufnahme"); }
     if (schau) schau.innerHTML = "";
     if (blob && blob.size) await tuChatMedien(blob, "video", "Video.webm");
     return;
   }
-  const s = await aufnahmeStart("video");
+  const s = await aufnahmeStart("video", "bc-video");
   if (s.fehler) { meldungM(s.fehler, "warn"); return; }
   if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
   if (schau) {

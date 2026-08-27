@@ -75,16 +75,17 @@ async function anrufSignal(roh) {
       '<button class="haupt" onclick="anrufAnnehmen()">Annehmen</button> ' +
       '<button onclick="anrufAblehnen()">Ablehnen</button>');
   } else if (s.typ === "annahme") {
-    if (anrufPc) await anrufPc.setRemoteDescription(s.answer);
+    // Nur der Angerufene selbst darf antworten - sonst koennte ein Dritter
+    // mit Schluessel die Verbindung uebernehmen.
+    if (anrufPc && anrufPartner && roh.von === anrufPartner.id) await anrufPc.setRemoteDescription(s.answer);
   } else if (s.typ === "eis") {
-    if (anrufPc) { try { await anrufPc.addIceCandidate(s.eis); } catch (e) {} }
+    if (anrufPc && anrufPartner && roh.von === anrufPartner.id) { try { await anrufPc.addIceCandidate(s.eis); } catch (e) {} }
     else if (anrufEingehend && anrufEingehend.von === roh.von) anrufEingehend.eis.push(s.eis);
-  } else if (s.typ === "besetzt") {
-    anrufBeenden("Besetzt: dort laeuft schon ein Anruf.");
-  } else if (s.typ === "abgelehnt") {
-    anrufBeenden("Anruf abgelehnt.");
-  } else if (s.typ === "aufgelegt") {
-    anrufBeenden("Aufgelegt.");
+  } else if (s.typ === "besetzt" || s.typ === "abgelehnt" || s.typ === "aufgelegt") {
+    const text = s.typ === "besetzt" ? "Besetzt: dort laeuft schon ein Anruf."
+      : s.typ === "abgelehnt" ? "Anruf abgelehnt." : "Aufgelegt.";
+    if (anrufPartner && roh.von === anrufPartner.id) anrufBeenden(text);
+    else if (anrufEingehend && roh.von === anrufEingehend.von) { anrufEingehend = null; anrufPanelZu(); }
   }
 }
 
@@ -136,7 +137,7 @@ async function anrufPcBauen(zielId, mitVideo) {
 }
 
 async function anrufStarten(partnerId, name, mitVideo) {
-  if (anrufPc) { alert("Es laeuft schon ein Anruf."); return; }
+  if (anrufPc || anrufEingehend) { alert("Es laeuft schon ein Anruf."); return; }
   const key = await kryptoDm(partnerId);
   if (!key) { alert("Anruf nicht moeglich: dein Freund braucht einmal die neue Version."); return; }
   const b = await anrufPcBauen(partnerId, mitVideo);
@@ -153,9 +154,9 @@ async function anrufStarten(partnerId, name, mitVideo) {
 async function anrufAnnehmen() {
   const ein = anrufEingehend;
   if (!ein) return;
+  anrufEingehend = null;   // sofort sperren: ein zweiter Klick baut sonst doppelt
   const b = await anrufPcBauen(ein.von, ein.video);
-  if (b.fehler) { alert(b.fehler); anrufAblehnen(); return; }
-  anrufEingehend = null;
+  if (b.fehler) { alert(b.fehler); anrufSenden(ein.von, { typ: "abgelehnt" }); anrufPanelZu(); return; }
   anrufPartner = { id: ein.von, name: ein.name, video: ein.video };
   anrufPanel("Im Gespraech mit <b>" + ein.name.replace(/</g, "&lt;") + "</b>",
     '<button onclick="anrufAuflegen()">Auflegen</button>');

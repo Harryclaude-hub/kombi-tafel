@@ -71,13 +71,25 @@ function medienLesen(text) {
   try { return JSON.parse(text.slice(MEDIEN_ZEICHEN.length)); } catch (e) { return null; }
 }
 
+function medienTypSicher(m) {
+  const t = String(m.typ || "");
+  if (m.art === "bild" && /^image\/(png|jpe?g|gif|webp)$/.test(t)) return t;
+  if (m.art === "ton" && /^audio\/[\w.+-]+$/.test(t)) return t;
+  if (m.art === "video" && /^video\/[\w.+-]+$/.test(t)) return t;
+  if (m.art === "bild") return "image/png";
+  if (m.art === "ton") return "audio/webm";
+  if (m.art === "video") return "video/webm";
+  return "application/octet-stream";
+}
+
 async function medienUrl(key, m) {
+  if (!/^(dm|bereich)\/[0-9a-f_-]+\/[0-9a-f]{32}$/i.test(String(m.pfad || ""))) return null;
   if (_medienUrls[m.pfad]) return _medienUrls[m.pfad];
   const dl = await supa.storage.from("kt-medien").download(m.pfad);
   if (dl.error || !key) return null;
   const klar = await medienEntschluesseln(key, await dl.data.arrayBuffer());
   if (!klar) return null;
-  const url = URL.createObjectURL(new Blob([klar], { type: m.typ || "application/octet-stream" }));
+  const url = URL.createObjectURL(new Blob([klar], { type: medienTypSicher(m) }));
   _medienUrls[m.pfad] = url;
   return url;
 }
@@ -89,10 +101,16 @@ function medienGroesseText(n) {
 }
 
 // Platzhalter-HTML; wird danach per medienNachladen(key) befuellt
+function medienSicher(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
 function medienPlatzhalter(m) {
-  const id = "med_" + m.pfad.replace(/[^a-z0-9]/gi, "");
-  const name = String(m.name || "Datei").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  return '<span class="medien" id="' + id + '" data-pfad="' + m.pfad + '">' +
+  // Der Pfad kommt aus der Nachricht eines ANDEREN Nutzers: er landet
+  // NIE roh im HTML, nur seine entschaerfte Form in der id.
+  const id = "med_" + String(m.pfad).replace(/[^a-z0-9]/gi, "");
+  const name = medienSicher(m.name || "Datei");
+  return '<span class="medien" id="' + id + '">' +
     "[" + (m.art === "bild" ? "Foto" : m.art === "ton" ? "Sprachnachricht" :
            m.art === "video" ? "Video" : "Datei") + " laedt: " + name + "]</span>";
 }
@@ -102,7 +120,7 @@ async function medienNachladen(key, m) {
   const ziel = document.getElementById(id);
   if (!ziel) return;
   const url = await medienUrl(key, m);
-  const name = String(m.name || "Datei").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const name = medienSicher(m.name || "Datei");
   if (!url) { ziel.innerHTML = "[nicht ladbar: " + name + "]"; return; }
   if (m.art === "bild") {
     ziel.innerHTML = '<a href="' + url + '" target="_blank"><img src="' + url + '" class="medienbild" alt="' + name + '"></a>';
@@ -120,7 +138,7 @@ async function medienNachladen(key, m) {
 
 let _aufnahme = null;   // { rec, teile, art, stream }
 
-async function aufnahmeStart(art) {
+async function aufnahmeStart(art, quelle) {
   if (_aufnahme) return { fehler: "Es laeuft schon eine Aufnahme." };
   let stream;
   try {
@@ -134,7 +152,7 @@ async function aufnahmeStart(art) {
   const teile = [];
   rec.ondataavailable = ev => { if (ev.data.size) teile.push(ev.data); };
   rec.start(250);
-  _aufnahme = { rec: rec, teile: teile, art: art, stream: stream };
+  _aufnahme = { rec: rec, teile: teile, art: art, stream: stream, quelle: quelle || "" };
   return { ok: true, stream: stream };
 }
 
@@ -159,4 +177,7 @@ function aufnahmeAbbrechen() {
   a.stream.getTracks().forEach(t => t.stop());
 }
 
-function aufnahmeLaeuft() { return !!_aufnahme; }
+function aufnahmeLaeuft(quelle) {
+  if (!_aufnahme) return false;
+  return quelle === undefined || _aufnahme.quelle === quelle;
+}

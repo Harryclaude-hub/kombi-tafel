@@ -172,6 +172,7 @@ async function glockeListe() {
     return;
   }
   const kontakte = await supaKontakteLaden();
+  if (glockePartner) return;   // ein Thread hat inzwischen uebernommen
   if (!kontakte.length) {
     ziel.innerHTML = '<p class="mini">Keine Nachrichten. Freunde addest du in ' +
       '<a href="mein.html">Mein Bereich</a> unter "Freunde und Nachrichten".</p>';
@@ -187,6 +188,7 @@ async function glockeListe() {
       k.username + '\')">' + k.username +
       (neu ? ' <span class="badge">' + neu + "</span>" : "") + "</button>";
   }
+  if (glockePartner) return;   // ein Thread hat inzwischen uebernommen
   ziel.innerHTML = html;
 }
 
@@ -277,13 +279,14 @@ async function glockeDatei(input) {
 async function glockeTon() {
   const knopf = document.getElementById("gp-ton");
   if (typeof aufnahmeStart !== "function") return;
-  if (aufnahmeLaeuft()) {
+  if (aufnahmeLaeuft() && !aufnahmeLaeuft("gp-ton")) { alert("Es laeuft schon eine andere Aufnahme."); return; }
+  if (aufnahmeLaeuft("gp-ton")) {
     const blob = await aufnahmeStopp();
     if (knopf) { knopf.innerHTML = "&#127908; Sprachnachricht"; knopf.classList.remove("aufnahme"); }
     if (blob && blob.size) await glockeMedienSenden(blob, "ton", "Sprachnachricht.webm");
     return;
   }
-  const s = await aufnahmeStart("ton");
+  const s = await aufnahmeStart("ton", "gp-ton");
   if (s.fehler) { alert(s.fehler); return; }
   if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
 }
@@ -292,14 +295,15 @@ async function glockeVideo() {
   const knopf = document.getElementById("gp-video");
   const schau = document.getElementById("gp-vorschau");
   if (typeof aufnahmeStart !== "function") return;
-  if (aufnahmeLaeuft()) {
+  if (aufnahmeLaeuft() && !aufnahmeLaeuft("gp-video")) { alert("Es laeuft schon eine andere Aufnahme."); return; }
+  if (aufnahmeLaeuft("gp-video")) {
     const blob = await aufnahmeStopp();
     if (knopf) { knopf.innerHTML = "&#128249; Video"; knopf.classList.remove("aufnahme"); }
     if (schau) schau.innerHTML = "";
     if (blob && blob.size) await glockeMedienSenden(blob, "video", "Video.webm");
     return;
   }
-  const s = await aufnahmeStart("video");
+  const s = await aufnahmeStart("video", "gp-video");
   if (s.fehler) { alert(s.fehler); return; }
   if (knopf) { knopf.textContent = "Stopp und senden"; knopf.classList.add("aufnahme"); }
   if (schau) {

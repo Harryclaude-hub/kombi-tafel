@@ -126,7 +126,7 @@ async function supaTeilen(gastId, rolle) {
   if (typeof kryptoMeinPriv === "function") {
     const gp = await supa.from("kt_profiles").select("pubkey").eq("id", gastId).maybeSingle();
     const priv = await kryptoMeinPriv();
-    const raw = localStorage.getItem("kt_e2e_bereich");
+    const raw = localStorage.getItem("kt_e2e_bereich_" + u.id);
     if (gp.data && gp.data.pubkey && priv && raw) {
       const paar = await kryPaarSchluessel(priv, gp.data.pubkey);
       schluessel = await kryAes(paar, raw);
@@ -153,7 +153,7 @@ async function supaScheineLaden(bereichId) {
     if (s.daten && s.daten.e2e) {
       const klar = await e2eAuf(key, s.daten.e2e);
       try { s.daten = JSON.parse(klar); }
-      catch (e) { s.daten = { kz: "?", anbieter: "?", wetten: [], einsatz: 0, quote: 0, moeglich: 0 }; }
+      catch (e) { s.daten = { kz: "?", anbieter: "?", wetten: [], einsatz: 0, quote: 0, moeglich: 0, gesperrt: true }; }
     }
     if (s.foto) {
       s.foto = await e2eAuf(key, s.foto);
@@ -167,6 +167,7 @@ async function supaScheineLaden(bereichId) {
 async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: OHNE_SCHLUESSEL } };
   return await supa.from("kt_scheine").insert({
     bereich: bereichId, angelegt_von: u.id,
     daten: key ? { e2e: await e2eZu(key, JSON.stringify(daten)) } : daten,
@@ -204,6 +205,7 @@ async function supaNachrichtenLaden(bereichId, abId) {
 async function supaNachrichtSenden(bereichId, text) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: OHNE_SCHLUESSEL } };
   return await supa.from("kt_nachrichten").insert({ bereich: bereichId, autor: u.id, text: await e2eZu(key, text) });
 }
 
@@ -272,6 +274,7 @@ async function supaBuchungenLaden(bereichId) {
 async function supaBuchen(bereichId, datum, konto, person, art, betrag, notiz) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: OHNE_SCHLUESSEL } };
   return await supa.from("kt_buchungen").insert({
     bereich: bereichId, autor: u.id, datum: datum,
     konto: await e2eZu(key, konto), person: await e2eZu(key, person),
@@ -336,6 +339,10 @@ async function supaOrdnerLaden(bereichId) {
   return liste;
 }
 
+// Ohne Schluessel wird NICHTS gespeichert - sonst laege der Klartext
+// unbemerkt in der Datenbank (Review-Fund vom 26.08.).
+const OHNE_SCHLUESSEL = "Kein Verschluesselungs-Schluessel fuer diesen Bereich - der Besitzer muss dir einmal neu teilen.";
+
 async function supaOrdnerAnlegen(bereichId, name) {
   const sauber = (name || "").trim();
   if (!sauber) return { fehler: "Bitte einen Namen eintragen." };
@@ -345,6 +352,7 @@ async function supaOrdnerAnlegen(bereichId, name) {
   if (alle.some(o => String(o.name).toLowerCase() === sauber.toLowerCase()))
     return { fehler: "Diese Person gibt es schon." };
   const key = await kryptoBereich(bereichId);
+  if (!key) return { fehler: OHNE_SCHLUESSEL };
   const r = await supa.from("kt_ordner").insert({ bereich: bereichId, name: await e2eZu(key, sauber) })
     .select("id, name").single();
   if (r.error) {
@@ -361,6 +369,7 @@ async function supaOrdnerUmbenennen(id, name) {
   // RLS-Lektion: verbotenes UPDATE gibt keinen Fehler, nur 0 Zeilen - deshalb select()
   const alt = await supa.from("kt_ordner").select("bereich").eq("id", id).maybeSingle();
   const key = alt.data ? await kryptoBereich(alt.data.bereich) : null;
+  if (!key) return { fehler: OHNE_SCHLUESSEL };
   const r = await supa.from("kt_ordner").update({ name: await e2eZu(key, sauber) }).eq("id", id).select("id").maybeSingle();
   if (r.error) {
     if (String(r.error.message).includes("duplicate")) return { fehler: "Diese Person gibt es schon." };
@@ -388,6 +397,7 @@ async function supaPersonBuchungenLaden(bereichId) {
 async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, betrag, notiz) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: OHNE_SCHLUESSEL } };
   return await supa.from("kt_person_zahlungen").insert({
     bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
     weg: weg, art: art, anbieter: art === "erhalten" ? null : anbieter,
