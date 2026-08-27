@@ -30,8 +30,9 @@ async function satzdatenLaden() {
         kat: w.kat || w.s, s: w.s || "SIEG", o: Array.isArray(w.o) ? w.o : []
       });
     }
-    // Neuester Satz zuerst (er ist der offene Ordner, solange nichts gewaehlt ist)
-    SAETZE.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+    // Aufsteigend sortieren: aktiverSatzId nimmt den LETZTEN Eintrag als
+    // neuesten Satz - so ist der frisch eingelesene Ordner der offene.
+    SAETZE.sort((a, b) => String(a.id).localeCompare(String(b.id)));
     satzdatenNeuZeichnen();
   } catch (e) { /* Satzdaten stoeren nie die Seite */ }
 }
