@@ -1998,14 +1998,20 @@ function zeichneOrdnerBilanz(scheine) {
       (bilanz >= 0 ? "gruen" : "rot") + "'>" + (bilanz >= 0 ? "+" : "") + rundM(bilanz).toFixed(2) +
       " &euro;</b>" : "") + "</summary>";
 
-    h += '<div class="bilanzzahlen">' +
-      zeile2("Insgesamt hineingespielt", rundM(o.einsatz).toFixed(2) + " &euro;") +
-      zeile2("Steckt noch in offenen Wetten", rundM(o.imSpiel).toFixed(2) + " &euro; (" + o.offen + ")") +
-      zeile2("Schon abgerechnet (Einsatz)", rundM(eingesetztFertig).toFixed(2) + " &euro; (" + fertig + ")") +
-      zeile2("Davon zurückbekommen", rundM(o.zurueck).toFixed(2) + " &euro;") +
-      zeile2("<b>Ergebnis der fertigen Wetten</b>", "<b>" + (bilanz >= 0 ? "+" : "") +
-        rundM(bilanz).toFixed(2) + " &euro;</b>") +
-      "</div>";
+    const bz = (titel, wert, zusatz) => "<tr><td>" + titel + "</td><td><b>" + wert +
+      "</b>" + (zusatz ? ' <span class="mini">' + zusatz + "</span>" : "") + "</td></tr>";
+    h += '<table class="tab bilanzzahlen"><tbody>' +
+      bz("Insgesamt hineingespielt", rundM(o.einsatz).toFixed(2) + " &euro;",
+         o.scheine.length + " Kombination(en)") +
+      bz("Steckt noch in offenen Wetten", rundM(o.imSpiel).toFixed(2) + " &euro;",
+         o.offen + " offen") +
+      bz("Schon abgerechnet (Einsatz)", rundM(eingesetztFertig).toFixed(2) + " &euro;",
+         o.gewonnen + " gewonnen, " + o.verloren + " verloren") +
+      bz("Davon zurückbekommen", rundM(o.zurueck).toFixed(2) + " &euro;", "") +
+      bz("<b>Ergebnis der fertigen Wetten</b>",
+         '<span class="' + (bilanz >= 0 ? "gruen" : "rot") + '">' + (bilanz >= 0 ? "+" : "") +
+         rundM(bilanz).toFixed(2) + " &euro;</span>", "") +
+      "</tbody></table>";
 
     const personZeilen = Object.entries(o.personen).map(([p, betrag]) =>
       "<tr><td>" + textSicherM(p === "-" ? "ohne Person" : ordnerNameM(p)) + "</td><td>" +
