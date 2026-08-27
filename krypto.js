@@ -194,8 +194,20 @@ async function kryptoEinrichten(passwort) {
     localStorage.removeItem("kt_e2e_bereich");
   }
 
-  if (safe && safe.keysafe) {
+  // Der Server-Safe ist die Wahrheit, wenn er da ist: er wird beim Anlegen
+  // NEUER Schluessel mitgeschrieben, der Passwort-Safe kann veraltet sein.
+  if (typeof kryptoEscrowHolen === "function") {
+    const esc = await kryptoEscrowHolen();
+    if (esc && (!kontoPub || await kryPasstZuKonto(esc.priv, kontoPub))) {
+      privB64 = esc.priv;
+      bereichB64 = esc.bereich;
+    }
+  }
+  if (!privB64 && safe && safe.keysafe) {
     privB64 = await kryAesAuf(kpass, safe.keysafe.iv, safe.keysafe.ct);
+    // Passt der Safe nicht mehr zum Konto (weil inzwischen neue Schluessel
+    // entstanden sind), NICHT verwenden - sonst waeren neue Daten unlesbar.
+    if (privB64 && kontoPub && !(await kryPasstZuKonto(privB64, kontoPub))) privB64 = null;
     if (privB64 === null) {
       // Safe passt nicht zum Passwort (Reset). Lokale Kopie nur, wenn sie
       // wirklich zu diesem Konto gehört (Regel 2).
