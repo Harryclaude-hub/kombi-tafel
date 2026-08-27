@@ -665,3 +665,197 @@ tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
   pointer-events:none; }
 .ausschnittmass { position:absolute; background:#ffd34d; color:#2a1f00; font-size:11px;
   font-weight:700; padding:1px 6px; border-radius:5px; pointer-events:none; }
+
+
+/* ============================================================
+   KENN-SCHICHT 27.08.: man soll auf einen Blick sehen, in
+   welchem Bereich man gerade ist.
+
+   Reine Optik. Dieser Block kann ersatzlos geloescht werden;
+   dann sieht das Programm wieder aus wie vorher und laeuft
+   unveraendert weiter. Er steht ganz unten und gewinnt allein
+   durch seine Lage - kein einziges !important.
+
+   EINHEITLICH GEBAUT, JE BEREICH ANDERS GEFUELLT.
+   Auf jeder der sieben Seiten sitzen dieselben vier Zeichen an
+   denselben Stellen, nur mit anderen Werten:
+     1. Kennkante    schmaler Farbstreifen ganz oben am Rand
+     2. Kennmarke    Schild ueber der Ueberschrift: Zeichen + Wort
+     3. Ueberschrift  Text und Linie darunter in der Kennfarbe
+     4. Kopfleiste   der aktive Knopf der obersten Navigation
+   Weiter unten aendert sich nichts. So bleiben die sieben Seiten
+   erkennbar EIN Programm.
+
+   WARUM ZEICHEN UND WORT UND NICHT NUR FARBE.
+   Gruen (bester Wert), rot (Abzug, vorbei, Warnung) und braun
+   (duenner Markt, aus Foto) tragen in den Tabellen Bedeutung und
+   sind damit gesperrt. Uebrig bleibt nur der Bereich von Petrol
+   bis Violett, und daraus lassen sich keine sieben sicher
+   unterscheidbaren Toene holen (nachgerechnet: acht der
+   einundzwanzig Farbpaare liegen zu nah beieinander).
+   Deshalb traegt das ZEICHEN und das WORT die Erkennung, die
+   Farbe ist nur der schnelle zweite Hinweis. Wer die Farben
+   nicht unterscheiden kann oder schwarzweiss druckt, liest
+   trotzdem sofort, wo er ist.
+
+   WO DIE FARBE NIE HINKOMMT.
+   In keine Tabelle: kein thead, kein tbody, keine Zelle, kein
+   Zebrastreifen, kein Filterknopf, keine Ordnerkarte, kein
+   Kasten. In diesem ganzen Block steht keine einzige Regel
+   innerhalb einer Tabelle. Merksatz: die Farbe hoert oberhalb
+   der Tabelle auf.
+
+   NACHGERECHNET, NICHT GESCHAETZT (WCAG AA braucht 4,5:1):
+   Marke  5,95 bis 13,02   Ueberschrift  6,79 bis 14,97
+   aktiver Knopf  6,79 bis 14,97   Admin-Knopf  11,49
+   ============================================================ */
+
+/* ---- 1. Die sieben Kennungen. Nur Werte, keine Regeln. ----
+   Der Haken sitzt am <body> jeder Seite: <body data-seite="tafel">.
+   Fehlt er, greift dieser ganze Block nicht und die Seite sieht
+   aus wie bisher.
+     --kenn      kraeftige Kennfarbe, weisse Schrift darauf lesbar
+     --kennhell  dieselbe Farbe stark aufgehellt, Flaeche der Marke
+     --kenntext  Zeichen und Wort auf der Marke: sagt die ART der
+                 Seite, wiederholt also nicht die Ueberschrift    */
+
+body[data-seite="tafel"]    { --kenn: #1a2c50; --kennhell: #eef1f7; --kenntext: "\1F4CB  Tabelle"; }
+body[data-seite="bau"]      { --kenn: #0e6273; --kennhell: #e7f2f4; --kenntext: "\1F527  Werkzeug"; }
+body[data-seite="handbuch"] { --kenn: #4b2e83; --kennhell: #f0ecf8; --kenntext: "\1F4D6  Lehrtext"; }
+body[data-seite="original"] { --kenn: #4a5566; --kennhell: #eef0f3; --kenntext: "\1F4C4  Vorlage"; }
+body[data-seite="hilfe"]    { --kenn: #1a5e97; --kennhell: #e8f1fa; --kenntext: "\2753  Bedienung"; }
+body[data-seite="mein"]     { --kenn: #6d2f70; --kennhell: #f6ecf6; --kenntext: "\1F464  Konto"; }
+body[data-seite="admin"]    { --kenn: #23272f; --kennhell: #eeeff2; --kenntext: "\2699  Verwaltung"; }
+/* Admin bekommt bewusst keine Buntfarbe, sondern Anthrazit: Rot ist
+   im Programm die Warnfarbe, und der dunkelrote Admin-Knopf soll auf
+   dieser Seite der einzige rote Punkt bleiben. */
+
+/* ---- 2. Kennkante: der Farbstreifen ganz oben ----
+   Liegt fest am Bildschirmrand und scrollt nie weg, kostet keinen
+   Platz (der Seitenrand oben ist 10px) und nimmt keine Klicks an.
+   z-index 50: ueber der klebenden Reiterleiste in Mein Bereich (40),
+   unter dem Nachrichtenfenster (1000) und der Ausschnitt-Buehne (9000). */
+body[data-seite]::before {
+  content: "";
+  position: fixed; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--kenn);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* ---- 3. Kennmarke: das Schild ueber der Ueberschrift ----
+   body > h1 trifft absichtlich NUR die Ueberschrift der Seite.
+   Ueberschriften, die spaeter im Inhalt erzeugt werden (Mein Bereich
+   baut welche), bekommen kein zweites Schild.
+   Die Marke steht VOR dem Titel in derselben Zeile. Damit kostet sie
+   keine einzige Zeile Hoehe ueber der Tabelle - und wird der Platz am
+   Handy doch zu eng, rutscht sie von selbst in die naechste Zeile,
+   statt etwas zu ueberlaufen.
+   12,5px, damit die Marke nicht die kleinste Schrift der Seite ist
+   (die Fusszeile hat 11,5px). */
+body[data-seite] > h1::before {
+  content: var(--kenntext);
+  display: inline-block;
+  vertical-align: 2px;
+  max-width: 100%;
+  margin: 0 10px 0 0;
+  padding: 3px 12px 3px 9px;
+  border-left: 5px solid var(--kenn);
+  border-radius: 0 5px 5px 0;
+  background: var(--kennhell);
+  color: var(--kenn);
+  font-size: 12.5px;
+  font-weight: bold;
+  line-height: 1.45;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Die Verwaltung bekommt als einzige eine GEFUELLTE Marke. Das ist ein
+   zweites Erkennungszeichen ganz ohne Farbe: schon an der Form sieht
+   man, dass man nicht als normaler Nutzer unterwegs ist.
+   Weiss auf Anthrazit ergibt 14,97:1. */
+body[data-seite="admin"] > h1::before {
+  background: var(--kenn);
+  color: #fff;
+  border-left-color: var(--kenn);
+  border-radius: 5px;
+  padding-left: 12px;
+}
+
+/* ---- 4. Die Ueberschrift selbst ----
+   Ersatzwert #1a2c50: eine Seite ohne Kennung behaelt exakt das
+   heutige Marineblau, es aendert sich also nichts. h2 bleibt
+   absichtlich hausblau - die Kennfarbe zeigt sich oben an der Seite,
+   nicht im ganzen Text. */
+h1 { color: var(--kenn, #1a2c50); border-bottom-color: var(--kenn, #1a2c50); }
+
+/* ---- 5. Der aktive Knopf in der obersten Kopfleiste ----
+   body > .navleiste trifft nur die Kopfleiste. Die zweite Leiste in
+   Mein Bereich (#bereichtabs) liegt im Inhalt und bleibt aussen vor.
+   ACHTUNG bei Aenderungen: die vier Sonderknoepfe sind ausdruecklich
+   ausgenommen, damit sie ihre Signalfarbe behalten (Glocke gruen,
+   Admin dunkelrot, App laden gruen, Update rot). Kommt ein fuenfter
+   farbiger Sonderknopf dazu, MUSS er hier in die :not()-Kette, sonst
+   uebermalt die Kennfarbe seine Warnwirkung, sobald er "aktiv" traegt.
+   Nicht aktive Knoepfe bleiben hausblau: so ist immer genau EIN Knopf
+   farbig, und der zeigt den Bereich. */
+body[data-seite] > .navleiste a.navknopf.aktiv:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf) {
+  background: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50);
+  color: #fff;
+}
+body[data-seite] > .navleiste a.navknopf.aktiv:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf):hover {
+  background: var(--kenn, #1a2c50);
+}
+
+/* ---- 6. Eine Reparatur, die dazugehoert ----
+   Auf admin.html traegt der Admin-Knopf gleichzeitig "aktiv". Die
+   Grundregel .navleiste a.navknopf.aktiv ist genauer als
+   .navknopf.adminknopf und uebermalt das Dunkelrot deshalb SCHON
+   HEUTE mit Hausblau - ausgerechnet auf der Seite, auf der die
+   Warnfarbe am meisten zaehlt. Diese Zeile gibt sie zurueck
+   (weiss auf #7a0000 = 11,49:1).
+   Wer den alten Zustand lieber behalten will, loescht genau diese
+   eine Regel; der Rest der Schicht bleibt davon unberuehrt. */
+body[data-seite] > .navleiste a.navknopf.adminknopf {
+  background: #7a0000; border-color: #7a0000; color: #fff;
+}
+
+/* ---- 7. Handy ----
+   Oben zaehlt jeder Punkt: Kante und Marke werden als EINE Einheit
+   etwas kleiner, damit der Kopf nicht mehr Platz frisst als heute. */
+@media (max-width: 480px) {
+  body[data-seite]::before { height: 3px; }
+  body[data-seite] > h1::before {
+    font-size: 11.5px; padding: 2px 9px 2px 7px; margin-right: 8px;
+    letter-spacing: 0.04em;
+  }
+}
+
+/* ---- 8. Druck ----
+   Der Streifen gehoert auf den Bildschirm, nicht aufs Papier (er
+   wuerde wegen print-color-adjust:exact als Farbbalken mitdrucken).
+   Die Marke bleibt, aber in reinem Schwarz auf Weiss: so sieht man
+   dem Ausdruck an, von welcher Seite er stammt, ohne Farbe zu
+   verbrauchen. Die Kopfleiste wird beim Drucken ohnehin ausgeblendet. */
+@media print {
+  body[data-seite]::before { display: none; }
+  body[data-seite] > h1::before,
+  body[data-seite="admin"] > h1::before {
+    background: #fff; color: #000; border-left-color: #000;
+    border-radius: 0; padding: 2px 10px 2px 7px; letter-spacing: 0.04em;
+  }
+  h1 { color: #000; border-bottom-color: #000; }
+}
+
+/* ---- 9. Ruhe ----
+   Diese Schicht bewegt sich nicht: keine Animation, kein Uebergang,
+   kein Blinken. Die Sperre steht trotzdem hier, falls spaeter jemand
+   Bewegung ergaenzt. Der einzige bewusst blinkende Knopf im Programm
+   bleibt der Update-Knopf, und der wird weiter oben abgeschaltet. */
+@media (prefers-reduced-motion: reduce) {
+  body[data-seite]::before, body[data-seite] > h1::before {
+    animation: none; transition: none;
+  }
+}
