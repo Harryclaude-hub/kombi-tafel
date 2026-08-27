@@ -490,7 +490,7 @@ function zeichne_() {
   document.getElementById("mind").value = z.einst.mind;
   document.querySelectorAll(".anbwahl").forEach(c => { c.checked = z.einst.anbieter.includes(c.value); });
 
-  const normal = z.scheine.filter(s => s.art === "normal");
+  const normal = z.scheine.filter(s => s.art === "normal" || s.art === "eigen");
   const niedrig = z.scheine.filter(s => s.art === "niedrig");
   const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
