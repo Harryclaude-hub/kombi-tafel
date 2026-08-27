@@ -78,13 +78,19 @@ function scheinFotoAuswerten(text) {
   // Einzelquoten: kleine Quoten, deren Produkt die Gesamtquote bestätigt
   const kandidaten = alle.map(x => x.wert).filter(w =>
     w >= 1.01 && w <= 30 && w !== best.quote && w !== best.einsatz && w !== best.gewinn);
+  // Teilmengen-Suche: welche Gruppe von Quoten ergibt multipliziert die
+  // Gesamtquote? So fliegt z. B. die 3 aus "3er Kombi" von selbst raus.
   let einzel = [], einzelProbe = false;
-  if (kandidaten.length >= 2 && kandidaten.length <= 6) {
-    const produkt = kandidaten.reduce((p, w) => p * w, 1);
-    if (Math.abs(produkt - best.quote) / best.quote <= 0.02) {
-      einzel = kandidaten;
-      einzelProbe = true;
+  if (kandidaten.length >= 2 && kandidaten.length <= 8) {
+    let beste = null;
+    for (let maske = 3; maske < (1 << kandidaten.length); maske++) {
+      const gruppe = kandidaten.filter((w, i) => maske & (1 << i));
+      if (gruppe.length < 2) continue;
+      const produkt = gruppe.reduce((p, w) => p * w, 1);
+      const rel = Math.abs(produkt - best.quote) / best.quote;
+      if (rel <= 0.02 && (!beste || gruppe.length > beste.length)) beste = gruppe;
     }
+    if (beste) { einzel = beste; einzelProbe = true; }
   }
   if (!einzelProbe) einzel = kandidaten;
 
