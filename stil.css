@@ -880,3 +880,261 @@ body[data-seite] > .navleiste a.navknopf.adminknopf {
   background: #fffaf0; border-radius: 8px; font-size: 13px; }
 .tippkasten ul { margin: 4px 0 2px 20px; }
 .tippkasten li { margin: 2px 0; }
+
+/* ============================================================
+   WOHLFUEHL-SCHICHT 28.08. (Karams Wunsch: "alles schoener,
+   uebersichtlicher, mehr Farben").
+
+   Reine Optik. Dieser Block wird ans ENDE von stil.css
+   angehaengt; loescht man ihn, sieht alles wieder aus wie
+   vorher und laeuft unveraendert. Kein einziges !important,
+   kein Eingriff in HTML oder JS.
+
+   DER GEDANKE: mutige Farbe mit Disziplin.
+   1. Jede Seite bekommt eine zarte Flaeche in ihrer Kennfarbe
+      (--kennhell aus der Kenn-Schicht weiter oben). Die Kaesten
+      liegen darauf als weisse Karten mit weichem Schatten.
+   2. Ueberschriften, Tabellenkoepfe, Kopfleiste, Filter-Reiter,
+      Haupt-Knoepfe, Fokus-Ringe und die Reiter in Mein Bereich
+      uebernehmen die Kennfarbe der Seite. So hat jeder Bereich
+      seine eigene Stimmung, ohne ein neues Farbsystem.
+   3. Die Scheine im Kombi-Bau tragen ihren Kopf in der
+      Hausfarbe des Anbieters (dieselben Farben wie die
+      .marke-Schilder: Interwetten gruen, Bwin schwarz,
+      Bet365 gruen-gelb, Stake dunkelblau).
+
+   WO NICHTS PASSIERT (die Farbe hoert oberhalb der Tabelle auf):
+   Innerhalb der Tabellenkoerper (tbody) aendert dieser Block
+   keine einzige Farbe. Gruen (bester Wert, gewonnen), rot
+   (Interwetten-Abzug, vorbei, verloren, Warnung) und braun/orange
+   (duenner Markt, aus Foto, offen, fertig) bleiben pixelgleich.
+   Die vier Sonderknoepfe (Glocke gruen, Admin dunkelrot,
+   App laden gruen, Update rot blinkend) werden nicht angefasst,
+   der rote Admin-Kasten auch nicht.
+
+   Alles steht in @media screen: der DRUCK bleibt dadurch exakt
+   wie heute. Es kommt keine Animation dazu, prefers-reduced-motion
+   hat in dieser Schicht nichts zu unterdruecken.
+
+   Alle var(...) haben einen Ersatzwert: fehlt einer Seite die
+   Kennung (data-seite), faellt alles auf das Hausblau zurueck.
+   ============================================================ */
+@media screen {
+
+/* ---- 1. Die Buehne: zarte Kennfarbe hinter den Karten ----
+   Bewusst heller gemischt als --kennhell pur, damit Kennmarke und
+   Tabellenkoepfe (die --kennhell pur tragen) sich weiter abheben.
+   Ein alter Browser ohne color-mix laesst die Zeile weg, dann
+   bleibt der Grund weiss wie bisher. */
+body[data-seite] { background-color: color-mix(in srgb, var(--kennhell, #ffffff) 55%, #fff); }
+
+/* Tabellen bekommen ihren weissen Grund jetzt selbst. Dadurch
+   bleiben die Zeilen OHNE eigene Farbe (das Zebra-Weiss) exakt
+   weiss wie heute; an den tbody-Regeln selbst aendert sich nichts. */
+table { background-color: #fff; }
+/* In farbig gefuellten Kaesten bleiben Tabellen durchsichtig,
+   sonst wuerde das neue Weiss die Kastenfarbe verdecken. */
+.lesekasten table, .ordnerpflicht table, .kassenformular table,
+.kassenwarnung table, .fertighinweis table, .tippkasten table { background-color: transparent; }
+
+/* ---- 2. Kaesten als richtige Karten ----
+   Weisser Grund fuer alles, was bisher durchsichtig war. Die
+   Bedeutungs-Kaesten (lesekasten gruen, fertighinweis orange,
+   kassenwarnung rot, fotodoppelt rot) stehen absichtlich NICHT
+   in dieser Liste und behalten ihre Farbe. */
+/* details:not(.anmk): die Anmerkungs-Kaesten stecken IN Tabellenzellen
+   (mein.js), dort wuerde Weiss das Zebra-Grau und das Fertig-Orange
+   uebermalen - im tbody aendert diese Schicht keine Farbe. */
+.warnkern, .zeitkern, .fuellkern, .filterbox, details:not(.anmk), .schein,
+.auth-kasten, .kassenkasten, .adminkasten, .eigenbaukasten,
+.fotokachel, .bsp { background-color: #fff; }
+
+/* Ein weicher, doppelter Schatten macht aus den Kaesten Karten.
+   Schatten liegt AUSSEN, die Innenfarben bleiben unberuehrt. */
+.kern, .warnkern, .zeitkern, .fuellkern, .filterbox, .schein,
+.auth-kasten, .kassenkasten, .adminkasten, .eigenbaukasten,
+.ordnerkarte, .fotokachel, .lesekasten, .kassenwarnung,
+.fertighinweis, .ordnerpflicht, .bsp, .chatliste, details:not(.anmk) {
+  box-shadow: 0 1px 2px rgba(15, 25, 40, 0.08), 0 3px 12px rgba(15, 25, 40, 0.07);
+}
+.zeitkern, .fuellkern, .filterbox { border-radius: 9px; }
+.bsp { border-radius: 9px; }
+/* Bewusst KEIN Rand am .bsp: bei 320 px Breite wuerde schon 1px
+   Rand die breiteste Beispieltabelle um 1px weiter hinausschieben
+   (nachgemessen). Der Schatten traegt die Kartenwirkung allein. */
+details:not(.anmk) { border-radius: 9px; }
+details:not(.anmk) > summary { border-radius: 8px 8px 0 0; }
+
+/* Neutrale Rahmen ziehen zur Kennfarbe um (rote und gruene
+   Rahmen sind Bedeutung und bleiben, wie sie sind). */
+.filterbox, .auth-kasten, .kassenkasten, .eigenbaukasten,
+.ordnerkarte, .ordnerwahl, .ordnerwerk, .chatliste,
+#glockenpanel, #freundepanel { border-color: var(--kenn, #1a2c50); }
+
+/* ---- 3. Ueberschriften mit Farbakzent aus der Kennfarbe ---- */
+body[data-seite] h2 {
+  color: var(--kenn, #1a2c50);
+  border-bottom-color: var(--kenn, #1a2c50);
+  border-left: 6px solid var(--kenn, #1a2c50);
+  padding-left: 10px;
+}
+body[data-seite] h3 { color: var(--kenn, #1a2c50); }
+body[data-seite] h4 { color: var(--kenn, #1a2c50); }
+
+/* ---- 4. Tabellenkoepfe in der Kennfarbe ----
+   thead ist der Kopf UEBER dem Tabellenkoerper; im tbody selbst
+   passiert weiterhin nichts. */
+body[data-seite] thead th {
+  background-color: var(--kennhell, #eef1f7);
+  border-bottom: 2px solid var(--kenn, #1a2c50);
+}
+
+/* ---- 5. Aufklapp-Kaesten: Kopfzeile in der Kennfarbe ----
+   .werkoffen (geoeffnete Ordner-Werkstatt, hellgruen) ist
+   ausgenommen und behaelt sein Signal. */
+body[data-seite] details:not(.anmk):not(.werkoffen) > summary {
+  background-color: var(--kennhell, #eef1f7);
+  border-left-color: var(--kenn, #1a2c50);
+}
+
+/* ---- 6. Kopfleiste: auch die ruhigen Knoepfe zeigen die
+   Kennfarbe der Seite. Die vier Sonderknoepfe sind ausgenommen
+   und behalten ihre Signalfarbe (gleiche Ausnahmen-Kette wie in
+   der Kenn-Schicht; kommt ein fuenfter Sonderknopf dazu, muss er
+   hier UND dort in die :not()-Kette). */
+body[data-seite] > .navleiste a.navknopf:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf) {
+  border-color: var(--kenn, #1a2c50);
+  color: var(--kenn, #1a2c50);
+}
+body[data-seite] > .navleiste a.navknopf:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf):hover {
+  background-color: var(--kennhell, #eef1f7);
+}
+body[data-seite] > .navleiste a.navknopf.aktiv:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf) {
+  background-color: var(--kenn, #1a2c50);
+  color: #fff;
+}
+
+/* ---- 7. Filterleisten: die neutralen Reiter faerben sich mit.
+   Die Bedeutungs-Filter behalten ihre Farben: Anbieter gruen,
+   Rang grau, Satz braun. */
+body[data-seite] #filter button.aktiv {
+  background-color: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50);
+  color: #fff;
+}
+body[data-seite] .filterzeile.f-reiter button.aktiv,
+body[data-seite] .filterzeile.f-zeit button.aktiv {
+  background-color: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50);
+  color: #fff;
+}
+.filterzeile .f-label { color: var(--kenn, #1a2c50); }
+
+/* ---- 8. Knoepfe und Eingaben ---- */
+button.haupt { background-color: var(--kenn, #1a2c50); border-color: var(--kenn, #1a2c50); }
+button.haupt:hover { background-color: color-mix(in srgb, var(--kenn, #1a2c50) 82%, #000); }
+button:not(.aktiv):not(.haupt):hover {
+  background-color: var(--kennhell, #eef2fa);
+  border-color: var(--kenn, #1a2c50);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--kenn, #1a2c50);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kenn, #1a2c50) 20%, transparent);
+}
+button.freundknopf { border-color: var(--kenn, #1a2c50); color: var(--kenn, #1a2c50); }
+button.freundknopf.aktiv { background-color: var(--kenn, #1a2c50); color: #fff; }
+
+/* ---- 9. Mein Bereich: Reiter, Bereichs-Knoepfe, Kassen-Leisten ---- */
+body[data-seite] .mb-navi {
+  background-color: color-mix(in srgb, var(--kennhell, #ffffff) 55%, #fff);
+  border-bottom-color: var(--kenn, #1a2c50);
+}
+.mb-navi button {
+  background-color: #fff;
+  border-color: var(--kenn, #1a2c50);
+  color: var(--kenn, #1a2c50);
+}
+.mb-navi button.aktiv {
+  background-color: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50);
+  color: #fff;
+  box-shadow: 0 3px 0 var(--kenn, #1a2c50);
+}
+#bereichtabs a.navknopf { border-color: var(--kenn, #1a2c50); color: var(--kenn, #1a2c50); }
+#bereichtabs a.navknopf:hover { background-color: var(--kennhell, #eef1f7); }
+#bereichtabs a.navknopf.aktiv {
+  background-color: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50);
+  color: #fff;
+}
+#bereichtabs a.navknopf.aktiv:hover { background-color: var(--kenn, #1a2c50); }
+/* Die Anzeigen-Leiste der Personen-Kasse (KASSE_BLOECKE) als
+   farbige Zeile statt grauem Balken. */
+.kassewahl {
+  background-color: var(--kennhell, #f4f4f4);
+  border-left: 4px solid var(--kenn, #1a2c50);
+  border-radius: 7px;
+}
+/* Formular-Flaechen ziehen mit der Kennfarbe mit. */
+.kassenformular, .ordnerpflicht { background-color: var(--kennhell, #f2f5fb); }
+.kassenformular { border-radius: 7px; }
+/* Chat: Sprechblasen in der Kennfarbe; die eigenen bleiben gruen. */
+.chatzeile { background-color: var(--kennhell, #eef1f7); border-left-color: var(--kenn, #1a2c50); }
+/* Nachrichten-Fenster: Kopf in der Kennfarbe der Seite. */
+.gp-kopf { background-color: var(--kenn, #1a2c50); }
+.gp-freund { border-color: var(--kenn, #1a2c50); color: var(--kenn, #1a2c50); }
+
+/* ---- 10. Kombi-Bau: der Schein-Kopf traegt die Hausfarbe
+   seines Anbieters (wie die .marke-Schilder). Das Farbband oben
+   plus zarte Tonflaeche; der rote Warnkopf (.niedrigkopf,
+   Quoten unter der Mindestquote) bleibt unangetastet rot.
+   Browser ohne :has() zeigen einfach den Kennfarben-Kopf. */
+.s-kopf:not(.niedrigkopf) { background-color: var(--kennhell, #eef1f7); border-bottom-color: var(--kenn, #1a2c50); }
+.schein:has(.s-kopf .m-iw):not(:has(.niedrigkopf)) { border-top: 5px solid #0a7d3e; }
+.schein:has(.s-kopf .m-bw):not(:has(.niedrigkopf)) { border-top: 5px solid #111111; }
+.schein:has(.s-kopf .m-b3):not(:has(.niedrigkopf)) { border-top: 5px solid #14805e; }
+.schein:has(.s-kopf .m-st):not(:has(.niedrigkopf)) { border-top: 5px solid #1a2c38; }
+.schein:has(.s-kopf .m-iw) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #0a7d3e 9%, #fff); border-bottom-color: #0a7d3e; }
+.schein:has(.s-kopf .m-bw) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #111111 6%, #fff); border-bottom-color: #111111; }
+.schein:has(.s-kopf .m-b3) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #14805e 9%, #fff); border-bottom-color: #14805e; }
+.schein:has(.s-kopf .m-st) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #1a2c38 8%, #fff); border-bottom-color: #1a2c38; }
+
+/* ---- 10b. Nachrechnen: die Zaehl-Zahlen als richtige Kacheln.
+   Die FARBEN bleiben exakt die alten (rot/gelb/gruen/grau tragen
+   Bedeutung) - nur Groesse und Karten-Look kommen dazu. ---- */
+.pruefkopf { gap: 10px; }
+.pruefzahl { font-size: 14.5px; padding: 6px 14px;
+  box-shadow: 0 1px 2px rgba(15, 25, 40, 0.08), 0 3px 10px rgba(15, 25, 40, 0.06); }
+
+/* ---- 10c. Mein Bereich, Reste in der Kennfarbe (sonst blieben
+   hausblaue Inseln im Bereichston stehen) ---- */
+.ordnerfilter button.aktiv { background-color: var(--kenn, #1a2c50);
+  border-color: var(--kenn, #1a2c50); color: #fff; }
+.ordnerwahl.aktiv { background-color: var(--kennhell, #eef1f7); }
+.ordnerpflicht { border-color: var(--kenn, #1a2c50); }
+.eb-zeile:hover { background-color: var(--kennhell, #eef2fa); }
+
+/* ---- 10d. h3/h4 mit kleinem Farbbalken als Gliederung (steht
+   nie in einer Tabelle, geprueft) ---- */
+body[data-seite] h3, body[data-seite] h4 {
+  border-left: 4px solid var(--kenn, #1a2c50); padding-left: 8px; }
+
+/* ---- 11. Handy: die grossen Reiter und Kopf-Knoepfe eine Spur
+   kompakter, damit unter 480px nichts drueckt. ---- */
+@media (max-width: 480px) {
+  .mb-navi button { font-size: 15px; padding: 9px 14px; }
+  .navleiste a.navknopf { padding: 7px 12px; font-size: 13.5px; }
+  .pruefzahl { font-size: 13px; padding: 5px 10px; }
+}
+
+/* ---- 12. Ruhe: die Rundungs-Schicht weiter oben gibt Knoepfen
+   Uebergaenge; wer Bewegung abgeschaltet hat, bekommt sie hier
+   still. Diese Schicht selbst bewegt nichts. ---- */
+@media (prefers-reduced-motion: reduce) {
+  button, input, select, textarea, .navleiste a.navknopf { transition: none; }
+}
+
+}
+/* ============================================================
+   ENDE WOHLFUEHL-SCHICHT 28.08.
+   ============================================================ */
