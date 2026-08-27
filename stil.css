@@ -527,3 +527,9 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 
 /* App-Installation (Design-Schicht) */
 .navknopf.installknopf { background: #1a7a1a; color: #fff; border-color: #1a7a1a; }
+
+/* Satz-Einlesen (Design-Schicht) */
+.tabellenrand { overflow-x: auto; }
+.satzkasten { border: 1px solid #999; padding: 6px 10px; margin: 8px 0; }
+.satzkasten summary { cursor: pointer; }
+#adm_vorschau input, #adm_saetze input { font-size: 14px; }

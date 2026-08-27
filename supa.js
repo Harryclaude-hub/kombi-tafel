@@ -470,3 +470,53 @@ async function supaAnmerkungLoeschen(id) {
 async function supaAdminRolle(zielId, neu) {
   return await supa.rpc("kt_admin_rolle_setzen", { ziel: zielId, neu: neu });
 }
+
+// ---------- Dynamische Foto-Saetze (das Programm liest selbst ein) ----------
+// Homebase: fuer alle lesbar, schreiben nur Admins (prueft die Datenbank).
+
+async function supaSaetzeLaden() {
+  const r = await supa.from("kt_saetze").select("id, titel").order("id", { ascending: false });
+  return r.data || [];
+}
+
+async function supaWettenLaden() {
+  const r = await supa.from("kt_wetten").select("*")
+    .order("satz", { ascending: false }).order("pos", { ascending: true });
+  return r.data || [];
+}
+
+async function supaSatzAnlegen(id, titel) {
+  const u = await supaNutzer();
+  const r = await supa.from("kt_saetze").upsert({ id: id, titel: titel, erstellt_von: u ? u.id : null });
+  return r;
+}
+
+async function supaWetteAnlegen(satz, w) {
+  return await supa.from("kt_wetten").insert({
+    satz: satz, pos: w.pos || 0, von: w.von || "", an_zeit: w.an_zeit,
+    liga: w.liga || "", spiel: w.spiel, wette: w.wette,
+    kat: w.kat || w.s || "", s: w.s || "SIEG", o: w.o || []
+  }).select("id").single();
+}
+
+async function supaWetteAendern(id, felder) {
+  return await supa.from("kt_wetten").update(felder).eq("id", id).select("id");
+}
+
+async function supaWetteLoeschen(id) {
+  return await supa.from("kt_wetten").delete().eq("id", id).select("id");
+}
+
+async function supaSatzLoeschen(id) {
+  return await supa.from("kt_saetze").delete().eq("id", id).select("id");
+}
+
+async function supaSatzUploadsVoll(datum) {
+  const r = await supa.from("kt_satz_uploads").select("id, foto, status")
+    .eq("satz_datum", datum).order("created_at", { ascending: true });
+  return r.data || [];
+}
+
+async function supaUploadStatus(id, status) {
+  return await supa.from("kt_satz_uploads").update({ status: status }).eq("id", id).select("id");
+}

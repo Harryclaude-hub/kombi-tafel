@@ -66,7 +66,10 @@ function zeichneOriginal() {
 
     const zeilen = basis.filter(w => w.id.split(".")[0] === String(bild));
     for (const w of zeilen) {
-      const r = ROH[w.id] || ["?", "?", "?"];
+      // Datenbank-Saetze haben keine ROH-Zusatzdaten: gemeldet aus dem
+      // von-Feld, die Foto-Quote direkt aus der Wette selbst
+      const r = ROH[w.id] || [w.von || "?",
+        (w.o && w.o[0] ? String(w.o[0][1]).replace(".", ",") : "?"), ""];
       koerper.appendChild(rohZeile({
         von: w.von, anText: rohZeitText(w.an), meld: r[0], liga: w.liga,
         spiel: w.spiel, wette: w.wette, qg: r[1], qh: r[2]
