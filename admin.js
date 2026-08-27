@@ -438,6 +438,29 @@ function felderAusWorten(words) {
 
 // Sieht eine nicht verwertbare Rohzeile trotzdem nach einer Wett-Zeile aus?
 // (dann wird sie in die Vorschau uebernommen statt weggeworfen)
+// Notfall-Zerlegung einer Zeile ohne brauchbare Spalten: die festen
+// Bestandteile (Datum, Meldedatum, Quoten) herausloesen, der Rest bleibt
+// als Liga/Spiel/Wette-Text stehen.
+function zeileNotZerlegen(text) {
+  let t = " " + String(text).replace(/\s+/g, " ").trim() + " ";
+  const felder = [];
+  const datum = t.match(/\d{2}-\d{2}-\d{4}[.,;]?\s*\d{1,2}[:.]\d{2}/);
+  if (datum) { felder.push(datum[0]); t = t.replace(datum[0], " | "); }
+  const meld = t.match(/\s\d{1,2}\/\d{1,2}\/\d{2,4}\s/);
+  if (meld) { felder.push(meld[0].trim()); t = t.replace(meld[0], " | "); }
+  const quoten = t.match(/\d{1,3}[.,]\d{2}(?!\d)/g) || [];
+  for (const q of quoten) t = t.replace(q, " | ");
+  // Spiel und Wette trennen: vor und nach dem Vereins-Trenner "vs"
+  const rest = t.split("|").map(x => x.trim()).filter(x => x.length > 1);
+  for (const r of rest) {
+    const vs = r.match(/^(.*\bvs?\.?\b.*?)\s+(\S.*\(.*\).*)$/i);
+    if (vs) { felder.push(vs[1].trim()); felder.push(vs[2].trim()); }
+    else felder.push(r);
+  }
+  for (const q of quoten) felder.push(q);
+  return felder;
+}
+
 function zeileSiehtNachWetteAus(text) {
   const t = String(text || "").trim();
   if (t.length < 12) return false;
@@ -452,7 +475,7 @@ function satzFelderParsen(felder, erbe) {
   const quoten = [];
   const rest = [];
   for (const f of felder) {
-    const anM = f.match(/(\d{2})-(\d{2})-(\d{4}),?\s*(\d{1,2})[:.](\d{2})/);
+    const anM = f.match(/(\d{2})-(\d{2})-(\d{4})[.,;]?\s*(\d{1,2})[:.](\d{2})/);
     const qM = f.match(/^[.,]?(\d{1,3})[,.](\d{2})[.,]?$/);
     const vonM = f.match(/^[^0-9]?(\d{1,2})\/(\d{1,2})\/?\d{0,4}$/);
     if (anM && !an) {
@@ -589,9 +612,9 @@ async function satzEinlesen(datum) {
     try {
       const gross = await bildVergroessern(up.foto, 2400);
       const nrJetzt = nr;
+      // NUR den logger uebergeben: zusaetzliche Einstellungen kosten hier die
+      // Wort-Koordinaten, und ohne die faellt die Spaltenerkennung aus.
       const erg = await Tesseract.recognize(gross, "deu", {
-        tessedit_pageseg_mode: "6",          // gleichmaessiger Textblock (Tabelle)
-        preserve_interword_spaces: "1",
         logger: m => {
         if (m.status === "recognizing text") {
           einleseBalken(box, nrJetzt, uploads.length, Math.round((m.progress || 0) * 100), "Zeilen werden gelesen...");
@@ -613,9 +636,16 @@ async function satzEinlesen(datum) {
     let erbe = null;
     let unklar = 0;
     for (const line of lines) {
-      const felder = felderAusWorten(line.words);
+      let felder = felderAusWorten(line.words);
       const rohText = (line.text || felder.join(" ")).replace(/\s+/g, " ").trim();
-      const p = satzFelderParsen(felder, erbe);
+      // Notfall: keine Wort-Koordinaten -> an groesseren Luecken zerlegen
+      if (felder.length < 3 && rohText.length > 20) {
+        const geteilt = rohText.split(/\s{2,}/).map(t => t.trim()).filter(Boolean);
+        if (geteilt.length >= 3) felder = geteilt;
+      }
+      let p = satzFelderParsen(felder, erbe);
+      // Zweiter Versuch: Zeile anhand der Muster zerlegen (Datum | Rest | Quoten)
+      if (!p && rohText.length > 20) p = satzFelderParsen(zeileNotZerlegen(rohText), erbe);
       if (p) {
         p.wette = wetteReparieren(p.wette);
         p.s = artErkennen(p.wette);
