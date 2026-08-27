@@ -149,7 +149,7 @@ async function zeigeApp() {
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button>
   <span id="benach_platz"></span>
-  ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">Admin-Bereich</a>' : ""}</div>
+  ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">&#9881;&#65039; Admin-Bereich</a>' : ""}</div>
 <details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschlüsselt - was heisst das?</summary>
 Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschlüsselt in der
 Datenbank - lesbar allein für dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
@@ -159,7 +159,7 @@ Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können
 <div id="mb_navi" class="mb-navi"></div>
 
 <div id="blk_kombis" class="mb-block">
-<h2>Personen</h2>
+<h2>&#128100; Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
 gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b> die
 Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur, wenn ein
@@ -168,7 +168,7 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="scheine_db"></div>
-<h2>Konto dieses Bereichs</h2>
+<h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
 <div id="importkasten"></div>
 </div>
@@ -183,7 +183,7 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 </div>
 
 <div id="blk_chat" class="mb-block">
-<h2>Chat dieses Bereichs</h2>
+<h2>&#128172; Chat dieses Bereichs</h2>
 <p class="mini">Alle, die diesen Bereich sehen können, können hier schreiben. So benachrichtigt
 ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p>
 <div id="chatliste" class="chatliste"></div>
@@ -239,10 +239,10 @@ async function tuPushEinschalten() {
 // vom 26.08.). Der zuletzt offene Block wird gemerkt.
 
 const MB_BLOECKE = [
-  ["kombis", "Kombinationen und Personen"],
-  ["buch", "Buchhaltung"],
-  ["freunde", "Freunde und Teilen"],
-  ["chat", "Chat"]
+  ["kombis", "&#127919; Kombinationen und Personen"],
+  ["buch", "&#128210; Buchhaltung"],
+  ["freunde", "&#128101; Freunde und Teilen"],
+  ["chat", "&#128172; Chat"]
 ];
 
 function mbAktiverBlock() {
@@ -605,7 +605,7 @@ async function tuScheinOrdner(id, wert) {
 
 async function zeichneBereich() {
   el("scheine_titel").textContent = (aktiverBereich.rolle === "ich")
-    ? "Meine Kombinationen" : "Kombinationen von " + aktiverBereich.username;
+    ? "&#127919; Meine Kombinationen" : "&#127919; Kombinationen von " + aktiverBereich.username;
   const scheine = await supaScheineLaden(aktiverBereich.id);
   ordnerListe = await supaOrdnerLaden(aktiverBereich.id);
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
@@ -896,7 +896,7 @@ function zeichnePersonenKasse(scheine) {
   const schreib = darfSchreiben();
   const p = personPruefen(person.id, scheine);
 
-  let html = '<div class="kassenkasten"><h3>Personen-Kasse: ' + textSicherM(person.name) + "</h3>";
+  let html = '<div class="kassenkasten"><h3>&#128176; Personen-Kasse: ' + textSicherM(person.name) + "</h3>";
   if (p.probleme.length) {
     html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
       p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";

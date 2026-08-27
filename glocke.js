@@ -72,7 +72,7 @@ async function freundeZeichnen() {
   const vonMir = await supaFreigabenVonMir();
   const fuerMich = await supaBereicheFuerMich();
 
-  let html = "<h4>Deine Freunde (" + kontakte.length + ")</h4>";
+  let html = "<h4>&#128101; Deine Freunde (" + kontakte.length + ")</h4>";
   if (!kontakte.length) html += '<p class="mini">Noch keine. Adden geht in <a href="mein.html">Mein Bereich</a>.</p>';
   const versteckte = [];
   for (const k of kontakte) {
@@ -98,14 +98,14 @@ async function freundeZeichnen() {
     html += "</details>";
   }
 
-  html += "<h4>Follower: die sehen deinen Bereich (" + vonMir.length + ")</h4>";
+  html += "<h4>&#128064; Follower: die sehen deinen Bereich (" + vonMir.length + ")</h4>";
   for (const f of vonMir) {
     html += '<div class="fp-freund mini">' + fpSicher(f.kt_profiles.username) +
       " <span class='mini'>(" + (f.rolle === "close" ? "darf mitarbeiten" : "schaut nur zu") + ")</span></div>";
   }
   if (!vonMir.length) html += '<p class="mini">Noch niemand.</p>';
 
-  html += "<h4>Du folgst: diese Bereiche siehst du (" + fuerMich.length + ")</h4>";
+  html += "<h4>&#11088; Du folgst: diese Bereiche siehst du (" + fuerMich.length + ")</h4>";
   for (const f of fuerMich) {
     html += '<div class="fp-freund mini">' + fpSicher(f.kt_profiles.username) +
       " <span class='mini'>(" + (f.rolle === "close" ? "mitarbeiten" : "nur lesen") + ")</span></div>";

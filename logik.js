@@ -62,6 +62,7 @@ function jetztText() {
 // ---------- Foto-Sätze ----------
 
 function aktiverSatzId() {
+  if (!SAETZE.length) return null;       // noch kein Ordner eingelesen
   const gespeichert = localStorage.getItem("kt_satz");
   if (gespeichert && SAETZE.some(x => x.id === gespeichert)) return gespeichert;
   return SAETZE[SAETZE.length - 1].id;   // Standard: der neueste Satz
@@ -108,6 +109,14 @@ function zeichneOrdnerLeiste() {
   const box = document.getElementById("ordnerleiste");
   if (!box) return;
   const id = aktiverSatzId();
+  if (!id) {
+    box.innerHTML = '<div class="ordnerkarte"><div class="ordnerkopf">&#128193; ' +
+      "<b>Noch kein Foto-Ordner.</b></div>" +
+      '<div class="mini" style="padding:8px 12px">Ein Admin lädt neue Fotos im ' +
+      '<a href="admin.html">Admin-Bereich</a> hoch und liest sie ein - dann erscheint ' +
+      "der Ordner hier für alle.</div></div>";
+    return;
+  }
   const satz = SAETZE.find(x => x.id === id) || SAETZE[SAETZE.length - 1];
   const deko = satzDeko(id);
   const farbe = deko.farbe || "#1a2c50";
@@ -118,7 +127,7 @@ function zeichneOrdnerLeiste() {
   let html = '<div class="ordnerkarte" style="border-color:' + farbe + '">' +
     '<div class="ordnerkopf" style="background:' + farbe + '">' +
     (emoji ? '<span class="ordneremoji">' + emoji + "</span> " : "") +
-    "Offener Ordner: <b>" + satz.titel + "</b>" +
+    "&#128193; Offener Ordner: <b>" + satz.titel + "</b>" +
     '<span class="ordnerzahl">' + anzahl + " Wetten, " + offen + " offen</span></div>" +
     '<div class="ordnerknoepfe">' +
     '<a class="ordnerknopf" href="admin.html" id="fotoadminknopf" style="display:none">Neue Fotos hochladen</a>' +

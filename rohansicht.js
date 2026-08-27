@@ -93,4 +93,36 @@ function zeichneOriginal() {
     "1 Foto-Überlappung (nur zur Vollstaendigkeit, zählt nicht doppelt).";
 }
 
-document.addEventListener("DOMContentLoaded", zeichneOriginal);
+// Die hochgeladenen Original-Fotos des offenen Ordners (Admins sehen sie -
+// die Foto-Dateien selbst sind nur fuer Admins lesbar)
+async function zeichneOrdnerFotos() {
+  try {
+    if (typeof supaSatzUploadsVoll !== "function" || typeof supaIstAdmin !== "function") return;
+    const id = (typeof aktiverSatzId === "function") ? aktiverSatzId() : null;
+    if (!id || !(await supaIstAdmin())) return;
+    const uploads = await supaSatzUploadsVoll(id);
+    if (!uploads.length) return;
+    let box = document.getElementById("ordnerfotos");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "ordnerfotos";
+      const tabelle = document.getElementById("rohkoerper");
+      if (tabelle && tabelle.closest("table")) {
+        tabelle.closest("table").parentNode.insertBefore(box, tabelle.closest("table"));
+      } else {
+        document.body.appendChild(box);
+      }
+    }
+    let h = '<div class="kern"><b>&#128247; Die Original-Fotos dieses Ordners (' + uploads.length +
+      ')</b> <span class="mini">- nur für Admins sichtbar</span></div><div class="fotogitter">';
+    for (const up of uploads) {
+      h += '<div class="fotokachel"><img src="' + up.foto + '" alt="Foto"></div>';
+    }
+    box.innerHTML = h + "</div>";
+  } catch (e) { /* Fotos stoeren nie die Tabelle */ }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  zeichneOriginal();
+  zeichneOrdnerFotos();
+});

@@ -48,7 +48,7 @@ async function startAdmin() {
   }
   adminIch = u;
   ziel.innerHTML = `
-<h2>Foto-Sätze der Homebase hochladen</h2>
+<h2>&#128193; Foto-Sätze der Homebase hochladen</h2>
 <p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum, für ALLE Nutzer gleich
 (die Homebase). Fotos hochladen, dann <b>Jetzt im Programm einlesen</b> drücken - das Programm
 liest sie sofort selbst, du prüfst die Vorschau und übernimmst. <b>Sätze mischen sich nie.</b>
@@ -56,12 +56,12 @@ Doppelt hochgeladene Fotos erkennt das Programm am Fingerabdruck und lehnt sie a
 Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>
 <div id="adm_fotos"></div>
 <div id="adm_vorschau"></div>
-<h2>Sätze bearbeiten</h2>
+<h2>&#128194; Sätze bearbeiten</h2>
 <p class="mini">Jeder eingelesene Satz lässt sich hier jederzeit nachbearbeiten: Einträge
 ändern, löschen oder neue hinzufügen. Die Tafel, der Kombi-Bau und die Original-Tabelle
 ziehen sofort mit. Der feste Satz vom 24.08. liegt im Programm selbst und bleibt wie er ist.</p>
 <div id="adm_saetze"></div>
-<h2>Alle User</h2>
+<h2>&#128101; Alle User</h2>
 <p class="mini">Löschen entfernt ein Konto RESTLOS - samt allem, was der User angelegt hat,
 auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrückt werden.
 Admins ernennst du mit "zum Admin machen" - auch das fragt zweimal.</p>
@@ -113,7 +113,7 @@ async function tuSatzFotos(input) {
   if (!dateien.length) return;
   let ok = 0, doppelt = 0;
   for (const datei of dateien) {
-    const dataUrl = await verkleinereBild(datei, 1100);
+    const dataUrl = await verkleinereBild(datei, 1600);
     if (!dataUrl) continue;
     const hash = await fotoFingerabdruck(dataUrl);
     if (hash && await supaUploadHashDa(datum, hash)) { doppelt++; continue; }
@@ -199,6 +199,27 @@ async function tuAlleFotosWeg(datum) {
   adminFotoSaetze();
   const imSatz = elA("satzfotos_" + datum);
   if (imSatz) { imSatz.dataset.geladen = ""; satzFotosLaden(datum); }
+}
+
+// Kleine Fotos vor der Erkennung hochskalieren - winzige Schrift ist der
+// Hauptgrund fuer verlorene Zeilen (15 statt 50!)
+function bildVergroessern(dataUrl, mindestBreite) {
+  return new Promise(fertig => {
+    const bild = new Image();
+    bild.onload = () => {
+      if (bild.width >= mindestBreite) { fertig(dataUrl); return; }
+      const faktor = mindestBreite / bild.width;
+      const c = document.createElement("canvas");
+      c.width = Math.round(bild.width * faktor);
+      c.height = Math.round(bild.height * faktor);
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = true;
+      g.drawImage(bild, 0, 0, c.width, c.height);
+      fertig(c.toDataURL("image/png"));
+    };
+    bild.onerror = () => fertig(dataUrl);
+    bild.src = dataUrl;
+  });
 }
 
 async function fotoFingerabdruck(dataUrl) {
@@ -328,7 +349,7 @@ function felderAusWorten(words) {
   return felder;
 }
 
-function satzFelderParsen(felder) {
+function satzFelderParsen(felder, erbe) {
   let an = null, von = "", quote = null;
   const rest = [];
   for (const f of felder) {
@@ -344,6 +365,12 @@ function satzFelderParsen(felder) {
     } else if (f.length > 1 && !/^[a-z]{1,3}$/i.test(f)) {
       rest.push(f);   // Kleinkram wie das jb-Kuerzel fliegt raus
     }
+  }
+  let geerbt = false;
+  if (!an && erbe && erbe.an && quote !== null && rest.length) {
+    an = erbe.an;                       // Datum aus der Vorzeile uebernehmen
+    if (!von && erbe.von) von = erbe.von;
+    geerbt = true;
   }
   if (!an || quote === null || quote < 1.01 || quote > 1000 || !rest.length) return null;
   let liga = "", spiel = "", wette = "";
@@ -361,7 +388,7 @@ function satzFelderParsen(felder) {
   }
   if (!wette && spiel) { wette = spiel; }
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette,
-    s: artErkennen(wette), quote: quote };
+    s: artErkennen(wette), quote: quote, geerbt: geerbt };
 }
 
 function artErkennen(wette) {
@@ -403,10 +430,15 @@ function pruefGruende(z, satzDatum) {
   return g;
 }
 
+// STRENG (fuers automatische Verwerfen): nur wirklich 1:1 gleiche Zeilen
+// gelten als Duplikat - Karams Regel. Alles nur AEHNLICHE wird lediglich
+// gelb markiert (weicher Schluessel) und bleibt seine Entscheidung.
 function zeilenSchluessel(z) {
-  // Uhrzeit (ohne Datum!) + Quote + Art + Spiel-Anfang: faengt auch
-  // Zeilen, bei denen die Texterkennung das DATUM vertippt hat, und
-  // solche, die auf zwei Fotos leicht unterschiedlich gelesen wurden
+  const norm = t => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+  return z.an_zeit + "|" + z.quote + "|" + norm(z.spiel) + "|" + norm(z.wette);
+}
+
+function zeilenSchluesselWeich(z) {
   const spiel6 = z.spiel.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
   const uhr = String(z.an_zeit).slice(11, 16);
   return uhr + "|" + z.quote + "|" + z.s + "|" + spiel6;
@@ -416,10 +448,10 @@ function zeilenSchluessel(z) {
 function vsDoppelVerdacht() {
   const zaehl = {};
   for (const z of vorschauZeilen) {
-    const k = z.an_zeit + "|" + z.quote;
+    const k = zeilenSchluesselWeich(z);
     zaehl[k] = (zaehl[k] || 0) + 1;
   }
-  return vorschauZeilen.map(z => zaehl[z.an_zeit + "|" + z.quote] > 1);
+  return vorschauZeilen.map(z => zaehl[zeilenSchluesselWeich(z)] > 1);
 }
 
 async function satzEinlesen(datum) {
@@ -443,7 +475,8 @@ async function satzEinlesen(datum) {
     box.innerHTML = '<div class="kern">Lese Foto ' + nr + " von " + uploads.length + "...</div>";
     let lines = [];
     try {
-      const erg = await Tesseract.recognize(up.foto, "deu");
+      const gross = await bildVergroessern(up.foto, 1600);
+      const erg = await Tesseract.recognize(gross, "deu");
       lines = erg.data.lines || [];
       // Fallback fuer aeltere Ausgaben: Bloecke/Absaetze durchsuchen
       if (!lines.length && erg.data.blocks) {
@@ -455,12 +488,15 @@ async function satzEinlesen(datum) {
       continue;
     }
     const geparst = [];
+    let erbe = null;
     for (const line of lines) {
-      const p = satzFelderParsen(felderAusWorten(line.words));
+      const p = satzFelderParsen(felderAusWorten(line.words), erbe);
       if (p) {
         p.wette = wetteReparieren(p.wette);
         p.s = artErkennen(p.wette);
         p.gruende = pruefGruende(p, datum);
+        if (p.geerbt) p.gruende.push("Anstoß aus der Vorzeile geerbt - prüfen");
+        erbe = { an: p.an_zeit, von: p.von };
         geparst.push(p);
       }
     }
@@ -499,7 +535,9 @@ function vorschauZeigen() {
       '<td><button onclick="vsWeg(' + i + ')">weg</button></td></tr>';
   });
   box.innerHTML = '<div class="kern"><b>Vorschau: ' + vorschauZeilen.length + " Wetten erkannt (Satz vom " +
-    sicherA(vorschauDatum) + ").</b> Bitte kurz mit den Fotos vergleichen - jede Zelle " +
+    sicherA(vorschauDatum) + ").</b> <b class='rot'>Zähle auf den Fotos nach, ob die Anzahl stimmt!</b> " +
+    "Fehlen Zeilen, ist das Foto zu klein oder unscharf - am besten Bildschirm-Screenshots in voller " +
+    "Größe hochladen, notfalls die Tabelle in mehreren Ausschnitten. Bitte kurz vergleichen - jede Zelle " +
     "lässt sich direkt ändern. <b>Gelbe Zeilen</b> haben gleiche Zeit und Quote wie eine andere - " +
     "möglicherweise doppelt erkannt, bitte vergleichen. Übernommen wird erst mit dem grünen Knopf.</div>" +
     '<div class="tabellenrand"><table><thead><tr><th>Prüfen</th><th>Anstoß (UK-Zeit)</th><th>gemeldet</th>' +

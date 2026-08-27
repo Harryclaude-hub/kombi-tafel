@@ -50,10 +50,12 @@ function speichereZustand(z) { localStorage.setItem(zustandSchluessel(), JSON.st
 function einstellungenLesen() {
   const anb = [];
   document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
+  const zielFeld = document.getElementById("ziel");
   return {
     mind: parseFloat(document.getElementById("mind").value) || 1.5,
     anbieter: anb.length ? anb : ["iw", "bw", "b3", "st"],
-    saat: parseInt(document.getElementById("mischzahl").value, 10) || 1
+    saat: parseInt(document.getElementById("mischzahl").value, 10) || 1,
+    ziel: zielFeld ? (parseFloat(zielFeld.value) || 400) : 400
   };
 }
 
@@ -558,7 +560,8 @@ function scheinHtml(s, z) {
       ">" + a.name + "</option>").join("") + "</select>";
 
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
-    "Schein " + s.nr + " " + marke(s.kz) + wahl +
+    "Schein " + s.nr + (s.teil ? ' <span class="s-warn">Teil ' + s.teil + " (gleiche Wetten, weiterer Anbieter)</span>" : "") +
+    " " + marke(s.kz) + wahl +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
       ' Wetten, kein Dreier mehr</span>' : "") +
@@ -574,9 +577,10 @@ function scheinHtml(s, z) {
       s.entfernt.map(e => (wetteNachId(e.id) ? wetteNachId(e.id).spiel : e.id) +
         " (" + e.grund + ")").join(", ") + "</div>" : "") +
     "<div class='s-fuss'>Einsatz <input type='number' step='0.5' min='0' class='einsatz' " +
-      "id='e_" + s.id + "' value='10' oninput=\"rechneGewinn('" + s.id + "'," + gesamt + ")\"> &euro;" +
-      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(10 * gesamt).toFixed(2) + " &euro;</b>" +
+      "id='e_" + s.id + "' value='" + zielEinsatz() + "' oninput=\"rechneGewinn('" + s.id + "'," + gesamt + ")\"> &euro;" +
+      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(zielEinsatz() * gesamt).toFixed(2) + " &euro;</b>" +
       '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
+      '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Wenn ein Anbieter nicht so viel Einsatz zulässt: denselben Schein zusätzlich bei einem weiteren Anbieter setzen, bis das Ziel erreicht ist.">&#10133; Bei weiterem Anbieter setzen</button>' +
       (s.wetten.length !== 3
         ? '<button class="auflösen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
         : "") +
@@ -617,6 +621,39 @@ function zeichneReste(z) {
   html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
   
   document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
+}
+
+// Karams Ziel: im Schnitt ~400 Euro je Kombi. Laesst ein Anbieter nicht
+// so viel Einsatz zu, wird derselbe Schein zusaetzlich bei einem weiteren
+// Anbieter gesetzt - jeder Teil hat sein eigenes Einsatzfeld.
+function zielEinsatz() {
+  const f = document.getElementById("ziel");
+  return f ? (parseFloat(f.value) || 400) : 400;
+}
+
+function scheinTeilen(scheinId) {
+  const z = liesZustand();
+  const s = z.scheine.find(x => x.id === scheinId);
+  if (!s) return;
+  const e = z.einst || einstellungenLesen();
+  const nr = s.nr;
+  const teile = z.scheine.filter(x => x.nr === nr);
+  const benutzt = teile.map(x => x.kz);
+  const frei = (e.anbieter || ["iw", "bw", "b3", "st"]).find(kz => !benutzt.includes(kz));
+  if (!frei) { meldung("Alle erlaubten Anbieter haben diesen Schein schon.", "warn"); return; }
+  const kopie = {
+    id: s.id + "_t" + (teile.length + 1), nr: nr, kz: frei, art: s.art,
+    teil: teile.length + 1,
+    wetten: s.wetten.map(w => ({ id: w.id, optIdx: w.optIdx })),
+    entfernt: []
+  };
+  const pos = z.scheine.indexOf(s);
+  z.scheine.splice(pos + teile.length, 0, kopie);
+  speichereZustand(z);
+  meldung("Schein " + nr + " zusätzlich bei <b>" + anbieterName(frei) + "</b> angelegt (Teil " +
+    kopie.teil + "). Trag dort den Rest-Einsatz ein, bis dein Ziel von " +
+    zielEinsatz().toFixed(0) + " &euro; erreicht ist.", "gut");
+  zeichne_();
 }
 
 function scheinAufloesen(scheinId) {
