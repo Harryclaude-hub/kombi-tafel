@@ -367,18 +367,24 @@ async function kryptoGeraetBereit() {
 // mehr ein Passwort eintippen. Der Safe liegt verschlüsselt in der
 // Datenbank; das Geheimnis dazu kennt nur die Server-Funktion.
 
-const SCHLUESSEL_URL = SUPA_URL + "/functions/v1/schluessel";
+// Die Adresse erst beim Aufruf zusammenbauen: krypto.js wird VOR supa.js
+// geladen, dort steht SUPA_URL - beim Laden waere sie noch unbekannt.
+function schluesselUrl() {
+  const basis = (typeof SUPA_URL === "string" && SUPA_URL)
+    ? SUPA_URL : "https://mqmevpyatjsambervgtu.supabase.co";
+  return basis + "/functions/v1/schluessel";
+}
 
 async function kryptoServerRuf(koerper) {
   const s = await supaSitzung();
   if (!s) return null;
   try {
-    const r = await fetch(SCHLUESSEL_URL, {
+    const r = await fetch(schluesselUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + s.access_token,
-        "apikey": SUPA_KEY
+        "apikey": (typeof SUPA_KEY === "string" ? SUPA_KEY : "")
       },
       body: JSON.stringify(koerper)
     });
