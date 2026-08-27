@@ -585,3 +585,10 @@ input:focus, select:focus, textarea:focus { border-color: #1a2c50; outline: none
   50% { box-shadow: 0 0 0 7px rgba(160, 0, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .navknopf.updateknopf { animation: none; } }
+
+/* Höhere Genauigkeit als die Navigations-Grundregel (sonst bleiben die
+   farbigen Sonder-Knöpfe weiß) */
+.navleiste a.navknopf.installknopf { background: #1a7a1a; color: #fff; border-color: #1a7a1a; }
+.navleiste a.navknopf.installknopf:hover { background: #146014; }
+.navleiste a.navknopf.updateknopf { background: #a00000; color: #fff; border-color: #a00000; }
+.navleiste a.navknopf.updateknopf:hover { background: #7a0000; }
