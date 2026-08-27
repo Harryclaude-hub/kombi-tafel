@@ -14,6 +14,15 @@
 // ============================================================
 "use strict";
 
+// Welche Fassung laeuft hier gerade? Steht im ?v= des eigenen Skript-Tags.
+const APP_FASSUNG = (function () {
+  try {
+    const s = document.currentScript && document.currentScript.src;
+    const m = s && s.match(/[?&]v=([A-Za-z0-9._-]+)/);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+})();
+
 const PUSH_PUB = "BEOK4zMFAGnbRL1k4VNm_4wX388JIkHCQhBYdijrFk7NsBmbBRawKep6dA579tImu2H6qkU1k_ts6QhCKo-PfR8";
 const PUSH_URL = "https://mqmevpyatjsambervgtu.supabase.co/functions/v1/push-senden";
 
@@ -133,3 +142,60 @@ async function pushSenden(anId, art) {
     }).catch(() => {});
   } catch (e) { /* nie die Seite stoeren */ }
 }
+
+// ============================================================
+// UPDATE-KNOPF: taucht NUR auf, wenn eine neuere Fassung da ist.
+// Erkennung ohne Zusatzdatei: die Startseite wird frisch geholt und
+// die dort eingetragene Fassung mit der eigenen verglichen.
+// ============================================================
+
+let _updateFassung = null;
+
+async function pruefeUpdate() {
+  try {
+    if (!APP_FASSUNG) return;
+    const html = await fetch("index.html?frisch=" + Date.now(), { cache: "no-store" }).then(r => r.text());
+    const m = html.match(/logik\.js\?v=([A-Za-z0-9._-]+)/) || html.match(/stil\.css\?v=([A-Za-z0-9._-]+)/);
+    if (!m) return;
+    if (m[1] !== APP_FASSUNG && m[1] !== _updateFassung) {
+      _updateFassung = m[1];
+      zeigeUpdateKnopf();
+    }
+  } catch (e) { /* Update-Pruefung stoert nie die Seite */ }
+}
+
+function zeigeUpdateKnopf() {
+  if (document.getElementById("app_update_knopf")) return;
+  const nav = document.querySelector(".navleiste");
+  if (!nav) return;
+  const k = document.createElement("a");
+  k.id = "app_update_knopf";
+  k.href = "#";
+  k.className = "navknopf updateknopf";
+  k.innerHTML = "&#128260; Update da - jetzt laden";
+  k.title = "Es gibt eine neuere Fassung der App. Ein Klick holt sie sofort.";
+  k.onclick = ev => { ev.preventDefault(); appAktualisieren(); };
+  nav.appendChild(k);
+}
+
+async function appAktualisieren() {
+  const k = document.getElementById("app_update_knopf");
+  if (k) k.innerHTML = "&#8987; wird geladen...";
+  try {
+    if ("caches" in window) {
+      const namen = await caches.keys();
+      await Promise.all(namen.map(n => caches.delete(n)));
+    }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.update();
+  } catch (e) { /* weiter, das Neuladen holt es ohnehin */ }
+  // Mit frischem Anhaengsel neu laden, damit kein alter Zwischenspeicher greift
+  const pfad = location.pathname.split("/").pop() || "index.html";
+  location.replace(pfad + "?frisch=" + Date.now());
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  pruefeUpdate();
+  setInterval(pruefeUpdate, 10 * 60 * 1000);          // alle 10 Minuten
+});
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pruefeUpdate(); });

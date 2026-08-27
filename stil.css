@@ -575,3 +575,13 @@ input:focus, select:focus, textarea:focus { border-color: #1a2c50; outline: none
 .zielzeile { padding: 8px 12px; border-top: 1px solid #ccc; font-size: 15px; }
 .ziel-gut { color: #0a5a0a; font-weight: bold; }
 .ziel-offen { color: #7a3d00; }
+
+/* Update-Knopf: fällt auf, wenn es etwas Neues gibt (Design-Schicht) */
+.navknopf.updateknopf { background: #a00000; color: #fff; border-color: #a00000;
+  font-weight: bold; animation: updatepuls 1.8s ease-in-out infinite; }
+.navknopf.updateknopf:hover { background: #7a0000; }
+@keyframes updatepuls {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(160, 0, 0, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(160, 0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .navknopf.updateknopf { animation: none; } }
