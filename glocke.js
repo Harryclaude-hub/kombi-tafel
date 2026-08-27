@@ -7,6 +7,7 @@
 "use strict";
 
 let glockeOffen = false;
+let _glockeVorher = -1;   // Zaehlerstand der letzten Runde (fuer Meldungen)
 let glockePartner = null;      // {partnerId, username}
 let glockeLetzteId = 0;
 let glockePoll = null;
@@ -139,6 +140,11 @@ async function glockeZaehlen() {
     b.textContent = n > 99 ? "99+" : String(n);
     b.style.display = n > 0 ? "inline-block" : "none";
   }
+  // Kam etwas Neues dazu, waehrend die Seite im Hintergrund liegt? Melden.
+  if (_glockeVorher >= 0 && n > _glockeVorher && typeof benachrichtige === "function") {
+    benachrichtige("Neue Nachricht", "In der Kombi-Tafel lesen.", "nachricht");
+  }
+  _glockeVorher = n;
 }
 
 function glockeUmschalten() {

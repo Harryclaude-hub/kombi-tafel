@@ -16,6 +16,7 @@ let anrufStream = null;          // eigenes Mikro/Kamera
 let anrufPartner = null;         // { id, name, video }
 let anrufEingehend = null;       // { von, name, offer, video, eis: [] }
 let anrufEigenerKanal = null;
+let anrufKlingelTimer = null;    // wiederholt das Klingeln beim Anrufer
 const _anrufKanaele = {};        // zielId -> subscribed channel
 
 // Auf jedem Seitenaufruf: eigenen Klingel-Kanal abonnieren
@@ -66,6 +67,10 @@ async function anrufSignal(roh) {
   if (!s || !s.typ) return;
 
   if (s.typ === "klingeln") {
+    // Wiederholtes Klingeln DESSELBEN Anrufers ist kein besetzt: er klingelt
+    // regelmaessig weiter, damit eine per Push geoeffnete App es noch faengt.
+    if ((anrufEingehend && anrufEingehend.von === roh.von) ||
+        (anrufPartner && anrufPartner.id === roh.von)) return;
     if (anrufPc || anrufEingehend) { anrufSenden(roh.von, { typ: "besetzt" }); return; }
     const p = await supa.from("kt_profiles").select("username").eq("id", roh.von).maybeSingle();
     anrufEingehend = { von: roh.von, name: (p.data && p.data.username) || "?",
@@ -74,7 +79,10 @@ async function anrufSignal(roh) {
       (s.video ? "mit Video" : "Ton") + ")...",
       '<button class="haupt" onclick="anrufAnnehmen()">Annehmen</button> ' +
       '<button onclick="anrufAblehnen()">Ablehnen</button>');
+    if (typeof benachrichtige === "function")
+      benachrichtige(anrufEingehend.name + " ruft dich an!", "In der Kombi-Tafel annehmen.", "anruf");
   } else if (s.typ === "annahme") {
+    anrufKlingelStopp();
     // Nur der Angerufene selbst darf antworten - sonst könnte ein Dritter
     // mit Schlüssel die Verbindung übernehmen.
     if (anrufPc && anrufPartner && roh.von === anrufPartner.id) await anrufPc.setRemoteDescription(s.answer);
@@ -148,7 +156,25 @@ async function anrufStarten(partnerId, name, mitVideo) {
   const offer = await anrufPc.createOffer();
   await anrufPc.setLocalDescription(offer);
   const ok = await anrufSenden(partnerId, { typ: "klingeln", offer: offer, video: mitVideo });
-  if (!ok) anrufBeenden("Klingeln nicht zustellbar.");
+  if (!ok) { anrufBeenden("Klingeln nicht zustellbar."); return; }
+  // Push aufs Geraet des Freundes (falls seine App gerade zu ist) ...
+  if (typeof pushSenden === "function") pushSenden(partnerId, "anruf");
+  // ... und alle 3 Sekunden weiterklingeln, bis er annimmt oder 45 s um sind
+  let versuche = 0;
+  anrufKlingelStopp();
+  anrufKlingelTimer = setInterval(() => {
+    versuche++;
+    if (!anrufPc || versuche > 15) {
+      anrufKlingelStopp();
+      if (anrufPc && versuche > 15) anrufBeenden("Keine Antwort.");
+      return;
+    }
+    anrufSenden(partnerId, { typ: "klingeln", offer: offer, video: mitVideo });
+  }, 3000);
+}
+
+function anrufKlingelStopp() {
+  if (anrufKlingelTimer) { clearInterval(anrufKlingelTimer); anrufKlingelTimer = null; }
 }
 
 async function anrufAnnehmen() {
@@ -179,6 +205,7 @@ function anrufAuflegen() {
 }
 
 function anrufBeenden(meldungText) {
+  anrufKlingelStopp();
   if (anrufPc) { try { anrufPc.close(); } catch (e) {} }
   if (anrufStream) anrufStream.getTracks().forEach(t => t.stop());
   anrufPc = null; anrufStream = null; anrufPartner = null; anrufEingehend = null;
