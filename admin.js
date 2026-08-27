@@ -90,7 +90,9 @@ async function adminFotoSaetze() {
       (g.wartet ? '<span class="rot">' + g.wartet + " warten</span> " +
         '<button class="haupt" onclick="satzEinlesen(\'' + sicherA(datum) + '\')">Jetzt im Programm einlesen</button>'
                 : '<span class="gruen">eingelesen</span> ' +
-        '<button onclick="satzEinlesen(\'' + sicherA(datum) + '\')">noch einmal einlesen</button>') + "</li>";
+        '<button onclick="satzEinlesen(\'' + sicherA(datum) + '\')">noch einmal einlesen</button>') +
+      ' <button onclick="fotosZeigen(\'' + sicherA(datum) + '\')">Fotos ansehen / löschen</button>' +
+      '<div id="fotoliste_' + sicherA(datum) + '"></div></li>';
   }
   const d = new Date();
   const heute = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
@@ -122,6 +124,56 @@ async function tuSatzFotos(input) {
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
     " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
     ". Jetzt oben auf <b>Jetzt im Programm einlesen</b> drücken.", ok || doppelt ? "gut" : "warn");
+  adminFotoSaetze();
+}
+
+// ---------- Fotos ansehen und loeschen ----------
+// Falsch hochgeladen? Jedes Foto laesst sich einzeln entfernen - oder
+// alle eines Datums auf einmal, um mit dem gleichen Datum komplett neu
+// anzufangen. (Satz löschen entfernt die Fotos absichtlich NICHT.)
+
+async function fotosZeigen(datum) {
+  const box = elA("fotoliste_" + datum);
+  if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ""; return; }   // zweiter Klick klappt zu
+  box.innerHTML = '<p class="mini">Lade Fotos...</p>';
+  const uploads = await supaSatzUploadsVoll(datum);
+  if (!uploads.length) { box.innerHTML = '<p class="mini">Keine Fotos mehr zu diesem Datum.</p>'; return; }
+  let h = '<div class="fotogitter">';
+  for (const up of uploads) {
+    h += '<div class="fotokachel"><img src="' + up.foto + '" alt="Foto">' +
+      '<div class="mini">' + (up.status === "wartet" ? '<span class="rot">wartet</span>' : '<span class="gruen">eingelesen</span>') +
+      ' <button onclick="tuFotoWeg(\'' + up.id + '\', \'' + sicherA(datum) + '\')">dieses Foto löschen</button></div></div>';
+  }
+  h += "</div>" +
+    '<p><button id="allefotosweg_' + sicherA(datum) + '" onclick="tuAlleFotosWeg(\'' + sicherA(datum) + '\')">' +
+    "ALLE " + uploads.length + " Fotos vom " + sicherA(datum) + " löschen</button> " +
+    '<span class="mini">Danach kannst du zum gleichen Datum komplett neue Fotos hochladen.</span></p>';
+  box.innerHTML = h;
+}
+
+async function tuFotoWeg(id, datum) {
+  const r = await supaSatzUploadLoeschen(id);
+  if (r.error || !r.data || !r.data.length) { meldungA("Foto nicht gelöscht (nur Admins).", "warn"); return; }
+  meldungA("Foto gelöscht.", "gut");
+  const box = elA("fotoliste_" + datum);
+  if (box) box.innerHTML = "";
+  await adminFotoSaetze();
+  fotosZeigen(datum);
+}
+
+async function tuAlleFotosWeg(datum) {
+  const knopf = elA("allefotosweg_" + datum);
+  if (knopf && knopf.dataset.sicher !== "1") {
+    knopf.dataset.sicher = "1";
+    knopf.textContent = "Wirklich ALLE Fotos vom " + datum + " löschen?";
+    knopf.classList.add("adminrot");
+    return;
+  }
+  const r = await supa.from("kt_satz_uploads").delete().eq("satz_datum", datum).select("id");
+  if (r.error) { meldungA("Nicht gelöscht: " + sicherA(r.error.message), "warn"); return; }
+  meldungA(((r.data && r.data.length) || 0) + " Fotos vom " + sicherA(datum) +
+    " gelöscht. Du kannst jetzt zum gleichen Datum frisch hochladen.", "gut");
   adminFotoSaetze();
 }
 

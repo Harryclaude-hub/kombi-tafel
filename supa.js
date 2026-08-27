@@ -336,7 +336,7 @@ async function supaUploadHashDa(satzDatum, hash) {
 }
 
 async function supaSatzUploadLoeschen(id) {
-  return await supa.from("kt_satz_uploads").delete().eq("id", id);
+  return await supa.from("kt_satz_uploads").delete().eq("id", id).select("id");
 }
 
 // ---------- Konto-Ordner (Unterordner für die Kombinationen) ----------

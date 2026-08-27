@@ -533,3 +533,8 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .satzkasten { border: 1px solid #999; padding: 6px 10px; margin: 8px 0; }
 .satzkasten summary { cursor: pointer; }
 #adm_vorschau input, #adm_saetze input { font-size: 14px; }
+
+/* Foto-Verwaltung im Admin (Design-Schicht) */
+.fotogitter { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0; }
+.fotokachel { border: 1px solid #999; padding: 6px; max-width: 300px; }
+.fotokachel img { max-width: 100%; display: block; margin-bottom: 4px; }
