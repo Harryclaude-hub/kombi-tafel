@@ -948,7 +948,9 @@ function scheinEnde(s) {
     const w = WETTEN.find(x => x.id === t.id);
     if (!w) return null;                        // Zeit unbekannt: nicht werten
     const a = liesAnstoss(anstossFeld(w));
+    if (a.fehlt) return null;                   // Zeit unbekannt: nicht werten
     const e = new Date(a.zeit);
+    if (isNaN(e.getTime())) return null;
     if (a.unklar) e.setHours(23, 59);
     e.setHours(e.getHours() + 3);
     if (!ende || e > ende) ende = e;

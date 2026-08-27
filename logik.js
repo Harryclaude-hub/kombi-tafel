@@ -21,6 +21,12 @@ function rund2(x) { return Math.round(x * 100) / 100; }
 // Anstoss lesen; "?" am Ende = Uhrzeit unbekannt.
 // Die Foto-Zeit wird um ZEITVERSATZ_MINUTEN nach vorne gerechnet (UK -> Oesterreich).
 function liesAnstoss(an) {
+  // Fehlt die Zeit ganz (Scanner hat keine gefunden, Wette von Hand ohne
+  // Anstoss), darf das nichts abstuerzen lassen: "fehlt" heisst dann nur,
+  // dass niemand etwas ueber den Zeitpunkt behaupten kann.
+  if (typeof an !== "string" || !an.trim()) {
+    return { zeit: new Date(NaN), unklar: true, fehlt: true };
+  }
   const unklar = an.endsWith("?");
   const iso = unklar ? an.slice(0, -1) : an;
   const d = new Date(iso);
@@ -34,6 +40,7 @@ function anstossFeld(w) { return w.anKorrigiert || w.an; }
 
 function zeitText(an) {
   const a = liesAnstoss(an);
+  if (a.fehlt) return "Zeit fehlt";
   const t = a.zeit;
   const dd = String(t.getDate()).padStart(2, "0");
   const mm = String(t.getMonth() + 1).padStart(2, "0");
@@ -45,6 +52,7 @@ function zeitText(an) {
 
 function istVorbei(an) {
   const a = liesAnstoss(an);
+  if (a.fehlt) return false;   // unbekannt ist NICHT dasselbe wie vorbei
   if (a.unklar) {
     // Uhrzeit unbekannt: erst am Folgetag als vorbei werten
     const ende = new Date(a.zeit); ende.setHours(23, 59);
