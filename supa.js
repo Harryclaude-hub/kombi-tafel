@@ -31,7 +31,11 @@ async function supaRegistrieren(username, email, passwort) {
     return { fehler: "Benutzername: 3 bis 24 Zeichen, nur Buchstaben, Zahlen, Punkt, Strich, Unterstrich." };
   const frei = await supa.from("kt_profiles").select("id").ilike("username", username).maybeSingle();
   if (frei.data) return { fehler: "Der Benutzername ist schon vergeben." };
-  const r = await supa.auth.signUp({ email: email, password: passwort });
+  // Kennzeichen mitgeben: diese Anmeldung kommt aus der Kombi-Tafel.
+  // Daran erkennen die Datenbank-Ausloeser, dass der Nutzer NICHT zum
+  // Immo-Check gehoert (beide Programme teilen sich die Konten-Tabelle).
+  const r = await supa.auth.signUp({ email: email, password: passwort,
+    options: { data: { app: "kombi-tafel" } } });
   if (r.error) return { fehler: uebersetzeFehler(r.error.message) };
   // Bestaetigung ist serverseitig abgeschaltet: direkt anmelden
   const a = await supa.auth.signInWithPassword({ email: email, password: passwort });
