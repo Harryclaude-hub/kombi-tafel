@@ -195,9 +195,72 @@ async function tuSatzFotos(input, satzId) {
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
     " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
     (neuerOrdner ? ". <b>Ordner automatisch angelegt.</b>" : ".") +
-    " Jetzt auf <b>Jetzt im Programm einlesen</b> drücken.", ok || doppelt ? "gut" : "warn");
-  adminFotoSaetze();
-  adminSaetze();
+    (ok ? " <b>Das Einlesen startet jetzt von selbst...</b>" : ""), ok || doppelt ? "gut" : "warn");
+  await adminSaetze();
+  if (ok) {
+    // DER DURCHLAUF: neue Fotos -> sofort einlesen. Saubere Zeilen gehen
+    // automatisch in die Datenbank; nur Unklares wartet auf Karam.
+    durchlaufDatum = datum;
+    satzAufklappen(datum);
+    satzEinlesen(datum);
+  }
+}
+
+// ============================================================
+// DER DURCHLAUF: Fotos hochladen, und alles Weitere passiert
+// von selbst - einlesen, saubere Zeilen uebernehmen, Ordner
+// aktivieren. Damit stehen Kombi-Tafel, Kombi-Bau und die
+// Original-Tabelle ohne einen weiteren Klick.
+// Nur Zeilen mit Pruef-Gruenden bleiben in der Vorschau stehen:
+// bei echtem Geld winkt der Durchlauf nichts Unsicheres durch.
+// ============================================================
+let durchlaufDatum = null;
+
+function zeileIstSauber(z, verdachtHier) {
+  return z.spiel && z.wette && z.quote && z.quote >= 1.01 &&
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(z.an_zeit) &&
+    !(z.gruende && z.gruende.length) && !verdachtHier;
+}
+
+async function durchlaufWeiter() {
+  if (durchlaufDatum !== vorschauDatum) return;
+  durchlaufDatum = null;
+  if (!vorschauZeilen.length) return;   // vorschauZeigen erklaert das schon
+  const verdacht = vsDoppelVerdacht();
+  const saubere = [], unklare = [];
+  vorschauZeilen.forEach((z, i) => (zeileIstSauber(z, verdacht[i]) ? saubere : unklare).push(z));
+
+  if (!saubere.length) {
+    meldungA("<b>Durchlauf angehalten:</b> keine der " + vorschauZeilen.length +
+      " Zeilen ist eindeutig - bitte in der Vorschau prüfen.", "warn");
+    return;
+  }
+
+  // Die sauberen Zeilen gehen sofort in die Datenbank
+  vorschauZeilen = saubere;
+  vsTrotzdem = false;
+  await vsUebernehmen();
+
+  if (!unklare.length) {
+    // Alles sauber: Ordner gleich aktivieren - der Durchlauf ist komplett
+    satzAktivieren(vorschauDatum);
+    meldungA("<b>&#9989; Durchlauf fertig: " + saubere.length + " Wetten eingelesen, " +
+      "Ordner aktiv.</b> Alles steht bereit: " +
+      '<a href="index.html"><b>Kombi-Tafel</b></a> &nbsp; ' +
+      '<a href="kombis.html"><b>Kombi-Bau</b></a> (baut die Dreier von selbst) &nbsp; ' +
+      '<a href="original.html"><b>Original-Tabelle</b></a>', "gut");
+    return;
+  }
+
+  // Unklares bleibt in der Vorschau stehen - nichts geht verloren
+  // Warten, bis die Ordner-Neuzeichnung durch ist, sonst wischt sie die Vorschau weg
+  await new Promise(r => setTimeout(r, 1800));
+  vorschauZeilen = unklare;
+  vorschauZeigen();
+  meldungA("<b>" + saubere.length + " saubere Zeilen sind schon drin.</b> " +
+    unklare.length + " Zeile(n) brauchen noch deinen Blick (unten in der Vorschau): " +
+    "korrigieren oder mit weg entfernen, dann den grünen Knopf drücken. " +
+    "Danach den Ordner aktivieren.", "warn");
 }
 
 // ---------- Fotos ansehen und loeschen ----------
@@ -589,6 +652,7 @@ function einleseBalken(box, foto, gesamt, prozent, text) {
 }
 
 async function satzEinlesen(datum) {
+  if (durchlaufDatum === null) durchlaufDatum = datum;   // Knopf = gleicher Durchlauf
   vorschauBox = "vorschau_" + datum;
   const box = elA(vorschauBox);
   if (typeof Tesseract === "undefined") {
@@ -678,6 +742,7 @@ async function satzEinlesen(datum) {
     }
   }
   vorschauZeigen();
+  durchlaufWeiter();
 }
 
 function vorschauZeigen() {
