@@ -219,51 +219,80 @@ let vorschauUploads = [];
 
 const S_WAHL = ["SIEG", "ASIA", "TORE", "ECKEN", "BTTS", "HZ-END", "DNB", "DC", "TENNIS"];
 
-function satzZeileParsen(zeile) {
-  const roh = String(zeile).trim();
-  if (roh.length < 15) return null;
-  const anM = roh.match(/(\d{2})-(\d{2})-(\d{4}),?\s*(\d{1,2})[:.](\d{2})/);
-  const quoteM = roh.match(/(\d{1,2})[,.](\d{2})\s*$/);
-  if (!anM || !quoteM) return null;
-  const an = anM[3] + "-" + anM[2] + "-" + anM[1] + "T" + anM[4].padStart(2, "0") + ":" + anM[5];
-  const quote = parseFloat(quoteM[1] + "." + quoteM[2]);
-  if (quote < 1.01 || quote > 1000) return null;
-  const vonM = roh.match(/(\d{1,2})\/(\d{1,2})\/\d{2,4}/);
-  const von = vonM ? vonM[1] + "." + vonM[2] + "." : "";
-  let mitte = roh.slice(roh.indexOf(anM[0]) + anM[0].length, roh.lastIndexOf(quoteM[0]));
-  if (vonM) mitte = mitte.replace(vonM[0], "  ");
-  const teile = mitte.split(/\s{2,}|\t|\|/).map(t => t.trim()).filter(t => t.length > 1);
-  let liga = "", spiel = "", wette = "";
-  const vsIdx = teile.findIndex(t => /\svs?\.?\s/i.test(t));
-  if (vsIdx >= 0) {
-    spiel = teile[vsIdx];
-    liga = teile.slice(0, vsIdx).join(" ");
-    wette = teile.slice(vsIdx + 1).join(" ");
-  } else if (teile.length >= 3) {
-    liga = teile[0]; spiel = teile[1]; wette = teile.slice(2).join(" ");
-  } else {
-    spiel = teile.join(" ");
+// Spalten erkennen ueber die PIXEL-Position der Woerter: die Text-
+// erkennung liefert zu jedem Wort, wo es im Bild steht. Grosse Luecken
+// zwischen Woertern sind Spaltengrenzen - viel robuster als Leerzeichen.
+function felderAusWorten(words) {
+  const w = (words || []).filter(x => x.text && x.text.trim() && x.bbox);
+  w.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+  const felder = [];
+  let akt = "", vorigesEnde = null;
+  for (const x of w) {
+    if (vorigesEnde !== null && (x.bbox.x0 - vorigesEnde) > 15) {
+      if (akt.trim()) felder.push(akt.trim());
+      akt = "";
+    }
+    akt += (akt ? " " : "") + x.text.trim();
+    vorigesEnde = x.bbox.x1;
   }
+  if (akt.trim()) felder.push(akt.trim());
+  return felder;
+}
+
+function satzFelderParsen(felder) {
+  let an = null, von = "", quote = null;
+  const rest = [];
+  for (const f of felder) {
+    const anM = f.match(/(\d{2})-(\d{2})-(\d{4}),?\s*(\d{1,2})[:.](\d{2})/);
+    const qM = f.match(/^[.,]?(\d{1,3})[,.](\d{2})[.,]?$/);
+    const vonM = f.match(/^[^0-9]?(\d{1,2})\/(\d{1,2})\/?\d{0,4}$/);
+    if (anM && !an) {
+      an = anM[3] + "-" + anM[2] + "-" + anM[1] + "T" + anM[4].padStart(2, "0") + ":" + anM[5];
+    } else if (vonM && !von && !an === false && rest.length === 0) {
+      von = vonM[1] + "." + vonM[2] + ".";
+    } else if (qM) {
+      quote = parseFloat(qM[1] + "." + qM[2]);   // das LETZTE Zahlenfeld gewinnt
+    } else if (f.length > 1 && !/^[a-z]{1,3}$/i.test(f)) {
+      rest.push(f);   // Kleinkram wie das jb-Kuerzel fliegt raus
+    }
+  }
+  if (!an || quote === null || quote < 1.01 || quote > 1000 || !rest.length) return null;
+  let liga = "", spiel = "", wette = "";
+  const vsIdx = rest.findIndex(t => /\bvs?\.?\b/i.test(t) && /[a-z].*\bvs?\.?\b.*[a-z]/i.test(t));
+  if (vsIdx >= 0) {
+    spiel = rest[vsIdx];
+    liga = rest.slice(0, vsIdx).join(" ");
+    wette = rest.slice(vsIdx + 1).join(" ");
+  } else if (rest.length >= 3) {
+    liga = rest[0]; spiel = rest[1]; wette = rest.slice(2).join(" ");
+  } else if (rest.length === 2) {
+    spiel = rest[0]; wette = rest[1];
+  } else {
+    spiel = rest[0];
+  }
+  if (!wette && spiel) { wette = spiel; }
   let s = "SIEG";
-  if (/AH\)?|\([+-]\d+[.,]5/i.test(wette) && /[+-]?\d+[.,]5/.test(wette)) s = "ASIA";
-  else if (/DNB/i.test(wette)) s = "DNB";
-  else if (/\(DC\)?/i.test(wette) && /DC/.test(wette)) s = "DC";
+  if (/[+-]\s?\d+[.,]?\d*\s*A[HIl]?/i.test(wette) || /\([+-]/.test(wette)) s = "ASIA";
+  else if (/DN[BE]/i.test(wette)) s = "DNB";
+  else if (/\(DC/i.test(wette)) s = "DC";
   else if (/ber\s|under|over|tore/i.test(wette)) s = "TORE";
   else if (/eck|corner/i.test(wette)) s = "ECKEN";
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette, s: s, quote: quote };
 }
 
-function satzTextParsen(text) {
-  const zeilen = [];
-  for (const z of String(text).split(/\n+/)) {
-    const p = satzZeileParsen(z);
-    if (p) zeilen.push(p);
-  }
-  return zeilen;
+function zeilenSchluessel(z) {
+  return (z.an_zeit + "|" + z.spiel + "|" + z.wette + "|" + z.quote)
+    .toLowerCase().replace(/[^a-z0-9|]/g, "");
 }
 
-function zeilenSchluessel(z) {
-  return (z.an_zeit + "|" + z.spiel + "|" + z.wette + "|" + z.quote).toLowerCase().replace(/\s+/g, " ");
+// Moegliche Doppelte (gleiche Zeit + gleiche Quote) fuer die Vorschau markieren
+function vsDoppelVerdacht() {
+  const zaehl = {};
+  for (const z of vorschauZeilen) {
+    const k = z.an_zeit + "|" + z.quote;
+    zaehl[k] = (zaehl[k] || 0) + 1;
+  }
+  return vorschauZeilen.map(z => zaehl[z.an_zeit + "|" + z.quote] > 1);
 }
 
 async function satzEinlesen(datum) {
@@ -284,15 +313,25 @@ async function satzEinlesen(datum) {
   for (const up of uploads) {
     nr++;
     box.innerHTML = '<div class="kern">Lese Foto ' + nr + " von " + uploads.length + "...</div>";
-    let text = "";
+    let lines = [];
     try {
       const erg = await Tesseract.recognize(up.foto, "deu");
-      text = erg.data.text;
+      lines = erg.data.lines || [];
+      // Fallback fuer aeltere Ausgaben: Bloecke/Absaetze durchsuchen
+      if (!lines.length && erg.data.blocks) {
+        for (const b of erg.data.blocks) for (const p of (b.paragraphs || []))
+          for (const l of (p.lines || [])) lines.push(l);
+      }
     } catch (e) {
       meldungA("Foto " + nr + " nicht lesbar: " + sicherA(String(e.message || e).slice(0, 60)), "warn");
       continue;
     }
-    for (const z of satzTextParsen(text)) {
+    const geparst = [];
+    for (const line of lines) {
+      const p = satzFelderParsen(felderAusWorten(line.words));
+      if (p) geparst.push(p);
+    }
+    for (const z of geparst) {
       const k = zeilenSchluessel(z);
       if (gesehen.has(k)) continue;   // Fotos ueberlappen sich oft - Doppelte fliegen raus
       gesehen.add(k);
@@ -310,9 +349,10 @@ function vorschauZeigen() {
       "Foto hochladen (Bildschirm-Screenshot liest sich am besten).</div>" + vorschauFussHtml();
     return;
   }
+  const verdacht = vsDoppelVerdacht();
   let zeilen = "";
   vorschauZeilen.forEach((z, i) => {
-    zeilen += "<tr>" +
+    zeilen += "<tr" + (verdacht[i] ? " class='ohneordner'" : "") + ">" +
       '<td><input value="' + sicherA(z.an_zeit) + '" onchange="vsFeld(' + i + ',\'an_zeit\',this.value)" size="16"></td>' +
       '<td><input value="' + sicherA(z.von) + '" onchange="vsFeld(' + i + ',\'von\',this.value)" size="5"></td>' +
       '<td><input value="' + sicherA(z.liga) + '" onchange="vsFeld(' + i + ',\'liga\',this.value)" size="20"></td>' +
@@ -325,7 +365,8 @@ function vorschauZeigen() {
   });
   box.innerHTML = '<div class="kern"><b>Vorschau: ' + vorschauZeilen.length + " Wetten erkannt (Satz vom " +
     sicherA(vorschauDatum) + ").</b> Bitte kurz mit den Fotos vergleichen - jede Zelle " +
-    "lässt sich direkt ändern. Übernommen wird erst mit dem grünen Knopf.</div>" +
+    "lässt sich direkt ändern. <b>Gelbe Zeilen</b> haben gleiche Zeit und Quote wie eine andere - " +
+    "möglicherweise doppelt erkannt, bitte vergleichen. Übernommen wird erst mit dem grünen Knopf.</div>" +
     '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK-Zeit)</th><th>gemeldet</th>' +
     "<th>Liga</th><th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" +
     zeilen + "</tbody></table></div>" + vorschauFussHtml();
