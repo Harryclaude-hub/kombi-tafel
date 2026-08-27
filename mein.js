@@ -148,6 +148,7 @@ async function zeigeApp() {
   el("inhalt").innerHTML = `
 <div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
   <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button>
+  <span id="benach_platz"></span>
   ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">Admin-Bereich</a>' : ""}</div>
 <details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschlüsselt - was heisst das?</summary>
 Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschlüsselt in der
@@ -198,12 +199,39 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
 </div>`;
 
   zeichneMbNavi();
+  benachKnopf();
   await zeichneTabs();
   await zeichneFreunde();
   await zeichneTeilen();
   zeichneImport();
   await zeichneBereich();
   await zeichneBuchhaltung();
+}
+
+// ---------- Benachrichtigungen einschalten ----------
+
+async function benachKnopf() {
+  const platz = el("benach_platz");
+  if (!platz || typeof pushStatus !== "function") return;
+  const status = await pushStatus();
+  if (status === "an") {
+    platz.innerHTML = ' <span class="mini gruen">&#128276; Benachrichtigungen an</span>';
+  } else if (status === "geht nicht") {
+    platz.innerHTML = "";
+  } else {
+    platz.innerHTML = ' <button onclick="tuPushEinschalten()">&#128276; Benachrichtigungen einschalten</button>';
+  }
+}
+
+async function tuPushEinschalten() {
+  const r = await pushEinschalten();
+  if (r.fehler) { meldungM("Nicht eingeschaltet: " + r.fehler, "warn"); return; }
+  meldungM(r.nurLokal
+    ? "Meldungen an, solange die App offen ist. Echtes Anklopfen bei geschlossener App kann dieser Browser nicht."
+    : "<b>Benachrichtigungen an für dieses Gerät.</b> Du bekommst jetzt eine Meldung bei neuen " +
+      "Nachrichten und Anrufen - auch wenn die App zu ist. Am besten auf JEDEM Gerät einmal einschalten " +
+      "(Laptop und Handy).", "gut");
+  benachKnopf();
 }
 
 // ---------- Die vier Blöcke von Mein Bereich ----------
