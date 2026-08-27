@@ -442,6 +442,7 @@ function meldung(text, art) {
 
 function zeichne_() {
   zeichneOrdnerLeiste();
+  zeichneEigenbau();
   // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
   if (!document.getElementById("scheine")) {
     zeichneVerlauf();
@@ -560,7 +561,8 @@ function scheinHtml(s, z) {
       ">" + a.name + "</option>").join("") + "</select>";
 
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
-    "Schein " + s.nr + (s.teil ? ' <span class="s-warn">Teil ' + s.teil + " (gleiche Wetten, weiterer Anbieter)</span>" : "") +
+    "Schein " + s.nr + (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
+    (s.teil ? ' <span class="s-warn">Teil ' + s.teil + " (gleiche Wetten, weiterer Anbieter)</span>" : "") +
     " " + marke(s.kz) + wahl +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
@@ -581,8 +583,8 @@ function scheinHtml(s, z) {
       ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(zielEinsatz() * gesamt).toFixed(2) + " &euro;</b>" +
       '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
       '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Wenn ein Anbieter nicht so viel Einsatz zulässt: denselben Schein zusätzlich bei einem weiteren Anbieter setzen, bis das Ziel erreicht ist.">&#10133; Bei weiterem Anbieter setzen</button>' +
-      (s.wetten.length !== 3
-        ? '<button class="auflösen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
+      (s.wetten.length !== 3 || s.art === "eigen" || s.teil
+        ? '<button class="aufloesen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
         : "") +
       '<label class="fotoknopf">Foto vom Wettschein' +
         '<input type="file" accept="image/*" style="display:none" ' +
@@ -653,6 +655,53 @@ function scheinTeilen(scheinId) {
   meldung("Schein " + nr + " zusätzlich bei <b>" + anbieterName(frei) + "</b> angelegt (Teil " +
     kopie.teil + "). Trag dort den Rest-Einsatz ein, bis dein Ziel von " +
     zielEinsatz().toFixed(0) + " &euro; erreicht ist.", "gut");
+  zeichne_();
+}
+
+// ---------- Eigener Schein: Wetten aus dem offenen Ordner selbst mischen ----------
+
+function zeichneEigenbau() {
+  const box = document.getElementById("eigenbau");
+  if (!box) return;
+  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)));
+  if (!offen.length) { box.innerHTML = '<p class="mini">Keine offenen Wetten im Ordner.</p>'; return; }
+  let zeilen = "";
+  for (const w of offen) {
+    const optIdx = gewaehlteOption(w);
+    zeilen += '<label class="eb-zeile"><input type="checkbox" class="eb-wahl" value="' + w.id + '"> ' +
+      "<b>" + w.spiel + "</b> <span class='mini'>" + w.wette + " (" + w.o[optIdx][0] + "), Foto-Quote " +
+      w.o[optIdx][1].toFixed(2) + ", " + zeitText(anstossFeld(w)) + "</span></label>";
+  }
+  box.innerHTML = '<div class="eigenbaukasten">' + zeilen +
+    '<p><button class="haupt" onclick="eigenbauAnlegen()">&#129513; Eigenen Schein aus den angehakten Wetten anlegen</button></p></div>';
+}
+
+function eigenbauAnlegen() {
+  const gewaehlt = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
+  if (gewaehlt.length < 2) { meldung("Bitte mindestens zwei Wetten anhaken.", "warn"); return; }
+  const kennungen = new Set();
+  for (const id of gewaehlt) {
+    const w = wetteNachId(id);
+    if (!w) continue;
+    const k = spielKennung(w);
+    if (kennungen.has(k)) {
+      meldung("<b>" + w.spiel + "</b> ist zweimal angehakt (gleiches Spiel) - " +
+        "ein Spiel darf nur einmal in denselben Schein.", "warn");
+      return;
+    }
+    kennungen.add(k);
+  }
+  const z = liesZustand() || baueAlles();
+  const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
+  z.scheine.push({
+    id: "E" + Date.now(), nr: nr, kz: (z.einst && z.einst.anbieter && z.einst.anbieter[0]) || "bw",
+    art: "eigen",
+    wetten: gewaehlt.map(id => ({ id: id, optIdx: gewaehlteOption(wetteNachId(id)) })),
+    entfernt: []
+  });
+  speichereZustand(z);
+  meldung("<b>Eigener Schein " + nr + "</b> mit " + gewaehlt.length + " Wetten angelegt - " +
+    "oben bei den Scheinen: Anbieter wählen, Einsatz eintragen, fertig.", "gut");
   zeichne_();
 }
 

@@ -454,6 +454,14 @@ function vsDoppelVerdacht() {
   return vorschauZeilen.map(z => zaehl[zeilenSchluesselWeich(z)] > 1);
 }
 
+// Lade-Anzeige mit Prozent: man sieht genau, was gerade passiert
+function einleseBalken(box, foto, gesamt, prozent, text) {
+  if (!box) return;
+  box.innerHTML = '<div class="kern"><b>&#128269; Einlesen läuft:</b> Foto ' + foto + " von " + gesamt +
+    " - " + text + '<div class="ladebalken"><div class="ladebalkenfuellung" style="width:' +
+    Math.max(2, Math.min(100, prozent)) + '%">' + prozent + " %</div></div></div>";
+}
+
 async function satzEinlesen(datum) {
   const box = elA("adm_vorschau");
   if (typeof Tesseract === "undefined") {
@@ -472,11 +480,18 @@ async function satzEinlesen(datum) {
   let nr = 0;
   for (const up of uploads) {
     nr++;
-    box.innerHTML = '<div class="kern">Lese Foto ' + nr + " von " + uploads.length + "...</div>";
+    einleseBalken(box, nr, uploads.length, 0, "Foto wird vorbereitet...");
     let lines = [];
     try {
       const gross = await bildVergroessern(up.foto, 1600);
-      const erg = await Tesseract.recognize(gross, "deu");
+      const nrJetzt = nr;
+      const erg = await Tesseract.recognize(gross, "deu", { logger: m => {
+        if (m.status === "recognizing text") {
+          einleseBalken(box, nrJetzt, uploads.length, Math.round((m.progress || 0) * 100), "Zeilen werden gelesen...");
+        } else if (m.status && m.progress !== undefined) {
+          einleseBalken(box, nrJetzt, uploads.length, Math.round((m.progress || 0) * 100), "Erkennung lädt (" + m.status + ")...");
+        }
+      } });
       lines = erg.data.lines || [];
       // Fallback fuer aeltere Ausgaben: Bloecke/Absaetze durchsuchen
       if (!lines.length && erg.data.blocks) {
