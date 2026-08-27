@@ -214,16 +214,37 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
 // Fehlen sie (neues Gerät, App neu installiert, Browser-Daten gelöscht),
 // lässt sich hier nichts anlegen. Ein Passwort holt sie aus dem Safe zurück.
 
-async function pruefeSchluessel() {
+async function pruefeSchluessel(erzwingen) {
   const box = el("schluesselkasten");
-  if (!box || typeof kryptoGeraetBereit !== "function") return;
-  if (await kryptoGeraetBereit()) { box.innerHTML = ""; return; }
-  box.innerHTML = '<div class="warnkern"><b>&#128274; Auf diesem Gerät fehlen deine Schlüssel.</b> ' +
-    "Deshalb lässt sich gerade nichts anlegen (Personen, Kombinationen, Buchungen). " +
-    "Das passiert nach einer Neuinstallation oder wenn die Browser-Daten gelöscht wurden. " +
-    "Gib einmal dein Passwort ein - dann sind sie zurück und alles funktioniert wieder.<br>" +
-    '<input type="password" id="schluessel_pw" placeholder="Dein Passwort" autocomplete="current-password"> ' +
-    '<button class="haupt" onclick="tuSchluesselNachtragen()">&#128273; Schlüssel zurückholen</button></div>';
+  if (!box || !ich) return;
+  // Bewusst OHNE Hilfsfunktion aus krypto.js prüfen: liegt dort eine alte
+  // Fassung im Zwischenspeicher, würde die Prüfung sonst still übersprungen.
+  const priv = localStorage.getItem("kt_e2e_priv_" + ich.id);
+  const bereich = localStorage.getItem("kt_e2e_bereich_" + ich.id);
+  if (priv && bereich && !erzwingen) { box.innerHTML = ""; return; }
+  const kannReparieren = (typeof kryptoNachtragen === "function");
+  box.innerHTML = '<div class="warnkern schluesselwarnung"><b>&#128274; Auf diesem Gerät fehlt dein Schlüssel.</b> ' +
+    "Deshalb lässt sich gerade nichts anlegen (Personen, Kombinationen, Buchungen, Nachrichten). " +
+    "Das passiert nach einer Neuinstallation, auf einem neuen Gerät oder wenn Browser-Daten gelöscht wurden. " +
+    "Deine Daten sind alle da - es fehlt nur der Schlüssel auf DIESEM Gerät.<br><br>" +
+    (kannReparieren
+      ? '<b>Einmal dein Passwort eingeben, dann läuft alles wieder:</b><br>' +
+        '<input type="password" id="schluessel_pw" placeholder="Dein Passwort" autocomplete="current-password" ' +
+        'onkeydown="if(event.key===\'Enter\')tuSchluesselNachtragen()"> ' +
+        '<button class="haupt" onclick="tuSchluesselNachtragen()">&#128273; Schlüssel zurückholen</button>'
+      : '<b>Dein Gerät hat noch eine alte Fassung geladen.</b> Bitte einmal frisch laden, ' +
+        "dann erscheint hier das Passwortfeld:") +
+    ' <button onclick="tuFrischLaden()">&#128260; Seite frisch laden</button></div>';
+  if (erzwingen) {
+    box.scrollIntoView({ block: "start" });
+    const f = el("schluessel_pw");
+    if (f) f.focus();
+  }
+}
+
+function tuFrischLaden() {
+  const seite = location.pathname.split("/").pop() || "mein.html";
+  location.replace(seite + "?frisch=" + Date.now());
 }
 
 async function tuSchluesselNachtragen() {
@@ -611,7 +632,11 @@ function tuOrdnerFilter(wert) {
 
 async function tuOrdnerAnlegen() {
   const r = await supaOrdnerAnlegen(aktiverBereich.id, el("ordner_neu").value);
-  if (r.fehler) { meldungM("Person nicht hinzugefuegt: " + r.fehler, "warn"); return; }
+  if (r.fehler) {
+    meldungM("Person nicht hinzugefügt: " + r.fehler, "warn");
+    if (String(r.fehler).includes("Schlüssel")) pruefeSchluessel(true);
+    return;
+  }
   meldungM('Person <b>' + textSicherM(r.ordner.name) + "</b> hinzugefuegt.", "gut");
   zeichneBereich();
 }

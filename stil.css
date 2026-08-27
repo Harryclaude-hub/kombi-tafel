@@ -605,3 +605,7 @@ tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
 .werkinhalt { padding: 4px 14px 14px 14px; }
 .werkleiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
+
+/* Schlüssel-Warnung: darf man nicht übersehen (Design-Schicht) */
+.schluesselwarnung { border-width: 3px; font-size: 17px; }
+.schluesselwarnung input { font-size: 17px; }
