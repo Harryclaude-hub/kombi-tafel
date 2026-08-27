@@ -523,28 +523,36 @@ function zeichneOrdnerBox(scheine) {
   filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")" +
     (ohneWartend ? ' <span class="fertigbadge">' + ohneWartend + ' fertig</span>' : "") + "</button></div>";
 
+  // Klare Personen-Uebersicht: eine Zeile je Person, alles auf einen Blick
   let verwalten = "";
   if (schreib) {
-    let zeilen = "";
+    verwalten = '<p><input id="ordner_neu" placeholder="Neue Person, z. B. ein Name"> ' +
+      '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufügen</button></p>';
+  }
+  if (ordnerListe.length) {
+    verwalten += "<table><thead><tr><th>Person</th><th>Kombinationen</th><th>fertig</th>" +
+      "<th>Kasse</th><th></th></tr></thead><tbody>";
     for (const o of ordnerListe) {
       const n = zahl[o.id] || 0;
       const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
-      let ende;
-      if (n === 0 && kasseN === 0) {
-        ende = '<button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">löschen</button>';
-      } else {
-        const teile = [];
-        if (n > 0) teile.push(n + (n === 1 ? " Schein" : " Scheine"));
-        if (kasseN > 0) teile.push(kasseN + (kasseN === 1 ? " Kassen-Buchung" : " Kassen-Buchungen"));
-        ende = '<span class="mini">' + teile.join(" und ") + " drin - erst leeren, dann löschen</span>";
+      const warn = personPruefen(o.id, scheine).probleme.length > 0;
+      let tasten = '<button onclick="tuOrdnerFilter(\'' + o.id + '\')">öffnen</button>';
+      if (schreib) {
+        tasten += ' <button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button>' +
+          ((n === 0 && kasseN === 0)
+            ? ' <button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">löschen</button>'
+            : ' <span class="mini">löschen erst wenn leer</span>');
       }
-      zeilen += '<div class="ordnerzeile"><input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '"> ' +
-        '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button> ' + ende + "</div>";
+      verwalten += "<tr" + (ordnerFilter === o.id ? " class='fertigzeile'" : "") + "><td>" +
+        (schreib ? '<input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '" size="16">'
+                 : "<b>" + textSicherM(o.name) + "</b>") + "</td>" +
+        "<td>" + n + "</td>" +
+        "<td>" + (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "-") + "</td>" +
+        "<td>" + (kasseN ? kasseN + " Buchungen" : "leer") +
+          (warn ? ' <span class="warnbadge">!</span>' : "") + "</td>" +
+        "<td>" + tasten + "</td></tr>";
     }
-    verwalten = '<p><input id="ordner_neu" placeholder="Neue Person, z. B. ein Name"> ' +
-      '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufuegen</button></p>' +
-      (zeilen ? '<details><summary>Personen verwalten (umbenennen, löschen)</summary>' +
-        '<div class="inhalt"><div>' + zeilen + "</div></div></details>" : "");
+    verwalten += "</tbody></table>";
   }
   const wartendGesamt = Object.values(wartend).reduce((p, x) => p + x, 0) + ohneWartend;
   box.innerHTML = filter + verwalten +

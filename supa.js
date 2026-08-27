@@ -321,11 +321,18 @@ async function supaSatzUploadsLaden() {
   return r.data || [];
 }
 
-async function supaSatzFotoHochladen(bereichId, satzDatum, fotoDataUrl) {
+async function supaSatzFotoHochladen(bereichId, satzDatum, fotoDataUrl, hash) {
   const u = await supaNutzer();
   return await supa.from("kt_satz_uploads").insert({
-    bereich: bereichId, autor: u.id, satz_datum: satzDatum, foto: fotoDataUrl
+    bereich: bereichId, autor: u.id, satz_datum: satzDatum, foto: fotoDataUrl, hash: hash || null
   });
+}
+
+// Gibt es dieses Foto (gleicher Fingerabdruck) zu diesem Datum schon?
+async function supaUploadHashDa(satzDatum, hash) {
+  const r = await supa.from("kt_satz_uploads").select("id", { count: "exact", head: true })
+    .eq("satz_datum", satzDatum).eq("hash", hash);
+  return (r.count || 0) > 0;
 }
 
 async function supaSatzUploadLoeschen(id) {

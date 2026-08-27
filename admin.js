@@ -50,8 +50,9 @@ async function startAdmin() {
   ziel.innerHTML = `
 <h2>Foto-Sätze der Homebase hochladen</h2>
 <p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum, für ALLE Nutzer gleich
-(die Homebase). Du laedst die Fotos hier hoch, Claude liest sie beim nächsten Auftrag ein und
-legt daraus den neuen Satz in der Kombi-Tafel an. <b>Sätze mischen sich nie.</b>
+(die Homebase). Fotos hochladen, dann <b>Jetzt im Programm einlesen</b> drücken - das Programm
+liest sie sofort selbst, du prüfst die Vorschau und übernimmst. <b>Sätze mischen sich nie.</b>
+Doppelt hochgeladene Fotos erkennt das Programm am Fingerabdruck und lehnt sie ab.
 Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>
 <div id="adm_fotos"></div>
 <div id="adm_vorschau"></div>
@@ -108,17 +109,28 @@ async function tuSatzFotos(input) {
   const dateien = Array.from(input.files || []);
   input.value = "";
   if (!dateien.length) return;
-  let ok = 0;
+  let ok = 0, doppelt = 0;
   for (const datei of dateien) {
     const dataUrl = await verkleinereBild(datei, 1100);
     if (!dataUrl) continue;
-    const r = await supaSatzFotoHochladen(adminIch.id, datum, dataUrl);
+    const hash = await fotoFingerabdruck(dataUrl);
+    if (hash && await supaUploadHashDa(datum, hash)) { doppelt++; continue; }
+    const r = await supaSatzFotoHochladen(adminIch.id, datum, dataUrl, hash);
     if (!r.error) ok++;
     else meldungA("Foto nicht gespeichert: " + sicherA(r.error.message), "warn");
   }
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
-    " hochgeladen. Claude liest sie beim nächsten Auftrag ein.", ok ? "gut" : "warn");
+    " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
+    ". Jetzt oben auf <b>Jetzt im Programm einlesen</b> drücken.", ok || doppelt ? "gut" : "warn");
   adminFotoSaetze();
+}
+
+async function fotoFingerabdruck(dataUrl) {
+  try {
+    const buf = new TextEncoder().encode(dataUrl);
+    const h = await crypto.subtle.digest("SHA-256", buf);
+    return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, "0")).join("");
+  } catch (e) { return null; }
 }
 
 function verkleinereBild(datei, maxBreite) {
@@ -280,9 +292,40 @@ function satzFelderParsen(felder) {
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette, s: s, quote: quote };
 }
 
+// Bekannte Lesefehler der Texterkennung deterministisch reparieren
+// (nur eindeutige Muster - alles andere bleibt und wird markiert)
+function wetteReparieren(w) {
+  let t = String(w).trim();
+  t = t.replace(/^[\('",\u201A\u2018\u2019]+/, "");          // fuehrende Klammer-/Anfuehrungsreste
+  t = t.replace(/DN[EB][._\s]*$/i, "DNB)");                 // DNE._ -> DNB)
+  t = t.replace(/A[Il1]\)?\s*$/i, "AH)");                   // Al / AI -> AH)
+  t = t.replace(/\((\d)[:.](5)\s/, "(-$1.$2 ");            // (2:5 -> (-2.5
+  t = t.replace(/\(([+-])(\d)(\d)(?![.,\d])/, "($1$2.$3"); // (-25 -> (-2.5
+  t = t.replace(/\(([+-]?\d+)\s(5)\b/, "($1.$2");          // (-1 5 -> (-1.5
+  t = t.replace(/[;:]\s*$/, ")");                           // (Win; -> (Win)
+  if (/\([^)]*$/.test(t)) t += ")";                        // fehlende Klammer schliessen
+  return t;
+}
+
+// Warnungen je Zeile: was der Mensch pruefen sollte (gelb in der Vorschau)
+function pruefGruende(z, satzDatum) {
+  const g = [];
+  const satz = new Date(satzDatum + "T00:00");
+  const tage = (new Date(z.an_zeit) - satz) / 86400000;
+  if (!(tage >= -1 && tage <= 14)) g.push("Anstoß weit weg vom Satz-Datum");
+  const spielNorm = z.spiel.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const teamNorm = z.wette.toLowerCase().replace(/\(.*$/, "").replace(/[^a-z0-9]/g, "");
+  if (teamNorm.length >= 4 && !spielNorm.includes(teamNorm.slice(0, Math.min(8, teamNorm.length))))
+    g.push("Wett-Team steht nicht im Spiel");
+  if (z.quote > 50) g.push("sehr hohe Quote");
+  return g;
+}
+
 function zeilenSchluessel(z) {
-  return (z.an_zeit + "|" + z.spiel + "|" + z.wette + "|" + z.quote)
-    .toLowerCase().replace(/[^a-z0-9|]/g, "");
+  // Zeit + Quote + Art + Spiel-Anfang: faengt auch Zeilen, die die
+  // Texterkennung auf zwei Fotos leicht unterschiedlich gelesen hat
+  const spiel4 = z.spiel.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
+  return z.an_zeit + "|" + z.quote + "|" + z.s + "|" + spiel4;
 }
 
 // Moegliche Doppelte (gleiche Zeit + gleiche Quote) fuer die Vorschau markieren
@@ -329,7 +372,11 @@ async function satzEinlesen(datum) {
     const geparst = [];
     for (const line of lines) {
       const p = satzFelderParsen(felderAusWorten(line.words));
-      if (p) geparst.push(p);
+      if (p) {
+        p.wette = wetteReparieren(p.wette);
+        p.gruende = pruefGruende(p, datum);
+        geparst.push(p);
+      }
     }
     for (const z of geparst) {
       const k = zeilenSchluessel(z);
@@ -352,7 +399,9 @@ function vorschauZeigen() {
   const verdacht = vsDoppelVerdacht();
   let zeilen = "";
   vorschauZeilen.forEach((z, i) => {
-    zeilen += "<tr" + (verdacht[i] ? " class='ohneordner'" : "") + ">" +
+    const gruende = (z.gruende || []).concat(verdacht[i] ? ["möglicherweise doppelt"] : []);
+    zeilen += "<tr" + (gruende.length ? " class='ohneordner'" : "") + ">" +
+      "<td class='mini'>" + (gruende.length ? sicherA(gruende.join(", ")) : "") + "</td>" +
       '<td><input value="' + sicherA(z.an_zeit) + '" onchange="vsFeld(' + i + ',\'an_zeit\',this.value)" size="16"></td>' +
       '<td><input value="' + sicherA(z.von) + '" onchange="vsFeld(' + i + ',\'von\',this.value)" size="5"></td>' +
       '<td><input value="' + sicherA(z.liga) + '" onchange="vsFeld(' + i + ',\'liga\',this.value)" size="20"></td>' +
@@ -367,7 +416,7 @@ function vorschauZeigen() {
     sicherA(vorschauDatum) + ").</b> Bitte kurz mit den Fotos vergleichen - jede Zelle " +
     "lässt sich direkt ändern. <b>Gelbe Zeilen</b> haben gleiche Zeit und Quote wie eine andere - " +
     "möglicherweise doppelt erkannt, bitte vergleichen. Übernommen wird erst mit dem grünen Knopf.</div>" +
-    '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK-Zeit)</th><th>gemeldet</th>' +
+    '<div class="tabellenrand"><table><thead><tr><th>Prüfen</th><th>Anstoß (UK-Zeit)</th><th>gemeldet</th>' +
     "<th>Liga</th><th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" +
     zeilen + "</tbody></table></div>" + vorschauFussHtml();
 }
@@ -402,17 +451,23 @@ async function vsUebernehmen() {
   const titel = "Fotos vom " + d[2] + "." + d[1] + "." + d[0];
   const s = await supaSatzAnlegen(vorschauDatum, titel);
   if (s.error) { meldungA("Satz nicht angelegt: " + sicherA(s.error.message), "warn"); return; }
-  let ok = 0;
+  // Was schon im Ordner steht, wird NICHT doppelt angelegt (Fotos nachschieben!)
+  const daWetten = (await supaWettenLaden()).filter(w => w.satz === vorschauDatum);
+  const daSchluessel = new Set(daWetten.map(w => zeilenSchluessel({
+    an_zeit: w.an_zeit, quote: (Array.isArray(w.o) && w.o[0]) ? w.o[0][1] : 0, s: w.s, spiel: w.spiel })));
+  let ok = 0, schonDa = 0;
   for (let i = 0; i < vorschauZeilen.length; i++) {
     const z = vorschauZeilen[i];
-    const r = await supaWetteAnlegen(vorschauDatum, { pos: i + 1, von: z.von, an_zeit: z.an_zeit,
+    if (daSchluessel.has(zeilenSchluessel(z))) { schonDa++; continue; }
+    const r = await supaWetteAnlegen(vorschauDatum, { pos: daWetten.length + i + 1, von: z.von, an_zeit: z.an_zeit,
       liga: z.liga, spiel: z.spiel, wette: z.wette, kat: z.s, s: z.s,
       o: [[z.wette, z.quote]] });
     if (!r.error) ok++;
   }
   for (const up of vorschauUploads) await supaUploadStatus(up.id, "eingelesen");
   elA("adm_vorschau").innerHTML = "";
-  meldungA("<b>Satz vom " + sicherA(vorschauDatum) + " übernommen: " + ok + " Wetten.</b> " +
+  meldungA("<b>Satz vom " + sicherA(vorschauDatum) + ": " + ok + " Wetten übernommen" +
+    (schonDa ? ", " + schonDa + " waren schon im Ordner (nicht doppelt angelegt)" : "") + ".</b> " +
     "Der Ordner steht ab sofort auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle - " +
     "über die Ordner-Leiste wählbar. Nachbearbeiten geht unten bei Sätze bearbeiten.", "gut");
   adminFotoSaetze();
@@ -425,9 +480,30 @@ async function adminSaetze() {
   const box = elA("adm_saetze");
   if (!box) return;
   const saetze = await supaSaetzeLaden();
-  if (!saetze.length) { box.innerHTML = '<p class="mini">Noch keine im Programm eingelesenen Sätze.</p>'; return; }
   const wetten = await supaWettenLaden();
-  let html = "";
+  const uploads = await supaSatzUploadsLaden();
+
+  // Klare Uebersicht: ein Blick, alle Ordner
+  let ueber = '<div class="kern"><b>Neuen leeren Ordner anlegen:</b> ' +
+    '<input type="date" id="neusatz_datum"> ' +
+    '<input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24"> ' +
+    '<button class="haupt" onclick="tuSatzNeu()">Ordner anlegen</button> ' +
+    '<span class="mini">Wetten dann unten von Hand hinzufügen oder Fotos einlesen.</span></div>';
+  if (saetze.length) {
+    ueber += "<table><thead><tr><th>Ordner</th><th>Wetten</th><th>Fotos</th><th></th></tr></thead><tbody>";
+    for (const s of saetze) {
+      const n = wetten.filter(w => w.satz === s.id).length;
+      const f = uploads.filter(u => u.satz_datum === s.id).length;
+      ueber += "<tr><td><b>" + sicherA(s.titel) + "</b> <span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
+        "<td>" + n + "</td><td>" + f + "</td>" +
+        '<td><button onclick="satzAufklappen(\'' + sicherA(s.id) + '\')">öffnen und bearbeiten</button></td></tr>';
+    }
+    ueber += "</tbody></table>";
+  } else {
+    ueber += '<p class="mini">Noch keine im Programm eingelesenen Ordner.</p>';
+  }
+
+  let html = ueber;
   for (const s of saetze) {
     const meine = wetten.filter(w => w.satz === s.id);
     let zeilen = "";
@@ -444,7 +520,7 @@ async function adminSaetze() {
         '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5"></td>' +
         '<td><button onclick="tuWetteWeg(' + w.id + ')">weg</button></td></tr>';
     }
-    html += '<details class="satzkasten"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
+    html += '<details class="satzkasten" id="satzdetails_' + sicherA(s.id) + '"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
       '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK)</th><th>gemeldet</th><th>Liga</th>' +
       "<th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" + zeilen +
       "</tbody></table></div>" +
@@ -453,6 +529,24 @@ async function adminSaetze() {
       "</details>";
   }
   box.innerHTML = html;
+}
+
+function satzAufklappen(id) {
+  const d = elA("satzdetails_" + id);
+  if (d) { d.open = true; d.scrollIntoView({ block: "start" }); }
+}
+
+async function tuSatzNeu() {
+  const datum = elA("neusatz_datum").value;
+  if (!datum) { meldungA("Bitte ein Datum wählen.", "warn"); return; }
+  const t = elA("neusatz_titel").value.trim();
+  const d = datum.split("-");
+  const titel = t || ("Fotos vom " + d[2] + "." + d[1] + "." + d[0]);
+  const r = await supaSatzAnlegen(datum, titel);
+  if (r.error) { meldungA("Ordner nicht angelegt: " + sicherA(r.error.message), "warn"); return; }
+  meldungA("Ordner <b>" + sicherA(titel) + "</b> angelegt - er erscheint sofort in der Ordner-Leiste. " +
+    "Wetten unten hinzufügen oder Fotos zu diesem Datum hochladen und einlesen.", "gut");
+  adminSaetze();
 }
 
 async function tuWette(id, feld, wert) {
