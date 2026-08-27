@@ -484,7 +484,9 @@ async function adminSaetze() {
   const uploads = await supaSatzUploadsLaden();
 
   // Klare Uebersicht: ein Blick, alle Ordner
-  let ueber = '<div class="kern"><b>Neuen leeren Ordner anlegen:</b> ' +
+  let ueber = '<p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..." ' +
+    'size="40" oninput="satzSuche(this.value)"></p>' +
+    '<div class="kern"><b>Neuen leeren Ordner anlegen:</b> ' +
     '<input type="date" id="neusatz_datum"> ' +
     '<input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24"> ' +
     '<button class="haupt" onclick="tuSatzNeu()">Ordner anlegen</button> ' +
@@ -494,7 +496,7 @@ async function adminSaetze() {
     for (const s of saetze) {
       const n = wetten.filter(w => w.satz === s.id).length;
       const f = uploads.filter(u => u.satz_datum === s.id).length;
-      ueber += "<tr><td><b>" + sicherA(s.titel) + "</b> <span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
+      ueber += "<tr data-such=\"" + sicherA((s.titel + " " + s.id).toLowerCase()) + "\"><td><b>" + sicherA(s.titel) + "</b> <span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
         "<td>" + n + "</td><td>" + f + "</td>" +
         '<td><button onclick="satzAufklappen(\'' + sicherA(s.id) + '\')">öffnen und bearbeiten</button></td></tr>';
     }
@@ -509,18 +511,19 @@ async function adminSaetze() {
     let zeilen = "";
     for (const w of meine) {
       const quote = (Array.isArray(w.o) && w.o[0]) ? w.o[0][1] : "";
+      const mehr = (Array.isArray(w.o) && w.o.length > 1) ? ' <span class="mini">(+' + (w.o.length - 1) + ' weitere)</span>' : "";
       zeilen += "<tr>" +
-        '<td><input value="' + sicherA(w.an_zeit) + '" onchange="tuWette(' + w.id + ',\'an_zeit\',this.value)" size="16"></td>' +
+        '<td><input value="' + sicherA(w.an_korrigiert || w.an_zeit) + '" onchange="tuWette(' + w.id + ',\'an_zeit\',this.value)" size="16"></td>' +
         '<td><input value="' + sicherA(w.von || "") + '" onchange="tuWette(' + w.id + ',\'von\',this.value)" size="5"></td>' +
         '<td><input value="' + sicherA(w.liga || "") + '" onchange="tuWette(' + w.id + ',\'liga\',this.value)" size="18"></td>' +
         '<td><input value="' + sicherA(w.spiel) + '" onchange="tuWette(' + w.id + ',\'spiel\',this.value)" size="32"></td>' +
         '<td><input value="' + sicherA(w.wette) + '" onchange="tuWette(' + w.id + ',\'wette\',this.value)" size="22"></td>' +
         '<td><select onchange="tuWette(' + w.id + ',\'s\',this.value)">' +
           S_WAHL.map(x => "<option" + (w.s === x ? " selected" : "") + ">" + x + "</option>").join("") + "</select></td>" +
-        '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5"></td>' +
+        '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5">' + mehr + "</td>" +
         '<td><button onclick="tuWetteWeg(' + w.id + ')">weg</button></td></tr>';
     }
-    html += '<details class="satzkasten" id="satzdetails_' + sicherA(s.id) + '"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
+    html += '<details class="satzkasten" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '" id="satzdetails_' + sicherA(s.id) + '"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
       '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK)</th><th>gemeldet</th><th>Liga</th>' +
       "<th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" + zeilen +
       "</tbody></table></div>" +
@@ -529,6 +532,13 @@ async function adminSaetze() {
       "</details>";
   }
   box.innerHTML = html;
+}
+
+function satzSuche(wert) {
+  const s = String(wert || "").toLowerCase().trim();
+  for (const el2 of document.querySelectorAll("[data-such]")) {
+    el2.style.display = (!s || el2.dataset.such.includes(s)) ? "" : "none";
+  }
 }
 
 function satzAufklappen(id) {
@@ -552,6 +562,7 @@ async function tuSatzNeu() {
 async function tuWette(id, feld, wert) {
   const felder = {}; felder[feld] = wert;
   if (feld === "s") felder.kat = wert;
+  if (feld === "an_zeit") felder.an_korrigiert = null;   // die neue Zeit gilt
   const r = await supaWetteAendern(id, felder);
   if (r.error || !r.data || !r.data.length) meldungA("Nicht gespeichert (nur Admins ändern Sätze).", "warn");
 }
@@ -559,9 +570,11 @@ async function tuWette(id, feld, wert) {
 async function tuWetteQuote(id, wert) {
   const q = parseFloat(String(wert).replace(",", "."));
   if (!q || q < 1.01) { meldungA("Quote ab 1.01 bitte.", "warn"); return; }
-  // Wett-Text als Linie mitfuehren, damit die Tafel sie anzeigen kann
-  const w = (await supa.from("kt_wetten").select("wette").eq("id", id).maybeSingle()).data;
-  const r = await supaWetteAendern(id, { o: [[(w && w.wette) || "", q]] });
+  // Nur die ERSTE Quote aendern - weitere Optionen der Wette bleiben erhalten
+  const w = (await supa.from("kt_wetten").select("wette, o").eq("id", id).maybeSingle()).data;
+  const o = (w && Array.isArray(w.o) && w.o.length) ? w.o.slice() : [[(w && w.wette) || "", q]];
+  o[0] = [o[0][0], q];
+  const r = await supaWetteAendern(id, { o: o });
   if (r.error || !r.data || !r.data.length) meldungA("Quote nicht gespeichert.", "warn");
 }
 

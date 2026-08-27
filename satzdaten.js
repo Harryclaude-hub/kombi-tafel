@@ -21,14 +21,22 @@ async function satzdatenLaden() {
     for (const s of saetze) {
       if (!SAETZE.some(x => x.id === s.id)) SAETZE.push({ id: s.id, titel: s.titel });
     }
-    // Bei erneutem Laden: alte Datenbank-Wetten austauschen
-    for (let i = WETTEN.length - 1; i >= 0; i--) if (WETTEN[i].dbid) WETTEN.splice(i, 1);
+    // Liegt ein Satz in der Datenbank, gewinnt IMMER die Datenbank-Fassung:
+    // die eingebaute Kopie (daten.js) ist nur noch Notrad, falls die
+    // Datenbank nicht erreichbar ist. Alte Kennungen (alt_id) bleiben
+    // erhalten, damit gespeicherte Scheine weiter passen.
+    const dbIds = new Set(saetze.map(x => x.id));
+    for (let i = WETTEN.length - 1; i >= 0; i--)
+      if (WETTEN[i].dbid || dbIds.has(WETTEN[i].satz)) WETTEN.splice(i, 1);
     for (const w of wetten) {
-      WETTEN.push({
-        id: "d" + w.id, dbid: w.id, satz: w.satz, von: w.von || "", an: w.an_zeit,
+      const e = {
+        id: w.alt_id || ("d" + w.id), dbid: w.id, satz: w.satz, von: w.von || "", an: w.an_zeit,
         liga: w.liga || "", spiel: w.spiel, wette: w.wette,
         kat: w.kat || w.s, s: w.s || "SIEG", o: Array.isArray(w.o) ? w.o : []
-      });
+      };
+      if (w.an_korrigiert) e.anKorrigiert = w.an_korrigiert;
+      if (w.doppel) e.doppel = w.doppel;
+      WETTEN.push(e);
     }
     // Aufsteigend sortieren: aktiverSatzId nimmt den LETZTEN Eintrag als
     // neuesten Satz - so ist der frisch eingelesene Ordner der offene.
