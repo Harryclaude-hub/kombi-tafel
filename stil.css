@@ -596,3 +596,12 @@ input:focus, select:focus, textarea:focus { border-color: #1a2c50; outline: none
 /* Nicht sicher erkannte Zeilen in der Vorschau (Design-Schicht) */
 tr.rohzeile td { background: #fdeaea; }
 tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
+
+/* Ordner-Werkstatt im Admin (Design-Schicht) */
+.ordnerwerk { border: 2px solid #1a2c50; border-radius: 7px; margin: 12px 0; background: #fff; }
+.ordnerwerk > summary { padding: 12px 14px; cursor: pointer; font-size: 17px; border-radius: 7px; }
+.ordnerwerk.werkoffen { border-width: 3px; }
+.ordnerwerk.werkoffen > summary { background: #eef7ee; }
+.werkinhalt { padding: 4px 14px 14px 14px; }
+.werkleiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid #ddd; margin-bottom: 10px; }

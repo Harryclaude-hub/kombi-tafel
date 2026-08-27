@@ -48,66 +48,127 @@ async function startAdmin() {
   }
   adminIch = u;
   ziel.innerHTML = `
-<h2>&#128193; Foto-Sätze der Homebase hochladen</h2>
-<p class="mini">Jede Foto-Lieferung ist ein eigener Ordner mit Datum, für ALLE Nutzer gleich
-(die Homebase). Fotos hochladen, dann <b>Jetzt im Programm einlesen</b> drücken - das Programm
-liest sie sofort selbst, du prüfst die Vorschau und übernimmst. <b>Sätze mischen sich nie.</b>
-Doppelt hochgeladene Fotos erkennt das Programm am Fingerabdruck und lehnt sie ab.
-Jeder Admin sieht hier auch die Uploads der anderen Admins.</p>
-<div id="adm_fotos"></div>
-<div id="adm_vorschau"></div>
-<h2>&#128194; Sätze bearbeiten</h2>
-<p class="mini">Jeder eingelesene Satz lässt sich hier jederzeit nachbearbeiten: Einträge
-ändern, löschen oder neue hinzufügen. Die Tafel, der Kombi-Bau und die Original-Tabelle
-ziehen sofort mit. Der feste Satz vom 24.08. liegt im Programm selbst und bleibt wie er ist.</p>
-<div id="adm_saetze"></div>
+<h2>&#128193; Ordner der Homebase</h2>
+<p class="mini">Der ganze Ablauf an einem Ort: <b>Ordner anlegen</b> (oder Fotos hochladen -
+der Ordner entsteht dann von selbst), <b>Fotos hineinlegen</b>, <b>einlesen</b> und die Zeilen
+<b>abarbeiten</b>. Jeder Ordner ist für ALLE Nutzer gleich; nur der aktivierte Ordner wird
+auf Kombi-Tafel, Kombi-Bau und Original-Tabelle angezeigt. Ordner mischen sich nie.</p>
+<div class="kern"><b>Neuen Ordner anlegen:</b>
+  <input type="date" id="neusatz_datum">
+  <input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24">
+  <button class="haupt" onclick="tuSatzNeu()">&#10133; Ordner anlegen</button></div>
+<p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..."
+  size="40" oninput="satzSuche(this.value)"></p>
+<div id="adm_ordner"><p class="mini">Lädt...</p></div>
 <h2>&#128101; Alle User</h2>
 <p class="mini">Löschen entfernt ein Konto RESTLOS - samt allem, was der User angelegt hat,
 auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrückt werden.
 Admins ernennst du mit "zum Admin machen" - auch das fragt zweimal.</p>
 <div id="adm_user"></div>`;
-  await adminFotoSaetze();
-  await adminSaetze();
+  await zeichneOrdner();
   await adminUserliste();
 }
 
 // ---------- Foto-Sätze ----------
 
-async function adminFotoSaetze() {
-  const box = elA("adm_fotos");
+// ---------- EINE Ordner-Werkstatt ----------
+// Je Ordner ein Kasten: Kopf mit Zahlen, Knopfleiste, Fotos, Vorschau,
+// Wetten-Tabelle. Alles was zu einem Ordner gehoert, ist beisammen.
+
+async function zeichneOrdner() {
+  const box = elA("adm_ordner");
   if (!box) return;
   const uploads = await supaSatzUploadsLaden();
-  const gruppen = {};
-  for (const u of uploads) {
-    gruppen[u.satz_datum] = gruppen[u.satz_datum] || { n: 0, wartet: 0 };
-    gruppen[u.satz_datum].n++;
-    if (u.status === "wartet") gruppen[u.satz_datum].wartet++;
+  let saetze = await supaSaetzeLaden();
+
+  // Fotos ohne Ordner? Dann fehlt der Ordner - er wird angelegt.
+  const datenOhne = [...new Set(uploads.map(u => u.satz_datum))].filter(d => !saetze.some(s => s.id === d));
+  for (const d of datenOhne) {
+    const t = d.split("-");
+    await supaSatzAnlegen(d, "Fotos vom " + t[2] + "." + t[1] + "." + t[0]);
   }
-  let liste = "";
-  for (const datum of Object.keys(gruppen)) {
-    const g = gruppen[datum];
-    liste += "<li><b>Satz vom " + sicherA(datum) + "</b>: " + g.n + " Foto(s), " +
-      (g.wartet ? '<span class="rot">' + g.wartet + " warten</span> " +
-        '<button class="haupt" onclick="satzEinlesen(\'' + sicherA(datum) + '\')">Jetzt im Programm einlesen</button>'
-                : '<span class="gruen">eingelesen</span> ' +
-        '<button onclick="satzEinlesen(\'' + sicherA(datum) + '\')">noch einmal einlesen</button>') +
-      ' <button onclick="fotosZeigen(\'' + sicherA(datum) + '\')">Fotos ansehen / löschen</button>' +
-      '<div id="fotoliste_' + sicherA(datum) + '"></div></li>';
+  if (datenOhne.length) saetze = await supaSaetzeLaden();
+
+  if (!saetze.length) {
+    box.innerHTML = '<div class="kern">Noch kein Ordner. Leg oben einen an - oder lade unten ' +
+      "einfach Fotos hoch, dann entsteht er von selbst.</div>" + fotoZuNeuemOrdnerHtml();
+    return;
   }
+  const wetten = await supaWettenLaden();
+  const offen = localStorage.getItem("kt_satz");
+  let html = "";
+  for (const s of saetze) {
+    const meine = wetten.filter(w => w.satz === s.id);
+    const fotos = uploads.filter(u => u.satz_datum === s.id);
+    const wartet = fotos.filter(u => u.status === "wartet").length;
+    const istOffen = offen === s.id;
+    html += '<details class="ordnerwerk' + (istOffen ? " werkoffen" : "") + '" id="satzdetails_' + sicherA(s.id) +
+      '" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '"' + (istOffen ? " open" : "") +
+      ' ontoggle="if(this.open)satzFotosLaden(\'' + sicherA(s.id) + '\')">' +
+      "<summary><b>&#128193; " + sicherA(s.titel) + "</b> " +
+      (istOffen ? '<span class="fertigbadge">offener Ordner</span> ' : "") +
+      '<span class="mini">' + meine.length + " Wetten, " + fotos.length + " Fotos" +
+      (wartet ? ", " + wartet + " noch nicht eingelesen" : "") + "</span></summary>" +
+      '<div class="werkinhalt">' +
+      // Knopfleiste
+      '<div class="werkleiste">' +
+      (istOffen ? '<span class="mini gruen">&#9989; Dieser Ordner ist überall offen</span>'
+                : '<button class="haupt" onclick="satzAktivieren(\'' + sicherA(s.id) + '\')">&#9989; Diesen Ordner aktivieren</button>') +
+      ' <label class="fotoknopf">&#128247; Fotos hinzufügen' +
+      '<input type="file" accept="image/*" multiple style="display:none" ' +
+      'onchange="tuSatzFotos(this, \'' + sicherA(s.id) + '\')"></label>' +
+      (fotos.length ? ' <button class="haupt" onclick="satzEinlesen(\'' + sicherA(s.id) + '\')">&#128269; ' +
+        (wartet ? "Fotos einlesen (" + wartet + " neu)" : "Fotos noch einmal einlesen") + "</button>" : "") +
+      ' <button onclick="tuWetteNeu(\'' + sicherA(s.id) + '\')">&#10133; Wette von Hand</button>' +
+      ' <button id="satzweg_' + sicherA(s.id) + '" onclick="tuSatzWeg(\'' + sicherA(s.id) + '\')">&#128465; Ordner löschen</button>' +
+      "</div>" +
+      '<div id="vorschau_' + sicherA(s.id) + '"></div>' +
+      '<div id="satzfotos_' + sicherA(s.id) + '"></div>' +
+      '<h3>Wetten in diesem Ordner (' + meine.length + ")</h3>" +
+      (meine.length ? '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK)</th><th>gemeldet</th>' +
+        "<th>Liga</th><th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" +
+        meine.map(w => wettenZeileHtml(w)).join("") + "</tbody></table></div>"
+        : '<p class="mini">Noch keine Wetten - Fotos einlesen oder von Hand anlegen.</p>') +
+      "</div></details>";
+  }
+  box.innerHTML = html;
+}
+
+function wettenZeileHtml(w) {
+  const quote = (Array.isArray(w.o) && w.o[0]) ? w.o[0][1] : "";
+  const mehr = (Array.isArray(w.o) && w.o.length > 1)
+    ? ' <span class="mini">(+' + (w.o.length - 1) + " weitere: " +
+      w.o.slice(1).map(x => x[1]).join(" / ") + ")</span>" : "";
+  return "<tr>" +
+    '<td><input value="' + sicherA(w.an_korrigiert || w.an_zeit) + '" onchange="tuWette(' + w.id + ',\'an_zeit\',this.value)" size="16"></td>' +
+    '<td><input value="' + sicherA(w.von || "") + '" onchange="tuWette(' + w.id + ',\'von\',this.value)" size="5"></td>' +
+    '<td><input value="' + sicherA(w.liga || "") + '" onchange="tuWette(' + w.id + ',\'liga\',this.value)" size="18"></td>' +
+    '<td><input value="' + sicherA(w.spiel) + '" onchange="tuWette(' + w.id + ',\'spiel\',this.value)" size="32"></td>' +
+    '<td><input value="' + sicherA(w.wette) + '" onchange="tuWette(' + w.id + ',\'wette\',this.value)" size="22"></td>' +
+    '<td><select onchange="tuWette(' + w.id + ',\'s\',this.value)">' +
+      S_WAHL.map(x => "<option" + (w.s === x ? " selected" : "") + ">" + x + "</option>").join("") + "</select></td>" +
+    '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5">' + mehr + "</td>" +
+    '<td><button onclick="tuWetteWeg(' + w.id + ')">weg</button></td></tr>';
+}
+
+// Fotos hochladen, wenn es noch gar keinen Ordner gibt
+function fotoZuNeuemOrdnerHtml() {
   const d = new Date();
   const heute = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
     String(d.getDate()).padStart(2, "0");
-  box.innerHTML =
-    '<label>Datum des Satzes: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
-    '<label class="fotoknopf">Fotos hochladen' +
-    '<input type="file" accept="image/*" multiple style="display:none" ' +
-    'onchange="tuSatzFotos(this)"></label>' +
-    (liste ? "<ul>" + liste + "</ul>" : '<p class="mini">Noch keine Foto-Sätze hochgeladen.</p>');
+  return '<p><label>Datum: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
+    '<label class="fotoknopf">&#128247; Fotos hochladen' +
+    '<input type="file" accept="image/*" multiple style="display:none" onchange="tuSatzFotos(this)"></label></p>';
 }
 
-async function tuSatzFotos(input) {
-  const datum = elA("satz_datum").value;
-  if (!datum) { meldungA("Bitte zuerst das Datum des Satzes wählen.", "warn"); return; }
+// Alte Namen weiterhin bedienbar (aeltere Aufrufe im Code)
+async function adminFotoSaetze() { return zeichneOrdner(); }
+async function adminSaetze() { return zeichneOrdner(); }
+
+async function tuSatzFotos(input, satzId) {
+  const feld = elA("satz_datum");
+  const datum = satzId || (feld ? feld.value : "");
+  if (!datum) { meldungA("Bitte zuerst das Datum des Ordners wählen.", "warn"); return; }
   const dateien = Array.from(input.files || []);
   input.value = "";
   if (!dateien.length) return;
@@ -351,6 +412,7 @@ let vorschauZeilen = [];
 let vorschauDatum = null;
 let vorschauUploads = [];
 let vsTrotzdem = false;
+let vorschauBox = null;
 
 const S_WAHL = ["SIEG", "ASIA", "TORE", "ECKEN", "BTTS", "HZ-END", "DNB", "DC", "TENNIS"];
 
@@ -387,6 +449,7 @@ function zeileSiehtNachWetteAus(text) {
 
 function satzFelderParsen(felder, erbe) {
   let an = null, von = "", quote = null;
+  const quoten = [];
   const rest = [];
   for (const f of felder) {
     const anM = f.match(/(\d{2})-(\d{2})-(\d{4}),?\s*(\d{1,2})[:.](\d{2})/);
@@ -397,7 +460,9 @@ function satzFelderParsen(felder, erbe) {
     } else if (vonM && !von && !an === false && rest.length === 0) {
       von = vonM[1] + "." + vonM[2] + ".";
     } else if (qM) {
-      quote = parseFloat(qM[1] + "." + qM[2]);   // das LETZTE Zahlenfeld gewinnt
+      const q = parseFloat(qM[1] + "." + qM[2]);
+      quoten.push(q);
+      quote = q;                                  // das LETZTE Zahlenfeld fuehrt
     } else if (f.length > 1 && !/^[a-z]{1,3}$/i.test(f)) {
       rest.push(f);   // Kleinkram wie das jb-Kuerzel fliegt raus
     }
@@ -423,8 +488,10 @@ function satzFelderParsen(felder, erbe) {
     spiel = rest[0];
   }
   if (!wette && spiel) { wette = spiel; }
+  // Stehen mehrere Quoten in einer Zeile (z. B. 2,25 / 2,50), kommen ALLE mit
+  const alle = quoten.filter(q => q >= 1.01 && q <= 1000);
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette,
-    s: artErkennen(wette), quote: quote, geerbt: geerbt };
+    s: artErkennen(wette), quote: quote, quoten: alle.length > 1 ? alle : null, geerbt: geerbt };
 }
 
 function artErkennen(wette) {
@@ -499,7 +566,8 @@ function einleseBalken(box, foto, gesamt, prozent, text) {
 }
 
 async function satzEinlesen(datum) {
-  const box = elA("adm_vorschau");
+  vorschauBox = "vorschau_" + datum;
+  const box = elA(vorschauBox);
   if (typeof Tesseract === "undefined") {
     meldungA("Die Texterkennung ist noch nicht geladen - Seite einmal neu laden.", "warn");
     return;
@@ -583,7 +651,7 @@ async function satzEinlesen(datum) {
 }
 
 function vorschauZeigen() {
-  const box = elA("adm_vorschau");
+  const box = elA(vorschauBox || "vorschau_" + vorschauDatum);
   if (!vorschauZeilen.length) {
     box.innerHTML = '<div class="warnkern"><b>Keine Zeilen erkannt.</b> Das Foto ist zu unscharf ' +
       "oder ein anderes Format - Zeilen lassen sich unten von Hand anlegen, oder ein besseres " +
@@ -605,7 +673,8 @@ function vorschauZeigen() {
       '<td><input value="' + sicherA(z.wette) + '" onchange="vsFeld(' + i + ',\'wette\',this.value)" size="24"></td>' +
       '<td><select onchange="vsFeld(' + i + ',\'s\',this.value)">' +
         S_WAHL.map(x => "<option" + (z.s === x ? " selected" : "") + ">" + x + "</option>").join("") + "</select></td>" +
-      '<td><input value="' + z.quote + '" onchange="vsFeld(' + i + ',\'quote\',this.value)" size="5"></td>' +
+      '<td><input value="' + z.quote + '" onchange="vsFeld(' + i + ',\'quote\',this.value)" size="5">' +
+        ((z.quoten && z.quoten.length > 1) ? ' <span class="mini">(+' + (z.quoten.length - 1) + " weitere)</span>" : "") + "</td>" +
       '<td><button onclick="vsWeg(' + i + ')">weg</button></td></tr>';
   });
   const fertigN = vorschauZeilen.filter(z => z.wette && z.quote >= 1.01).length;
@@ -626,7 +695,7 @@ function vorschauZeigen() {
 function vorschauFussHtml() {
   return '<p><button onclick="vsNeueZeile()">Zeile hinzufügen</button> ' +
     '<button class="haupt" onclick="vsUebernehmen()">Satz übernehmen: Ordner anlegen und überall anzeigen</button> ' +
-    '<button onclick="elA(\'adm_vorschau\').innerHTML=\'\'">abbrechen</button></p>';
+    '<button onclick="elA(\'" + (vorschauBox || "vorschau_" + vorschauDatum) + "\').innerHTML=\'\'">abbrechen</button></p>';
 }
 
 function vsFeld(i, feld, wert) {
@@ -672,13 +741,16 @@ async function vsUebernehmen() {
   for (let i = 0; i < vorschauZeilen.length; i++) {
     const z = vorschauZeilen[i];
     if (daSchluessel.has(zeilenSchluessel(z))) { schonDa++; continue; }
+    const optionen = (z.quoten && z.quoten.length > 1)
+      ? z.quoten.map((q, k) => [k === 0 ? z.wette : "Option " + (k + 1), q])
+      : [[z.wette, z.quote]];
     const r = await supaWetteAnlegen(vorschauDatum, { pos: daWetten.length + i + 1, von: z.von, an_zeit: z.an_zeit,
       liga: z.liga, spiel: z.spiel, wette: z.wette, kat: z.s, s: z.s,
-      o: [[z.wette, z.quote]] });
+      o: optionen });
     if (!r.error) ok++;
   }
   for (const up of vorschauUploads) await supaUploadStatus(up.id, "eingelesen");
-  elA("adm_vorschau").innerHTML = "";
+  elA(vorschauBox || "vorschau_" + vorschauDatum).innerHTML = "";
   meldungA("<b>Satz vom " + sicherA(vorschauDatum) + ": " + ok + " Wetten übernommen" +
     (schonDa ? ", " + schonDa + " waren schon im Ordner (nicht doppelt angelegt)" : "") + ".</b> " +
     "Der Ordner steht ab sofort auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle - " +
@@ -687,72 +759,7 @@ async function vsUebernehmen() {
   adminSaetze();
 }
 
-// ---------- Saetze bearbeiten (aendern, loeschen, hinzufuegen) ----------
-
-async function adminSaetze() {
-  const box = elA("adm_saetze");
-  if (!box) return;
-  const saetze = await supaSaetzeLaden();
-  const wetten = await supaWettenLaden();
-  const uploads = await supaSatzUploadsLaden();
-
-  // Klare Uebersicht: ein Blick, alle Ordner
-  let ueber = '<p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..." ' +
-    'size="40" oninput="satzSuche(this.value)"></p>' +
-    '<div class="kern"><b>Neuen leeren Ordner anlegen:</b> ' +
-    '<input type="date" id="neusatz_datum"> ' +
-    '<input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24"> ' +
-    '<button class="haupt" onclick="tuSatzNeu()">Ordner anlegen</button> ' +
-    '<span class="mini">Wetten dann unten von Hand hinzufügen oder Fotos einlesen.</span></div>';
-  if (saetze.length) {
-    ueber += "<table><thead><tr><th>Ordner</th><th>Wetten</th><th>Fotos</th><th></th></tr></thead><tbody>";
-    for (const s of saetze) {
-      const n = wetten.filter(w => w.satz === s.id).length;
-      const f = uploads.filter(u => u.satz_datum === s.id).length;
-      const istOffen = localStorage.getItem("kt_satz") === s.id;
-      ueber += "<tr data-such=\"" + sicherA((s.titel + " " + s.id).toLowerCase()) + "\"" +
-        (istOffen ? " class='fertigzeile'" : "") + "><td><b>" + sicherA(s.titel) + "</b> " +
-        (istOffen ? '<span class="fertigbadge">offener Ordner</span> ' : "") +
-        "<span class='mini'>(" + sicherA(s.id) + ")</span></td>" +
-        "<td>" + n + "</td><td>" + f + "</td>" +
-        '<td><button class="haupt" onclick="satzAktivieren(\'' + sicherA(s.id) + '\')" ' +
-        'title="Diesen Ordner überall als offenen Ordner setzen">&#9989; Aktivieren</button> ' +
-        '<button onclick="satzAufklappen(\'' + sicherA(s.id) + '\')">öffnen und bearbeiten</button></td></tr>';
-    }
-    ueber += "</tbody></table>";
-  } else {
-    ueber += '<p class="mini">Noch keine im Programm eingelesenen Ordner.</p>';
-  }
-
-  let html = ueber;
-  for (const s of saetze) {
-    const meine = wetten.filter(w => w.satz === s.id);
-    let zeilen = "";
-    for (const w of meine) {
-      const quote = (Array.isArray(w.o) && w.o[0]) ? w.o[0][1] : "";
-      const mehr = (Array.isArray(w.o) && w.o.length > 1) ? ' <span class="mini">(+' + (w.o.length - 1) + ' weitere)</span>' : "";
-      zeilen += "<tr>" +
-        '<td><input value="' + sicherA(w.an_korrigiert || w.an_zeit) + '" onchange="tuWette(' + w.id + ',\'an_zeit\',this.value)" size="16"></td>' +
-        '<td><input value="' + sicherA(w.von || "") + '" onchange="tuWette(' + w.id + ',\'von\',this.value)" size="5"></td>' +
-        '<td><input value="' + sicherA(w.liga || "") + '" onchange="tuWette(' + w.id + ',\'liga\',this.value)" size="18"></td>' +
-        '<td><input value="' + sicherA(w.spiel) + '" onchange="tuWette(' + w.id + ',\'spiel\',this.value)" size="32"></td>' +
-        '<td><input value="' + sicherA(w.wette) + '" onchange="tuWette(' + w.id + ',\'wette\',this.value)" size="22"></td>' +
-        '<td><select onchange="tuWette(' + w.id + ',\'s\',this.value)">' +
-          S_WAHL.map(x => "<option" + (w.s === x ? " selected" : "") + ">" + x + "</option>").join("") + "</select></td>" +
-        '<td><input value="' + sicherA(String(quote)) + '" onchange="tuWetteQuote(' + w.id + ',this.value)" size="5">' + mehr + "</td>" +
-        '<td><button onclick="tuWetteWeg(' + w.id + ')">weg</button></td></tr>';
-    }
-    html += '<details class="satzkasten" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '" id="satzdetails_' + sicherA(s.id) + '" ontoggle="if(this.open)satzFotosLaden(\'' + sicherA(s.id) + '\')"><summary><b>' + sicherA(s.titel) + "</b> (" + meine.length + " Wetten)</summary>" +
-      '<div class="tabellenrand"><table><thead><tr><th>Anstoß (UK)</th><th>gemeldet</th><th>Liga</th>' +
-      "<th>Spiel</th><th>Wette</th><th>Art</th><th>Quote</th><th></th></tr></thead><tbody>" + zeilen +
-      "</tbody></table></div>" +
-      '<div id="satzfotos_' + sicherA(s.id) + '"></div>' +
-      '<p><button onclick="tuWetteNeu(\'' + sicherA(s.id) + '\')">Wette hinzufügen</button> ' +
-      '<button id="satzweg_' + sicherA(s.id) + '" onclick="tuSatzWeg(\'' + sicherA(s.id) + '\')">ganzen Satz löschen</button></p>' +
-      "</details>";
-  }
-  box.innerHTML = html;
-}
+// ---------- Ordner-Werkzeuge (Suche, Aktivieren, Aufklappen) ----------
 
 function satzSuche(wert) {
   const s = String(wert || "").toLowerCase().trim();
