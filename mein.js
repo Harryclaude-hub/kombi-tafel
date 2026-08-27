@@ -155,6 +155,7 @@ Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschl
 Datenbank - lesbar allein für dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
 einem NEUEN Gerät zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
 Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können.</details>
+<div id="schluesselkasten"></div>
 <div id="bereichtabs" class="navleiste"></div>
 <div id="mb_navi" class="mb-navi"></div>
 
@@ -200,12 +201,38 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
 
   zeichneMbNavi();
   benachKnopf();
+  pruefeSchluessel();
   await zeichneTabs();
   await zeichneFreunde();
   await zeichneTeilen();
   zeichneImport();
   await zeichneBereich();
   await zeichneBuchhaltung();
+}
+
+// ---------- Schlüssel auf diesem Gerät ----------
+// Fehlen sie (neues Gerät, App neu installiert, Browser-Daten gelöscht),
+// lässt sich hier nichts anlegen. Ein Passwort holt sie aus dem Safe zurück.
+
+async function pruefeSchluessel() {
+  const box = el("schluesselkasten");
+  if (!box || typeof kryptoGeraetBereit !== "function") return;
+  if (await kryptoGeraetBereit()) { box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="warnkern"><b>&#128274; Auf diesem Gerät fehlen deine Schlüssel.</b> ' +
+    "Deshalb lässt sich gerade nichts anlegen (Personen, Kombinationen, Buchungen). " +
+    "Das passiert nach einer Neuinstallation oder wenn die Browser-Daten gelöscht wurden. " +
+    "Gib einmal dein Passwort ein - dann sind sie zurück und alles funktioniert wieder.<br>" +
+    '<input type="password" id="schluessel_pw" placeholder="Dein Passwort" autocomplete="current-password"> ' +
+    '<button class="haupt" onclick="tuSchluesselNachtragen()">&#128273; Schlüssel zurückholen</button></div>';
+}
+
+async function tuSchluesselNachtragen() {
+  const pw = el("schluessel_pw") ? el("schluessel_pw").value : "";
+  if (!pw) { meldungM("Bitte dein Passwort eintragen.", "warn"); return; }
+  const r = await kryptoNachtragen(pw);
+  if (r.fehler) { meldungM(r.fehler, "warn"); return; }
+  meldungM("<b>Schlüssel zurückgeholt.</b> Alles funktioniert wieder.", "gut");
+  location.reload();
 }
 
 // ---------- Benachrichtigungen einschalten ----------
@@ -530,8 +557,8 @@ function zeichneOrdnerBox(scheine) {
       '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufügen</button></p>';
   }
   if (ordnerListe.length) {
-    verwalten += "<table><thead><tr><th>Person</th><th>Kombinationen</th><th>fertig</th>" +
-      "<th>Erhalten</th><th>Eingezahlt</th><th></th></tr></thead><tbody>";
+    verwalten += "<table><thead><tr><th>Person</th><th>Kombis</th><th>Einsatz gesamt</th>" +
+      "<th>fertig</th><th>Erhalten</th><th>Eingezahlt</th><th>Gewonnen</th><th></th></tr></thead><tbody>";
     for (const o of ordnerListe) {
       const n = zahl[o.id] || 0;
       const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
@@ -548,15 +575,26 @@ function zeichneOrdnerBox(scheine) {
         (schreib ? '<input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '" size="16">'
                  : "<b>" + textSicherM(o.name) + "</b>") + "</td>" +
         "<td>" + n + "</td>" +
+        "<td>" + personEinsatz(o.id, scheine).toFixed(2) + " &euro;</td>" +
         "<td>" + (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "-") + "</td>" +
         "<td>" + p.erhaltengesamt.toFixed(2) + " &euro;</td>" +
         "<td>" + p.eingesamt.toFixed(2) + " &euro;" +
           (warn ? ' <span class="warnbadge">!</span>' : "") + "</td>" +
+        "<td>" + personGewinn(o.id, scheine).toFixed(2) + " &euro;</td>" +
         "<td>" + tasten + "</td></tr>";
     }
     verwalten += "</tbody></table>";
   }
   const wartendGesamt = Object.values(wartend).reduce((p, x) => p + x, 0) + ohneWartend;
+  // Erinnerung aufs Gerät: fertige Scheine warten auf dein Ergebnis
+  if (wartendGesamt && typeof benachrichtige === "function") {
+    const merker = "kt_erinnert_" + new Date().toISOString().slice(0, 10) + "_" + wartendGesamt;
+    if (!localStorage.getItem(merker)) {
+      localStorage.setItem(merker, "1");
+      benachrichtige(wartendGesamt + " Kombination" + (wartendGesamt === 1 ? "" : "en") + " fertig",
+        "Bitte gewonnen oder verloren eintragen.", "ergebnis");
+    }
+  }
   box.innerHTML = filter + verwalten +
     (wartendGesamt ? '<p class="mini"><b>fertig</b> heisst: alle Spiele dieses Scheins sind aus - ' +
       "bitte Person anklicken und unten <b>gewonnen oder verloren</b> eintragen, dann stimmt das Geld.</p>" : "") +
@@ -890,6 +928,46 @@ function heuteDatum() {
     String(d.getDate()).padStart(2, "0");
 }
 
+function personEinsatz(ordnerId, scheine) {
+  return scheine.filter(s => s.ordner === ordnerId)
+    .reduce((p, s) => p + (s.daten.einsatz || 0), 0);
+}
+
+function personGewinn(ordnerId, scheine) {
+  return scheine.filter(s => s.ordner === ordnerId && s.stand === "gewonnen")
+    .reduce((p, s) => p + echtZurueckWert(s), 0);
+}
+
+// Alle Kombinationen einer Person auf einen Blick: Einsatz, Anbieter,
+// Stand, Foto - und wie viele Teile zusammen zum Ziel gehören.
+function kombiUebersichtHtml(ordnerId, scheine) {
+  const meine = scheine.filter(s => s.ordner === ordnerId);
+  if (!meine.length) return '<p class="mini">Noch keine Kombinationen bei dieser Person.</p>';
+  const einsatz = meine.reduce((p, s) => p + (s.daten.einsatz || 0), 0);
+  const offen = meine.filter(s => s.stand === "offen").length;
+  const gew = meine.filter(s => s.stand === "gewonnen").length;
+  const ver = meine.filter(s => s.stand === "verloren").length;
+  let h = "<h3>&#127919; Kombinationen dieser Person (" + meine.length + ")</h3>" +
+    '<p class="mini"><b>Gesamteinsatz ' + einsatz.toFixed(2) + " &euro;</b> - " + offen + " offen, " +
+    '<span class="gruen">' + gew + " gewonnen</span>, <span class=\"rot\">" + ver + " verloren</span>. " +
+    "Ein Schein hat drei Wetten; setzt du 400 &euro;, zählen die 400 &euro; für die ganze Kombination.</p>" +
+    '<div class="tabellenrand"><table><thead><tr><th>Wann</th><th>Anbieter</th><th>Spiele</th>' +
+    "<th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th><th>Foto</th></tr></thead><tbody>";
+  for (const s of meine) {
+    const d = s.daten;
+    h += "<tr" + (scheinWartet(s) ? " class='fertigzeile'" : "") + ">" +
+      "<td class='mini'>" + zeitM(s.created_at) + "</td>" +
+      "<td>" + markeM(d.kz) + "</td>" +
+      "<td class='mini'>" + (d.wetten || []).map(t => textSicherM(t.spiel)).join("<br>") + "</td>" +
+      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td>" +
+      "<td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
+      "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
+      "<td>" + s.stand + (scheinWartet(s) ? ' <span class="fertigbadge">Ergebnis?</span>' : "") + "</td>" +
+      "<td>" + (s.foto ? '<img src="' + s.foto + '" class="minifoto">' : '<span class="mini">-</span>') + "</td></tr>";
+  }
+  return h + "</tbody></table></div>";
+}
+
 function zeichnePersonenKasse(scheine) {
   const box = el("personenkasse");
   if (!box) return;
@@ -955,6 +1033,7 @@ function zeichnePersonenKasse(scheine) {
       "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
   }
   html += "</tbody></table>";
+  html += kombiUebersichtHtml(person.id, scheine);
 
   if (schreib) {
     html += '<div class="kassenformular"><b>Neue Buchung:</b> ' +

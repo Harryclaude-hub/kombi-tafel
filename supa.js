@@ -355,7 +355,9 @@ async function supaOrdnerLaden(bereichId) {
 
 // Ohne Schlüssel wird NICHTS gespeichert - sonst laege der Klartext
 // unbemerkt in der Datenbank (Review-Fund vom 26.08.).
-const OHNE_SCHLUESSEL = "Kein Verschlüsselungs-Schlüssel für diesen Bereich - der Besitzer muss dir einmal neu teilen.";
+const OHNE_SCHLUESSEL = "Auf diesem Gerät fehlt der Verschlüsselungs-Schlüssel. " +
+  "Im eigenen Bereich hilft der rote Kasten oben (einmal Passwort eingeben); " +
+  "in einem geteilten Bereich muss der Besitzer noch einmal teilen.";
 
 async function supaOrdnerAnlegen(bereichId, name) {
   const sauber = (name || "").trim();

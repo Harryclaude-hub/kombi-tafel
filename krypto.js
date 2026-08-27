@@ -323,3 +323,36 @@ async function e2eAuf(key, s) {
   }
   return key ? "[verschlüsselt - Schlüssel passt nicht]" : "[verschlüsselt - Schlüssel fehlt]";
 }
+
+// ---------- Schluessel auf diesem Geraet nachtragen ----------
+// Faelle: neues Geraet, geleerter Browser-Speicher, App neu installiert.
+// Der Safe liegt auf dem Server - er braucht nur das Passwort. Stimmt das
+// Passwort nicht, wird NICHTS ueberschrieben (sonst waeren alte Daten weg).
+
+async function kryptoNachtragen(passwort) {
+  const u = await supaNutzer();
+  if (!u) return { fehler: "Nicht angemeldet." };
+  const safeR = await supa.from("kt_schluessel").select("*").eq("id", u.id).maybeSingle();
+  const safe = safeR.data || null;
+  if (!safe || !safe.keysafe) {
+    // Noch gar kein Safe: normal einrichten
+    const e = await kryptoEinrichten(passwort);
+    return e.ok ? { ok: true, neu: true } : { fehler: "Einrichten fehlgeschlagen." };
+  }
+  const kpass = await kryptoPassSchluessel(passwort, u.id);
+  const priv = await kryAesAuf(kpass, safe.keysafe.iv, safe.keysafe.ct);
+  if (priv === null) return { fehler: "Das Passwort stimmt nicht - es wurde nichts geändert." };
+  let bereich = safe.bereichsafe
+    ? await kryAesAuf(kpass, safe.bereichsafe.iv, safe.bereichsafe.ct) : null;
+  if (!bereich) bereich = await kryBereichNeu();
+  kryLokalSetzen(u.id, priv, bereich);
+  kryptoCacheLeeren();
+  return { ok: true };
+}
+
+// Hat dieses Geraet die Schluessel des angemeldeten Kontos?
+async function kryptoGeraetBereit() {
+  const u = await supaNutzer();
+  if (!u) return true;
+  return !!kryLokalPriv(u.id) && !!kryLokalBereich(u.id);
+}
