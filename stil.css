@@ -609,3 +609,16 @@ tr.rohzeile td:first-child { color: #a00000; font-weight: bold; }
 /* Schlüssel-Warnung: darf man nicht übersehen (Design-Schicht) */
 .schluesselwarnung { border-width: 3px; font-size: 17px; }
 .schluesselwarnung input { font-size: 17px; }
+
+/* Geldfluss-Karte (Design-Schicht) */
+.flusskarte { width: 100%; max-width: 680px; height: auto; margin: 8px 0; }
+.flusskarte .fk-weg { fill: #eef2fa; stroke: #1a2c50; stroke-width: 2; }
+.flusskarte .fk-anb { fill: #f3faf3; stroke: #1a7a1a; stroke-width: 2; }
+.flusskarte .fk-bank { fill: #fff3e0; stroke: #b35a00; stroke-width: 2; }
+.flusskarte .fk-name { font: bold 13px Arial; fill: #000; }
+.flusskarte .fk-zahl { font: 12px Arial; fill: #333; }
+.flusskarte .fk-titel { font: bold 12px Arial; fill: #666; }
+.flusskarte .fk-hin { stroke: #1a2c50; stroke-width: 2; }
+.flusskarte .fk-raus { stroke: #b35a00; stroke-width: 2; stroke-dasharray: 5 4; }
+.flussliste { margin: 6px 0 6px 18px; }
+.flussliste li { margin: 3px 0; }

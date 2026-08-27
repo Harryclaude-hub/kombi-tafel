@@ -824,7 +824,8 @@ let personBuchungen = [];
 let kasseScheine = [];
 
 const KASSE_WEGE = [["paypal", "PayPal"], ["paysafe", "Paysafe"], ["neteller", "Neteller"], ["skrill", "Skrill"]];
-const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"], ["vom_anbieter", "vom Anbieter zurueck"]];
+const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"],
+  ["vom_anbieter", "vom Anbieter zurück"], ["ausgezahlt", "auf eigenes Konto ausgezahlt (raus)"]];
 const KASSE_ANBIETER = [["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"], ["st", "Stake"]];
 
 function wegName(w) { const x = KASSE_WEGE.find(k => k[0] === w); return x ? x[1] : w; }
@@ -879,6 +880,7 @@ function personPruefen(ordnerId, scheine) {
     const betrag = Number(b.betrag) || 0;
     if (!wege[b.weg]) continue;
     if (b.art === "erhalten") wege[b.weg].erhalten += betrag;
+    else if (b.art === "ausgezahlt") wege[b.weg].raus = (wege[b.weg].raus || 0) + betrag;
     else if (b.art === "zum_anbieter") { wege[b.weg].hin += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].einge += betrag; }
     else { wege[b.weg].zurueck += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].geholt += betrag; }
   }
@@ -898,7 +900,7 @@ function personPruefen(ordnerId, scheine) {
   const probleme = [];
   for (const [w, nameW] of KASSE_WEGE) {
     const x = wege[w];
-    x.stand = x.erhalten - x.hin + x.zurueck;
+    x.stand = x.erhalten - x.hin + x.zurueck - (x.raus || 0);
     if (x.stand < -0.004) probleme.push(nameW + " ist im Minus (" + x.stand.toFixed(2) +
       " Euro): mehr weitergezahlt als erhalten. Buchung vergessen oder falsch eingetragen.");
   }
@@ -911,8 +913,14 @@ function personPruefen(ordnerId, scheine) {
   }
   const eingesamt = buch.filter(b => b.art === "zum_anbieter").reduce((p, b) => p + Number(b.betrag), 0);
   const erhaltengesamt = buch.filter(b => b.art === "erhalten").reduce((p, b) => p + Number(b.betrag), 0);
+  const ausgezahlt = buch.filter(b => b.art === "ausgezahlt").reduce((p, b) => p + Number(b.betrag), 0);
+  const aufWegen = Object.values(wege).reduce((p, x) => p + x.stand, 0);
+  const beiAnbietern = Object.values(anbieter).reduce((p, x) => p + x.guthaben, 0);
+  const imSpiel = Object.values(anbieter).reduce((p, x) => p + (x.imSpiel || 0), 0);
   return { wege: wege, anbieter: anbieter, probleme: probleme, buch: buch,
-    eingesamt: eingesamt, erhaltengesamt: erhaltengesamt };
+    eingesamt: eingesamt, erhaltengesamt: erhaltengesamt, ausgezahlt: ausgezahlt,
+    aufWegen: aufWegen, beiAnbietern: beiAnbietern, imSpiel: imSpiel,
+    bilanz: (aufWegen + beiAnbietern + imSpiel + ausgezahlt) - erhaltengesamt };
 }
 
 // Wann ist ein Schein "fertig"? Wenn das letzte Spiel darin sicher aus ist
@@ -945,15 +953,22 @@ function kasseZeit(d) {
 }
 
 // Was in Ansicht UND PDF gezeigt wird, je Person gemerkt (z. B. kein Neteller)
+const KASSE_BLOECKE = [["statistik", "Statistik"], ["fluss", "Geldfluss"],
+  ["wege", "Zahlungswege"], ["anbieter", "Wettanbieter"],
+  ["kombis", "Kombinationen"], ["buchungen", "Buchungsliste"]];
+
 function kasseZeigen(ordnerId) {
   try {
     const s = JSON.parse(localStorage.getItem("kt_kasse_zeigen_" + ordnerId) || "{}");
-    return { wege: s.wege || {}, anbieter: s.anbieter || {} };
-  } catch (e) { return { wege: {}, anbieter: {} }; }
+    return { wege: s.wege || {}, anbieter: s.anbieter || {}, bloecke: s.bloecke || {} };
+  } catch (e) { return { wege: {}, anbieter: {}, bloecke: {} }; }
 }
+
+function blockAn(zg, name) { return zg.bloecke[name] !== false; }
 
 function tuKasseZeigen(ordnerId, typ, key, an) {
   const z = kasseZeigen(ordnerId);
+  if (!z[typ]) z[typ] = {};
   z[typ][key] = !!an;
   localStorage.setItem("kt_kasse_zeigen_" + ordnerId, JSON.stringify(z));
   zeichneBereich();
@@ -1012,66 +1027,101 @@ function zeichnePersonenKasse(scheine) {
   if (!person) { box.innerHTML = ""; return; }
   const schreib = darfSchreiben();
   const p = personPruefen(person.id, scheine);
-
-  let html = '<div class="kassenkasten"><h3>&#128176; Personen-Kasse: ' + textSicherM(person.name) + "</h3>";
-  if (p.probleme.length) {
-    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
-      p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
-  } else if (p.buch.length) {
-    html += '<p class="mini gruen"><b>Alles geht sich aus:</b> Buchungen und Kombinationen passen zusammen.</p>';
-  }
+  const zg = kasseZeigen(person.id);
   const meineScheine = scheine.filter(s => s.ordner === person.id);
+
+  let html = '<div class="kassenkasten"><h3>&#128176; ' + textSicherM(person.name) + "</h3>";
+
+  // Fertige Kombinationen zuerst - das ist die wichtigste Meldung
   const wartendHier = meineScheine.filter(s => scheinWartet(s)).length;
   if (wartendHier) {
     html += '<div class="fertighinweis"><b>' + wartendHier + " Schein" + (wartendHier === 1 ? "" : "e") +
-      " fertig:</b> alle Spiele sind aus. Bitte unten in der Tabelle <b>gewonnen oder verloren</b> " +
-      "eintragen - erst dann stimmt die Rechnung hier.</div>";
+      " fertig:</b> alle Spiele sind aus. Bitte unten <b>gewonnen oder verloren</b> eintragen - " +
+      "erst dann stimmt die Rechnung hier.</div>";
   }
-  html += "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " &euro;</b> &nbsp;&nbsp; " +
-    "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " &euro;</b></p>";
+  if (p.probleme.length) {
+    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
+      p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
+  }
 
-  // Was gezeigt wird (Ansicht UND PDF) - z. B. kein Neteller: Haken weg
-  const zg = kasseZeigen(person.id);
-  html += '<div class="kassewahl mini"><b>Zeigen (gilt auch fürs PDF):</b> ';
-  for (const [w, nameW] of KASSE_WEGE) {
-    html += '<label><input type="checkbox"' + (zg.wege[w] !== false ? " checked" : "") +
-      ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
+  // ---------- Was möchtest du sehen? ----------
+  html += '<div class="kassewahl mini"><b>&#128065; Anzeigen:</b> ';
+  for (const [k, titel] of KASSE_BLOECKE) {
+    html += '<label><input type="checkbox"' + (blockAn(zg, k) ? " checked" : "") +
+      ' onchange="tuKasseZeigen(\'' + person.id + "','bloecke','" + k + '\', this.checked)"> ' + titel + "</label> ";
   }
-  for (const [kz, nameA] of KASSE_ANBIETER) {
-    html += '<label><input type="checkbox"' + (zg.anbieter[kz] !== false ? " checked" : "") +
-      ' onchange="tuKasseZeigen(\'' + person.id + "','anbieter','" + kz + '\', this.checked)"> ' + nameA + "</label> ";
-  }
-  html += '<button onclick="tuKassePdf(\'' + person.id + '\')">Als PDF herunterladen</button></div>';
+  html += '<button onclick="tuKassePdf(\'' + person.id + '\')">&#128196; Als PDF</button></div>';
 
-  html += "<table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
-    "<th>zurück</th><th>Stand jetzt</th></tr></thead><tbody>";
-  for (const [w, nameW] of KASSE_WEGE) {
-    if (zg.wege[w] === false) continue;
-    const x = p.wege[w];
-    html += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
-      "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
-      "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td></tr>";
+  // ---------- Statistik ----------
+  if (blockAn(zg, "statistik")) {
+    html += "<h4>&#128200; Statistik</h4><table><tbody>" +
+      zeile2("Von der Person erhalten (rein)", p.erhaltengesamt) +
+      zeile2("Auf eigenes Konto ausgezahlt (raus)", p.ausgezahlt) +
+      zeile2("Liegt noch auf den Zahlungswegen", p.aufWegen) +
+      zeile2("Liegt bei den Wettanbietern", p.beiAnbietern) +
+      zeile2("Steckt gerade in offenen Wetten", p.imSpiel) +
+      "<tr><td><b>Unterm Strich (Gewinn/Verlust)</b></td><td class='" +
+        (p.bilanz >= 0 ? "e-gew" : "e-ver") + "'><b>" + (p.bilanz >= 0 ? "+" : "") +
+        p.bilanz.toFixed(2) + " &euro;</b></td></tr>" +
+      "</tbody></table>";
   }
-  html += "</tbody></table>";
 
-  html += "<table><thead><tr><th>Anbieter</th><th>eingezahlt</th><th>zurückgeholt</th>" +
-    "<th>eingesetzt</th><th>im Spiel (wartet)</th><th>möglich offen</th><th>wirklich gewonnen</th>" +
-    "<th>fertig</th><th>Ergebnis ab</th><th>rechnerisch dort</th></tr></thead><tbody>";
-  for (const kz of ["iw", "bw", "b3", "st"]) {
-    if (zg.anbieter[kz] === false) continue;
-    const a = p.anbieter[kz];
-    html += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
-      "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
-      "<td>" + (a.imSpiel || 0).toFixed(2) + " &euro;</td>" +
-      "<td>" + (a.moeglichOffen || 0).toFixed(2) + " &euro;</td>" +
-      "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
-      "<td>" + (a.wartet ? "<b class='rot'>" + a.wartet + "</b>" : "-") + "</td>" +
-      "<td class='mini'>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td>" +
-      "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
+  // ---------- Geldfluss (Karte + Verlauf) ----------
+  if (blockAn(zg, "fluss")) {
+    html += "<h4>&#128260; Geldfluss</h4>" + geldflussHtml(p, zg) + geldflussVerlaufHtml(p, schreib);
   }
-  html += "</tbody></table>";
-  html += kombiUebersichtHtml(person.id, scheine);
 
+  // ---------- Zahlungswege ----------
+  if (blockAn(zg, "wege")) {
+    html += "<h4>&#128179; Zahlungswege</h4>" +
+      '<div class="kassewahl mini">';
+    for (const [w, nameW] of KASSE_WEGE) {
+      html += '<label><input type="checkbox"' + (zg.wege[w] !== false ? " checked" : "") +
+        ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
+    }
+    html += "</div><table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
+      "<th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th></tr></thead><tbody>";
+    for (const [w, nameW] of KASSE_WEGE) {
+      if (zg.wege[w] === false) continue;
+      const x = p.wege[w];
+      html += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
+        "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
+        "<td>" + (x.raus || 0).toFixed(2) + " &euro;</td>" +
+        "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td></tr>";
+    }
+    html += "</tbody></table>";
+  }
+
+  // ---------- Wettanbieter ----------
+  if (blockAn(zg, "anbieter")) {
+    html += "<h4>&#127967; Wettanbieter</h4>" +
+      '<div class="kassewahl mini">';
+    for (const [kz, nameA] of KASSE_ANBIETER) {
+      html += '<label><input type="checkbox"' + (zg.anbieter[kz] !== false ? " checked" : "") +
+        ' onchange="tuKasseZeigen(\'' + person.id + "','anbieter','" + kz + '\', this.checked)"> ' + nameA + "</label> ";
+    }
+    html += "</div><table><thead><tr><th>Anbieter</th><th>rein</th><th>raus</th>" +
+      "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>gewonnen</th>" +
+      "<th>fertig</th><th>Ergebnis ab</th><th>liegt dort</th></tr></thead><tbody>";
+    for (const kz of ["iw", "bw", "b3", "st"]) {
+      if (zg.anbieter[kz] === false) continue;
+      const a = p.anbieter[kz];
+      html += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
+        "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
+        "<td>" + (a.imSpiel || 0).toFixed(2) + " &euro;</td>" +
+        "<td>" + (a.moeglichOffen || 0).toFixed(2) + " &euro;</td>" +
+        "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
+        "<td>" + (a.wartet ? "<b class='rot'>" + a.wartet + "</b>" : "-") + "</td>" +
+        "<td class='mini'>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td>" +
+        "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
+    }
+    html += "</tbody></table>";
+  }
+
+  // ---------- Kombinationen ----------
+  if (blockAn(zg, "kombis")) html += kombiUebersichtHtml(person.id, scheine);
+
+  // ---------- Neue Buchung ----------
   if (schreib) {
     html += '<div class="kassenformular"><b>Neue Buchung:</b> ' +
       '<input type="date" id="pk_datum" value="' + heuteDatum() + '"> ' +
@@ -1080,30 +1130,102 @@ function zeichnePersonenKasse(scheine) {
       '<select id="pk_anbieter" style="display:none">' + KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
       '<input type="number" id="pk_betrag" step="0.01" min="0" class="einsatz" placeholder="Betrag"> &euro; ' +
       '<input id="pk_notiz" placeholder="Notiz (freiwillig)"> ' +
-      '<button class="haupt" id="pk_knopf" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button></div>';
+      '<button class="haupt" id="pk_knopf" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button>' +
+      '<div class="mini">Tipp: <b>auf eigenes Konto ausgezahlt</b> heißt, das Geld verlässt das System - ' +
+      "es steht nicht mehr zum Wetten bereit, bleibt aber in der Rechnung sichtbar.</div></div>";
   }
 
-  if (p.buch.length) {
-    html += "<table><thead><tr><th>Datum</th><th>Zahlungsweg</th><th>Was</th><th>Anbieter</th>" +
-      "<th>Betrag</th><th>Notiz</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
-    for (const b of p.buch.slice().reverse()) {
-      html += "<tr><td class='mini'>" + b.datum + "</td><td>" + wegName(b.weg) + "</td>" +
-        "<td>" + artName(b.art) + "</td><td>" + (b.anbieter ? markeM(b.anbieter) : "-") + "</td>" +
-        "<td><b>" + Number(b.betrag).toFixed(2) + " &euro;</b></td>" +
-        "<td class='mini'>" + textSicherM(b.notiz || "") + "</td>" +
-        (schreib ? "<td><button onclick=\"tuPersonBuchungWeg(" + b.id + ")\">weg</button></td>" : "") + "</tr>";
+  // ---------- Buchungsliste ----------
+  if (blockAn(zg, "buchungen")) {
+    if (p.buch.length) {
+      html += "<h4>&#128203; Alle Buchungen</h4><table><thead><tr><th>Datum</th><th>Zahlungsweg</th><th>Was</th>" +
+        "<th>Anbieter</th><th>Betrag</th><th>Notiz</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
+      for (const b of p.buch.slice().reverse()) {
+        html += "<tr><td class='mini'>" + b.datum + "</td><td>" + wegName(b.weg) + "</td>" +
+          "<td>" + artName(b.art) + "</td><td>" + (b.anbieter ? markeM(b.anbieter) : "-") + "</td>" +
+          "<td><b>" + Number(b.betrag).toFixed(2) + " &euro;</b></td>" +
+          "<td class='mini'>" + textSicherM(b.notiz || "") + "</td>" +
+          (schreib ? "<td><button onclick=\"tuPersonBuchungWeg(" + b.id + ")\">weg</button></td>" : "") + "</tr>";
+      }
+      html += "</tbody></table>";
+    } else {
+      html += '<p class="mini">Noch keine Buchungen bei dieser Person.</p>';
     }
-    html += "</tbody></table>";
-  } else {
-    html += '<p class="mini">Noch keine Buchungen bei dieser Person. Trag oben ein, was du ' +
-      "erhalten und was du zu den Anbietern eingezahlt hast.</p>";
   }
+
   html += "</div>";
   box.innerHTML = html;
 }
 
+function zeile2(titel, wert) {
+  return "<tr><td>" + titel + "</td><td><b>" + wert.toFixed(2) + " &euro;</b></td></tr>";
+}
+
+// ---------- Geldfluss als Karte ----------
+// Links die Zahlungswege, rechts die Anbieter, dazu die Auszahlung nach
+// aussen. Die Pfeile zeigen, wie viel wohin geflossen ist.
+function geldflussHtml(p, zg) {
+  const wege = KASSE_WEGE.filter(([w]) => zg.wege[w] !== false && (p.wege[w].erhalten || p.wege[w].hin || p.wege[w].zurueck || p.wege[w].raus));
+  const anb = KASSE_ANBIETER.filter(([kz]) => zg.anbieter[kz] !== false && (p.anbieter[kz].einge || p.anbieter[kz].geholt));
+  if (!wege.length && !anb.length) return '<p class="mini">Noch kein Geldfluss - trag unten die erste Buchung ein.</p>';
+  const hoehe = Math.max(wege.length, anb.length, 1) * 62 + 40;
+  let svg = '<svg viewBox="0 0 640 ' + hoehe + '" class="flusskarte" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<text x="60" y="18" class="fk-titel">Zahlungswege</text>' +
+         '<text x="330" y="18" class="fk-titel">Wettanbieter</text>' +
+         '<text x="530" y="18" class="fk-titel">eigenes Konto</text>';
+  wege.forEach(([w, nameW], i) => {
+    const y = 40 + i * 62;
+    svg += '<rect x="20" y="' + y + '" width="150" height="44" rx="7" class="fk-weg"/>' +
+      '<text x="30" y="' + (y + 19) + '" class="fk-name">' + nameW + "</text>" +
+      '<text x="30" y="' + (y + 36) + '" class="fk-zahl">Stand ' + p.wege[w].stand.toFixed(2) + " &#8364;</text>";
+    if (p.wege[w].raus) {
+      svg += '<line x1="170" y1="' + (y + 22) + '" x2="500" y2="' + (y + 22) + '" class="fk-raus"/>' +
+        '<text x="330" y="' + (y + 14) + '" class="fk-zahl fk-mitte">ausgezahlt ' + p.wege[w].raus.toFixed(2) + " &#8364;</text>";
+    }
+  });
+  anb.forEach(([kz, nameA], i) => {
+    const y = 40 + i * 62;
+    svg += '<rect x="300" y="' + y + '" width="170" height="44" rx="7" class="fk-anb"/>' +
+      '<text x="310" y="' + (y + 19) + '" class="fk-name">' + nameA + "</text>" +
+      '<text x="310" y="' + (y + 36) + '" class="fk-zahl">liegt dort ' + p.anbieter[kz].guthaben.toFixed(2) + " &#8364;</text>" +
+      '<line x1="170" y1="' + (y + 22) + '" x2="300" y2="' + (y + 22) + '" class="fk-hin"/>' +
+      '<text x="180" y="' + (y + 16) + '" class="fk-zahl">&#8594; ' + p.anbieter[kz].einge.toFixed(2) + " &#8364;</text>" +
+      (p.anbieter[kz].geholt ? '<text x="180" y="' + (y + 38) + '" class="fk-zahl">&#8592; ' + p.anbieter[kz].geholt.toFixed(2) + " &#8364;</text>" : "");
+  });
+  if (p.ausgezahlt) {
+    svg += '<rect x="500" y="40" width="120" height="44" rx="7" class="fk-bank"/>' +
+      '<text x="510" y="59" class="fk-name">Ausgezahlt</text>' +
+      '<text x="510" y="76" class="fk-zahl">' + p.ausgezahlt.toFixed(2) + " &#8364;</text>";
+  }
+  return svg + "</svg>";
+}
+
+function geldflussVerlaufHtml(p, schreib) {
+  if (!p.buch.length) return "";
+  let h = '<details><summary class="mini">Verlauf: jede Bewegung einzeln (' + p.buch.length + ")</summary><ul class='flussliste'>";
+  for (const b of p.buch.slice().reverse()) {
+    const betrag = Number(b.betrag).toFixed(2) + " &euro;";
+    let text;
+    if (b.art === "erhalten") text = "<b>" + betrag + "</b> auf <b>" + wegName(b.weg) + "</b> erhalten";
+    else if (b.art === "ausgezahlt") text = "<b>" + betrag + "</b> von <b>" + wegName(b.weg) + "</b> &#8594; eigenes Konto (raus)";
+    else if (b.art === "zum_anbieter") text = "<b>" + betrag + "</b> von <b>" + wegName(b.weg) + "</b> &#8594; " + anbieterNameM(b.anbieter);
+    else text = "<b>" + betrag + "</b> von " + anbieterNameM(b.anbieter) + " &#8594; <b>" + wegName(b.weg) + "</b>";
+    h += "<li><span class='mini'>" + b.datum + "</span> " + text +
+      (b.notiz ? " <span class='mini'>(" + textSicherM(b.notiz) + ")</span>" : "") + "</li>";
+  }
+  return h + "</ul></details>";
+}
+
+function anbieterNameM(kz) {
+  const x = KASSE_ANBIETER.find(a => a[0] === kz);
+  return x ? "<b>" + x[1] + "</b>" : kz;
+}
+
 function pkArtWechsel() {
-  el("pk_anbieter").style.display = el("pk_art").value === "erhalten" ? "none" : "";
+  // Anbieter nur bei Ein-/Auszahlung ZUM oder VOM Anbieter
+  const art = el("pk_art").value;
+  const braucht = (art === "zum_anbieter" || art === "vom_anbieter");
+  el("pk_anbieter").style.display = braucht ? "" : "none";
 }
 
 async function tuPersonBuchen(ordnerId) {
@@ -1118,10 +1240,11 @@ async function tuPersonBuchen(ordnerId) {
   if (knopf && knopf.dataset.trotzdem !== "1") {
     const p = personPruefen(ordnerId, kasseScheine);
     let problem = null;
-    if (art === "zum_anbieter") {
+    if (art === "zum_anbieter" || art === "ausgezahlt") {
       const st = p.wege[el("pk_weg").value].stand;
       if (st < betrag - 0.004) problem = "Auf " + wegName(el("pk_weg").value) + " liegen rechnerisch nur " +
-        st.toFixed(2) + " Euro, du willst aber " + betrag.toFixed(2) + " Euro weiterzahlen.";
+        st.toFixed(2) + " Euro, du willst aber " + betrag.toFixed(2) + " Euro " +
+        (art === "ausgezahlt" ? "auszahlen." : "weiterzahlen.");
     } else if (art === "vom_anbieter") {
       const g = p.anbieter[el("pk_anbieter").value].guthaben;
       if (g < betrag - 0.004) problem = "Beim Anbieter sind rechnerisch nur " + g.toFixed(2) +
