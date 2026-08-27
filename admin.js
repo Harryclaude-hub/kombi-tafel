@@ -393,7 +393,7 @@ async function tuAdminLoeschen(id) {
   }
   const r = await supaAdminUserLoeschen(id);
   if (r.error) { meldungA("Nicht gelöscht: " + sicherA(r.error.message), "warn"); return; }
-  meldungA("User restlos gelöscht.", "gut");
+  meldungA("User " + sicherA(String(r.data || "gelöscht")) + ".", "gut");
   adminUserliste();
 }
 
