@@ -1,5 +1,5 @@
 // ============================================================
-// SCHULE: erzeugt die visuellen Ergebnis-Tafeln.
+// HANDBUCH (Datei heisst weiter schule.js): erzeugt die visuellen Ergebnis-Tafeln.
 // Reine Anzeige-Logik, keine Berechnung für die Kombi-Tafel.
 // ============================================================
 "use strict";

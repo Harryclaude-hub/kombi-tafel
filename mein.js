@@ -75,7 +75,7 @@ function zeigeAnmeldung() {
   </div>
 </div>
 <p class="mini">Dein Bereich ist privat. Nur wer ihn von dir geteilt bekommt, kann ihn sehen.
-Alle anderen Seiten (Tafel, Kombi-Bau, Schule) brauchen kein Konto.</p>`;
+Alle anderen Seiten (Tafel, Kombi-Bau, Handbuch) brauchen kein Konto.</p>`;
 }
 
 async function tuAnmelden() {

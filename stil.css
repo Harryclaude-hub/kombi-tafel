@@ -161,7 +161,7 @@ td.anbieter .geprueft { font-size: 10px; color: #1a7a1a; }
 .ausshot { color: #7a4a00; font-size: 10.5px; }
 td.anbieter.hatshot { background: #fffaf0; }
 
-/* ---- Wett-Schule (schule.html) ---- */
+/* ---- Handbuch (schule.html) ---- */
 .ergebnistafel td, .ergebnistafel th { text-align: center; font-size: 11px; padding: 3px 4px; }
 .ergebnistafel td.linie { text-align: left; white-space: nowrap; background: #f2f2f2; }
 .ergebnistafel td.klartext { text-align: left; font-size: 11px; }
