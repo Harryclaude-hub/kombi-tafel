@@ -245,6 +245,11 @@ async function kryptoEinrichten(passwort) {
     bereichsafe: await kryAes(kpass, bereichB64),
     updated_at: new Date().toISOString()
   });
+  // ... und in den Server-Safe, damit jedes weitere Gerät sie automatisch bekommt
+  if (typeof kryptoEscrowSichern === "function") {
+    const s = await kryptoEscrowSichern(privB64, bereichB64);
+    if (s && s.ok) localStorage.setItem("kt_escrow_" + u.id, "1");
+  }
   return { ok: true, hinweis: hinweis };
 }
 
@@ -355,4 +360,93 @@ async function kryptoGeraetBereit() {
   const u = await supaNutzer();
   if (!u) return true;
   return !!kryLokalPriv(u.id) && !!kryLokalBereich(u.id);
+}
+
+// ---------- Schlüssel-Automatik über den Server-Safe ----------
+// Jedes angemeldete Gerät holt sich seine Schlüssel selbst. Niemand muss
+// mehr ein Passwort eintippen. Der Safe liegt verschlüsselt in der
+// Datenbank; das Geheimnis dazu kennt nur die Server-Funktion.
+
+const SCHLUESSEL_URL = SUPA_URL + "/functions/v1/schluessel";
+
+async function kryptoServerRuf(koerper) {
+  const s = await supaSitzung();
+  if (!s) return null;
+  try {
+    const r = await fetch(SCHLUESSEL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + s.access_token,
+        "apikey": SUPA_KEY
+      },
+      body: JSON.stringify(koerper)
+    });
+    return await r.json();
+  } catch (e) { return null; }
+}
+
+async function kryptoEscrowSichern(privB64, bereichB64) {
+  return await kryptoServerRuf({ was: "sichern", priv: privB64, bereich: bereichB64 });
+}
+
+async function kryptoEscrowHolen() {
+  const a = await kryptoServerRuf({ was: "holen" });
+  return (a && a.ok && a.priv && a.bereich) ? { priv: a.priv, bereich: a.bereich } : null;
+}
+
+// Hat der Nutzer verschlüsselte Daten im EIGENEN Bereich? (Dann dürfen
+// keine neuen Schlüssel erzeugt werden, sonst wären sie unlesbar.)
+async function kryptoHatDaten(uid) {
+  const tabellen = [["kt_ordner", "bereich"], ["kt_scheine", "bereich"],
+                    ["kt_nachrichten", "bereich"], ["kt_buchungen", "bereich"],
+                    ["kt_person_zahlungen", "bereich"], ["kt_anmerkungen", "bereich"]];
+  for (const [t, spalte] of tabellen) {
+    const r = await supa.from(t).select("id", { count: "exact", head: true }).eq(spalte, uid);
+    if ((r.count || 0) > 0) return true;
+  }
+  return false;
+}
+
+// Frische Schlüssel anlegen (nur wenn es nichts zu verlieren gibt)
+async function kryptoFrischErzeugen() {
+  const u = await supaNutzer();
+  if (!u) return false;
+  const paar = await kryptoNeuesPaar();
+  const priv = await kryPrivExport(paar.privateKey);
+  const bereich = await kryBereichNeu();
+  await supa.from("kt_profiles").update({ pubkey: await kryPubExport(paar.publicKey) }).eq("id", u.id);
+  kryLokalSetzen(u.id, priv, bereich);
+  kryptoCacheLeeren();
+  await kryptoEscrowSichern(priv, bereich);
+  return true;
+}
+
+// DER Einstiegspunkt: sorgt dafür, dass dieses Gerät arbeiten kann.
+// Ergebnis: { ok:true } | { ok:true, neu:true } | { ok:false, passwort:true }
+async function kryptoSicherstellen() {
+  const u = await supaNutzer();
+  if (!u) return { ok: false };
+  if (kryLokalPriv(u.id) && kryLokalBereich(u.id)) {
+    // Vorhanden - beim ersten Mal auch in den Server-Safe legen
+    if (!localStorage.getItem("kt_escrow_" + u.id)) {
+      const r = await kryptoEscrowSichern(kryLokalPriv(u.id), kryLokalBereich(u.id));
+      if (r && r.ok) localStorage.setItem("kt_escrow_" + u.id, "1");
+    }
+    return { ok: true };
+  }
+  const e = await kryptoEscrowHolen();
+  if (e) {
+    kryLokalSetzen(u.id, e.priv, e.bereich);
+    kryptoCacheLeeren();
+    localStorage.setItem("kt_escrow_" + u.id, "1");
+    return { ok: true };
+  }
+  // Kein Server-Safe: nur wenn nichts zu verlieren ist, frisch anlegen
+  if (!(await kryptoHatDaten(u.id))) {
+    await kryptoFrischErzeugen();
+    localStorage.setItem("kt_escrow_" + u.id, "1");
+    return { ok: true, neu: true };
+  }
+  return { ok: false, passwort: true };
 }

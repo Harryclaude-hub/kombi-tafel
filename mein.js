@@ -217,24 +217,35 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
 async function pruefeSchluessel(erzwingen) {
   const box = el("schluesselkasten");
   if (!box || !ich) return;
-  // Bewusst OHNE Hilfsfunktion aus krypto.js prüfen: liegt dort eine alte
-  // Fassung im Zwischenspeicher, würde die Prüfung sonst still übersprungen.
+  // Automatik: das Gerät holt sich die Schlüssel selbst - ohne Passwort.
+  if (typeof kryptoSicherstellen === "function") {
+    const r = await kryptoSicherstellen();
+    if (r.ok) {
+      box.innerHTML = r.neu
+        ? '<div class="kern mini">&#128273; Für dieses Gerät wurden neue Schlüssel angelegt. ' +
+          "Alles funktioniert; nur ältere verschlüsselte Direktnachrichten von früher bleiben unlesbar.</div>"
+        : "";
+      if (erzwingen && r.ok) meldungM("Schlüssel sind da - bitte noch einmal versuchen.", "gut");
+      return;
+    }
+    if (r.passwort) { schluesselPasswortKasten(box, erzwingen); return; }
+  }
+  // Alte Fassung im Zwischenspeicher: frisch laden anbieten
   const priv = localStorage.getItem("kt_e2e_priv_" + ich.id);
-  const bereich = localStorage.getItem("kt_e2e_bereich_" + ich.id);
-  if (priv && bereich && !erzwingen) { box.innerHTML = ""; return; }
-  const kannReparieren = (typeof kryptoNachtragen === "function");
-  box.innerHTML = '<div class="warnkern schluesselwarnung"><b>&#128274; Auf diesem Gerät fehlt dein Schlüssel.</b> ' +
-    "Deshalb lässt sich gerade nichts anlegen (Personen, Kombinationen, Buchungen, Nachrichten). " +
-    "Das passiert nach einer Neuinstallation, auf einem neuen Gerät oder wenn Browser-Daten gelöscht wurden. " +
-    "Deine Daten sind alle da - es fehlt nur der Schlüssel auf DIESEM Gerät.<br><br>" +
-    (kannReparieren
-      ? '<b>Einmal dein Passwort eingeben, dann läuft alles wieder:</b><br>' +
-        '<input type="password" id="schluessel_pw" placeholder="Dein Passwort" autocomplete="current-password" ' +
-        'onkeydown="if(event.key===\'Enter\')tuSchluesselNachtragen()"> ' +
-        '<button class="haupt" onclick="tuSchluesselNachtragen()">&#128273; Schlüssel zurückholen</button>'
-      : '<b>Dein Gerät hat noch eine alte Fassung geladen.</b> Bitte einmal frisch laden, ' +
-        "dann erscheint hier das Passwortfeld:") +
-    ' <button onclick="tuFrischLaden()">&#128260; Seite frisch laden</button></div>';
+  if (priv) { box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="warnkern schluesselwarnung"><b>&#128274; Dein Gerät hat noch eine alte Fassung geladen.</b> ' +
+    'Bitte einmal frisch laden: <button onclick="tuFrischLaden()">&#128260; Seite frisch laden</button></div>';
+}
+
+// Nur noch im Ausnahmefall: es gibt alte verschlüsselte Daten, aber keinen
+// Server-Safe (Konto von vor der Automatik). Einmal Passwort, nie wieder.
+function schluesselPasswortKasten(box, erzwingen) {
+  box.innerHTML = '<div class="warnkern schluesselwarnung"><b>&#128274; Einmalig: Schlüssel freischalten.</b> ' +
+    "Dein Konto stammt aus der Zeit vor der Schlüssel-Automatik. Gib einmal dein Passwort ein - " +
+    "danach holt sich jedes Gerät die Schlüssel automatisch, und du wirst nie wieder gefragt.<br><br>" +
+    '<input type="password" id="schluessel_pw" placeholder="Dein Passwort" autocomplete="current-password" ' +
+    'onkeydown="if(event.key===\'Enter\')tuSchluesselNachtragen()"> ' +
+    '<button class="haupt" onclick="tuSchluesselNachtragen()">&#128273; Freischalten</button></div>';
   if (erzwingen) {
     box.scrollIntoView({ block: "start" });
     const f = el("schluessel_pw");
@@ -252,7 +263,8 @@ async function tuSchluesselNachtragen() {
   if (!pw) { meldungM("Bitte dein Passwort eintragen.", "warn"); return; }
   const r = await kryptoNachtragen(pw);
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
-  meldungM("<b>Schlüssel zurückgeholt.</b> Alles funktioniert wieder.", "gut");
+  if (typeof kryptoSicherstellen === "function") await kryptoSicherstellen();
+  meldungM("<b>Freigeschaltet.</b> Ab jetzt geht das automatisch - du wirst nicht mehr gefragt.", "gut");
   location.reload();
 }
 
