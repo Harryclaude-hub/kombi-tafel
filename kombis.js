@@ -66,104 +66,111 @@ function baueAlles() {
   const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)))
     .sort((a, b) => liesAnstoss(anstossFeld(a)).zeit - liesAnstoss(anstossFeld(b)).zeit);
 
-  // 1. Doppelte Spiele: nur das erste behalten
-  const gesehen = new Set();
-  const einmalig = [];
-  const doppelt = [];
+  // ---- Eingabe fuer den Verteiler bauen ----
+  // Je Wette: die gewaehlte Option, die ROHEN Quoten je Anbieter, ob die
+  // Quote BELEGT ist (eigene Eingabe oder Screenshot = Beweis, dass der
+  // Anbieter den Markt fuehrt) und die Markt-Schaetzung J/D/N.
+  const eingabe = { wetten: [], einst: { mind: e.mind, ziel: e.ziel,
+    anbieter: e.anbieter, maxNutzung: 2, saat: e.saat } };
+  const optVon = {};
   for (const w of offen) {
-    const k = spielKennung(w);
-    if (gesehen.has(k)) { doppelt.push(w.id); continue; }
-    gesehen.add(k);
-    einmalig.push(w);
-  }
-
-  // 2. Je Wette: bei welchen erlaubten Anbietern gibt es den Markt?
-  //    Und liegt die Quote dort über der Mindestquote?
-  const passt = [];       // erfuellt die Mindestquote
-  const zuNiedrig = [];   // Markt da, aber Quote zu klein
-  const keinMarkt = [];   // kein erlaubter Anbieter führt das
-  for (const w of einmalig) {
     const optIdx = gewaehlteOption(w);
+    optVon[w.id] = optIdx;
     const v = verfuegbarkeit(w);
-    // Karams Regel: nie zu 100 % behaupten, ein Anbieter habe den Markt nicht.
-    // Alle erlaubten Anbieter kommen in Frage; unsichere bekommen nur einen Hinweis.
-    const moeglich = [];
+    const quoten = {}, belegt = {}, verf = {};
     for (const kz of e.anbieter) {
-      moeglich.push({ kz: kz, q: zielQuote(w, optIdx, kz), duenn: v[kz] !== "J" });
+      const q = zielQuote(w, optIdx, kz);
+      quoten[kz] = (q.roh && q.roh > 1) ? q.roh : null;
+      belegt[kz] = q.fest === true || q.quelle === "Screenshot";
+      verf[kz] = v[kz] || "J";
     }
-    moeglich.sort((a, b) => b.q.echt - a.q.echt);
-    const über = moeglich.filter(m => m.q.echt >= e.mind - 0.0001);
-    if (über.length) passt.push({ id: w.id, optIdx: optIdx, moeglich: über, alle: moeglich });
-    else zuNiedrig.push({ id: w.id, optIdx: optIdx, moeglich: [], alle: moeglich });
+    eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt, verf: verf });
   }
 
+  // ---- Verteilen: beide Verfahren rechnen, das bessere gewinnt ----
+  const aus = (typeof verteileBeste === "function")
+    ? verteileBeste(eingabe)
+    : { kombis: [], uebrig: eingabe.wetten.map(x => x.id), bericht: {} };
+
+  // ---- Kombinationen in Scheine uebersetzen ----
+  // Eine Kombination = eine Gruppen-Nummer (daran haengt die 400er-Rechnung).
+  // Jeder Teil = ein Schein bei einem Anbieter mit seinem Einsatz.
   const scheine = [];
-  let lfd = 1;
-
-  // 3. Normale Scheine: nach bestem Anbieter buendeln
-  const topf = {};
-  for (const kz of e.anbieter) topf[kz] = [];
-  for (const k of passt) topf[waehleAnbieter(k.moeglich, topf)].push(k);
-
-  // Reste umverteilen, damit möglichst wenig liegen bleibt
-  for (let runde = 0; runde < 4; runde++) {
-    for (const kz of e.anbieter) {
-      const rest = topf[kz].length % 3;
-      if (!rest || !topf[kz].length) continue;
-      for (let i = 0; i < rest; i++) {
-        const k = topf[kz][topf[kz].length - 1];
-        const ziel = k.moeglich.find(m => m.kz !== kz && m.kz !== "b3" && topf[m.kz] && (topf[m.kz].length % 3) !== 0);
-        if (ziel) { topf[kz].pop(); topf[ziel.kz].push(k); } else break;
-      }
-    }
+  let lfd = 0;
+  for (const k of aus.kombis || []) {
+    lfd++;
+    const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
+    const teile = (k.teile && k.teile.length) ? k.teile
+      : [{ kz: e.anbieter[0], einsatz: e.ziel, sicherheit: "geschaetzt" }];
+    teile.forEach((t, ti) => {
+      scheine.push({
+        nr: lfd,
+        id: "S" + lfd + (ti ? "_t" + (ti + 1) : ""),
+        kz: t.kz,
+        art: "normal",
+        teil: ti ? ti + 1 : undefined,
+        einsatz: t.einsatz,
+        sicherheit: t.sicherheit || "geschaetzt",
+        wetten: wetten.map(x => ({ id: x.id, optIdx: x.optIdx })),
+        entfernt: []
+      });
+    });
   }
 
-  const uebrig = [];
-  for (const kz of e.anbieter) {
-    const liste = mische(topf[kz].slice(), e.saat);
-    let i = 0;
-    while (i + 3 <= liste.length) {
-      scheine.push(macheSchein(lfd++, kz, liste.slice(i, i + 3), "normal"));
-      i += 3;
-    }
-    for (; i < liste.length; i++) uebrig.push({ kz: kz, id: liste[i].id });
+  // ---- Was nicht verbaut wurde ----
+  // Unter der Mindestquote ueberall -> eigene 3er-Scheine wie bisher
+  // ("niedrig"), damit nichts weggeworfen wird. Der Rest bleibt als
+  // "uebrig" sichtbar.
+  const inKombi = new Set();
+  for (const k of aus.kombis || []) for (const id of k.wetten) inKombi.add(id);
+  const zuNiedrig = [], uebrig = [];
+  for (const w of offen) {
+    if (inKombi.has(w.id)) continue;
+    const irgendwoUeber = e.anbieter.some(kz =>
+      zielQuote(w, optVon[w.id], kz).echt >= e.mind - 0.0001);
+    (irgendwoUeber ? uebrig : zuNiedrig).push(w);
   }
-
-  // 4. Zu-niedrig-Scheine: eigene 3er, nach bestem Anbieter gebuendelt
-  const topfN = {};
-  for (const kz of e.anbieter) topfN[kz] = [];
-  for (const k of zuNiedrig) topfN[waehleAnbieter(k.alle, topfN)].push(k);
+  const topfN = mische(zuNiedrig.slice(), e.saat + 7);
   const uebrigN = [];
-  for (const kz of e.anbieter) {
-    const liste = mische(topfN[kz].slice(), e.saat + 7);
-    let i = 0;
-    while (i + 3 <= liste.length) {
-      scheine.push(macheSchein(lfd++, kz, liste.slice(i, i + 3), "niedrig"));
-      i += 3;
+  while (topfN.length) {
+    const gruppe = [];
+    const spiele = new Set();
+    for (let i = 0; i < topfN.length && gruppe.length < 3; i++) {
+      const kk = spielKennung(topfN[i]);
+      if (spiele.has(kk)) continue;               // R2 auch bei den Niedrigen
+      spiele.add(kk);
+      gruppe.push(topfN.splice(i, 1)[0]);
+      i--;
     }
-    for (; i < liste.length; i++) uebrigN.push({ kz: kz, id: liste[i].id });
+    if (gruppe.length === 3) {
+      lfd++;
+      // Bet365 ist auch hier die letzte Wahl (R6): der erste erlaubte
+      // Nicht-b3-Anbieter bekommt den Niedrig-Schein.
+      const kzN = e.anbieter.find(kz => kz !== "b3") || e.anbieter[0];
+      scheine.push(macheSchein(lfd, kzN,
+        gruppe.map(w => ({ id: w.id, optIdx: optVon[w.id] || 0 })), "niedrig"));
+    } else {
+      for (const w of gruppe) uebrigN.push({ kz: "", id: w.id });
+      break;
+    }
   }
 
   const zustand = {
     einst: e,
     scheine: scheine,
-    uebrig: uebrig,
+    uebrig: uebrig.map(w => ({ kz: "", id: w.id })),
     uebrigNiedrig: uebrigN,
-    doppelt: doppelt,
-    keinMarkt: keinMarkt,
+    doppelt: [],          // Doppel-Spiele fliegen nicht mehr raus: der
+    keinMarkt: [],        // Verteiler achtet je Schein darauf (R2)
     gesamtOffen: offen.length,
+    tipps: (aus.bericht && aus.bericht.tippVorschlaege) || [],
+    bericht: aus.bericht || {},
     gebautAm: new Date().toISOString()
   };
   speichereZustand(zustand);
   return zustand;
 }
 
-// Welcher Anbieter bekommt diese Wette?
-// Erst die beste Quote. Bei praktisch gleicher Quote (Unterschied unter 0,005,
-// das passiert staendig weil nur Interwetten eine Gebühr hat) entscheidet:
-// 1. wer den Markt sicher führt statt nur duenn,
-// 2. wer bisher am wenigsten Wetten bekommen hat.
-// So verteilen sich die Scheine über alle Anbieter statt alle bei einem zu landen.
 function waehleAnbieter(moeglich, topf) {
   // Karams Regel: Bet365 ist die LETZTE Option. Solange irgendein anderer
   // erlaubter Anbieter die Wette führt, bekommt Bet365 sie nicht automatisch.
@@ -552,13 +559,13 @@ function zeichne_() {
   const niedrig = z.scheine.filter(s => s.art === "niedrig");
   const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
+  const gruppenZahl = new Set(normal.map(s => s.nr)).size;
   document.getElementById("uebersicht").innerHTML =
-    "<b>" + normal.length + " Scheine über der Mindestquote</b> (" + z.einst.mind.toFixed(2) + ")" +
+    "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (" + z.einst.mind.toFixed(2) + ")" +
     ", dazu <b>" + niedrig.length + " Scheine mit zu niedrigen Quoten</b>. " +
-    verbaut + " Wetten verbaut von " + z.gesamtOffen + " offenen. " +
-    z.doppelt.length + " Doppel-Spiele und " + z.keinMarkt.length +
-    " ohne passenden Anbieter aussortiert, " + (z.uebrig.length + z.uebrigNiedrig.length) +
-    " blieben uebrig.";
+    verbaut + " Plätze belegt bei " + z.gesamtOffen + " offenen Wetten (jede darf in " +
+    "höchstens zwei Scheinen stecken), " + (z.uebrig.length + z.uebrigNiedrig.length) +
+    " blieben übrig." + tippsHtml(z);
 
   document.getElementById("scheine").innerHTML =
     (normal.length ? normal.map(s => scheinHtml(s, z)).join("") :
@@ -623,6 +630,10 @@ function scheinHtml(s, z) {
     (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
       (s.variante ? " (andere Mischung für den Rest)" : " (gleiche Wetten, weiterer Anbieter)") + "</span>" : "") +
     " " + marke(s.kz) + wahl +
+    (s.sicherheit === "unsicher"
+      ? ' <span class="s-warn">&#9888; nicht bestätigt - vor dem Setzen beim Anbieter prüfen</span>'
+      : s.sicherheit === "geschaetzt"
+        ? ' <span class="ausshot">Markt nur geschätzt - kurz prüfen</span>' : "") +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
       ' Wetten, kein Dreier mehr</span>' : "") +
@@ -1167,3 +1178,18 @@ function neuMischen() {
 }
 
 document.addEventListener("DOMContentLoaded", zeichne_);
+
+
+// Welche Quote sollte Karam als Naechstes eintippen? Jeder Tipp macht aus
+// "geschaetzt" ein "belegt" und verbessert damit die naechste Verteilung.
+function tippsHtml(z) {
+  const tipps = (z.tipps || []).slice(0, 6);
+  if (!tipps.length) return "";
+  let h = '<div class="tippkasten"><b>&#128161; Das bringt am meisten:</b> diese Quoten beim Anbieter nachschauen und hier eintippen<ul>';
+  for (const t of tipps) {
+    const w = wetteNachId(t.id);
+    h += "<li><b>" + (w ? w.spiel : t.id) + "</b> bei <b>" + anbieterName(t.kz) + "</b>" +
+      (t.grund ? ' <span class="mini">' + t.grund + "</span>" : "") + "</li>";
+  }
+  return h + "</ul></div>";
+}

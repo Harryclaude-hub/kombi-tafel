@@ -873,3 +873,10 @@ body[data-seite] > .navleiste a.navknopf.adminknopf {
 .pd-dok { border: 1px solid #bbb; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
 .pd-vorschau { display: block; max-width: 190px; max-height: 130px; margin-top: 5px;
   border-radius: 5px; }
+
+
+/* ---------- Tipp-Kasten des Verteilers (loeschbar) ---------- */
+.tippkasten { margin-top: 8px; padding: 8px 12px; border: 1px solid #b98a00;
+  background: #fffaf0; border-radius: 8px; font-size: 13px; }
+.tippkasten ul { margin: 4px 0 2px 20px; }
+.tippkasten li { margin: 2px 0; }

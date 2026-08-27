@@ -1879,7 +1879,7 @@ function pruefAlles(scheine) {
   }
 
   // ---- 6. Dasselbe Spiel mehrfach bei derselben Person ----
-  geprueft.push("kein Spiel doppelt in zwei Kombinationen derselben Person");
+  geprueft.push("kein Spiel in mehr als ZWEI Kombinationen derselben Person (deine Zweimal-Regel)");
   const proPerson = {};
   for (const s of scheine) {
     if (s.stand !== "offen") continue;
@@ -1895,10 +1895,10 @@ function pruefAlles(scheine) {
   }
   for (const [p, spiele] of Object.entries(proPerson)) {
     for (const eintrag of Object.values(spiele)) {
-      if (eintrag.staemme.size > 1) {
+      if (eintrag.staemme.size > 2) {
         add("warnung", "Doppelt", "Bei <b>" + textSicherM(p === "-" ? "ohne Person" : ordnerNameM(p)) +
           "</b> läuft <b>" + textSicherM(eintrag.name) + "</b> in " + eintrag.staemme.size +
-          " verschiedenen Kombinationen. Deine Regel ist: jedes Spiel nur einmal. " +
+          " verschiedenen Kombinationen. Deine Regel ist: jedes Spiel in höchstens zwei. " +
           "(Teile derselben Kombination bei mehreren Anbietern zählen hier nicht mit.)");
       }
     }
