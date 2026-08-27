@@ -1272,35 +1272,65 @@ function tuKassePdf(ordnerId) {
   const zg = kasseZeigen(ordnerId);
   const jetzt = new Date();
   let h = "<h1>Übersicht: " + textSicherM(person.name) + "</h1>" +
-    "<p>Stand: " + kasseZeit(jetzt) + " Uhr</p>" +
-    "<p><b>Erhalten insgesamt: " + p.erhaltengesamt.toFixed(2) + " Euro</b><br>" +
-    "<b>Zu den Anbietern eingezahlt insgesamt: " + p.eingesamt.toFixed(2) + " Euro</b></p>";
+    "<p>Stand: " + kasseZeit(jetzt) + " Uhr</p>";
 
-  h += "<h2>Zahlungswege</h2><table><tr><th>Zahlungsweg</th><th>erhalten</th>" +
-    "<th>zum Anbieter</th><th>zurück</th><th>Stand jetzt</th></tr>";
-  for (const [w, nameW] of KASSE_WEGE) {
-    if (zg.wege[w] === false) continue;
-    const x = p.wege[w];
-    h += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + "</td><td>" + x.hin.toFixed(2) +
-      "</td><td>" + x.zurueck.toFixed(2) + "</td><td><b>" + x.stand.toFixed(2) + "</b></td></tr>";
+  if (blockAn(zg, "statistik")) {
+    h += "<h2>Statistik</h2><table>" +
+      "<tr><td>Von der Person erhalten (rein)</td><td><b>" + p.erhaltengesamt.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Auf eigenes Konto ausgezahlt (raus)</td><td><b>" + p.ausgezahlt.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Liegt auf den Zahlungswegen</td><td><b>" + p.aufWegen.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Liegt bei den Wettanbietern</td><td><b>" + p.beiAnbietern.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Steckt in offenen Wetten</td><td><b>" + p.imSpiel.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td><b>Unterm Strich</b></td><td><b>" + (p.bilanz >= 0 ? "+" : "") + p.bilanz.toFixed(2) + " Euro</b></td></tr>" +
+      "</table>";
   }
-  h += "</table>";
 
-  h += "<h2>Anbieter</h2><table><tr><th>Anbieter</th><th>eingezahlt</th><th>zurückgeholt</th>" +
-    "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>wirklich gewonnen</th>" +
-    "<th>Ergebnis ab</th><th>rechnerisch dort</th></tr>";
-  for (const [kz, nameA] of KASSE_ANBIETER) {
-    if (zg.anbieter[kz] === false) continue;
-    const a = p.anbieter[kz];
-    h += "<tr><td>" + nameA + "</td><td>" + a.einge.toFixed(2) + "</td><td>" + a.geholt.toFixed(2) +
-      "</td><td>" + a.einsatz.toFixed(2) + "</td><td>" + (a.imSpiel || 0).toFixed(2) +
-      "</td><td>" + (a.moeglichOffen || 0).toFixed(2) + "</td><td>" + a.gewonnen.toFixed(2) +
-      "</td><td>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td><td><b>" + a.guthaben.toFixed(2) + "</b></td></tr>";
+  if (blockAn(zg, "wege")) {
+    h += "<h2>Zahlungswege</h2><table><tr><th>Zahlungsweg</th><th>erhalten</th>" +
+      "<th>zum Anbieter</th><th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th></tr>";
+    for (const [w, nameW] of KASSE_WEGE) {
+      if (zg.wege[w] === false) continue;
+      const x = p.wege[w];
+      h += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + "</td><td>" + x.hin.toFixed(2) +
+        "</td><td>" + x.zurueck.toFixed(2) + "</td><td>" + (x.raus || 0).toFixed(2) +
+        "</td><td><b>" + x.stand.toFixed(2) + "</b></td></tr>";
+    }
+    h += "</table>";
   }
-  h += "</table>";
 
-  const offene = kasseScheine.filter(s => s.ordner === ordnerId && s.stand === "offen" &&
-    zg.anbieter[s.daten.kz] !== false);
+  if (blockAn(zg, "anbieter")) {
+    h += "<h2>Wettanbieter</h2><table><tr><th>Anbieter</th><th>rein</th><th>raus</th>" +
+      "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>gewonnen</th>" +
+      "<th>Ergebnis ab</th><th>liegt dort</th></tr>";
+    for (const [kz, nameA] of KASSE_ANBIETER) {
+      if (zg.anbieter[kz] === false) continue;
+      const a = p.anbieter[kz];
+      h += "<tr><td>" + nameA + "</td><td>" + a.einge.toFixed(2) + "</td><td>" + a.geholt.toFixed(2) +
+        "</td><td>" + a.einsatz.toFixed(2) + "</td><td>" + (a.imSpiel || 0).toFixed(2) +
+        "</td><td>" + (a.moeglichOffen || 0).toFixed(2) + "</td><td>" + a.gewonnen.toFixed(2) +
+        "</td><td>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td><td><b>" + a.guthaben.toFixed(2) + "</b></td></tr>";
+    }
+    h += "</table>";
+  }
+
+  if (blockAn(zg, "fluss") && p.buch.length) {
+    h += "<h2>Geldfluss</h2><table><tr><th>Datum</th><th>Bewegung</th><th>Betrag</th></tr>";
+    for (const b of p.buch) {
+      if (b.weg && zg.wege[b.weg] === false) continue;
+      if (b.anbieter && zg.anbieter[b.anbieter] === false) continue;
+      let text;
+      if (b.art === "erhalten") text = "auf " + wegName(b.weg) + " erhalten";
+      else if (b.art === "ausgezahlt") text = "von " + wegName(b.weg) + " auf eigenes Konto ausgezahlt";
+      else if (b.art === "zum_anbieter") text = "von " + wegName(b.weg) + " zu " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1];
+      else text = "von " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1] + " zurück auf " + wegName(b.weg);
+      h += "<tr><td>" + b.datum + "</td><td>" + text + "</td><td><b>" + Number(b.betrag).toFixed(2) + "</b></td></tr>";
+    }
+    h += "</table>";
+  }
+
+  const offene = blockAn(zg, "kombis")
+    ? kasseScheine.filter(s => s.ordner === ordnerId && s.stand === "offen" && zg.anbieter[s.daten.kz] !== false)
+    : [];
   if (offene.length) {
     h += "<h2>Offene Kombinationen</h2><table><tr><th>Anbieter</th><th>Spiele</th><th>Quote</th>" +
       "<th>Einsatz</th><th>möglich</th><th>Stand</th></tr>";
@@ -1310,7 +1340,7 @@ function tuKassePdf(ordnerId) {
         "<td>" + (s.daten.wetten || []).map(t => textSicherM(t.spiel)).join("<br>") + "</td>" +
         "<td>" + (s.daten.quote || 0).toFixed(2) + "</td><td>" + (s.daten.einsatz || 0).toFixed(2) + "</td>" +
         "<td>" + (s.daten.moeglich || 0).toFixed(2) + "</td>" +
-        "<td>" + (scheinWartet(s) ? "fertig, Ergebnis offen" : (e ? "laeuft bis " + kasseZeit(e) : "laeuft")) + "</td></tr>";
+        "<td>" + (scheinWartet(s) ? "fertig, Ergebnis offen" : (e ? "läuft bis " + kasseZeit(e) : "läuft")) + "</td></tr>";
     }
     h += "</table>";
   }
@@ -1320,7 +1350,7 @@ function tuKassePdf(ordnerId) {
   f.document.write("<html><head><title>Übersicht " + textSicherM(person.name) + "</title><style>" +
     "body{font-family:Arial,sans-serif;color:#000;background:#fff;margin:24px;}" +
     "h1{font-size:22px;margin:0 0 4px 0;} h2{font-size:16px;margin:18px 0 6px 0;}" +
-    "table{border-collapse:collapse;width:100%;} th,td{border:1px solid #000;padding:4px 8px;" +
+    "table{border-collapse:collapse;width:100%;margin-bottom:10px;} th,td{border:1px solid #000;padding:4px 8px;" +
     "font-size:13px;text-align:left;} th{background:#eee;}" +
     "</style></head><body>" + h + "</body></html>");
   f.document.close();
