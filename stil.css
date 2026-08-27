@@ -859,3 +859,17 @@ body[data-seite] > .navleiste a.navknopf.adminknopf {
     animation: none; transition: none;
   }
 }
+
+
+/* ---------- Personendaten (Design-Schicht, loeschbar) ---------- */
+.persondaten-felder { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 8px 0; }
+.pd-feld { font-size: 13px; flex: 1 1 220px; max-width: 320px; }
+.pd-feld input, .pd-feld textarea { width: 100%; font-size: 14px; padding: 4px 7px;
+  border: 1px solid #888; }
+.pd-feld textarea { min-height: 54px; font-family: inherit; }
+.pd-breit { flex: 1 1 100%; max-width: none; }
+.pd-leiste { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+.pd-doks { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.pd-dok { border: 1px solid #bbb; border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
+.pd-vorschau { display: block; max-width: 190px; max-height: 130px; margin-top: 5px;
+  border-radius: 5px; }

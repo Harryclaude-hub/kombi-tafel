@@ -702,6 +702,7 @@ async function zeichneBereich() {
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
   personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
+  personDatenKarte = await supaPersonDatenLaden(aktiverBereich.id);
   anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
   kasseScheine = scheine;
   zeichneOrdnerBox(scheine);
@@ -837,6 +838,7 @@ async function tuKopieren(id) {
 
 let personBuchungen = [];
 let kasseScheine = [];
+let personDatenKarte = {};   // ordnerId -> entschluesseltes Personendaten-Objekt
 
 const KASSE_WEGE = [["paypal", "PayPal"], ["paysafe", "Paysafe"], ["neteller", "Neteller"], ["skrill", "Skrill"]];
 const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"],
@@ -970,7 +972,7 @@ function kasseZeit(d) {
 }
 
 // Was in Ansicht UND PDF gezeigt wird, je Person gemerkt (z. B. kein Neteller)
-const KASSE_BLOECKE = [["statistik", "Statistik"], ["fluss", "Geldfluss"],
+const KASSE_BLOECKE = [["daten", "Personendaten"], ["statistik", "Statistik"], ["fluss", "Geldfluss"],
   ["wege", "Zahlungswege"], ["anbieter", "Wettanbieter"],
   ["kombis", "Kombinationen"], ["buchungen", "Buchungsliste"]];
 
@@ -1068,6 +1070,9 @@ function zeichnePersonenKasse(scheine) {
       ' onchange="tuKasseZeigen(\'' + person.id + "','bloecke','" + k + '\', this.checked)"> ' + titel + "</label> ";
   }
   html += '<button onclick="tuKassePdf(\'' + person.id + '\')">&#128196; Als PDF</button></div>';
+
+  // ---------- Personendaten ----------
+  if (blockAn(zg, "daten")) html += personDatenHtml(person, schreib);
 
   // ---------- Statistik ----------
   if (blockAn(zg, "statistik")) {
@@ -1290,6 +1295,15 @@ function tuKassePdf(ordnerId) {
   const jetzt = new Date();
   let h = "<h1>Übersicht: " + textSicherM(person.name) + "</h1>" +
     "<p>Stand: " + kasseZeit(jetzt) + " Uhr</p>";
+
+  if (blockAn(zg, "daten")) {
+    const pd = personDatenLesen(ordnerId);
+    const zeilen = PERSON_FELDER
+      .filter(([feld, , typ]) => typ !== "password" && (pd[feld] || "").trim())
+      .map(([feld, titel]) => "<tr><td>" + titel + "</td><td><b>" + textSicherM(pd[feld]) + "</b></td></tr>");
+    // Das Passwort kommt NIE in ein PDF: ein Ausdruck liegt offen herum.
+    if (zeilen.length) h += "<h2>Personendaten</h2><table>" + zeilen.join("") + "</table>";
+  }
 
   if (blockAn(zg, "statistik")) {
     h += "<h2>Statistik</h2><table>" +
@@ -2044,4 +2058,150 @@ function zeichneOrdnerBilanz(scheine) {
     h += "</tbody></table></details>";
   }
   box.innerHTML = h;
+}
+
+
+// ============================================================
+// PERSONENDATEN: je Person ein Katalog mit allen Angaben plus
+// Fotos und Ausweise. Alles Ende-zu-Ende verschluesselt: die
+// Felder als JSON in kt_person_daten, die Bilder als Datenmuell
+// im Speicher (gleicher Weg wie die Messenger-Medien).
+// ============================================================
+
+// Der Katalog: Feldname, Beschriftung, Eingabetyp
+const PERSON_FELDER = [
+  ["vorname", "Vorname", "text"],
+  ["nachname", "Nachname", "text"],
+  ["geburtsdatum", "Geburtsdatum", "date"],
+  ["geburtsort", "Geburtsort", "text"],
+  ["staat", "Staatsbürgerschaft", "text"],
+  ["adresse", "Adresse (Strasse, PLZ, Ort)", "text"],
+  ["telefon", "Telefon", "text"],
+  ["email", "E-Mail", "text"],
+  ["passwort", "Passwort", "password"],
+  ["notiz", "Notizen", "textarea"]
+];
+
+function personDatenLesen(ordnerId) {
+  const d = personDatenKarte[ordnerId];
+  return (d && typeof d === "object") ? d : { dokumente: [] };
+}
+
+function personDatenHtml(person, schreib) {
+  const d = personDatenLesen(person.id);
+  let h = '<h4>&#128100; Personendaten</h4><div class="persondaten">';
+  h += '<div class="persondaten-felder">';
+  for (const [feld, titel, typ] of PERSON_FELDER) {
+    const wert = textSicherM(d[feld] || "");
+    const id = "pd_" + feld;
+    if (typ === "textarea") {
+      h += '<label class="pd-feld pd-breit">' + titel + '<br><textarea id="' + id + '"' +
+        (schreib ? "" : " disabled") + ">" + wert + "</textarea></label>";
+    } else if (typ === "password") {
+      h += '<label class="pd-feld">' + titel + '<br><input id="' + id + '" type="password" value="' + wert + '"' +
+        (schreib ? "" : " disabled") + " autocomplete=\"off\"> " + augeHtml(id) + "</label>";
+    } else {
+      h += '<label class="pd-feld">' + titel + '<br><input id="' + id + '" type="' + typ + '" value="' + wert + '"' +
+        (schreib ? "" : " disabled") + "></label>";
+    }
+  }
+  h += "</div>";
+  if (schreib) {
+    h += '<div class="pd-leiste"><button class="haupt" onclick="tuPersonDatenSpeichern(\'' + person.id + '\')">' +
+      "&#128190; Personendaten speichern</button>" +
+      '<label class="fotoknopf">&#128247; Foto oder Ausweis hinzufügen' +
+      '<input type="file" accept="image/*,.pdf" style="display:none" ' +
+      'onchange="tuPersonDokument(\'' + person.id + '\', this)"></label>' +
+      '<span class="mini">Alles verschlüsselt - nur du (und wem du teilst) kann das lesen.</span></div>';
+  }
+  // Dokumente
+  const doks = Array.isArray(d.dokumente) ? d.dokumente : [];
+  if (doks.length) {
+    h += '<div class="pd-doks">';
+    for (const m of doks) {
+      const kennung = "pddok_" + String(m.pfad || "").replace(/[^a-z0-9]/gi, "");
+      h += '<div class="pd-dok" id="' + kennung + '"><b>' + textSicherM(m.name || "Datei") + "</b> " +
+        '<span class="mini">' + medienGroesseText(m.groesse || 0) + " &middot; " + textSicherM(m.wann || "") + "</span> " +
+        '<span class="pd-dok-bild mini">lädt...</span>' +
+        (schreib ? ' <button onclick="tuPersonDokumentWeg(\'' + person.id + "','" +
+          textSicherM(m.pfad) + '\')">Weg</button>' : "") + "</div>";
+    }
+    h += "</div>";
+    setTimeout(() => personDokumenteNachladen(person.id), 50);
+  } else {
+    h += '<p class="mini">Noch keine Fotos oder Ausweise gespeichert.</p>';
+  }
+  return h + "</div>";
+}
+
+async function personDokumenteNachladen(ordnerId) {
+  const d = personDatenLesen(ordnerId);
+  const key = await kryptoBereich(aktiverBereich.id);
+  for (const m of d.dokumente || []) {
+    const kennung = "pddok_" + String(m.pfad || "").replace(/[^a-z0-9]/gi, "");
+    const kasten = el(kennung);
+    if (!kasten) continue;
+    const ziel = kasten.querySelector(".pd-dok-bild");
+    if (!ziel) continue;
+    const url = await medienUrl(key, m);
+    if (!url) { ziel.textContent = "[nicht lesbar]"; continue; }
+    if (m.art === "bild") {
+      ziel.outerHTML = '<a href="' + url + '" target="_blank" rel="noopener">' +
+        '<img src="' + url + '" class="pd-vorschau" alt=""></a>';
+    } else {
+      ziel.outerHTML = '<a href="' + url + '" target="_blank" rel="noopener">öffnen</a>';
+    }
+  }
+}
+
+function personDatenAusFeldern(ordnerId) {
+  const d = personDatenLesen(ordnerId);
+  for (const [feld] of PERSON_FELDER) {
+    const f = el("pd_" + feld);
+    if (f) d[feld] = f.value.trim();
+  }
+  if (!Array.isArray(d.dokumente)) d.dokumente = [];
+  return d;
+}
+
+async function tuPersonDatenSpeichern(ordnerId) {
+  const d = personDatenAusFeldern(ordnerId);
+  const r = await supaPersonDatenSpeichern(aktiverBereich.id, ordnerId, d);
+  if (r.fehler) { meldungM("Nicht gespeichert: " + r.fehler, "warn"); return; }
+  personDatenKarte[ordnerId] = d;
+  meldungM("<b>Personendaten gespeichert.</b>", "gut");
+}
+
+async function tuPersonDokument(ordnerId, eingabe) {
+  const datei = eingabe.files && eingabe.files[0];
+  if (!datei) return;
+  eingabe.value = "";
+  const key = await kryptoBereich(aktiverBereich.id);
+  if (!key) { meldungM(OHNE_SCHLUESSEL, "warn"); return; }
+  meldungM("Datei wird verschlüsselt und hochgeladen...", "gut");
+  const art = /^image\//.test(datei.type) ? "bild" : "datei";
+  const r = await medienHochladen(key, medienBereichPfad(aktiverBereich.id), datei, art, datei.name);
+  if (r.fehler) { meldungM("Hochladen fehlgeschlagen: " + r.fehler, "warn"); return; }
+  const m = medienLesen(r.text);
+  m.wann = new Date().toLocaleDateString("de-AT");
+  // Erst die Felder mitnehmen (nichts Getipptes verlieren), dann anhaengen
+  const d = personDatenAusFeldern(ordnerId);
+  d.dokumente.push(m);
+  const s = await supaPersonDatenSpeichern(aktiverBereich.id, ordnerId, d);
+  if (s.fehler) { meldungM("Nicht gespeichert: " + s.fehler, "warn"); return; }
+  personDatenKarte[ordnerId] = d;
+  meldungM("<b>" + textSicherM(datei.name) + "</b> gespeichert (verschlüsselt).", "gut");
+  zeichnePersonenKasse(kasseScheine);
+}
+
+async function tuPersonDokumentWeg(ordnerId, pfadWert) {
+  if (!confirm("Diese Datei wirklich löschen?")) return;
+  const d = personDatenAusFeldern(ordnerId);
+  d.dokumente = (d.dokumente || []).filter(m => m.pfad !== pfadWert);
+  const s = await supaPersonDatenSpeichern(aktiverBereich.id, ordnerId, d);
+  if (s.fehler) { meldungM("Nicht gespeichert: " + s.fehler, "warn"); return; }
+  personDatenKarte[ordnerId] = d;
+  try { await supa.storage.from("kt-medien").remove([pfadWert]); } catch (e) { /* Verweis ist weg, Rest egal */ }
+  meldungM("Datei gelöscht.", "gut");
+  zeichnePersonenKasse(kasseScheine);
 }

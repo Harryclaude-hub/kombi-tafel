@@ -533,3 +533,32 @@ async function supaSatzUploadsVoll(datum) {
 async function supaUploadStatus(id, status) {
   return await supa.from("kt_satz_uploads").update({ status: status }).eq("id", id).select("id");
 }
+
+// ---------- Personendaten (kt_person_daten) ----------
+// Je Person EIN Datensatz: ein JSON mit allen Angaben, als Ganzes
+// Ende-zu-Ende verschluesselt. Die Datenbank sieht nur Datenmuell.
+
+async function supaPersonDatenLaden(bereichId) {
+  const r = await supa.from("kt_person_daten").select("ordner, daten")
+    .eq("bereich", bereichId);
+  const key = await kryptoBereich(bereichId);
+  const karte = {};
+  for (const z of r.data || []) {
+    const klar = await e2eAuf(key, z.daten);
+    try { karte[z.ordner] = JSON.parse(klar); } catch (e) { /* unlesbar: ueberspringen */ }
+  }
+  return karte;
+}
+
+async function supaPersonDatenSpeichern(bereichId, ordnerId, objekt) {
+  const key = await kryptoBereich(bereichId);
+  if (!key) return { fehler: OHNE_SCHLUESSEL };
+  const r = await supa.from("kt_person_daten").upsert({
+    bereich: bereichId, ordner: ordnerId,
+    daten: await e2eZu(key, JSON.stringify(objekt)),
+    updated_at: new Date().toISOString()
+  }, { onConflict: "ordner" }).select("id");
+  if (r.error) return { fehler: r.error.message };
+  if (!r.data || !r.data.length) return { fehler: "Nicht gespeichert (keine Berechtigung?)." };
+  return { ok: true };
+}
