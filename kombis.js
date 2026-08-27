@@ -490,7 +490,7 @@ function zeichne_() {
   document.getElementById("mind").value = z.einst.mind;
   document.querySelectorAll(".anbwahl").forEach(c => { c.checked = z.einst.anbieter.includes(c.value); });
 
-  const normal = z.scheine.filter(s => s.art === "normal" || s.art === "eigen");
+  const normal = z.scheine.filter(s => s.art === "normal" || s.art === "eigen" || s.art === "variante");
   const niedrig = z.scheine.filter(s => s.art === "niedrig");
   const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
@@ -562,7 +562,8 @@ function scheinHtml(s, z) {
 
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
     "Schein " + s.nr + (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
-    (s.teil ? ' <span class="s-warn">Teil ' + s.teil + " (gleiche Wetten, weiterer Anbieter)</span>" : "") +
+    (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
+      (s.variante ? " (andere Mischung für den Rest)" : " (gleiche Wetten, weiterer Anbieter)") + "</span>" : "") +
     " " + marke(s.kz) + wahl +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
@@ -579,10 +580,11 @@ function scheinHtml(s, z) {
       s.entfernt.map(e => (wetteNachId(e.id) ? wetteNachId(e.id).spiel : e.id) +
         " (" + e.grund + ")").join(", ") + "</div>" : "") +
     "<div class='s-fuss'>Einsatz <input type='number' step='0.5' min='0' class='einsatz' " +
-      "id='e_" + s.id + "' value='" + zielEinsatz() + "' oninput=\"rechneGewinn('" + s.id + "'," + gesamt + ")\"> &euro;" +
-      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(zielEinsatz() * gesamt).toFixed(2) + " &euro;</b>" +
+      "id='e_" + s.id + "' value='" + einsatzWert(s, z) + "' oninput=\"einsatzGeaendert('" + s.id + "', this.value, " + gesamt + ")\"> &euro;" +
+      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(einsatzWert(s, z) * gesamt).toFixed(2) + " &euro;</b>" +
       '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
-      '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Wenn ein Anbieter nicht so viel Einsatz zulässt: denselben Schein zusätzlich bei einem weiteren Anbieter setzen, bis das Ziel erreicht ist.">&#10133; Bei weiterem Anbieter setzen</button>' +
+      '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Der Anbieter lässt nicht mehr zu? Gleiche Wetten zusätzlich bei einem weiteren Anbieter setzen.">&#10133; Rest bei weiterem Anbieter</button>' +
+      '<button onclick="scheinNeuMischen(\'' + s.id + '\')" title="Geht auch beim anderen Anbieter nicht mehr? Andere Wetten aus dem Ordner zu einer neuen Mischung, damit der Rest trotzdem gesetzt wird.">&#128256; Andere Mischung für den Rest</button>' +
       (s.wetten.length !== 3 || s.art === "eigen" || s.teil
         ? '<button class="aufloesen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
         : "") +
@@ -590,6 +592,7 @@ function scheinHtml(s, z) {
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
     "</div>" +
+    '<div class="zielzeile" id="ziel_' + s.id + '">' + gruppenText(z, s.nr) + "</div>" +
     '<div class="ordnerwahl" id="ordnerwahl_' + s.id + '"></div>' +
     (foto ? (function () {
       const name = localStorage.getItem(fotoSchluessel(s.id) + "_name") || "Wettschein";
@@ -633,6 +636,121 @@ function zielEinsatz() {
   return f ? (parseFloat(f.value) || 400) : 400;
 }
 
+// ---------- Karams Ziel-Logik: 400 Euro je Kombination ----------
+// Jede Kombination (Gruppe mit derselben Nummer) soll den Ziel-Einsatz
+// erreichen. Laesst ein Anbieter nicht so viel zu, kommen weitere Teile
+// dazu: gleiche Wetten bei einem anderen Anbieter, oder - wenn das auch
+// nicht geht - eine ANDERE Mischung aus demselben Ordner fuer den Rest.
+
+function gruppeScheine(z, nr) {
+  return z.scheine.filter(s => s.nr === nr);
+}
+
+function einsatzWert(s, z) {
+  if (s.einsatz !== undefined && s.einsatz !== null) return s.einsatz;
+  const gruppe = gruppeScheine(z, s.nr);
+  const andere = gruppe.filter(x => x.id !== s.id)
+    .reduce((p, x) => p + (parseFloat(x.einsatz) || 0), 0);
+  const rest = zielEinsatz() - andere;
+  return rund2(Math.max(0, rest));
+}
+
+function gruppeGesetzt(z, nr) {
+  return gruppeScheine(z, nr).reduce((p, s) => {
+    const feld = document.getElementById("e_" + s.id);
+    const wert = feld ? parseFloat(feld.value) : parseFloat(s.einsatz);
+    return p + (isNaN(wert) ? 0 : wert);
+  }, 0);
+}
+
+function gruppenText(z, nr) {
+  const ziel = zielEinsatz();
+  const gesetzt = gruppeGesetzt(z, nr);
+  const rest = rund2(ziel - gesetzt);
+  const teile = gruppeScheine(z, nr).length;
+  if (rest <= 0.004) {
+    return '<span class="ziel-gut">&#9989; Ziel erreicht: ' + rund2(gesetzt).toFixed(2) +
+      " &euro; von " + ziel.toFixed(2) + " &euro;" + (teile > 1 ? " (in " + teile + " Teilen)" : "") + "</span>";
+  }
+  return '<span class="ziel-offen">&#9888; Von deinem Ziel <b>' + ziel.toFixed(2) + " &euro;</b> sind erst <b>" +
+    rund2(gesetzt).toFixed(2) + " &euro;</b> gesetzt" + (teile > 1 ? " (in " + teile + " Teilen)" : "") +
+    " - es fehlen noch <b>" + rest.toFixed(2) + " &euro;</b>. Nimm dafür <b>Rest bei weiterem Anbieter</b> " +
+    "oder <b>Andere Mischung für den Rest</b>.</span>";
+}
+
+function aktualisiereZielzeilen() {
+  const z = liesZustand();
+  if (!z) return;
+  for (const s of z.scheine) {
+    const el = document.getElementById("ziel_" + s.id);
+    if (el) el.innerHTML = gruppenText(z, s.nr);
+  }
+}
+
+function einsatzGeaendert(scheinId, wert, gesamt) {
+  const z = liesZustand();
+  const s = z.scheine.find(x => x.id === scheinId);
+  if (s) {
+    const w = parseFloat(wert);
+    s.einsatz = isNaN(w) ? 0 : w;
+    speichereZustand(z);
+  }
+  rechneGewinn(scheinId, gesamt);
+  aktualisiereZielzeilen();
+}
+
+// Andere Mischung fuer den Rest: neue Wetten aus DEMSELBEN Ordner
+function scheinNeuMischen(scheinId) {
+  const z = liesZustand();
+  const s = z.scheine.find(x => x.id === scheinId);
+  if (!s) return;
+  const e = z.einst || einstellungenLesen();
+  const rest = rund2(zielEinsatz() - gruppeGesetzt(z, s.nr));
+  if (rest <= 0.004) { meldung("Diese Kombination hat ihr Ziel schon erreicht.", "warn"); return; }
+
+  // Spiele, die in DIESER Gruppe schon stecken, kommen nicht noch einmal rein
+  const gruppe = gruppeScheine(z, s.nr);
+  const gesperrt = new Set();
+  for (const g of gruppe) for (const w of g.wetten) {
+    const ww = wetteNachId(w.id);
+    if (ww) gesperrt.add(spielKennung(ww));
+  }
+  // Anbieter, die in dieser Gruppe schon dran waren, hinten anstellen
+  const benutzt = gruppe.map(g => g.kz);
+  const erlaubt = (e.anbieter && e.anbieter.length) ? e.anbieter : ["iw", "bw", "b3", "st"];
+  const kz = erlaubt.find(x => !benutzt.includes(x)) || s.kz;
+
+  const frei = satzWetten().filter(w => !istVorbei(anstossFeld(w)) && !gesperrt.has(spielKennung(w)));
+  const passend = [];
+  const schonDrin = new Set();
+  for (const w of frei) {
+    const k = spielKennung(w);
+    if (schonDrin.has(k)) continue;
+    const optIdx = gewaehlteOption(w);
+    const q = zielQuote(w, optIdx, kz);
+    if (q.echt >= e.mind - 0.0001) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
+    if (passend.length === 3) break;
+  }
+  if (passend.length < 3) {
+    meldung("<b>Keine andere Mischung möglich:</b> im Ordner sind nicht genug freie Spiele, " +
+      "die deine Mindestquote schaffen und noch nicht in dieser Kombination stecken. " +
+      "Möglichkeiten: Mindestquote senken, mehr Anbieter anhaken, oder den Rest bei einem " +
+      "weiteren Anbieter auf die gleichen Wetten setzen.", "warn");
+    return;
+  }
+  const nummer = gruppe.length + 1;
+  z.scheine.splice(z.scheine.indexOf(gruppe[gruppe.length - 1]) + 1, 0, {
+    id: s.id + "_m" + nummer, nr: s.nr, kz: kz, art: "variante", teil: nummer,
+    variante: true, einsatz: rest,
+    wetten: passend, entfernt: []
+  });
+  speichereZustand(z);
+  meldung("<b>Andere Mischung angelegt</b> (Teil " + nummer + " bei " + anbieterName(kz) + "): " +
+    "drei andere Spiele aus demselben Ordner, Einsatz " + rest.toFixed(2) +
+    " &euro; - damit erreicht diese Kombination ihr Ziel von " + zielEinsatz().toFixed(2) + " &euro;.", "gut");
+  zeichne_();
+}
+
 function scheinTeilen(scheinId) {
   const z = liesZustand();
   const s = z.scheine.find(x => x.id === scheinId);
@@ -643,9 +761,11 @@ function scheinTeilen(scheinId) {
   const benutzt = teile.map(x => x.kz);
   const frei = (e.anbieter || ["iw", "bw", "b3", "st"]).find(kz => !benutzt.includes(kz));
   if (!frei) { meldung("Alle erlaubten Anbieter haben diesen Schein schon.", "warn"); return; }
+  const rest = rund2(zielEinsatz() - gruppeGesetzt(z, nr));
   const kopie = {
-    id: s.id + "_t" + (teile.length + 1), nr: nr, kz: frei, art: s.art,
-    teil: teile.length + 1,
+    id: s.id + "_t" + (teile.length + 1), nr: nr, kz: frei,
+    art: (s.art === "niedrig") ? "niedrig" : "normal",
+    teil: teile.length + 1, einsatz: Math.max(0, rest),
     wetten: s.wetten.map(w => ({ id: w.id, optIdx: w.optIdx })),
     entfernt: []
   };
@@ -653,8 +773,8 @@ function scheinTeilen(scheinId) {
   z.scheine.splice(pos + teile.length, 0, kopie);
   speichereZustand(z);
   meldung("Schein " + nr + " zusätzlich bei <b>" + anbieterName(frei) + "</b> angelegt (Teil " +
-    kopie.teil + "). Trag dort den Rest-Einsatz ein, bis dein Ziel von " +
-    zielEinsatz().toFixed(0) + " &euro; erreicht ist.", "gut");
+    kopie.teil + ") mit dem offenen Rest von <b>" + Math.max(0, rest).toFixed(2) + " &euro;</b>. " +
+    "Geht dort auch nicht die volle Summe, nimm <b>Andere Mischung für den Rest</b>.", "gut");
   zeichne_();
 }
 

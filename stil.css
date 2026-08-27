@@ -570,3 +570,8 @@ input:focus, select:focus, textarea:focus { border-color: #1a2c50; outline: none
 .mb-navi { position: sticky; top: 0; background: #fff; z-index: 40; padding: 8px 0 0 0; }
 .mb-navi button { font-size: 17px; padding: 12px 26px; }
 .mb-navi button.aktiv { box-shadow: 0 3px 0 #1a2c50; }
+
+/* Ziel-Logik: 400 Euro je Kombination (Design-Schicht) */
+.zielzeile { padding: 8px 12px; border-top: 1px solid #ccc; font-size: 15px; }
+.ziel-gut { color: #0a5a0a; font-weight: bold; }
+.ziel-offen { color: #7a3d00; }
