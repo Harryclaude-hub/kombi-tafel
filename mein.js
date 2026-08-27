@@ -531,11 +531,12 @@ function zeichneOrdnerBox(scheine) {
   }
   if (ordnerListe.length) {
     verwalten += "<table><thead><tr><th>Person</th><th>Kombinationen</th><th>fertig</th>" +
-      "<th>Kasse</th><th></th></tr></thead><tbody>";
+      "<th>Erhalten</th><th>Eingezahlt</th><th></th></tr></thead><tbody>";
     for (const o of ordnerListe) {
       const n = zahl[o.id] || 0;
       const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
-      const warn = personPruefen(o.id, scheine).probleme.length > 0;
+      const p = personPruefen(o.id, scheine);
+      const warn = p.probleme.length > 0;
       let tasten = '<button onclick="tuOrdnerFilter(\'' + o.id + '\')">öffnen</button>';
       if (schreib) {
         tasten += ' <button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button>' +
@@ -548,7 +549,8 @@ function zeichneOrdnerBox(scheine) {
                  : "<b>" + textSicherM(o.name) + "</b>") + "</td>" +
         "<td>" + n + "</td>" +
         "<td>" + (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "-") + "</td>" +
-        "<td>" + (kasseN ? kasseN + " Buchungen" : "leer") +
+        "<td>" + p.erhaltengesamt.toFixed(2) + " &euro;</td>" +
+        "<td>" + p.eingesamt.toFixed(2) + " &euro;" +
           (warn ? ' <span class="warnbadge">!</span>' : "") + "</td>" +
         "<td>" + tasten + "</td></tr>";
     }
