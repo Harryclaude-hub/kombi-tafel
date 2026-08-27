@@ -46,8 +46,9 @@ function zeichneOriginal() {
   const extraZeigen = (typeof aktiverSatzId !== "function" || aktiverSatzId() === "2026-08-24");
   const gruppen = [];
   for (const w of basis) {
-    // Datenbank-Saetze bilden EINE Gruppe, die alten Foto-ids ihre Bilder
-    const g = w.dbid ? "Fotos" : w.id.split(".")[0];
+    // Kennungen mit Punkt (1.01) tragen ihre Bild-Nummer, alle anderen
+    // (neue Datenbank-Wetten) bilden zusammen die Gruppe Fotos
+    const g = w.id.includes(".") ? w.id.split(".")[0] : "Fotos";
     if (!gruppen.includes(g)) gruppen.push(g);
   }
   for (const bild of gruppen) {
@@ -65,7 +66,7 @@ function zeichneOriginal() {
       }));
     }
 
-    const zeilen = basis.filter(w => (w.dbid ? "Fotos" : w.id.split(".")[0]) === String(bild));
+    const zeilen = basis.filter(w => (w.id.includes(".") ? w.id.split(".")[0] : "Fotos") === String(bild));
     for (const w of zeilen) {
       // Datenbank-Saetze haben keine ROH-Zusatzdaten: gemeldet aus dem
       // von-Feld, die Foto-Quote direkt aus der Wette selbst
