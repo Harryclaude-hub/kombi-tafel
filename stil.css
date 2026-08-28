@@ -1849,3 +1849,175 @@ details.anmk summary { min-height: 44px; display: block; padding: 11px 0; }
    unter der Empfehlung, und zwar auf der Kombi-Tafel, die am Handy
    ausdruecklich nicht zum Arbeiten gedacht ist. Wer das aendern will,
    aendert die Grundfarben oben - nicht hier unten mit Ausnahmen. */
+
+/* ============================================================
+   PROFIL (Design-Schicht, loeschbar).
+   Die Farben hier sind AUSSCHLIESSLICH Wunschfarben fuer
+   Anzeigenamen - sie haben nichts mit den Bedeutungsfarben zu
+   tun und stehen deshalb nie in einer Tabelle: dort traegt der
+   Name die Klasse pf-schlicht und bleibt schwarz.
+   ============================================================ */
+.profilname { font-weight: 600; }
+.profilname.pf-schlicht,
+tbody .profilname,
+button .profilname,
+a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
+
+/* Wunschfarben. Alle gegen Weiss auf mindestens 4,5:1 geprueft. */
+.profilname.pf-c-blau { color: #17457e; }
+.profilname.pf-c-gruen { color: #14663a; }
+.profilname.pf-c-rot { color: #a4111f; }
+.profilname.pf-c-lila { color: #6a2a86; }
+.profilname.pf-c-orange { color: #8a4a00; }
+.profilname.pf-c-tuerkis { color: #0d5f66; }
+.profilname.pf-c-schwarz { color: #1a1a1a; }
+.profilname.pf-c-pink { color: #99205e; }
+
+/* Zierschriften. Nur was auf den Geraeten schon da ist - es wird
+   nichts nachgeladen. Fehlt eine, nimmt der Browser die Normalschrift. */
+.profilname.pf-f-system { font-family: inherit; }
+.profilname.pf-f-rund { font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; }
+.profilname.pf-f-schreib { font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", cursive; }
+.profilname.pf-f-fett { font-family: "Arial Black", "Helvetica Neue", Impact, sans-serif; font-weight: 900; }
+.profilname.pf-f-schmal { font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+.profilname.pf-f-breit { font-family: Georgia, "Times New Roman", serif; letter-spacing: 0.4px; }
+
+/* Das runde Bild */
+.pf-bild {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex: 0 0 auto;
+  border-radius: 50%; overflow: hidden;
+  background: #dde4f0; color: #26426f;
+  font-weight: 700; font-size: 17px; text-transform: uppercase;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+.pf-bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Der Knopf oben: mit Bild wird das Bild zum Knopf */
+.navknopf.profilknopf.pf-hatbild { padding: 3px 8px; }
+.pf-navbild {
+  width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
+  display: block; border: 2px solid currentColor;
+}
+
+/* Die Visitenkarte */
+.pf-karte {
+  background: #fff; border-radius: 14px; padding: 22px 20px; text-align: center;
+  max-width: 340px; width: calc(100% - 32px);
+  box-shadow: 0 10px 40px rgba(10, 18, 32, 0.4);
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+}
+.pf-kartenname { font-size: 21px; }
+.pf-kartenuser { color: #667; }
+.pf-kartenbio {
+  font-size: 14px; line-height: 1.5; color: #243; text-align: left;
+  background: #f5f7fb; border-radius: 9px; padding: 9px 11px; width: 100%;
+  white-space: pre-wrap; word-break: break-word;
+}
+.pf-karte button { min-height: 44px; width: 100%; }
+
+/* Der Bearbeiten-Block */
+.profilkasten { padding: 2px 0; }
+.pf-hinweis {
+  background: #fff4e0; border-left: 4px solid #b35a00; border-radius: 8px;
+  padding: 9px 12px; margin: 8px 0 12px 0; font-size: 13.5px;
+}
+.pf-vorschau {
+  border: 2px dashed #bcc6d8; border-radius: 10px; padding: 12px;
+  margin-bottom: 14px; background: #fafbfe;
+}
+.pf-vorschauzeile { display: flex; align-items: center; gap: 12px; }
+.pf-vorschauzeile .pf-bild { width: 54px; height: 54px; font-size: 22px; }
+.pf-vorschaubio { margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+.pf-feld { display: block; margin: 12px 0; }
+.pf-feld > b { display: block; margin-bottom: 3px; }
+.pf-feld input, .pf-feld textarea {
+  width: 100%; font-size: 16px; padding: 9px 10px; margin-top: 4px;
+  border: 1px solid #8a94a8; border-radius: 8px;
+}
+.pf-feld textarea { min-height: 76px; font-family: inherit; }
+.pf-wahlreihe { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
+.pf-wahl {
+  min-width: 52px; min-height: 44px; padding: 6px 12px;
+  border: 2px solid #c3cad8; border-radius: 9px; background: #fff;
+  font-size: 15px; font-weight: 600;
+}
+.pf-wahl.aktiv { border-color: #1a2c50; box-shadow: 0 0 0 3px rgba(26, 44, 80, 0.16); }
+.pf-fotoreihe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 5px; }
+
+@media (max-width: 700px) {
+  .pf-karte { padding: 20px 16px; }
+  .pf-kartenname { font-size: 20px; }
+  .pf-wahl { min-height: 48px; font-size: 16px; }
+  .pf-feld input, .pf-feld textarea { font-size: 16px; padding: 11px 12px; }
+  .pf-vorschauzeile .pf-bild { width: 62px; height: 62px; font-size: 25px; }
+  .pf-navbild { width: 32px; height: 32px; }
+}
+
+/* ============================================================
+   MESSENGER IN ZWEI SPALTEN (Design-Schicht, loeschbar).
+   Am Rechner: links die Gespraeche, rechts das offene.
+   Am Handy: immer nur eines von beiden, mit Zurueck-Pfeil.
+   ============================================================ */
+.gp-zwei { display: flex; align-items: stretch; min-height: 0; flex: 1 1 auto; }
+.gp-spalte {
+  flex: 0 0 232px; display: flex; flex-direction: column; min-height: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.14); overflow-y: auto;
+}
+.gp-spaltekopf { padding: 7px 10px 4px 10px; font-weight: bold; color: #445; }
+.gp-gespraech { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.gp-leer { padding: 22px 16px; color: #667; text-align: center; }
+
+.gp-freund {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: 56px; padding: 8px 10px; text-align: left;
+  border: 0; border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent; border-radius: 0; font-size: 14.5px;
+}
+.gp-freund.offen { background: rgba(26, 44, 80, 0.09); }
+.gp-freundname { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.gp-freundname > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-freunduser { color: #778; }
+
+.gp-gkopf {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.14); flex: 0 0 auto;
+}
+.gp-kopfname { flex: 1 1 auto; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.gp-zurueck { display: none; min-width: 44px; min-height: 44px; font-size: 19px; }
+.gp-ruf { min-width: 44px; min-height: 44px; font-size: 17px; }
+.gp-e2e { padding: 3px 10px; color: #667; flex: 0 0 auto; }
+.gp-liste { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* "schreibt gerade ..." */
+/* Ganz weg statt nur flach: eine Hoehe von 0 wurde in der Flex-Spalte
+   nicht durchgesetzt und liess einen leeren Streifen stehen. */
+.gp-tippt { display: none; }
+.gp-tippt.da {
+  display: block; flex: 0 0 auto; padding: 1px 12px 3px 12px;
+  font-size: 12.5px; color: #556; font-style: italic;
+}
+
+/* Die Schreibzeile: Ikonen klein, Textfeld gross */
+.chateingabe { display: flex; align-items: center; gap: 6px; padding: 7px; flex: 0 0 auto; }
+.chateingabe #gp-text { flex: 1 1 auto; min-width: 0; font-size: 16px; min-height: 44px; }
+.gp-ikon {
+  min-width: 44px; min-height: 44px; padding: 0; flex: 0 0 auto;
+  font-size: 18px; line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.gp-senden { min-width: 52px; min-height: 44px; font-size: 19px; padding: 0; flex: 0 0 auto; }
+
+@media (max-width: 700px) {
+  /* Am Handy ist immer nur EINE Spalte zu sehen. */
+  .gp-spalte { flex: 1 1 auto; border-right: 0; }
+  .gp-zeigt-liste .gp-gespraech { display: none; }
+  .gp-zeigt-gespraech .gp-spalte { display: none; }
+  .gp-zurueck { display: inline-flex; align-items: center; justify-content: center; }
+  .gp-freund { min-height: 62px; font-size: 15.5px; }
+  .gp-kopfname { font-size: 17px; }
+  .gp-ikon { min-width: 46px; min-height: 46px; font-size: 19px; }
+  .gp-senden { min-width: 56px; min-height: 46px; }
+  .chateingabe #gp-text { min-height: 46px; }
+}

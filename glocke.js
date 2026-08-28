@@ -164,20 +164,37 @@ function glockeUmschalten() {
     if (panel) panel.remove();
     if (glockePoll) clearInterval(glockePoll);
     if (typeof aufnahmeAbbrechen === "function") aufnahmeAbbrechen();
+    tippKanalZu();
     return;
   }
   panel = document.createElement("div");
   panel.id = "glockenpanel";
-  panel.innerHTML = '<div class="gp-kopf">Nachrichten <button class="gp-zu" ' +
-    'onclick="glockeUmschalten()">schliessen</button></div><div id="gp-inhalt">Lädt...</div>';
+  // ZWEI SPALTEN: links alle Gespraeche, rechts das offene. Am Handy ist
+  // immer nur eine davon zu sehen (das steuert die Klasse gp-zeigt-*).
+  panel.innerHTML =
+    '<div class="gp-kopf">&#128172; Nachrichten' +
+    '<button class="gp-zu" onclick="glockeUmschalten()">schliessen</button></div>' +
+    '<div id="gp-inhalt" class="gp-zwei gp-zeigt-liste">' +
+    '<div id="gp-spalte" class="gp-spalte"><div class="mini gp-spaltekopf">Deine Chats</div>' +
+    '<div id="gp-liste-inhalt">Lädt...</div></div>' +
+    '<div id="gp-gespraech" class="gp-gespraech">' +
+    '<div class="gp-leer mini">Links ein Gespräch antippen.</div></div>' +
+    "</div>";
   document.body.appendChild(panel);
   glockeListe();
 }
 
-async function glockeListe() {
-  glockePartner = null;
-  if (glockePoll) clearInterval(glockePoll);
-  const ziel = document.getElementById("gp-inhalt");
+// Zeigt am Handy entweder die Liste oder das Gespraech.
+function glockeSpalteZeigen(was) {
+  const i = document.getElementById("gp-inhalt");
+  if (!i) return;
+  i.classList.toggle("gp-zeigt-liste", was === "liste");
+  i.classList.toggle("gp-zeigt-gespraech", was === "gespraech");
+}
+
+async function glockeListe(nurListe) {
+  if (!nurListe) { glockePartner = null; if (glockePoll) clearInterval(glockePoll); tippKanalZu(); }
+  const ziel = document.getElementById("gp-liste-inhalt");
   if (!ziel) return;
   const u = await supaNutzer();
   if (!u) {
@@ -186,48 +203,148 @@ async function glockeListe() {
     return;
   }
   const kontakte = await supaKontakteLaden();
-  if (glockePartner) return;   // ein Thread hat inzwischen übernommen
   if (!kontakte.length) {
-    ziel.innerHTML = '<p class="mini">Keine Nachrichten. Freunde addest du in ' +
-      '<a href="mein.html">Mein Bereich</a> unter "Freunde und Nachrichten".</p>';
+    ziel.innerHTML = '<p class="mini">Noch keine Freunde. Freunde addest du in ' +
+      '<a href="mein.html">Mein Bereich</a> unter "Freunde und Teilen".</p>';
     return;
   }
-  let html = "";
+  // Die Anzeigenamen aller Gespraechspartner auf einmal holen.
+  if (typeof profileLaden === "function") await profileLaden(kontakte.map(k => k.partnerId));
+
+  ziel.innerHTML = "";
   for (const k of kontakte) {
     const gelesen = parseInt(localStorage.getItem("kt_dm_gelesen_" + k.partnerId) || "0", 10);
     const r = await supa.from("kt_direkt").select("id", { count: "exact", head: true })
       .eq("an", u.id).eq("von", k.partnerId).gt("id", gelesen);
     const neu = r.count || 0;
-    html += '<button class="gp-freund" onclick="glockeThread(\'' + k.partnerId + "','" +
-      k.username + '\')">' + k.username +
-      (neu ? ' <span class="badge">' + neu + "</span>" : "") + "</button>";
+
+    const b = document.createElement("button");
+    b.className = "gp-freund" + (glockePartner && glockePartner.partnerId === k.partnerId ? " offen" : "");
+    b.onclick = () => glockeThread(k.partnerId, k.username);
+    if (typeof profilBildEl === "function") b.appendChild(profilBildEl(k.partnerId, k.username, 40));
+    const mitte = document.createElement("span");
+    mitte.className = "gp-freundname";
+    mitte.appendChild(typeof profilNameEl === "function"
+      ? profilNameEl(k.partnerId, k.username, true)
+      : document.createTextNode(k.username));
+    const wer = document.createElement("span");
+    wer.className = "mini gp-freunduser";
+    wer.textContent = "@" + k.username;
+    mitte.appendChild(wer);
+    b.appendChild(mitte);
+    if (neu) {
+      const z = document.createElement("span");
+      z.className = "badge";
+      z.textContent = String(neu);
+      b.appendChild(z);
+    }
+    ziel.appendChild(b);
   }
-  if (glockePartner) return;   // ein Thread hat inzwischen übernommen
-  ziel.innerHTML = html;
 }
 
 async function glockeThread(partnerId, username) {
   glockePartner = { partnerId: partnerId, username: username };
   glockeLetzteId = 0;
-  const ziel = document.getElementById("gp-inhalt");
-  ziel.innerHTML = '<button class="gp-zurueck" onclick="glockeListe()">zurück</button> ' +
-    "<b>" + username + '</b> <span class="mini">&#128274; Ende-zu-Ende</span>' +
+  const ziel = document.getElementById("gp-gespraech");
+  if (!ziel) return;
+  glockeSpalteZeigen("gespraech");
+  if (typeof profileLaden === "function") await profileLaden([partnerId]);
+
+  ziel.innerHTML =
+    '<div class="gp-gkopf">' +
+    '<button class="gp-zurueck" onclick="glockeSpalteZeigen(\'liste\')" title="Zurück zur Liste">&#8592;</button>' +
+    '<span id="gp-kopfbild"></span>' +
+    '<span class="gp-kopfname" id="gp-kopfname"></span>' +
+    '<button class="gp-ruf" onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, false)" ' +
+    'title="Anrufen">&#128222;</button>' +
+    '<button class="gp-ruf" onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, true)" ' +
+    'title="Video-Anruf">&#128249;</button></div>' +
+    '<div class="mini gp-e2e">&#128274; Ende-zu-Ende verschlüsselt</div>' +
     '<div id="gp-vorschau"></div>' +
     '<div id="gp-liste" class="chatliste gp-liste"></div>' +
-    '<div class="chateingabe"><input id="gp-text" placeholder="Nachricht..." ' +
-    'onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
-    '<button class="haupt" onclick="glockeSenden()">Senden</button></div>' +
-    '<div class="medienleiste">' +
-    '<label class="fotoknopf" title="Foto oder Datei senden (bis 50 MB)">&#128206; Datei' +
+    '<div id="gp-tippt" class="gp-tippt"></div>' +
+    '<div class="chateingabe">' +
+    '<label class="gp-ikon fotoknopf" title="Foto oder Datei">&#128206;' +
     '<input type="file" style="display:none" onchange="glockeDatei(this)"></label>' +
-    '<button id="gp-ton" onclick="glockeTon()" title="Sprachnachricht">&#127908; Sprachnachricht</button>' +
-    '<button id="gp-video" onclick="glockeVideo()" title="Video aufnehmen">&#128249; Video</button>' +
-    '<button onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, false)" title="Anrufen">&#128222; Anrufen</button>' +
-    '<button onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, true)" title="Video-Anruf">&#128222;&#128249; Video-Anruf</button>' +
+    '<button id="gp-ton" class="gp-ikon" onclick="glockeTon()" title="Sprachnachricht">&#127908;</button>' +
+    '<button id="gp-video" class="gp-ikon" onclick="glockeVideo()" title="Video">&#128249;</button>' +
+    '<input id="gp-text" placeholder="Nachricht..." autocomplete="off" ' +
+    'oninput="tippMelden()" onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
+    '<button class="haupt gp-senden" onclick="glockeSenden()" title="Senden">&#10148;</button>' +
     "</div>";
+
+  const kb = document.getElementById("gp-kopfbild");
+  if (kb && typeof profilBildEl === "function") kb.appendChild(profilBildEl(partnerId, username, 36));
+  const kn = document.getElementById("gp-kopfname");
+  if (kn) kn.appendChild(typeof profilNameEl === "function"
+    ? profilNameEl(partnerId, username) : document.createTextNode(username));
+
   await glockeNachladen();
   if (glockePoll) clearInterval(glockePoll);
   glockePoll = setInterval(glockeNachladen, 10000);
+  tippKanalAuf(partnerId);
+  glockeListe(true);            // die Liste markiert das offene Gespraech
+}
+
+// ============================================================
+// "schreibt gerade ..." - laeuft ueber denselben Live-Weg wie die
+// Anrufe. Es wird NUR gemeldet, DASS jemand tippt, nie was.
+// ============================================================
+
+let _tippKanal = null, _tippZiel = null, _tippUhr = null, _tippZuletzt = 0;
+
+function tippRaum(a, b) {
+  return "kt-tipp-" + [String(a), String(b)].sort().join("-");
+}
+
+function tippKanalZu() {
+  if (_tippKanal) { try { supa.removeChannel(_tippKanal); } catch (e) { } _tippKanal = null; }
+  _tippZiel = null;
+  if (_tippUhr) { clearTimeout(_tippUhr); _tippUhr = null; }
+}
+
+async function tippKanalAuf(partnerId) {
+  try {
+    tippKanalZu();
+    if (!window.supa) return;
+    const u = await supaNutzer();
+    if (!u) return;
+    _tippZiel = partnerId;
+    const k = supa.channel(tippRaum(u.id, partnerId), { config: { broadcast: { self: false } } });
+    k.on("broadcast", { event: "tippt" }, p => {
+      if (!p || !p.payload || p.payload.von !== partnerId) return;
+      tippAnzeigen(true);
+    });
+    k.subscribe(() => {});
+    _tippKanal = k;
+  } catch (e) { /* die Anzeige darf nie den Chat stoeren */ }
+}
+
+function tippAnzeigen(an) {
+  const z = document.getElementById("gp-tippt");
+  if (!z) return;
+  if (!an) { z.textContent = ""; z.classList.remove("da"); return; }
+  const name = (typeof profilName === "function" && glockePartner)
+    ? profilName(glockePartner.partnerId, glockePartner.username)
+    : (glockePartner ? glockePartner.username : "");
+  z.textContent = name + " schreibt gerade ...";
+  z.classList.add("da");
+  if (_tippUhr) clearTimeout(_tippUhr);
+  // Nach drei Sekunden Stille wieder ausblenden.
+  _tippUhr = setTimeout(() => tippAnzeigen(false), 3000);
+}
+
+// Beim Tippen hoechstens alle 1,5 Sekunden etwas hinausschicken.
+async function tippMelden() {
+  try {
+    if (!_tippKanal || !glockePartner) return;
+    const jetzt = Date.now();
+    if (jetzt - _tippZuletzt < 1500) return;
+    _tippZuletzt = jetzt;
+    const u = await supaNutzer();
+    if (!u) return;
+    _tippKanal.send({ type: "broadcast", event: "tippt", payload: { von: u.id } });
+  } catch (e) { }
 }
 
 async function glockeNachladen() {

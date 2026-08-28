@@ -21,6 +21,11 @@ function meldungM(text, art) {
   box.className = (art === "warn") ? "warnkern" : "merk";
   box.innerHTML = text;
   box.style.display = "block";
+  // Der Kasten sitzt ganz OBEN auf der Seite. Am Handy steht man beim
+  // Anlegen aber weit unten - die Meldung erschien dann ausserhalb des
+  // Bildschirms, und es sah aus, als passiere gar nichts. Deshalb wird
+  // jetzt immer dorthin gescrollt.
+  try { box.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { }
 }
 function zeitM(iso) {
   const d = new Date(iso);
@@ -84,7 +89,8 @@ function zeigeAnmeldung() {
   <div class="auth-kasten">
     <h2>Neues Konto</h2>
     <label>Benutzername<br><input id="reg_user" autocomplete="username"></label>
-    <label>E-Mail <span class="mini">(nur fürs Passwort-Zurücksetzen, keine Bestaetigung noetig)</span><br>
+    <label>E-Mail <span class="mini">(freiwillig! Nur damit du ein vergessenes Passwort zurücksetzen
+      kannst. Ohne E-Mail geht alles andere genauso - aber ein vergessenes Passwort ist dann weg.)</span><br>
       <input id="reg_mail" type="email" autocomplete="email"></label>
     <label>Passwort <span class="mini">(mindestens 6 Zeichen)</span><br>
       <input id="reg_pw" type="password" autocomplete="new-password"> ${augeHtml("reg_pw")}</label>
@@ -110,7 +116,10 @@ async function tuRegistrieren() {
   if (knopf) { knopf.disabled = false; knopf.textContent = "Konto anlegen"; }
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
   // Die Bestaetigung muss das Neuladen ueberleben, sonst sieht sie niemand.
-  try { localStorage.setItem("kt_neu_angelegt", name); } catch (e) { }
+  try {
+    localStorage.setItem("kt_neu_angelegt", name);
+    if (r.ohneMail) localStorage.setItem("kt_neu_ohne_mail", "1");
+  } catch (e) { }
   location.reload();
 }
 
@@ -122,7 +131,10 @@ function begruessungZeigen() {
     if (name) localStorage.removeItem("kt_neu_angelegt");
   } catch (e) { return; }
   if (!name) return;
+  let ohne = false;
+  try { ohne = localStorage.getItem("kt_neu_ohne_mail") === "1"; localStorage.removeItem("kt_neu_ohne_mail"); } catch (e) { }
   meldungM("<b>&#9989; Dein Konto ist angelegt, " + textSicherM(name) + ".</b> " +
+    (ohne ? "<b>Ohne E-Mail:</b> merk dir dein Passwort gut - ohne E-Mail kann es niemand zurücksetzen. " : "") +
     "Du bist gleich angemeldet - du musst dich nicht noch einmal einloggen. " +
     "Als Nächstes am besten oben auf die Glocke tippen und die Benachrichtigungen " +
     "einschalten, damit du Nachrichten und Anrufe auch dann bekommst, wenn die App zu ist.",
@@ -237,6 +249,8 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   <span id="bc-vorschau"></span>
 </div>
 </div>
+
+<div id="blk_profil" class="mb-block"></div>
 
 <div id="blk_pruefen" class="mb-block">
 <h2>&#128269; Nachrechnen</h2>
@@ -369,6 +383,7 @@ async function tuPushEinschalten() {
 // vom 26.08.). Der zuletzt offene Block wird gemerkt.
 
 const MB_BLOECKE = [
+  ["profil", "&#128100; Mein Profil"],
   ["kombis", "&#127919; Kombinationen und Personen"],
   ["buch", "&#128210; Buchhaltung"],
   ["freunde", "&#128101; Freunde und Teilen"],
@@ -383,6 +398,15 @@ function mbAktiverBlock() {
 
 function mbBlockZeigen(kurz) {
   localStorage.setItem("kt_mb_block", kurz);
+  // Der Profil-Block wird erst beim Aufmachen gebaut und gefuellt -
+  // so kostet er nichts, solange ihn niemand ansieht.
+  if (kurz === "profil") {
+    const b = el("blk_profil");
+    if (b && typeof profilBlockHtml === "function") {
+      if (!b.dataset.gebaut) { b.innerHTML = profilBlockHtml(); b.dataset.gebaut = "1"; }
+      if (typeof profilBlockFuellen === "function") profilBlockFuellen();
+    }
+  }
   for (const [k] of MB_BLOECKE) {
     const blk = el("blk_" + k);
     if (blk) blk.classList.toggle("offen", k === kurz);

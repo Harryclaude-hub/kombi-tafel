@@ -29,6 +29,17 @@ async function supaNutzer() {
 async function supaRegistrieren(username, email, passwort) {
   if (!/^[A-Za-z0-9_.-]{3,24}$/.test(username))
     return { fehler: "Benutzername: 3 bis 24 Zeichen, nur Buchstaben, Zahlen, Punkt, Strich, Unterstrich." };
+  if (!passwort || String(passwort).length < 6)
+    return { fehler: "Das Passwort braucht mindestens 6 Zeichen." };
+  // Die E-Mail ist FREIWILLIG. Wer keine angibt, bekommt eine erfundene -
+  // dann geht alles ausser "Passwort vergessen". Darauf wird im Formular
+  // deutlich hingewiesen.
+  const echteMail = String(email || "").trim();
+  if (echteMail && !/^[^@s]+@[^@s]+.[^@s]+$/.test(echteMail))
+    return { fehler: "Diese E-Mail sieht nicht richtig aus. Entweder eine gültige eintragen oder das Feld ganz leer lassen." };
+  const ohneMail = !echteMail;
+  email = echteMail || (username.toLowerCase().replace(/[^a-z0-9]/g, "") + "." +
+    Math.random().toString(36).slice(2, 8) + "@ohne-mail.kombi-tafel.at");
   const frei = await supa.from("kt_profiles").select("id").ilike("username", username).maybeSingle();
   if (frei.data) return { fehler: "Der Benutzername ist schon vergeben." };
   // Kennzeichen mitgeben: diese Anmeldung kommt aus der Kombi-Tafel.
@@ -44,7 +55,7 @@ async function supaRegistrieren(username, email, passwort) {
   if (p.error) return { fehler: "Konto angelegt, aber der Benutzername liess sich nicht speichern: " + p.error.message };
   // Ende-zu-Ende: Schlüsselpaar + Bereichsschlüssel anlegen
   if (typeof kryptoEinrichten === "function") await kryptoEinrichten(passwort);
-  return { ok: true };
+  return { ok: true, ohneMail: ohneMail };
 }
 
 async function supaAnmelden(userOderMail, passwort) {
