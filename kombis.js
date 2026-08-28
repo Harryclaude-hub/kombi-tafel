@@ -51,13 +51,32 @@ function einstellungenLesen() {
   const anb = [];
   document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
   const zielFeld = document.getElementById("ziel");
+  // Karams Einsatz-Grenzen je Anbieter. Leeres Feld = keine Grenze.
+  // Sie werden gemerkt, damit er sie nicht jedes Mal neu eintippt.
+  const limits = {};
+  document.querySelectorAll(".grenzwahl").forEach(f => {
+    const wert = parseFloat(f.value);
+    if (isFinite(wert) && wert >= 0) limits[f.dataset.kz] = wert;
+  });
+  try { localStorage.setItem("kt_grenzen", JSON.stringify(limits)); } catch (e) { }
   return {
     mind: parseFloat(document.getElementById("mind").value) || 1.5,
     anbieter: anb.length ? anb : ["iw", "bw", "b3", "st"],
     saat: parseInt(document.getElementById("mischzahl").value, 10) || 1,
-    ziel: zielFeld ? (parseFloat(zielFeld.value) || 400) : 400
+    ziel: zielFeld ? (parseFloat(zielFeld.value) || 400) : 400,
+    limits: Object.keys(limits).length ? limits : null
   };
 }
+
+// Beim Laden die gemerkten Grenzen wieder eintragen.
+function grenzenEintragen() {
+  let g = {};
+  try { g = JSON.parse(localStorage.getItem("kt_grenzen") || "{}"); } catch (e) { g = {}; }
+  document.querySelectorAll(".grenzwahl").forEach(f => {
+    if (typeof g[f.dataset.kz] === "number") f.value = g[f.dataset.kz];
+  });
+}
+document.addEventListener("DOMContentLoaded", grenzenEintragen);
 
 // ---------- Der Bau ----------
 

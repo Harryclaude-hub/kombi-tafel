@@ -228,22 +228,33 @@ async function pushEinschalten(still) {
         "starten und hier noch einmal einschalten." };
     if (!("Notification" in window) || !("serviceWorker" in navigator))
       return { fehler: "Dieser Browser kann keine Benachrichtigungen." };
-    // 1. ZUERST die Anmeldung pruefen. Frueher stand das NACH dem Abonnieren:
-    //    dann lag eine Anmeldung im Browser, die nirgends ankam, und die
-    //    Anzeige meldete trotzdem fuer immer "an".
-    const u = await supaNutzer();
-    if (!u) return { fehler: "Zuerst anmelden - Benachrichtigungen gehoeren zu deinem Konto." };
-    // 2. Dann erst fragen.
+
+    // 1. ZUERST fragen - und zwar OHNE vorher irgendetwas abzuwarten.
+    //    Auf dem iPhone zeigt Safari die Frage nur, wenn sie unmittelbar
+    //    aus dem Fingertipp kommt. Stand hier vorher ein "await" (die
+    //    Anmelde-Pruefung), war der Tipp verbraucht und Apple hat die
+    //    Frage stillschweigend verschluckt: der Knopf tat scheinbar nichts.
+    //    Das blosse Fragen legt noch NICHTS an, also entsteht auch kein
+    //    halber Zustand, wenn danach etwas schiefgeht.
     let erlaubnis = Notification.permission;
     if (erlaubnis === "denied")
-      return { fehler: "Dieser Browser hat Benachrichtigungen fuer die Seite gesperrt. " +
-        "Das laesst sich nur in den Browser-Einstellungen der Seite wieder erlauben (Schloss-Zeichen neben der Adresse)." };
+      return { fehler: pushIstApple()
+        ? "Das iPhone hat Benachrichtigungen für diese App gesperrt. Wieder einschalten: " +
+          "Einstellungen (das graue Zahnrad) öffnen, ganz unten die Kombi-Tafel suchen, " +
+          "antippen und Mitteilungen erlauben."
+        : "Dieser Browser hat Benachrichtigungen für die Seite gesperrt. Wieder erlauben " +
+          "geht nur dort: auf das Schloss-Zeichen links neben der Adresse tippen." };
     if (erlaubnis !== "granted") {
       if (still) return { fehler: "noch nicht erlaubt" };
       erlaubnis = await Notification.requestPermission();
     }
     if (erlaubnis !== "granted")
       return { fehler: "Benachrichtigungen wurden nicht erlaubt." };
+
+    // 2. Erst JETZT die Anmeldung pruefen - vor dem Abonnieren, damit kein
+    //    Abo entsteht, das in der Datenbank nie ankommt.
+    const u = await supaNutzer();
+    if (!u) return { fehler: "Zuerst anmelden - Benachrichtigungen gehören zu deinem Konto." };
     const reg = await wkRegistrierung(8000);
     if (!reg || !reg.pushManager) return { ok: true, nurLokal: true };
     // 3. Vorhandene Anmeldung wiederverwenden, sonst eine neue anlegen.
@@ -416,6 +427,9 @@ function pushIstIos() {
 }
 
 function pushIosOhneApp() { return pushIstIos() && !weckerIstStandalone(); }
+
+// Fuer Hilfetexte: auf dem iPhone stehen die Schalter woanders als am Rechner.
+function pushIstApple() { return pushIstIos(); }
 
 // ---------- Der kleine Meldebalken (statt stiller Fehlschlaege) ----------
 

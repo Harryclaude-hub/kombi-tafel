@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="logo-180.png">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260828h">
+<link rel="stylesheet" href="stil.css?v=20260828i">
 </head>
 <body data-seite="bau">
 
@@ -49,8 +49,20 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
     <label><input type="checkbox" class="anbwahl" value="bw" checked> Bwin</label>
     <label><input type="checkbox" class="anbwahl" value="b3" checked> Bet365</label>
     <label><input type="checkbox" class="anbwahl" value="st" checked> Stake</label>
-    <span class="mini">Nur angehakte Anbieter kommen in Frage. Ein Schein liegt immer komplett bei einem.
-    <b>Bet365 ist die letzte Option:</b> es bekommt beim Verteilen nur Wetten, die sonst nirgends laufen. Von Hand umstellen geht immer.</span>
+    <span class="mini">Nur angehakte Anbieter kommen in Frage.
+    <b>Reihenfolge:</b> zuerst Stake, dann Interwetten, dann Bwin (= Sportingbet), zuletzt Bet365.
+    Sie wird eingehalten, wo es geht - kostet aber nie eine Kombination.</span>
+  </span>
+</div>
+<div class="filterzeile">
+  <span class="f-label">Einsatz-Grenzen</span>
+  <span class="f-knoepfe">
+    <label>Stake <input type="number" class="grenzwahl" data-kz="st" min="0" step="10" style="width:72px"> &euro;</label>
+    <label>Interwetten <input type="number" class="grenzwahl" data-kz="iw" min="0" step="10" style="width:72px"> &euro;</label>
+    <label>Bwin <input type="number" class="grenzwahl" data-kz="bw" min="0" step="10" style="width:72px"> &euro;</label>
+    <label>Bet365 <input type="number" class="grenzwahl" data-kz="b3" min="0" step="10" style="width:72px"> &euro;</label>
+    <span class="mini">Wie viel nimmt dieser Anbieter je Kombination hoechstens an? Leer = keine Grenze.
+    Ist die Grenze erreicht, wandert der Rest automatisch zum naechsten in der Reihenfolge.</span>
   </span>
 </div>
 <div class="filterzeile">
@@ -108,20 +120,20 @@ Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der Ap
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="scheinlesen.js?v=20260828h"></script>
-<script src="krypto.js?v=20260828h"></script>
-<script src="medien.js?v=20260828h"></script>
-<script src="anruf.js?v=20260828h"></script>
-<script src="supa.js?v=20260828h"></script>
-<script src="benachrichtigung.js?v=20260828h"></script>
-<script src="satzdaten.js?v=20260828h"></script>
-<script src="glocke.js?v=20260828h"></script>
-<script src="daten.js?v=20260828h"></script>
-<script src="roh.js?v=20260828h"></script>
-<script src="recherche.js?v=20260828h"></script>
-<script src="logik.js?v=20260828h"></script>
-<script src="verteiler.js?v=20260828h"></script>
-<script src="kombis.js?v=20260828h"></script>
-<script src="ausschnitt.js?v=20260828h"></script>
+<script src="scheinlesen.js?v=20260828i"></script>
+<script src="krypto.js?v=20260828i"></script>
+<script src="medien.js?v=20260828i"></script>
+<script src="anruf.js?v=20260828i"></script>
+<script src="supa.js?v=20260828i"></script>
+<script src="benachrichtigung.js?v=20260828i"></script>
+<script src="satzdaten.js?v=20260828i"></script>
+<script src="glocke.js?v=20260828i"></script>
+<script src="daten.js?v=20260828i"></script>
+<script src="roh.js?v=20260828i"></script>
+<script src="recherche.js?v=20260828i"></script>
+<script src="logik.js?v=20260828i"></script>
+<script src="verteiler.js?v=20260828i"></script>
+<script src="kombis.js?v=20260828i"></script>
+<script src="ausschnitt.js?v=20260828i"></script>
 </body>
 </html>

@@ -79,7 +79,16 @@
 var GEBUEHREN_TEILER = { iw: 1.05, bw: 1.00, b3: 1.00, st: 1.00 };
 
 var ALLE_ANBIETER = ["iw", "bw", "b3", "st"];
-var LETZTE_WAHL = "b3";          // R6
+var LETZTE_WAHL = "b3";
+// KARAMS RANGFOLGE (28.08.): Stake zuerst, dann Interwetten, dann Bwin
+// (bzw. Sportingbet - dasselbe Haus), Bet365 ganz zuletzt.
+// Kleinere Zahl = lieber. Das ist ein WUNSCH, keine Pflicht: bringt ein
+// bevorzugter Anbieter keinen Dreier zustande, gewinnt trotzdem der, der
+// einen zustande bringt. Kein einziger Dreier geht dafuer verloren.
+var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3 };
+function anbRang(kz) {
+  return Object.prototype.hasOwnProperty.call(ANBIETER_RANG, kz) ? ANBIETER_RANG[kz] : 2;
+}          // R6
 
 var RANG_BELEGT = 0;
 var RANG_GESCHAETZT = 1;
@@ -127,9 +136,9 @@ function reihenfolgeAnbieter(liste) {
     raus.push(kz);
   }
   raus.sort(function (a, b) {
-    var la = a === LETZTE_WAHL ? 1 : 0;
-    var lb = b === LETZTE_WAHL ? 1 : 0;
-    if (la !== lb) return la - lb;
+    // Nach Karams Rangfolge, nicht nach der Reihenfolge der Kaestchen.
+    var ra = anbRang(a), rb = anbRang(b);
+    if (ra !== rb) return ra - rb;
     return quelle.indexOf(a) - quelle.indexOf(b);
   });
   return raus;
@@ -329,7 +338,7 @@ function verteile(eingabe) {
         kz: kz,
         rang: schlechtester,
         quote: produkt,
-        istB3: kz === LETZTE_WAHL ? 1 : 0,
+        rangAnb: anbRang(kz),
         eigen: kz === kb.gebautBei ? 0 : 1,
         platz: ai
       });
@@ -340,7 +349,7 @@ function verteile(eingabe) {
     // Dreier gebaut wurde, danach die hoehere Gesamtquote.
     kandidaten.sort(function (x, y) {
       if (x.rang !== y.rang) return x.rang - y.rang;
-      if (x.istB3 !== y.istB3) return x.istB3 - y.istB3;
+      if (x.rangAnb !== y.rangAnb) return x.rangAnb - y.rangAnb;
       if (x.eigen !== y.eigen) return x.eigen - y.eigen;
       if (y.quote !== x.quote) return y.quote - x.quote;
       return x.platz - y.platz;
@@ -750,6 +759,15 @@ var GEBUEHREN_TEILER = { iw: 1.05, bw: 1, b3: 1, st: 1 };
 
 // Regel R6: Bet365 ist die letzte Wahl.
 var LETZTE_WAHL = "b3";
+// KARAMS RANGFOLGE (28.08.): Stake zuerst, dann Interwetten, dann Bwin
+// (bzw. Sportingbet - dasselbe Haus), Bet365 ganz zuletzt.
+// Kleinere Zahl = lieber. Das ist ein WUNSCH, keine Pflicht: bringt ein
+// bevorzugter Anbieter keinen Dreier zustande, gewinnt trotzdem der, der
+// einen zustande bringt. Kein einziger Dreier geht dafuer verloren.
+var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3 };
+function anbRang(kz) {
+  return Object.prototype.hasOwnProperty.call(ANBIETER_RANG, kz) ? ANBIETER_RANG[kz] : 2;
+}
 
 // Guete einer Wette bei einem Anbieter. Hoeher ist besser.
 // 4    eigene Quote eingetippt oder Screenshot  -> BELEGT, ein Beweis
@@ -831,6 +849,8 @@ function bereiteVor(eingabe) {
     ziel: ziel,
     maxNutzung: maxNutzung,
     saat: saat,
+    // Karams Einsatz-Grenzen je Anbieter (leer = keine Grenze)
+    grenzen: (einstRoh.limits && typeof einstRoh.limits === "object") ? einstRoh.limits : null,
     spielNr: [],      // Zahl statt Text, damit der Vergleich schnell ist
     maske: [],        // Bitmaske: bei welchen Anbietern ist R5 erfuellt
     echt: [],         // echte Quote je Anbieter (nach Gebuehr)
@@ -1050,14 +1070,14 @@ function teileFuer(trip, v) {
       kz: v.anbieter[a],
       stufe: st,
       rang: rangVon(st),
-      spaet: v.anbieter[a] === LETZTE_WAHL ? 1 : 0,
+      spaet: anbRang(v.anbieter[a]),
       quote: quote
     });
   }
 
   kandidaten.sort(function (x, y) {
     if (y.rang !== x.rang) return y.rang - x.rang;        // belegt zuerst
-    if (x.spaet !== y.spaet) return x.spaet - y.spaet;    // R6: Bet365 hinten
+    if (x.spaet !== y.spaet) return x.spaet - y.spaet;    // Karams Rangfolge
     if (y.quote !== x.quote) return y.quote - x.quote;    // dann hoehere Quote
     return x.kz < y.kz ? -1 : (x.kz > y.kz ? 1 : 0);      // fester Tiebreak
   });
@@ -1066,7 +1086,12 @@ function teileFuer(trip, v) {
   var rest = v.ziel;
   for (var f = 0; f < kandidaten.length && rest > 0.5; f++) {
     var k = kandidaten[f];
-    var nehmen = Math.min(rest, deckelFuer(k.stufe, v.ziel));
+    // Karams Einsatz-Grenze je Anbieter: mehr als das nimmt er dort nicht
+    // an. Ohne Angabe gilt keine Grenze.
+    var grenze = (v.grenzen && typeof v.grenzen[k.kz] === "number" && isFinite(v.grenzen[k.kz]))
+      ? v.grenzen[k.kz] : Infinity;
+    if (grenze <= 0) continue;
+    var nehmen = Math.min(rest, deckelFuer(k.stufe, v.ziel), grenze);
     if (nehmen <= 0) continue;
     teile.push({
       kz: k.kz,
@@ -1098,7 +1123,11 @@ function eineLoesung(v, lauf) {
   for (var a = 0; a < v.anbieter.length; a++) {
     if (v.anbieter[a] === LETZTE_WAHL) zuletzt.push(a); else normal.push(a);
   }
+  // Erster Lauf: streng nach Karams Rangfolge. Spaetere Laeufe mischen,
+  // damit die Suche auch andere Aufteilungen findet - genau Karams Satz
+  // "wenn die Moeglichkeit nicht da ist, dann lass es ganz random sein".
   if (lauf > 0) mischeListe(normal, wuerfel);
+  else normal.sort(function (x, y) { return anbRang(v.anbieter[x]) - anbRang(v.anbieter[y]); });
   var anbieterFolge = normal.concat(zuletzt);
 
   // Drei Wellen: erst nur Belegtes, dann Geschaetztes, dann alles.
