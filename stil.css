@@ -1295,3 +1295,473 @@ body[data-seite] h3, body[data-seite] h4 {
   border: 1px solid #ccd; border-radius: 5px; font-size: 13px; }
 .scankasten textarea { width: 100%; font-family: monospace; font-size: 12.5px;
   margin-top: 4px; padding: 6px; border: 1px solid #888; border-radius: 5px; }
+
+/* ============================================================
+   HANDY-SCHICHT 28.08. ("Alles wird zur Karte")
+
+   Reine Optik. Dieser Block wird ans ENDE von stil.css
+   angehaengt. Loescht man ihn wieder, sieht alles aus wie
+   vorher und laeuft unveraendert weiter. Kein !important,
+   keine geaenderte Bedeutungsfarbe, kein Eingriff in eine
+   Rechnung.
+
+   AM RECHNER AENDERT SICH NICHTS.
+   Jede einzelne Regel in dieser Schicht steht in
+   @media (max-width: 700px). Ein Bildschirm ab 701 Pixel
+   Breite sieht diesen Block gar nicht.
+
+   WOFUER DAS HANDY DA IST (Karams Rangfolge):
+     1. Schreiben mit Freunden
+     2. Berichte und deren Fotos anschauen
+     3. einzelne Kombinationen anschauen
+     4. NICHT die vollen Tafeln, NICHT setzen, NICHT bauen
+
+   DESHALB:
+     - Der Chat wird Vollbild statt Briefmarke.
+     - Die Kombinationen werden Karten statt Tabellenzeilen.
+     - Fotos werden gross und lassen sich antippen.
+     - Die Kopfleiste schrumpft auf EINE Zeile zum Schieben,
+       mit den Schreib-Knoepfen ganz vorne.
+     - Die grossen Tafeln bekommen einen ehrlichen Hinweis
+       und lassen sich seitlich schieben, statt gequetscht
+       zu werden.
+
+   BEDEUTUNGSFARBEN: unangetastet. Gruen (bester Wert,
+   gewonnen), rot (Interwetten-Abzug, vorbei, verloren,
+   Warnung) und braun-orange (duenner Markt, aus Foto,
+   offen, fertig) kommen in dieser Schicht als Farbwert
+   NICHT EIN EINZIGES MAL vor. Innerhalb von tbody wird
+   keine Farbe angefasst; die Kombinationen werden dort nur
+   umgestapelt, ihre Zeilenfarben bleiben, wie sie sind.
+   Die vier Sonderknoepfe (Glocke gruen, Admin dunkelrot,
+   App laden gruen, Update rot blinkend) und der Wecker
+   behalten ihre Signalfarbe: hier wird nur ihre GROESSE
+   und ihre REIHENFOLGE geaendert.
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+/* ---- 1. Grundlage: iPhone-Raender und Daumen-Mass ----
+   env(safe-area-inset-*) haelt den Inhalt aus der Rundung und
+   aus dem Balken unten heraus, wenn die App vom Homebildschirm
+   startet. Ein Browser, der max() oder env() nicht kennt, nimmt
+   einfach die 8 Pixel aus der Zeile davor. */
+body {
+  margin: 8px;
+  margin-left: max(8px, env(safe-area-inset-left));
+  margin-right: max(8px, env(safe-area-inset-right));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Apple nennt 44 Pixel als kleinstes Tippziel. Das gilt hier fuer
+   alles, was man wirklich trifft. Ausgenommen sind nur die
+   Winzlinge, die IN einer Tabellenzelle sitzen und die Zeile
+   sonst auseinanderreissen wuerden. */
+button,
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select, textarea {
+  min-height: 44px;
+}
+/* 16 Pixel Schrift ist die Grenze, unter der iOS beim Antippen
+   ungefragt hineinzoomt. Darum tippt man hier nie unter 16. */
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  font-size: 16px;
+}
+/* Einzige Ausnahme: der Kopier-Knopf in der Anbieter-Zelle der grossen
+   Tafel. Der sitzt zu dritt in einer Tabellenzeile und wuerde die
+   ganze Tafel auseinanderreissen. */
+td.anbieter button.kopier, .hilf {
+  min-height: 0;
+}
+label.fotoknopf, .medienleiste .fotoknopf {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 6px 14px;
+}
+/* Auch die Knoepfe, die AUSSERHALB der Kopfleiste stehen (zum Beispiel
+   der Admin-Knopf in der Konto-Zeile von Mein Bereich). */
+a.navknopf {
+  display: inline-flex; align-items: center; min-height: 44px;
+}
+/* Haekchen und Punkte bekommen keine 44 Pixel Hoehe verpasst - dann
+   waere das Kaestchen ein Rechteck. Stattdessen wird das Kaestchen
+   selbst groesser und die Beschriftung drumherum wird zur Tippflaeche
+   (in kombis.html und in der Kassen-Auswahl steckt das Kaestchen
+   ohnehin im label). */
+input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+.filterzeile label, .kassewahl label {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
+}
+
+/* ---- 2. Die Kopfleiste: aus neun Reihen wird EINE Zeile ----
+   Sie bleibt oben kleben, damit der Nachrichten-Knopf immer da
+   ist, und laesst sich mit dem Daumen seitlich schieben. Die
+   Reihenfolge wird umgestellt: was man am Handy braucht, steht
+   vorne. Kein Knopf verschwindet, keiner wird versteckt. */
+body[data-seite] > .navleiste {
+  position: sticky; top: 0; z-index: 45;
+  flex-wrap: nowrap;
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 5px;
+  margin: 0 -8px 8px -8px;
+  padding: 5px 8px;
+  background-color: color-mix(in srgb, var(--kennhell, #ffffff) 55%, #fff);
+}
+body[data-seite] > .navleiste::-webkit-scrollbar { display: none; }
+/* Das Logo kostet am Handy 44 Pixel Breite und sagt nichts, was
+   die Ueberschrift nicht schon sagt. */
+body[data-seite] > .navleiste .logo { display: none; }
+body[data-seite] > .navleiste a.navknopf {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center;
+  min-height: 44px;
+  padding: 6px 13px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+/* Reihenfolge am Handy. Alles ohne eigene Nummer landet hinten. */
+body[data-seite] > .navleiste a.navknopf { order: 20; }
+body[data-seite] > .navleiste a.navknopf.updateknopf  { order: 1; }
+body[data-seite] > .navleiste a.navknopf#nav_nachrichten { order: 2; }
+body[data-seite] > .navleiste a.navknopf#nav_freunde     { order: 3; }
+body[data-seite] > .navleiste a.navknopf.weckerknopf     { order: 4; }
+body[data-seite] > .navleiste a.navknopf[href="mein.html"]:not(.glocke) { order: 5; }
+body[data-seite] > .navleiste a.navknopf.installknopf { order: 6; }
+body[data-seite] > .navleiste a.navknopf.adminknopf   { order: 7; }
+/* Der Nachrichten-Knopf ist der wichtigste der Seite: er wird
+   breiter und traegt seine Zahl gut sichtbar. */
+body[data-seite] > .navleiste a.navknopf#nav_nachrichten { font-size: 19px; padding: 6px 15px; }
+body[data-seite] > .navleiste a.navknopf#nav_nachrichten .badge {
+  font-size: 12px; min-width: 20px; padding: 1px 6px;
+}
+/* "margin-left:auto" schob den Nachrichten-Knopf am Rechner ganz
+   nach rechts. In einer Schiebe-Zeile wuerde das eine Luecke von
+   mehreren hundert Pixeln aufreissen. */
+.navleiste a.glocke { margin-left: 0; }
+
+/* Die zweite Leiste in Mein Bereich (die Bereiche der Freunde)
+   wird genauso zu einer Schiebe-Zeile - aber ohne zu kleben,
+   sonst haetten wir zwei Balken uebereinander. */
+#bereichtabs.navleiste {
+  flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; gap: 5px;
+}
+#bereichtabs.navleiste::-webkit-scrollbar { display: none; }
+#bereichtabs a.navknopf {
+  flex: 0 0 auto; display: inline-flex; align-items: center;
+  min-height: 44px; padding: 6px 13px; font-size: 14px; white-space: nowrap;
+}
+/* Die Reiter von Mein Bereich kleben am Rechner oben. Am Handy
+   waere das der zweite Balken; hier laufen sie einfach mit. */
+.mb-navi { position: static; }
+.mb-navi button { font-size: 14px; padding: 9px 13px; min-height: 44px; }
+
+/* ---- 3. Der Kopf der Seite: kleiner, damit unten mehr bleibt ---- */
+h1 { font-size: 21px; padding-bottom: 3px; margin-bottom: 4px; }
+body[data-seite] > h1::before {
+  font-size: 11px; padding: 2px 8px 2px 6px; margin: 0 7px 0 0;
+  letter-spacing: 0.04em;
+}
+.unter { font-size: 13.5px; margin-bottom: 6px; }
+
+/* ============================================================
+   4. SCHREIBEN: der Chat wird Vollbild.
+   Das ist der Hauptzweck am Handy. Aus dem schwebenden
+   Kaestchen oben rechts wird eine richtige Messenger-Ansicht
+   ueber den ganzen Schirm: Kopf oben, Verlauf in der Mitte,
+   Eingabe unten.
+   100dvh statt 100vh: auf dem iPhone rechnet 100vh die
+   Adressleiste NICHT mit, dann steht das Eingabefeld unter
+   dem Bildschirmrand. Die 100vh-Zeile davor ist nur der
+   Ersatz fuer alte Browser, die dvh nicht kennen.
+   ============================================================ */
+#glockenpanel, #freundepanel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  width: auto; max-width: none;
+  height: 100vh; height: 100dvh;
+  max-height: none;
+  margin: 0; padding: 0;
+  border: none; border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  z-index: 1000;
+}
+#glockenpanel .gp-kopf, #freundepanel .gp-kopf {
+  flex: 0 0 auto;
+  border-radius: 0;
+  font-size: 17px;
+  padding: 12px 12px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+}
+#glockenpanel .gp-zu, #freundepanel .gp-zu {
+  min-height: 44px; padding: 8px 14px; font-size: 14px;
+}
+/* Der Inhalt fuellt den Rest und ist selbst wieder eine Spalte:
+   nur die Nachrichtenliste darin waechst mit. min-height:0 ist
+   noetig, sonst weigert sich ein Flex-Kasten zu schrumpfen und
+   die Eingabe rutscht unten hinaus. */
+#gp-inhalt, #fp-inhalt {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: 8px 10px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+#gp-inhalt > *, #fp-inhalt > * { flex: 0 0 auto; }
+#gp-inhalt > .gp-zurueck { align-self: flex-start; min-height: 44px; padding: 8px 16px; font-size: 15px; }
+#gp-liste, .gp-liste, #glockenpanel .chatliste {
+  flex: 1 1 auto; min-height: 120px; max-height: none;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+}
+/* Die Freundes-Knoepfe in der Nachrichtenliste sind jetzt
+   richtige Zeilen zum Antippen. */
+.gp-freund { min-height: 52px; font-size: 16px; padding: 10px 12px; margin: 5px 0; }
+
+/* Sprechblasen statt Zeilen. Die Farben bleiben: eigene gruen,
+   fremde in der Kennfarbe der Seite - nur die Form aendert sich. */
+.chatzeile { font-size: 15px; padding: 8px 11px; margin: 7px 0; border-radius: 10px; }
+.chatzeile.vonmir { margin-left: 14%; }
+.chatzeile:not(.vonmir) { margin-right: 14%; }
+
+/* Die Eingabezeile klebt unten am Rand des Vollbilds. */
+#glockenpanel .chateingabe, #glockenpanel .medienleiste { flex: 0 0 auto; }
+.chateingabe { gap: 7px; margin-top: 7px; }
+.chateingabe input { font-size: 16px; min-height: 46px; padding: 8px 11px; }
+.chateingabe button { min-height: 46px; padding: 8px 16px; font-size: 15px; }
+.medienleiste { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.medienleiste button, .medienleiste .fotoknopf { margin-right: 0; font-size: 14px; }
+/* Im Vollbild-Chat stehen Datei, Sprachnachricht, Video und die zwei
+   Anruf-Knoepfe in EINER Zeile zum Schieben. Umgebrochen waeren das
+   auf einem kleinen iPhone drei Zeilen, die dem Gespraech selbst
+   ueber 90 Pixel wegnehmen. */
+#glockenpanel .medienleiste {
+  flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding-bottom: 2px;
+}
+#glockenpanel .medienleiste::-webkit-scrollbar { display: none; }
+#glockenpanel .medienleiste > * { flex: 0 0 auto; white-space: nowrap; }
+
+/* Der Anruf gehoert am Handy unten hin, in voller Breite. */
+#anrufpanel {
+  left: 6px; right: 6px; bottom: 6px; width: auto; max-width: none;
+  bottom: calc(6px + env(safe-area-inset-bottom));
+  /* MUSS ueber dem Vollbild-Chat liegen (der hat 1000). Aus stil.css
+     kaeme nur 80 - dann waere waehrend eines Gespraechs der Knopf
+     "Auflegen" hinter dem Chat verschwunden. */
+  z-index: 1100;
+}
+#anrufpanel button { min-height: 44px; }
+/* Der Schalt-Kasten der Benachrichtigungen zieht mit (die
+   Wecker-Schicht macht das ab 480 Pixel, hier ab 700). */
+#weckerpanel { top: 62px; right: 6px; left: 6px; width: auto; }
+/* Beide gehoeren am Handy nach OBEN. Unten liegt im Vollbild-Chat das
+   Schreibfeld, und ihr z-index (9600 und 9500) ist hoeher als der des
+   Chats - sie wuerden das Tippen unmoeglich machen. Das gilt ohne jedes
+   JavaScript, also auch wenn handy.js gar nicht laeuft. */
+#weckerbalken {
+  left: 6px; right: 6px; transform: none; width: auto; max-width: none;
+  top: calc(8px + env(safe-area-inset-top)); bottom: auto;
+}
+#weckerfrage {
+  left: 6px; right: 6px; transform: none; width: auto; max-width: none;
+  top: calc(8px + env(safe-area-inset-top)); bottom: auto;
+}
+
+/* ============================================================
+   5. NACHSCHAUEN: aus jeder Kombination wird eine Karte.
+   Nur die Kombinations-Liste in Mein Bereich (#scheine_db)
+   wird umgebaut - genau das, was Karam am Handy anschaut.
+   Die Tabelle bleibt eine Tabelle im HTML, sie wird nur
+   anders gestapelt. Keine einzige Farbe aendert sich dabei:
+   das Zebra-Grau, das Orange der fertigen Zeilen und das
+   Gelb der Zeilen ohne Person bleiben genau, wie sie sind.
+   ============================================================ */
+#scheine_db table, #scheine_db thead, #scheine_db tbody,
+#scheine_db tr, #scheine_db td { display: block; width: auto; }
+#scheine_db thead { display: none; }
+#scheine_db table { border-collapse: separate; border-spacing: 0; }
+#scheine_db tr {
+  border: 1px solid #999; border-radius: 11px;
+  margin: 0 0 12px 0; padding: 2px 0; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 25, 40, 0.08), 0 3px 12px rgba(15, 25, 40, 0.07);
+}
+#scheine_db td {
+  border: none; border-top: 1px solid rgba(0, 0, 0, 0.09);
+  padding: 8px 12px; font-size: 14.5px;
+}
+#scheine_db tr > td:first-child { border-top: none; }
+/* Die Spaltenueberschrift steht jetzt VOR dem Wert in der Zeile.
+   Die Reihenfolge ist die aus zeichneScheineDb in mein.js:
+   Wann, Anbieter, Person, Wetten, Quote, Einsatz, Moeglich,
+   Wirklich bekommen, Stand, Notiz, Knoepfe. */
+#scheine_db tbody td::before {
+  display: block;
+  font-size: 10.5px; font-weight: bold; letter-spacing: 0.06em;
+  text-transform: uppercase; opacity: 0.6;
+  margin-bottom: 2px;
+}
+#scheine_db tbody td:nth-child(1)::before { content: "Wann"; }
+#scheine_db tbody td:nth-child(2)::before { content: "Anbieter"; }
+#scheine_db tbody td:nth-child(3)::before { content: "Person"; }
+#scheine_db tbody td:nth-child(4)::before { content: "Wetten und Foto"; }
+#scheine_db tbody td:nth-child(5)::before { content: "Quote"; }
+#scheine_db tbody td:nth-child(6)::before { content: "Einsatz"; }
+#scheine_db tbody td:nth-child(7)::before { content: "Moeglich"; }
+#scheine_db tbody td:nth-child(8)::before { content: "Wirklich bekommen"; }
+#scheine_db tbody td:nth-child(9)::before { content: "Stand"; }
+#scheine_db tbody td:nth-child(10)::before { content: "Notiz"; }
+/* Die letzte Zelle sind nur Knoepfe, die brauchen keine Aufschrift. */
+#scheine_db tbody td:nth-child(11)::before { content: none; }
+#scheine_db tbody td:nth-child(11) { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Kurze Angaben stehen zu zweit nebeneinander statt jede auf einer
+   eigenen Zeile. Sonst waere eine einzige Kombination laenger als
+   zwei Bildschirme. Betroffen sind: Wann und Anbieter (1 und 2)
+   sowie Quote, Einsatz, Moeglich und Wirklich bekommen (5 bis 8). */
+#scheine_db tbody td:nth-child(1), #scheine_db tbody td:nth-child(2),
+#scheine_db tbody td:nth-child(5), #scheine_db tbody td:nth-child(6),
+#scheine_db tbody td:nth-child(7), #scheine_db tbody td:nth-child(8) {
+  display: inline-block; width: 50%; vertical-align: top;
+  border-top: 1px solid rgba(0, 0, 0, 0.09);
+}
+#scheine_db tbody td:nth-child(2) { border-left: 1px solid rgba(0, 0, 0, 0.09); }
+#scheine_db tbody td:nth-child(6), #scheine_db tbody td:nth-child(8) {
+  border-left: 1px solid rgba(0, 0, 0, 0.09);
+}
+/* Muss NACH der Zeile davor stehen: die oberste Zelle der Karte
+   bekommt sonst wieder einen Strich direkt unter die Rundung. */
+#scheine_db tbody tr > td:nth-child(1) { border-top: none; }
+/* Die Wetten sind der Kern der Karte: gross und mit Luft. */
+#scheine_db tbody td:nth-child(4) { font-size: 15.5px; line-height: 1.5; }
+#scheine_db tbody td:nth-child(4) .mini { font-size: 15.5px; }
+#scheine_db td select, #scheine_db td textarea { width: 100%; }
+#scheine_db td.notizzelle { min-width: 0; }
+#scheine_db textarea.notizfeld { min-height: 66px; font-size: 16px; }
+
+/* ---- 6. Fotos: gross und antippbar ----
+   Ein Bericht ohne sein Foto ist am Handy die Haelfte wert.
+   Die Handy-Schicht (handy.js) oeffnet jedes dieser Bilder auf
+   Antippen formatfuellend; hier steht nur, wie gross sie in der
+   Karte selbst sind. */
+img.minifoto, .s-foto img, .medienbild, .fotokachel img, .pd-vorschau {
+  max-width: 100%; width: 100%; height: auto; display: block;
+  margin-top: 6px; border-radius: 8px;
+}
+.medienvideo, #gp-vorschau video { max-width: 100%; width: 100%; }
+.fotokachel { max-width: 100%; }
+.fotogitter { display: block; }
+.fotoname { font-size: 14px; }
+/* Der Hinweis, dass da mehr kommt, wenn man tippt. */
+img.minifoto, .s-foto img, .medienbild { cursor: zoom-in; }
+
+/* ---- 7. Das Vollbild fuer ein Foto (gehoert zu handy.js) ---- */
+#handyfoto {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  z-index: 11000; background: rgba(10, 16, 30, 0.94);
+  display: flex; flex-direction: column;
+}
+#handyfoto .hf-kopf {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top));
+  color: #fff; background: #16233d; font-size: 14px;
+}
+#handyfoto .hf-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#handyfoto .hf-zu {
+  flex: 0 0 auto; min-height: 44px; padding: 8px 14px; font-size: 14px;
+  background: rgba(255, 255, 255, 0.14); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 8px;
+}
+#handyfoto .hf-flaeche {
+  flex: 1 1 auto; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch;
+  touch-action: pinch-zoom; display: flex; align-items: center; justify-content: center;
+  padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+#handyfoto .hf-flaeche img {
+  max-width: 100%; max-height: 100%; width: auto; height: auto;
+  border-radius: 6px; cursor: zoom-in;
+}
+#handyfoto.hf-gross .hf-flaeche { display: block; }
+#handyfoto.hf-gross .hf-flaeche img {
+  max-width: none; max-height: none; width: 250%; cursor: zoom-out;
+}
+#handyfoto .hf-fuss {
+  flex: 0 0 auto; color: #b9c6de; font-size: 12px; text-align: center;
+  padding: 0 12px 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+/* ============================================================
+   8. DIE GROSSEN TAFELN: ehrlich statt gequetscht.
+   Zwoelf Spalten auf 375 Pixel sind nicht lesbar, sondern nur
+   schmal. Deshalb bekommen die zwei grossen Tabellen am Handy
+   ihre echte Breite zurueck und lassen sich seitlich schieben -
+   und darueber steht, wo die volle Tafel wirklich hingehoert.
+   Die Seite selbst laeuft dabei NICHT ueber: geschoben wird
+   nur innerhalb des Kastens.
+   ============================================================ */
+/* Ohne neues div im HTML: die Tabelle selbst wird zum Schiebe-Kasten.
+   So bleibt die Schicht wirklich loeschbar - nimmt man den Block hier
+   weg, ist an den Seiten nichts zurueckgeblieben. */
+body[data-seite="tafel"] > table,
+body[data-seite="original"] > table {
+  display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(0, 0, 0, 0.18); border-radius: 9px;
+}
+body[data-seite="tafel"] > table { min-width: 0; }
+body[data-seite="original"] > table { min-width: 0; }
+body[data-seite="tafel"] #zaehler::before,
+body[data-seite="original"] #rohzaehler::before {
+  content: "Am Handy zum Nachschauen. Die volle Tafel zum Arbeiten steht am Rechner. Zum Lesen die Tabelle seitlich schieben.";
+  display: block;
+  margin: 6px 0; padding: 8px 11px;
+  border-left: 4px solid var(--kenn, #1a2c50);
+  background-color: var(--kennhell, #eef1f7);
+  color: var(--kenn, #1a2c50);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px; line-height: 1.45; font-weight: normal;
+}
+
+/* ---- 9. Der Rest der Bedienung: weniger Gedraenge ---- */
+.filterzeile { flex-wrap: wrap; gap: 5px; }
+.filterzeile .f-label { flex: 1 1 100%; padding-top: 0; }
+.filterzeile button { min-height: 44px; font-size: 14px; padding: 6px 12px; min-width: 0; }
+.auth { gap: 10px; }
+.auth-kasten { min-width: 0; flex: 1 1 100%; padding: 12px; }
+.auth-kasten input { max-width: none; }
+.buch-eingabe input, .buch-eingabe select { flex: 1 1 140px; }
+.persondaten-felder .pd-feld { max-width: none; }
+.ordnerknoepfe .ordnerknopf { min-height: 44px; display: inline-flex; align-items: center; }
+.anmk-neu input { width: 100%; }
+.anmk-neu { display: flex; gap: 7px; margin-top: 7px; }
+.anmk-zeile { padding: 8px 10px; }
+.anmk-tasten { margin-left: 0; display: inline-flex; gap: 7px; }
+.anmk-tasten button { margin-left: 0; font-size: 13px; padding: 6px 11px; }
+details.anmk summary { min-height: 44px; display: block; padding: 11px 0; }
+/* Breite Kaesten mit Tabellen drin duerfen schieben statt quetschen. */
+.tabellenrand, .scrollbox { -webkit-overflow-scrolling: touch; }
+
+}
+/* ============================================================
+   ENDE HANDY-SCHICHT 28.08.
+   ============================================================ */
+
+
+/* ============================================================
+   NACHTRAG (aus dem zweiten Entwurf uebernommen)
+   ============================================================ */
+@media (max-width: 700px) {
+  /* Die Fragezeichen in den Tabellenkoepfen: rund und gross genug
+     zum Treffen, ohne den Kopf zu sprengen. */
+  .hilf { width: 26px; height: 26px; line-height: 24px; font-size: 12px; }
+
+  /* Die uebrigen breiten Tabellen in Mein Bereich schieben in ihrem
+     eigenen Kasten, statt die ganze Seite quer laufen zu lassen.
+     #scheine_db steht bewusst NICHT dabei - das ist die Karte. */
+  #konto_db, #buchhaltung, #ordnerbilanz, #pruefbericht,
+  #personenkasse, #verlauf { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Beschriftungen in den Filterzeilen duerfen umbrechen, sonst ragt
+     der Kombi-Bau seitlich hinaus. */
+  .filterzeile label { white-space: normal; }
+}

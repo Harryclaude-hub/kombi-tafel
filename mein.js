@@ -771,6 +771,12 @@ function zeichneKontoDb(scheine) {
   el("konto_db").innerHTML = html;
 }
 
+// ACHTUNG bei Aenderungen an der Spaltenreihenfolge: am Handy stehen ueber
+// diesen Spalten Aufschriften (Wann, Anbieter, Person, Wetten, Quote,
+// Einsatz, Moeglich, Wirklich bekommen, Stand, Notiz). Sie haengen in
+// stil.css am Ende (Handy-Schicht, #scheine_db td:nth-child(n)) an genau
+// dieser Reihenfolge. Wer hier umsortiert, muss sie dort nachziehen -
+// sonst steht eine falsche Ueberschrift ueber einer richtigen Zahl.
 function zeichneScheineDb(scheine) {
   if (!scheine.length) { el("scheine_db").innerHTML = '<p class="mini">Noch keine Scheine hier. ' +
     'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" drücken.</p>'; return; }

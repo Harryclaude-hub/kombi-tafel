@@ -254,7 +254,11 @@ async function pushEinschalten(still) {
     // 2. Erst JETZT die Anmeldung pruefen - vor dem Abonnieren, damit kein
     //    Abo entsteht, das in der Datenbank nie ankommt.
     const u = await supaNutzer();
-    if (!u) return { fehler: "Zuerst anmelden - Benachrichtigungen gehören zu deinem Konto." };
+    if (!u) return { fehler: (pushIstIos() && weckerIstStandalone())
+      ? "Du musst dich HIER in der App noch einmal anmelden. Das iPhone hält die " +
+        "App vom Home-Bildschirm getrennt von Safari - deine Anmeldung aus Safari " +
+        "gilt hier nicht. Einmal anmelden, dann bleibt es."
+      : "Zuerst anmelden - Benachrichtigungen gehören zu deinem Konto." };
     const reg = await wkRegistrierung(8000);
     if (!reg || !reg.pushManager) return { ok: true, nurLokal: true };
     // 3. Vorhandene Anmeldung wiederverwenden, sonst eine neue anlegen.
@@ -349,9 +353,15 @@ function pushStatusText(st) {
   if (st === "halb") return "Fast: der Browser erlaubt es, aber dieses Geraet steht nicht in deinem Konto. " +
     "Ein Klick auf Einschalten repariert das.";
   if (st === "aus") return "Benachrichtigungen sind auf diesem Geraet aus.";
-  if (st === "gesperrt") return "Dieser Browser hat Benachrichtigungen fuer die Seite gesperrt. " +
-    "Das laesst sich nur dort wieder erlauben: auf das Schloss-Zeichen links neben der Adresse " +
-    "tippen und Benachrichtigungen auf Erlauben stellen.";
+  // Auf dem iPhone gibt es in der Home-Bildschirm-App gar keine Adressleiste
+  // und damit kein Schloss-Zeichen - dort steht der Schalter woanders.
+  if (st === "gesperrt") return pushIstIos()
+    ? "Das iPhone hat Mitteilungen fuer diese App gesperrt. Wieder einschalten: " +
+      "Einstellungen (graues Zahnrad) oeffnen, ganz nach unten zur Kombi-Tafel, " +
+      "antippen und Mitteilungen erlauben."
+    : "Dieser Browser hat Benachrichtigungen fuer die Seite gesperrt. " +
+      "Das laesst sich nur dort wieder erlauben: auf das Schloss-Zeichen links neben der Adresse " +
+      "tippen und Benachrichtigungen auf Erlauben stellen.";
   if (st === "anmelden") return "Zuerst anmelden - Benachrichtigungen gehoeren zu deinem Konto.";
   if (st === "ios-install") return "iPhone und iPad: Benachrichtigungen gehen erst, wenn die Seite als App " +
     "auf dem Home-Bildschirm liegt.";
