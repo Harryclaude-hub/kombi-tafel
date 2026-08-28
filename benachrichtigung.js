@@ -1121,3 +1121,61 @@ async function weckerDiagnoseZeigen() {
   ziel.innerHTML = "";
   ziel.appendChild(kasten);
 }
+
+// ============================================================
+// "LEG MICH AUF DEN HOME-BILDSCHIRM" - der Streifen fuers iPhone.
+//
+// Karam kam hier mehrfach nicht durch. Deshalb steht die Anleitung
+// jetzt ganz oben auf jeder Seite, mit dem echten Logo daneben,
+// solange die App NICHT vom Home-Bildschirm laeuft. Sie laesst
+// sich wegklicken und kommt dann sieben Tage nicht wieder.
+//
+// Ganz wichtig ist der letzte Punkt: wer die App abgelegt hat,
+// BEVOR die Apple-Angabe im Kopf der Seite drin war, hat ein
+// totes Symbol. iOS backt die Einstellungen beim Ablegen ein und
+// sieht nie wieder nach. Das alte Symbol MUSS weg.
+// ============================================================
+
+function ablegenStreifenZu(fuerImmer) {
+  const s = document.getElementById("ablegenstreifen");
+  if (s) s.remove();
+  if (fuerImmer) {
+    try { localStorage.setItem("kt_ablegen_spaeter", String(Date.now() + 7 * 24 * 3600 * 1000)); } catch (e) { }
+  }
+}
+
+function ablegenStreifenZeigen() {
+  try {
+    if (document.getElementById("ablegenstreifen")) return;
+    // Nur auf iPhone und iPad, und nur solange es NICHT als App laeuft.
+    if (!pushIstIos() || weckerIstStandalone()) return;
+    const bis = parseInt(localStorage.getItem("kt_ablegen_spaeter") || "0", 10);
+    if (bis && Date.now() < bis) return;
+    const nav = document.querySelector(".navleiste");
+    if (!nav || !nav.parentNode) return;
+
+    const s = document.createElement("div");
+    s.id = "ablegenstreifen";
+    s.innerHTML =
+      '<img src="logo-192.png" alt="" class="ab-logo">' +
+      '<div class="ab-text">' +
+      "<b>Leg die Kombi-Tafel auf deinen Home-Bildschirm.</b>" +
+      "<div class='ab-schritte'>" +
+      "<span><b>1.</b> Unten in Safari auf das Teilen-Zeichen (Kästchen mit Pfeil nach oben)</span>" +
+      "<span><b>2.</b> Nach unten wischen bis <b>Zum Home-Bildschirm</b>, antippen, dann <b>Hinzufügen</b></span>" +
+      "<span><b>3.</b> Safari schließen und die App vom Home-Bildschirm starten</span>" +
+      "</div>" +
+      "<div class='ab-warn'><b>Hast du sie schon einmal abgelegt und es ging nicht?</b> " +
+      "Dann ist das alte Symbol kaputt: iPhone merkt sich die Einstellungen beim Ablegen " +
+      "für immer. Altes Symbol gedrückt halten, <b>App entfernen</b>, und die drei " +
+      "Schritte oben noch einmal machen.</div>" +
+      "<div class='ab-warum'>Erst als App vom Home-Bildschirm lässt Apple Benachrichtigungen " +
+      "und Anrufe zu. In Safari geht das nicht, das ist eine Regel von Apple.</div>" +
+      "</div>" +
+      '<button class="ab-zu" title="Ausblenden">&#10005;</button>';
+    s.querySelector(".ab-zu").onclick = () => ablegenStreifenZu(true);
+    nav.parentNode.insertBefore(s, nav.nextSibling);
+  } catch (e) { /* der Streifen darf nie die Seite stoeren */ }
+}
+
+document.addEventListener("DOMContentLoaded", () => setTimeout(ablegenStreifenZeigen, 700));

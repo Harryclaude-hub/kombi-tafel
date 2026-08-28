@@ -9,6 +9,11 @@
   "theme_color": "#1a2c50",
   "icons": [
     {
+      "src": "logo-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
       "src": "logo-192.png",
       "sizes": "192x192",
       "type": "image/png"
@@ -23,11 +28,7 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
     }
-  ]
+  ],
+  "id": "/kombi-tafel/"
 }

@@ -1800,3 +1800,52 @@ details.anmk summary { min-height: 44px; display: block; padding: 11px 0; }
 @media (max-width: 700px) {
   .wk-diag { padding: 10px 12px; font-size: 14px; }
 }
+
+/* ---------- "Leg mich auf den Home-Bildschirm" (loeschbar) ---------- */
+#ablegenstreifen {
+  position: relative; display: flex; gap: 12px; align-items: flex-start;
+  margin: 10px 0 14px 0; padding: 12px 40px 12px 12px;
+  border: 2px solid #1a2c50; border-left-width: 6px; border-radius: 10px;
+  background: #f4f7fc; color: #142136; font-size: 14px; line-height: 1.5;
+}
+#ablegenstreifen .ab-logo {
+  width: 52px; height: 52px; flex: 0 0 auto; border-radius: 11px;
+  box-shadow: 0 2px 6px rgba(15, 25, 40, 0.22);
+}
+#ablegenstreifen .ab-text { flex: 1 1 auto; min-width: 0; }
+#ablegenstreifen .ab-schritte { display: flex; flex-direction: column; gap: 5px; margin: 7px 0; }
+#ablegenstreifen .ab-schritte span { display: block; }
+#ablegenstreifen .ab-warn {
+  margin-top: 8px; padding: 8px 10px; border-radius: 7px;
+  background: #fff4e0; border-left: 4px solid #b35a00; font-size: 13.5px;
+}
+#ablegenstreifen .ab-warum { margin-top: 7px; font-size: 12.5px; color: #445; }
+#ablegenstreifen .ab-zu {
+  position: absolute; top: 6px; right: 6px;
+  width: 34px; height: 34px; min-height: 34px; padding: 0;
+  border: 1px solid #aab; border-radius: 8px; background: #fff;
+  font-size: 15px; line-height: 1; color: #445;
+}
+@media (max-width: 700px) {
+  #ablegenstreifen { font-size: 15px; padding: 13px 46px 13px 13px; }
+  #ablegenstreifen .ab-logo { width: 58px; height: 58px; }
+  #ablegenstreifen .ab-zu { width: 40px; height: 40px; min-height: 40px; }
+}
+
+/* ---------- Kontrast am Handy (loeschbar, NUR am Handy) ---------- */
+@media (max-width: 700px) {
+  /* Nach WCAG auf einem 390er Schirm gemessen. Nur die Zahl im aktiven
+     Filter-Knopf wird ausgebessert: sie steht AUSSERHALB der Tabelle.
+     Der Selektor muss so genau sein wie der aus Zeile 141, sonst verliert
+     er - deshalb dieselbe Kette. */
+  .filterzeile button.aktiv .f-zahl { color: #fff; }
+}
+
+/* BEWUSST NICHT AUSGEBESSERT, und das ist eine Entscheidung, keine
+   Vergesslichkeit: .leer (grauer Platzhalter), .abzug (Gebuehren-Hinweis)
+   und .duenn (brauner "duenner Markt") liegen alle INNERHALB des
+   Tabellenkoerpers. Dort wird laut Hausregel keine Farbe angefasst -
+   .duenn ist sogar eine Bedeutungsfarbe. Sie liegen mit 3,5 bis 4,5 knapp
+   unter der Empfehlung, und zwar auf der Kombi-Tafel, die am Handy
+   ausdruecklich nicht zum Arbeiten gedacht ist. Wer das aendern will,
+   aendert die Grundfarben oben - nicht hier unten mit Ausnahmen. */
