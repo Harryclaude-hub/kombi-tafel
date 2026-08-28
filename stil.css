@@ -2387,3 +2387,48 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
    Kasten war. */
 #glockenpanel .gp-liste,
 #glockenpanel .chatliste { max-height: none; flex: 1 1 auto; min-height: 0; }
+
+/* ---------- Anrufbild wie am Telefon (loeschbar) ---------- */
+/* Das Gesicht des Anrufers im Kreis. Solange kein Foto da ist, bleibt der
+   Anfangsbuchstabe stehen - der Anruf wartet nie auf ein Bild. */
+#weckerruf .wk-kreis { position: relative; overflow: hidden; }
+#weckerruf .wk-foto {
+  display: none; position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+#weckerruf .wk-kreis.hat, #weckerruf.wk-hatfoto .wk-foto { display: block; }
+#weckerruf.wk-hatfoto .wk-buchstabe { display: none; }
+
+@media (max-width: 700px) {
+  /* Am Handy soll es sich anfuehlen wie ein gewoehnlicher Anruf: dunkler
+     Vollbildschirm, grosses Gesicht oben, die beiden Knoepfe unten in
+     Daumennaehe. Kein Kasten mitten auf der Seite. */
+  #weckerruf { padding: 0; background: #0b1220; }
+  #weckerruf .wk-karte {
+    width: auto; max-width: none; height: 100%;
+    border: 0; border-radius: 0; box-shadow: none;
+    background: linear-gradient(170deg, #16233d 0%, #0b1220 62%);
+    color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12vh 18px calc(28px + env(safe-area-inset-bottom, 0px)) 18px;
+  }
+  #weckerruf .wk-oben { color: #9fb0cc; }
+  #weckerruf .wk-kreis {
+    width: 132px; height: 132px; margin: 26px auto 18px auto; font-size: 58px;
+    border: 3px solid rgba(255,255,255,0.22);
+  }
+  #weckerruf .wk-name { font-size: 30px; color: #fff; }
+  #weckerruf .wk-art { color: #9fb0cc; font-size: 15px; }
+  #weckerruf .wk-tonhinweis {
+    background: rgba(255,243,224,0.12); color: #ffd9a3; border-color: #b35a00;
+  }
+  /* Die Knoepfe rutschen ans untere Ende - so wie bei jedem Telefon. */
+  #weckerruf .wk-tasten {
+    margin-top: auto; width: 100%; max-width: 380px;
+    gap: 18px; flex-wrap: nowrap;
+  }
+  #weckerruf .wk-tasten button {
+    flex: 1 1 0; min-height: 64px; font-size: 17px; border-radius: 40px;
+    border-width: 0;
+  }
+}

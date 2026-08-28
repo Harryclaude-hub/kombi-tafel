@@ -102,6 +102,7 @@ async function profilFotoLaden(id) {
   const f = (r.data && typeof r.data.foto === "string" &&
     r.data.foto.indexOf("data:image/jpeg;base64,") === 0) ? r.data.foto : null;
   _fotos[id] = f;
+  if (f) profilFotoMerken(id, f);
   return f;
 }
 
@@ -481,4 +482,52 @@ function profilFehlerKlartext(m) {
   if (/Failed to fetch|NetworkError/i.test(t)) return "Keine Verbindung. Internet prüfen.";
   if (/column .* does not exist/i.test(t)) return "Das Profil ist in der Datenbank noch nicht eingerichtet.";
   return t.slice(0, 120);
+}
+
+// ============================================================
+// DAS FOTO FUER SPAETER MERKEN
+//
+// WOZU: wenn dich jemand anruft und die App ist ZU, baut nicht die
+// Seite die Meldung, sondern der Service Worker. Der kann die Datenbank
+// nicht fragen (er hat keine Anmeldung). Also legt die Seite jedes Foto,
+// das sie ohnehin schon geholt hat, in dieselbe Schublade wie den
+// Weck-Wunsch (kt-wecker/merker). Beim Anruf holt es der Service Worker
+// dort heraus und zeigt es in der Meldung.
+//
+// Es wird ZWEIMAL abgelegt: unter der Kennung und unter dem
+// Benutzernamen. Grund: die Meldung vom Server traegt die Kennung nicht
+// mit (in eine Push-Nachricht passen nur rund vier Kilobyte, und die
+// Server-Funktion laesst sich von hier aus gerade nicht neu hochladen).
+// Der Name steht aber immer im Titel - darueber findet der Service
+// Worker das Bild trotzdem.
+//
+// Es verlaesst das Geraet dabei NICHT: die Schublade gehoert allein
+// diesem Browser.
+// ============================================================
+
+const PROFIL_FOTO_MAX = 200000;   // ueber 200 kB wird nichts gemerkt
+
+function profilSchubladeOeffnen() {
+  return new Promise((ja, nein) => {
+    try {
+      const a = indexedDB.open("kt-wecker", 1);
+      a.onupgradeneeded = () => {
+        if (!a.result.objectStoreNames.contains("merker")) a.result.createObjectStore("merker");
+      };
+      a.onsuccess = () => ja(a.result);
+      a.onerror = () => nein(a.error);
+    } catch (e) { nein(e); }
+  });
+}
+
+async function profilFotoMerken(id, datenUrl) {
+  try {
+    if (!datenUrl || datenUrl.length > PROFIL_FOTO_MAX) return;
+    const db = await profilSchubladeOeffnen();
+    const t = db.transaction("merker", "readwrite");
+    const s = t.objectStore("merker");
+    s.put(datenUrl, "foto:" + id);
+    const p = _profile[id];
+    if (p && p.username) s.put(datenUrl, "fotoname:" + String(p.username).toLowerCase());
+  } catch (e) { /* ohne Zwischenspeicher zeigt die Meldung eben das Programm-Zeichen */ }
 }

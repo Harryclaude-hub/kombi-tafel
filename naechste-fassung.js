@@ -62,7 +62,27 @@ if (process.argv.indexOf("--setzen") < 0) {
 let n = 0;
 for (const f of fs.readdirSync(".").filter(x => x.endsWith(".html"))) {
   const t = fs.readFileSync(f, "utf8");
-  const v = t.replace(/(\.(?:js|css|webmanifest))\?v=[0-9a-z]+/g, "$1?v=" + neu);
+  // Auch die Logo-Bilder: iOS merkt sich das Symbol nach der Adresse.
+  // Ohne Fassungsnummer behaelt ein Geraet, das schon einmal da war,
+  // fuer immer das alte Bild - und beim Beheben des leeren Symbols
+  // haette niemand gemerkt, dass die Behebung gar nicht ankommt.
+  const v = t.replace(/(\.(?:js|css|webmanifest|png))\?v=[0-9a-z]+/g, "$1?v=" + neu);
   if (v !== t) { fs.writeFileSync(f, v); n++; }
 }
+// Das Manifest zaehlt seine Bilder selbst auf - die muessen mit,
+// sonst behaelt ein Android-Geraet ewig das alte Symbol.
+try {
+  const m = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
+  let geaendert = false;
+  m.icons = (m.icons || []).map(i => {
+    const s = String(i.src).replace(/\?v=[0-9a-z]+/, "?v=" + neu);
+    if (s !== i.src) geaendert = true;
+    return { ...i, src: s };
+  });
+  if (geaendert) {
+    fs.writeFileSync("manifest.webmanifest", JSON.stringify(m, null, 2) + "\n");
+    console.log("  ok  manifest.webmanifest: Bilder auf " + neu);
+  }
+} catch (e) { console.error("  !!  manifest.webmanifest nicht angepasst: " + e.message); }
+
 console.log("  ok  " + n + " Seiten auf " + neu);

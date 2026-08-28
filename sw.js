@@ -86,6 +86,66 @@ function wkWunschHolen() {
   })).catch(() => ({ nachrichten: true, anrufe: true }));
 }
 
+// ---------- Das Gesicht zur Meldung ----------
+//
+// Die Seite legt jedes Profilbild, das sie ohnehin geholt hat, in
+// dieselbe Schublade wie den Weck-Wunsch. Hier wird es wieder
+// herausgeholt - ohne Datenbank, ohne Netz.
+//
+// WARUM UEBER DEN NAMEN UND NICHT NUR UEBER DIE KENNUNG:
+// Die Server-Funktion push-senden schickt die Kennung des Anrufers
+// noch nicht mit. Sie laesst sich von hier aus gerade nicht neu
+// hochladen (die Bruecke zu Supabase verformt die Datei, und ein
+// Zugangsschluessel liegt nicht vor). Der Name steht aber immer im
+// Titel - "Karam ruft dich an!". Darueber findet das Bild trotzdem
+// seinen Weg. Sobald die Server-Funktion "von" mitschickt, greift
+// automatisch der erste, saubere Weg.
+
+function wkNameAusTitel(t) {
+  const s = String(t || "");
+  let m = /^(.+?) ruft dich an!?$/.exec(s);
+  if (m) return m[1];
+  m = /^Neue Nachricht (?:im Bereich )?von (.+)$/.exec(s);
+  if (m) return m[1];
+  return null;
+}
+
+function wkFotoHolen(d) {
+  // Wieder mit harter Zeitgrenze: eine Meldung darf NIE daran haengen,
+  // ob sich die Schublade oeffnen laesst.
+  return Promise.race([
+    wkFotoSuchen(d),
+    new Promise(f => setTimeout(() => f(null), 500))
+  ]).catch(() => null);
+}
+
+function wkFotoSuchen(d) {
+  const schluessel = [];
+  if (d && d.von) schluessel.push("foto:" + d.von);
+  const name = wkNameAusTitel(d && d.titel);
+  if (name) schluessel.push("fotoname:" + name.toLowerCase());
+  if (!schluessel.length) return Promise.resolve(null);
+  return wkSchubladeOeffnen().then(db => new Promise(fertig => {
+    try {
+      const t = db.transaction("merker", "readonly");
+      const s = t.objectStore("merker");
+      let i = 0;
+      const weiter = () => {
+        if (i >= schluessel.length) { fertig(null); return; }
+        const g = s.get(schluessel[i++]);
+        g.onsuccess = () => {
+          const w = g.result;
+          // Nur echte JPEG-Bilddaten annehmen.
+          if (typeof w === "string" && w.indexOf("data:image/jpeg;base64,") === 0) fertig(w);
+          else weiter();
+        };
+        g.onerror = () => weiter();
+      };
+      weiter();
+    } catch (x) { fertig(null); }
+  })).catch(() => null);
+}
+
 // ---------- Push kommt herein ----------
 
 async function wkPushZeigen(d) {
@@ -96,13 +156,17 @@ async function wkPushZeigen(d) {
   const wunsch = await wkWunschLesen();
   if (istAnruf && !wunsch.anrufe) return;
   if (!istAnruf && !wunsch.nachrichten) return;
+  // Das Gesicht des Anrufers, wenn die Seite es frueher schon einmal
+  // geholt und gemerkt hat. Kommt keines, bleibt es beim Programm-Zeichen.
+  const bild = await wkFotoHolen(d);
   const einstellung = {
     body: d.text || "",
-    icon: "logo-192.png",
+    icon: bild || "logo-192.png",
     badge: "logo-192.png",
     tag: d.tag || (istAnruf ? "anruf" : "kombi-tafel"),
     renotify: true,
-    data: { url: d.url || "mein.html", art: d.art || (istAnruf ? "anruf" : "nachricht"), von: d.von || null },
+    data: { url: d.url || "mein.html", art: d.art || (istAnruf ? "anruf" : "nachricht"),
+      von: d.von || null, bild: bild || null },
     // Ein Anruf muss man UEBERSEHEN koennen: er bleibt stehen, bis
     // jemand ihn wegklickt, und er ruettelt das Handy.
     requireInteraction: !!istAnruf,

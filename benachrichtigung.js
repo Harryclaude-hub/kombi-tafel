@@ -98,9 +98,14 @@ async function benachrichtige(titel, text, tag, mehr) {
     if (!document.hidden && tag !== "anruf") return;   // sichtbar: nur Anrufe melden
     const vonWem = (mehr && mehr.von) || null;
     const reg = await wkRegistrierung();
+    // Das Profilbild des Anrufers, wenn es da ist. So sieht man schon am
+    // Sperrbildschirm, WER anruft, und muss nicht erst lesen.
+    // Das Programm-Zeichen bleibt als Abzeichen (badge) stehen, damit man
+    // trotzdem sieht, aus welcher App die Meldung kommt.
+    const bild = (mehr && mehr.bild) || null;
     const einst = {
       body: text || "",
-      icon: "logo-192.png",
+      icon: bild || "logo-192.png",
       badge: "logo-192.png",
       // Je Absender ein eigener Merkzettel: sonst ersetzt der zweite Anruf
       // den ersten und einer verschwindet spurlos.
@@ -108,7 +113,7 @@ async function benachrichtige(titel, text, tag, mehr) {
       renotify: true,
       requireInteraction: tag === "anruf",
       vibrate: tag === "anruf" ? [500, 250, 500, 250, 500] : [200, 100, 200],
-      data: { url: "mein.html", art: tag || "nachricht", von: vonWem }
+      data: { url: "mein.html", art: tag || "nachricht", von: vonWem, bild: bild }
     };
     if (reg) {
       if (tag === "anruf") einst.actions = [

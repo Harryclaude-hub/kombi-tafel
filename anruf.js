@@ -149,11 +149,11 @@ async function anrufSignal(roh) {
     // DER WECKER: Vollbild, echter Klingelton, Vibrieren. Und der Anruf
     // raeumt sich nach 60 Sekunden selbst weg, damit ein toter Anruf nicht
     // alle weiteren Anrufer auf "besetzt" laufen laesst.
-    anrufWeckerAn(anrufEingehend.name, !!s.video);
+    anrufWeckerAn(anrufEingehend.name, !!s.video, roh.von);
     anrufEingehendUhrStellen();
-    if (typeof benachrichtige === "function")
-      benachrichtige(anrufEingehend.name + " ruft dich an!", "Annehmen oder ablehnen.", "anruf",
-        { von: roh.von });
+    // Die Meldung erst bauen, wenn das Bild da ist - aber hoechstens
+    // 800 Millisekunden warten. Ein Anruf darf nie auf ein Bild warten.
+    anrufMeldungMitBild(roh.von, anrufEingehend.name, !!s.video);
   } else if (s.typ === "annahme") {
     anrufKlingelStopp();
     // Das Freizeichen MUSS hier aufhoeren, sonst tutet es beim Anrufer
@@ -458,7 +458,7 @@ function anrufVollbildZu() {
   if (d) d.remove();
 }
 
-function anrufVollbild(name, mitVideo, tonHinweis) {
+function anrufVollbild(name, mitVideo, tonHinweis, vonId) {
   anrufVollbildZu();
   if (!document.body) return;
   const d = document.createElement("div");
@@ -466,7 +466,7 @@ function anrufVollbild(name, mitVideo, tonHinweis) {
   d.innerHTML =
     '<div class="wk-karte">' +
     '<div class="wk-oben">Eingehender ' + (mitVideo ? "Video-Anruf" : "Anruf") + "</div>" +
-    '<div class="wk-kreis"><span class="wk-buchstabe"></span></div>' +
+    '<div class="wk-kreis"><span class="wk-buchstabe"></span><img class="wk-foto" alt=""></div>' +
     '<div class="wk-name"></div>' +
     '<div class="wk-art">' + (mitVideo ? "mit Bild und Ton" : "nur Ton") + "</div>" +
     (tonHinweis ? '<div class="wk-tonhinweis"></div>' : "") +
@@ -490,18 +490,36 @@ function anrufVollbild(name, mitVideo, tonHinweis) {
   // Namen NIE als HTML einsetzen - so kann kein Benutzername Unfug bauen.
   d.querySelector(".wk-name").textContent = name || "Unbekannt";
   d.querySelector(".wk-buchstabe").textContent = String(name || "?").slice(0, 1).toUpperCase();
+  // Das Profilbild nachholen. Bis es da ist, steht der Anfangsbuchstabe
+  // im Kreis - der Anruf klingelt sofort und wartet auf nichts.
+  if (vonId && typeof profilFotoLaden === "function") {
+    profilFotoLaden(vonId).then(f => {
+      const el = d.querySelector(".wk-foto");
+      if (f && el && document.body.contains(d)) { el.src = f; d.classList.add("wk-hatfoto"); }
+    }).catch(() => { });
+  }
+  // Und der Anzeigename, wenn die Person sich einen gegeben hat.
+  if (vonId && typeof profileLaden === "function") {
+    profileLaden([vonId]).then(() => {
+      const el = d.querySelector(".wk-name");
+      if (el && document.body.contains(d) && typeof profilName === "function")
+        el.textContent = profilName(vonId, name || "Unbekannt");
+    }).catch(() => { });
+  }
   if (tonHinweis) d.querySelector(".wk-tonhinweis").textContent = tonHinweis;
 }
 
 // Klingeln komplett an: Bild, Ton, Vibrieren.
-function anrufWeckerAn(name, mitVideo) {
+function anrufWeckerAn(name, mitVideo, vonId) {
   const tonKam = anrufKlingelnAn();
   anrufVollbild(name, mitVideo, tonKam ? null :
-    "Ton konnte noch nicht starten - dieser Browser erlaubt ihn erst, wenn du einmal auf die Seite klickst.");
+    "Ton konnte noch nicht starten - dieser Browser erlaubt ihn erst, wenn du einmal auf die Seite klickst.",
+    vonId);
 }
 
 function anrufWeckerAus() {
   anrufWartenWeg();
+  anrufMeldungWeg(anrufEingehend ? anrufEingehend.von : null);
   anrufKlingelnAus();
   anrufFreizeichenAus();
   anrufVollbildZu();
@@ -644,4 +662,53 @@ async function anrufProbeText() {
       "antwortet aber nicht" + (p.fehler.length ? " (" + p.fehler[0] + ")" : "") + "." };
   return { gut: false, text: "Dieses Geraet findet gar keinen Weg nach draussen. Anrufe werden hier " +
     "nicht funktionieren" + (p.fehler.length ? " (" + p.fehler[0] + ")" : "") + "." };
+}
+// ============================================================
+// DIE MELDUNG MIT DEM GESICHT DES ANRUFERS
+//
+// Am Laptop und am Android-Handy zeigt die Meldung das Profilbild -
+// so sieht man beim Klingeln sofort, wer dran ist, und kann direkt
+// aus der Meldung heraus abheben.
+//
+// EHRLICH DAZU: auf dem iPhone geht das NICHT. Apple zeigt in einer
+// Web-Push-Meldung immer nur das Zeichen der App selbst und laesst
+// auch keine Knoepfe auf der Meldung zu. Dort tippt man die Meldung
+// an, die App geht auf, und DANN steht das grosse Anrufbild mit Foto
+// und den beiden Knoepfen da.
+// ============================================================
+async function anrufMeldungMitBild(vonId, name, mitVideo) {
+  let bild = null;
+  try {
+    if (typeof profilFotoLaden === "function") {
+      bild = await Promise.race([
+        profilFotoLaden(vonId),
+        new Promise(f => setTimeout(() => f(null), 800))
+      ]);
+    }
+  } catch (e) { bild = null; }
+  let anzeige = name;
+  try {
+    if (typeof profilName === "function") anzeige = profilName(vonId, name);
+  } catch (e) { }
+  if (typeof benachrichtige === "function")
+    benachrichtige(anzeige + " ruft dich an!",
+      mitVideo ? "Video-Anruf - annehmen oder ablehnen." : "Annehmen oder ablehnen.",
+      "anruf", { von: vonId, bild: bild });
+}
+
+// Ist der Anruf vorbei, muss auch die Meldung weg - sonst steht auf dem
+// Sperrbildschirm noch "ruft dich an", waehrend laengst niemand mehr ruft.
+async function anrufMeldungWeg(vonId) {
+  try {
+    const reg = (typeof wkRegistrierung === "function") ? await wkRegistrierung(1500) : null;
+    if (!reg || !reg.getNotifications) return;
+    const liste = await reg.getNotifications({ tag: vonId ? "anruf-" + vonId : "anruf" });
+    for (const m of liste) { try { m.close(); } catch (e) { } }
+    if (!vonId) return;
+    const rest = await reg.getNotifications();
+    for (const m of rest) {
+      const d = m.data || {};
+      if (d.art === "anruf") { try { m.close(); } catch (e) { } }
+    }
+  } catch (e) { }
 }
