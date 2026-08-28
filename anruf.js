@@ -536,10 +536,15 @@ function anrufEingehendUhrStellen() {
   _wkEingehendUhr = setTimeout(() => {
     if (anrufEingehend && anrufEingehend === derselbe) {
       const wer = anrufEingehend.name;
+      const werId = anrufEingehend.von;
       anrufEingehend = null;
       anrufWeckerAus();
       if (typeof weckerBalken === "function")
         weckerBalken("Verpasster Anruf von " + wer + ".", "warn");
+      // Ein verpasster Anruf darf nicht spurlos verschwinden. Die
+      // "ruft dich an"-Meldung wird weggeraeumt (es ruft ja niemand mehr),
+      // dafuer bleibt eine, die stehenbleibt und im Verlauf steht.
+      anrufVerpasstMerken(werId, wer);
     }
   }, 60000);
 }
@@ -716,5 +721,33 @@ async function anrufMeldungWeg(vonId) {
       const d = m.data || {};
       if (d.art === "anruf") { try { m.close(); } catch (e) { } }
     }
+  } catch (e) { }
+}
+// Haelt einen verpassten Anruf fest: als Meldung, die stehenbleibt, und
+// im Verlauf in der Glocke. Vorher war er nach 60 Sekunden einfach weg.
+async function anrufVerpasstMerken(vonId, name) {
+  let bild = null, anzeige = name;
+  try {
+    if (typeof profilFotoLaden === "function") bild = await profilFotoLaden(vonId);
+    if (typeof profilName === "function") anzeige = profilName(vonId, name);
+  } catch (e) { }
+  const titel = "Verpasster Anruf von " + anzeige;
+  try {
+    if (typeof verlaufSchreiben === "function")
+      await verlaufSchreiben({ titel: titel, text: "Nicht angenommen.",
+        art: "verpasst", von: vonId, bild: bild });
+  } catch (e) { }
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const reg = (typeof wkRegistrierung === "function") ? await wkRegistrierung(2000) : null;
+    if (!reg) return;
+    await reg.showNotification(titel, {
+      body: "Du warst gerade nicht da.",
+      icon: bild || "logo-192.png", badge: "logo-192.png",
+      tag: "verpasst-" + vonId, renotify: false,
+      // requireInteraction bewusst AUS: sie soll im Verlauf des Geraets
+      // liegen bleiben, aber nicht den Bildschirm blockieren.
+      data: { url: "mein.html", art: "verpasst", von: vonId }
+    });
   } catch (e) { }
 }

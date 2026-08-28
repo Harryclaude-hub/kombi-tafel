@@ -2432,3 +2432,40 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
     border-width: 0;
   }
 }
+
+/* ---------- Warnung: Scheine nicht lesbar (loeschbar) ---------- */
+/* Muss ins Auge springen: solange sie steht, sind ALLE Geldsummen
+   auf der Seite zu niedrig. */
+.gesperrtwarn {
+  border: 2px solid #a00000; border-left-width: 8px; border-radius: 8px;
+  background: #fff5f5; color: #3a0000;
+  padding: 12px 14px; margin: 10px 0 14px 0;
+}
+.gesperrtwarn b { color: #a00000; }
+.gesperrtwarn p { margin: 8px 0 0 0; }
+.gesperrtwarn .mini { color: #5a2020; }
+/* ---------- Verlauf der Meldungen (loeschbar) ---------- */
+.wk-verlauf { margin-top: 6px; max-height: 320px; overflow-y: auto; }
+.wk-vlleeren { float: right; font-size: 12px; padding: 3px 9px; }
+.vl-zeile {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 8px; border-bottom: 1px solid #e6e6ee;
+}
+.vl-zeile:last-child { border-bottom: 0; }
+.vl-bild {
+  flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%;
+  background: #eef1f7; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; overflow: hidden;
+}
+.vl-bild img { width: 100%; height: 100%; object-fit: cover; }
+.vl-mitte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.vl-mitte > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vl-wann { flex: 0 0 auto; color: #667; }
+/* Bedeutungsfarbe: ein verpasster Anruf ist das Einzige, was auffallen soll. */
+.vl-verpasst .vl-bild { background: #ffe9e9; }
+.vl-verpasst b { color: #a00000; }
+.vl-anruf .vl-bild { background: #e6f5ea; }
+@media (max-width: 700px) {
+  .vl-zeile { padding: 10px 8px; }
+  .vl-bild { flex-basis: 40px; width: 40px; height: 40px; }
+}

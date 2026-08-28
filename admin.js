@@ -246,7 +246,12 @@ async function durchlaufWeiter() {
   // Die sauberen Zeilen gehen sofort in die Datenbank
   vorschauZeilen = saubere;
   vsTrotzdem = false;
-  await vsUebernehmen();
+  const erg = await vsUebernehmen();
+  // Ging beim Speichern etwas schief, darf der Durchlauf NICHT weiterlaufen
+  // und schon gar nicht den Ordner aktivieren: sonst stuende gruen "fertig",
+  // waehrend die Zeilen gar nicht in der Datenbank sind. vsUebernehmen hat
+  // die rote Meldung dazu bereits ausgegeben.
+  if (!erg || erg.fehler) return;
 
   if (!unklare.length) {
     // Alles sauber: Ordner gleich aktivieren - der Durchlauf ist komplett
@@ -581,10 +586,43 @@ function satzFelderParsen(felder, erbe) {
     spiel = rest[0];
   }
   if (!wette && spiel) { wette = spiel; }
-  // Stehen mehrere Quoten in einer Zeile (z. B. 2,25 / 2,50), kommen ALLE mit
-  const alle = quoten.filter(q => q >= 1.01 && q <= 1000);
+  // Stehen mehrere Quoten in einer Zeile (z. B. 2,25 / 2,50), kommen ALLE mit -
+  // ABER nicht die Interwetten-Spalte. Sie ist keine zweite Wettmoeglichkeit,
+  // sondern dieselbe Quote nach Abzug der 5 Prozent (G geteilt durch 1,05).
+  const alle = ohneGebuehrenspalte(quoten.filter(q => q >= 1.01 && q <= 1000));
+  // Die fuehrende Quote muss aus der bereinigten Liste kommen. Vorher fuehrte
+  // schlicht das letzte Zahlenfeld der Zeile - und das war meistens die
+  // schon gekuerzte Interwetten-Zahl.
+  const fuehrend = alle.length ? alle[alle.length - 1] : quote;
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette,
-    s: artErkennen(wette), quote: quote, quoten: alle.length > 1 ? alle : null, geerbt: geerbt };
+    s: artErkennen(wette), quote: fuehrend, quoten: alle.length > 1 ? alle : null, geerbt: geerbt };
+}
+
+// Wirft aus einer Quotenliste jede Zahl heraus, die eine andere Zahl
+// geteilt durch 1,05 ist. Genau so entsteht Saschas Spalte H aus Spalte G.
+// 0,02 Spielraum, weil in der Tabelle auf zwei Stellen gerundet wird.
+// Beispiel aus Zeile 1.01: aus [2.30, 2.19] bleibt [2.30] (2.30/1.05 = 2.19).
+// Aus zwei echten Optionen wie [2.25, 2.50] bleiben beide stehen
+// (2.50/1.05 = 2.38, 2.25/1.05 = 2.14 - keine trifft die andere).
+// WARUM GEGEN DIE ZULETZT BEHALTENE ZAHL UND NICHT GEGEN ALLE:
+// Beim Durchrechnen fiel eine Kette auf. Verglichen mit ALLEN Zahlen
+// waere aus [2.10, 2.00, 1.90] nur noch [2.10] geworden: erst faellt 2.00
+// als Abzug von 2.10, dann 1.90 als Abzug von 2.00 - obwohl 2.00 da
+// schon draussen war. Verglichen wird deshalb immer nur mit der zuletzt
+// BEHALTENEN Zahl. Dann bleibt [2.10, 1.90] stehen, und aus
+// [3.00, 2.86, 1.50, 1.43] (zwei Optionen mit je ihrer Abzugsspalte)
+// wird richtig [3.00, 1.50].
+function ohneGebuehrenspalte(liste) {
+  if (!liste || liste.length < 2) return liste || [];
+  const raus = [];
+  for (const q of liste) {
+    // Dieselbe Zahl zweimal ist keine zweite Wettmoeglichkeit.
+    if (raus.some(x => Math.abs(x - q) < 0.001)) continue;
+    const letzte = raus.length ? raus[raus.length - 1] : null;
+    if (letzte !== null && Math.abs(q - letzte / 1.05) <= 0.02) continue;
+    raus.push(q);
+  }
+  return raus;
 }
 
 function artErkennen(wette) {
@@ -848,12 +886,11 @@ async function vsUebernehmen() {
   if (s.error) { meldungA("Satz nicht angelegt: " + sicherA(s.error.message), "warn"); return; }
   // Was schon im Ordner steht, wird NICHT doppelt angelegt (Fotos nachschieben!)
   const daWetten = (await supaWettenLaden()).filter(w => w.satz === vorschauDatum);
-  const daSchluessel = new Set(daWetten.map(w => zeilenSchluessel({
-    an_zeit: w.an_zeit, quote: (Array.isArray(w.o) && w.o[0]) ? w.o[0][1] : 0, s: w.s, spiel: w.spiel })));
-  let ok = 0, schonDa = 0;
+  const daSchluessel = new Set(daWetten.map(satzSchluessel));
+  let ok = 0, schonDa = 0, fehler = 0, ersterFehler = "";
   for (let i = 0; i < vorschauZeilen.length; i++) {
     const z = vorschauZeilen[i];
-    if (daSchluessel.has(zeilenSchluessel(z))) { schonDa++; continue; }
+    if (daSchluessel.has(satzSchluessel(z))) { schonDa++; continue; }
     const optionen = (z.quoten && z.quoten.length > 1)
       ? z.quoten.map((q, k) => [k === 0 ? z.wette : "Option " + (k + 1), q])
       : [[z.wette, z.quote]];
@@ -861,15 +898,40 @@ async function vsUebernehmen() {
       liga: z.liga, spiel: z.spiel, wette: z.wette, kat: z.s, s: z.s,
       o: optionen });
     if (!r.error) ok++;
+    // Frueher wurde ein Fehlschlag hier nur NICHT mitgezaehlt und sonst
+    // verschwiegen. Dann stand gruen "45 Wetten uebernommen", obwohl
+    // keine einzige in der Datenbank war.
+    else { fehler++; if (!ersterFehler) ersterFehler = String(r.error.message || r.error); }
   }
-  for (const up of vorschauUploads) await supaUploadStatus(up.id, "eingelesen");
+  // Die Fotos gelten NUR als eingelesen, wenn wirklich alles durchging.
+  // Sonst verschwaende der Hinweis "X noch nicht eingelesen" und niemand
+  // wuesste, dass etwas nachzutragen ist.
+  if (!fehler) { for (const up of vorschauUploads) await supaUploadStatus(up.id, "eingelesen"); }
   elA(vorschauBox || "vorschau_" + vorschauDatum).innerHTML = "";
-  meldungA("<b>Satz vom " + sicherA(vorschauDatum) + ": " + ok + " Wetten übernommen" +
-    (schonDa ? ", " + schonDa + " waren schon im Ordner (nicht doppelt angelegt)" : "") + ".</b> " +
-    "Der Ordner steht ab sofort auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle - " +
-    "über die Ordner-Leiste wählbar. Nachbearbeiten geht unten bei Sätze bearbeiten.", "gut");
+  if (fehler) {
+    meldungA("<b>Achtung: " + fehler + " von " + (ok + fehler) + " Zeilen sind NICHT " +
+      "gespeichert worden.</b> " + sicherA(ersterFehler.slice(0, 120)) + " - die Fotos bleiben " +
+      "auf \"noch nicht eingelesen\" stehen, du kannst es also einfach noch einmal versuchen. " +
+      "Die " + ok + " gespeicherten Zeilen stehen schon im Ordner und werden beim naechsten " +
+      "Versuch nicht doppelt angelegt.", "warn");
+  } else {
+    meldungA("<b>Satz vom " + sicherA(vorschauDatum) + ": " + ok + " Wetten übernommen" +
+      (schonDa ? ", " + schonDa + " waren schon im Ordner (nicht doppelt angelegt)" : "") + ".</b> " +
+      "Der Ordner steht ab sofort auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle - " +
+      "über die Ordner-Leiste wählbar. Nachbearbeiten geht unten bei Sätze bearbeiten.", "gut");
+  }
   adminFotoSaetze();
   adminSaetze();
+  return { ok: ok, schonDa: schonDa, fehler: fehler, grund: ersterFehler };
+}
+
+// Der Vergleichsschluessel fuer "steht schon im Ordner". Er benutzt nur
+// Felder, die beim Speichern und beim Wiederlesen GENAU gleich bleiben:
+// Anstosszeit, Spiel und Wette. Die Quote bleibt bewusst draussen (siehe
+// die Erklaerung oben bei daSchluessel).
+function satzSchluessel(w) {
+  const norm = t => String(t == null ? "" : t).toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(w.an_zeit) + "|" + norm(w.spiel) + "|" + norm(w.wette);
 }
 
 // ---------- Ordner-Werkzeuge (Suche, Aktivieren, Aufklappen) ----------

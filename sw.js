@@ -179,6 +179,10 @@ async function wkPushZeigen(d) {
     ];
   }
   await self.registration.showNotification(d.titel || "Kombi-Tafel", einstellung);
+  // In den Verlauf, damit man spaeter nachsehen kann, was gekommen ist -
+  // gerade DAS, was kam, waehrend die App zu war.
+  await wkVerlaufSchreiben({ titel: d.titel || "Kombi-Tafel", text: d.text || "",
+    art: istAnruf ? "anruf" : "nachricht", von: d.von || null, bild: bild });
 }
 
 self.addEventListener("push", e => {
@@ -186,6 +190,34 @@ self.addEventListener("push", e => {
   try { d = e.data.json(); } catch (x) { }
   e.waitUntil(wkPushZeigen(d));
 });
+
+// ---------- Verlauf mitschreiben ----------
+// Dieselbe Schublade und dasselbe Format wie auf der Seite
+// (benachrichtigung.js, verlaufSchreiben). Faellt es aus, ist das kein
+// Grund, die Meldung nicht zu zeigen - deshalb faengt alles ab.
+function wkVerlaufSchreiben(eintrag) {
+  return wkSchubladeOeffnen().then(db => new Promise(fertig => {
+    try {
+      const t = db.transaction("merker", "readwrite");
+      const s = t.objectStore("merker");
+      const g = s.get("verlauf");
+      g.onsuccess = () => {
+        const alt = Array.isArray(g.result) ? g.result : [];
+        alt.unshift({
+          zeit: Date.now(),
+          titel: String(eintrag.titel || "").slice(0, 120),
+          text: String(eintrag.text || "").slice(0, 200),
+          art: eintrag.art || "nachricht",
+          von: eintrag.von || null,
+          bild: eintrag.bild || null
+        });
+        s.put(alt.slice(0, 60), "verlauf");
+      };
+      t.oncomplete = () => fertig();
+      t.onerror = () => fertig();
+    } catch (x) { fertig(); }
+  })).catch(() => { });
+}
 
 // ---------- Klick auf die Meldung ----------
 

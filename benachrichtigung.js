@@ -121,6 +121,8 @@ async function benachrichtige(titel, text, tag, mehr) {
         { action: "ablehnen", title: "Ablehnen" }
       ];
       await reg.showNotification(titel, einst);
+      verlaufSchreiben({ titel: titel, text: text || "", art: tag || "nachricht",
+        von: vonWem, bild: bild });
       return;
     }
     // KEIN Rueckfall auf "new Notification": Android-Chrome verbietet den
@@ -672,6 +674,19 @@ async function weckerPanelZeichnen() {
     "Gerät unten in der Liste steht - und spätestens, wenn dir jemand schreibt oder anruft.</p>" +
     '<div id="wk-probe" class="mini"></div></div>';
 
+  // Der ehrliche Teil: eine Probe an sich selbst KANN nicht ankommen.
+  html += '<div class="wk-zeile"><b>Kommt es auch von aussen an?</b>' +
+    '<p class="mini">Wichtig zu wissen: der Server schickt <b>nie</b> eine Meldung an dich ' +
+    "selbst zurueck. Eine Probe an dich allein kann also gar nicht ankommen - das ist kein " +
+    "Fehler. Diese Probe geht deshalb an einen Freund und liest vor, was der Server " +
+    "geantwortet hat.</p>" +
+    '<button onclick="weckerProbeFreund()">&#128228; Probemeldung an einen Freund</button>' +
+    '<div id="wk-probe2" class="mini"></div></div>';
+
+  html += '<div class="wk-zeile"><b>Verlauf: was angekommen ist</b>' +
+    '<button class="wk-vlleeren" onclick="verlaufLeeren()">leeren</button>' +
+    '<div id="wk-verlauf" class="wk-verlauf">Laedt...</div></div>';
+
   html += '<div class="wk-zeile"><b>Deine angemeldeten Geraete</b><div id="wk-geraete" class="mini">Laedt...</div></div>';
 
   html += '<div class="wk-zeile mini"><b>Was steht in so einer Meldung?</b><br>' +
@@ -680,6 +695,7 @@ async function weckerPanelZeichnen() {
 
   ziel.innerHTML = html;
   weckerGeraeteZeichnen();
+  weckerVerlaufZeichnen();
 }
 
 async function weckerGeraeteZeichnen() {
@@ -1198,3 +1214,189 @@ function ablegenStreifenZeigen() {
 }
 
 document.addEventListener("DOMContentLoaded", () => setTimeout(ablegenStreifenZeigen, 700));
+
+// ============================================================
+// DER VERLAUF
+//
+// Karams Wunsch: die Meldungen sollen sich verhalten wie bei einem
+// gewoehnlichen Programm - man soll spaeter nachsehen koennen, was
+// gekommen ist, auch wenn man gerade nicht davorsass.
+//
+// Er liegt in derselben Schublade wie der Weck-Wunsch
+// (kt-wecker/merker, Schluessel "verlauf"). KEIN eigener Speicher:
+// eine zweite Stelle waere nur eine weitere, die auseinanderlaufen kann.
+// Geschrieben wird von zwei Seiten - von der offenen Seite hier und vom
+// Service Worker, wenn die App zu war. Beide haengen nur an, deshalb
+// reicht Lesen-Aendern-Schreiben in EINER Transaktion.
+//
+// Es steht dort NICHTS Vertrauliches: nur wer angeklopft hat und ob es
+// ein Anruf oder eine Nachricht war. Der Text selbst bleibt Ende-zu-Ende
+// verschluesselt und kommt hier nie an. Und die Schublade gehoert allein
+// diesem Browser - sie verlaesst das Geraet nie.
+// ============================================================
+
+const VERLAUF_MAX = 60;
+
+async function verlaufSchreiben(eintrag) {
+  try {
+    const db = await weckerSchubladeOeffnen();
+    await new Promise((fertig, schief) => {
+      const t = db.transaction("merker", "readwrite");
+      const s = t.objectStore("merker");
+      const g = s.get("verlauf");
+      g.onsuccess = () => {
+        const alt = Array.isArray(g.result) ? g.result : [];
+        alt.unshift({
+          zeit: Date.now(),
+          titel: String(eintrag.titel || "").slice(0, 120),
+          text: String(eintrag.text || "").slice(0, 200),
+          art: eintrag.art || "nachricht",
+          von: eintrag.von || null,
+          bild: eintrag.bild || null
+        });
+        s.put(alt.slice(0, VERLAUF_MAX), "verlauf");
+      };
+      g.onerror = () => schief(g.error);
+      t.oncomplete = () => fertig();
+      t.onerror = () => schief(t.error);
+    });
+  } catch (e) { /* ohne Verlauf laeuft alles andere weiter */ }
+}
+
+async function verlaufLesen() {
+  try {
+    const db = await weckerSchubladeOeffnen();
+    return await new Promise(fertig => {
+      const g = db.transaction("merker", "readonly").objectStore("merker").get("verlauf");
+      g.onsuccess = () => fertig(Array.isArray(g.result) ? g.result : []);
+      g.onerror = () => fertig([]);
+    });
+  } catch (e) { return []; }
+}
+
+async function verlaufLeeren() {
+  try {
+    const db = await weckerSchubladeOeffnen();
+    const t = db.transaction("merker", "readwrite");
+    t.objectStore("merker").put([], "verlauf");
+  } catch (e) { }
+  weckerVerlaufZeichnen();
+}
+
+function verlaufWann(ms) {
+  const d = new Date(ms), jetzt = new Date();
+  const uhr = d.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+  const gleicherTag = d.toDateString() === jetzt.toDateString();
+  if (gleicherTag) return "heute " + uhr;
+  const gestern = new Date(jetzt.getTime() - 86400000);
+  if (d.toDateString() === gestern.toDateString()) return "gestern " + uhr;
+  return d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit" }) + " " + uhr;
+}
+
+async function weckerVerlaufZeichnen() {
+  const ziel = document.getElementById("wk-verlauf");
+  if (!ziel) return;
+  const liste = await verlaufLesen();
+  if (!liste.length) {
+    ziel.innerHTML = '<p class="mini">Noch nichts angekommen. Hier steht spaeter, wer ' +
+      "dich angerufen oder dir geschrieben hat - auch das, was kam, waehrend die App zu war.</p>";
+    return;
+  }
+  ziel.innerHTML = "";
+  for (const e of liste) {
+    const z = document.createElement("div");
+    z.className = "vl-zeile vl-" + (e.art === "anruf" ? "anruf"
+      : e.art === "verpasst" ? "verpasst" : "nachricht");
+    const bild = document.createElement("span");
+    bild.className = "vl-bild";
+    if (e.bild) {
+      const i = document.createElement("img");
+      i.src = e.bild; i.alt = "";
+      bild.appendChild(i);
+    } else {
+      bild.textContent = e.art === "anruf" ? "\uD83D\uDCDE"
+        : e.art === "verpasst" ? "\uD83D\uDCF5" : "\uD83D\uDCAC";
+    }
+    z.appendChild(bild);
+    const mitte = document.createElement("span");
+    mitte.className = "vl-mitte";
+    const t1 = document.createElement("b");
+    // NIE als HTML: der Titel traegt einen Benutzernamen.
+    t1.textContent = e.titel || "";
+    const t2 = document.createElement("span");
+    t2.className = "mini";
+    t2.textContent = e.text || "";
+    mitte.appendChild(t1); mitte.appendChild(t2);
+    z.appendChild(mitte);
+    const wann = document.createElement("span");
+    wann.className = "vl-wann mini";
+    wann.textContent = verlaufWann(e.zeit);
+    z.appendChild(wann);
+    ziel.appendChild(z);
+  }
+}
+
+// ============================================================
+// DIE PROBE, DIE WIRKLICH ETWAS BEWEIST
+//
+// WARUM ES DIE BRAUCHT: der Server schickt GRUNDSAETZLICH nichts an den
+// Absender selbst zurueck (push-senden prueft an === user.id und hoert
+// dann auf). Eine Probe an sich selbst kann also gar nie ankommen - genau
+// deshalb kam bei Karam am Laptop nie etwas an, obwohl alles richtig
+// eingestellt war. Diese Probe geht deshalb an einen FREUND und liest die
+// Antwort des Servers vor: wie viele Geraete er kennt und an wie viele er
+// wirklich geschickt hat.
+// ============================================================
+async function weckerProbeFreund() {
+  const ziel = document.getElementById("wk-probe2");
+  const sag = t => { if (ziel) ziel.innerHTML = t; };
+  sag("Sehe nach, wen ich fragen kann...");
+  try {
+    const u = await supaNutzer();
+    if (!u) { sag("Dafuer musst du angemeldet sein."); return; }
+    const kontakte = await supaKontakteLaden();
+    if (!kontakte.length) {
+      sag("Du hast noch keinen Freund. Der Server schickt <b>nie</b> eine Meldung an dich " +
+        "selbst zurueck - deshalb laesst sich der Weg ueber den Server erst pruefen, wenn " +
+        "jemand anderes da ist. Die Probe auf diesem Geraet oben geht trotzdem.");
+      return;
+    }
+    let html = '<p class="mini">An wen soll die Probe gehen? Der Freund sieht eine ganz ' +
+      "normale Meldung.</p>";
+    for (const k of kontakte) {
+      html += '<button class="wk-probeziel" data-id="' + k.partnerId + '">' +
+        wkText(k.username) + "</button> ";
+    }
+    sag(html);
+    for (const knopf of ziel.querySelectorAll(".wk-probeziel")) {
+      knopf.onclick = () => weckerProbeSenden(knopf.dataset.id, knopf.textContent);
+    }
+  } catch (e) { sag("Ging nicht: " + wkText(String(e.message || e).slice(0, 100))); }
+}
+
+function wkText(t) {
+  return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+async function weckerProbeSenden(anId, name) {
+  const ziel = document.getElementById("wk-probe2");
+  const sag = t => { if (ziel) ziel.innerHTML = t; };
+  sag("Schicke...");
+  const r = await pushSenden(anId, "nachricht");
+  if (!r || !r.ok) {
+    sag("<b>Der Server hat es NICHT angenommen.</b> " +
+      wkText(String((r && r.fehler) || "kein Grund genannt").slice(0, 160)));
+    return;
+  }
+  if (!r.geraete) {
+    sag("<b>" + wkText(name) + " hat auf keinem Geraet Benachrichtigungen eingeschaltet.</b> " +
+      "Der Weg von hier bis zum Server steht also - weiter geht es erst, wenn dort jemand " +
+      "einschaltet.");
+    return;
+  }
+  sag("<b>Hinausgegangen: an " + r.gesendet + " von " + r.geraete + " Geraeten von " +
+    wkText(name) + ".</b>" + (r.aufgeraeumt ? " " + r.aufgeraeumt + " tote Anmeldung(en) " +
+    "hat der Server dabei weggeraeumt." : "") +
+    "<br>Kommt dort nichts an, liegt es am Geraet dort, nicht an uns. Kommt es an, " +
+    "funktioniert die ganze Kette.");
+}

@@ -609,6 +609,8 @@ async function tuImport() {
   let lokal = [];
   try { lokal = JSON.parse(localStorage.getItem("verlauf") || "[]"); } catch (e) {}
   let ok = 0;
+  const liegenGeblieben = [];   // nur die, die NICHT durchgingen
+  let ersterFehler = "";
   for (const e of lokal) {
     const foto = e.scheinId ? localStorage.getItem("foto_" + e.scheinId) : null;
     const fotoName = e.scheinId ? localStorage.getItem("foto_" + e.scheinId + "_name") : null;
@@ -617,13 +619,26 @@ async function tuImport() {
         moeglich: e.moeglich, wetten: e.wetten, stand: e.stand, notiz: e.notiz || "" },
       foto, fotoName);
     if (!r.error) ok++;
+    else {
+      liegenGeblieben.push(e);
+      if (!ersterFehler) ersterFehler = String(r.error.message || r.error);
+    }
   }
   if (ok === lokal.length) {
     localStorage.removeItem("verlauf");
     meldungM("Alle " + ok + " Scheine übernommen und lokal aufgeraeumt. Sie liegen unter " +
       "\"ohne Person\" - bitte in der Tabelle den Personen zuordnen.", "gut");
   } else {
-    meldungM("Nur " + ok + " von " + lokal.length + " übernommen; die lokalen bleiben zur Sicherheit liegen.", "warn");
+    // NUR die nicht uebernommenen bleiben liegen. Frueher blieb alles
+    // liegen, und der zweite Druck auf den Knopf legte die schon
+    // gespeicherten Scheine ein zweites Mal an.
+    try { localStorage.setItem("verlauf", JSON.stringify(liegenGeblieben)); }
+    catch (e) { /* voller Speicher: dann bleibt eben die alte Liste stehen */ }
+    meldungM("<b>" + ok + " von " + lokal.length + " übernommen.</b> Die " +
+      liegenGeblieben.length + " nicht übernommenen bleiben lokal liegen - drück den Knopf " +
+      "gleich noch einmal, dann werden NUR diese versucht. Die schon gespeicherten " +
+      "werden nicht doppelt angelegt." +
+      (ersterFehler ? " Grund: " + textSicherM(ersterFehler.slice(0, 120)) : ""), "warn");
   }
   zeigeApp();
 }
@@ -775,6 +790,33 @@ async function tuScheinOrdner(id, wert) {
   zeichneBereich();
 }
 
+// Warnt, wenn Scheine auf DIESEM Geraet nicht lesbar sind. Solange das so
+// ist, sind alle Geldsummen darunter zu niedrig - das muss man sehen,
+// bevor man ihnen glaubt.
+function zeichneGesperrtWarnung(scheine) {
+  const alt = document.getElementById("gesperrt_warnung");
+  if (alt) alt.remove();
+  const liste = (scheine || []).filter(s => s.daten && s.daten.gesperrt);
+  if (!liste.length) return;
+  const ziel = el("scheine_titel");
+  if (!ziel || !ziel.parentNode) return;
+  const d = document.createElement("div");
+  d.id = "gesperrt_warnung";
+  d.className = "gesperrtwarn";
+  d.innerHTML =
+    "<b>&#9888; " + liste.length + (liste.length === 1
+      ? " Kombination lässt sich" : " Kombinationen lassen sich") +
+    " auf diesem Gerät nicht entschlüsseln.</b>" +
+    "<p>Sie stehen unten mit <b>0,00 &euro;</b> in der Tabelle. Damit sind <b>alle Summen " +
+    "auf dieser Seite zu niedrig</b>: Einsätze, \"im Spiel\", die Anbieter-Tabelle und die " +
+    "Buchhaltung. Glaub den Zahlen erst, wenn dieser Kasten weg ist.</p>" +
+    "<p class=\"mini\">Das passiert auf einem Gerät, dem der Schlüssel fehlt (neues Handy, " +
+    "Browserdaten gelöscht) oder als Gast in einem geteilten Bereich ohne Schlüssel. " +
+    "Meist hilft: einmal abmelden und auf dem gewohnten Gerät wieder anmelden. " +
+    "<b>Es ist nichts verloren</b> - die Scheine liegen unverändert in der Datenbank.</p>";
+  ziel.parentNode.insertBefore(d, ziel.nextSibling);
+}
+
 async function zeichneBereich() {
   el("scheine_titel").textContent = (aktiverBereich.rolle === "ich")
     ? "&#127919; Meine Kombinationen" : "&#127919; Kombinationen von " + aktiverBereich.username;
@@ -786,6 +828,7 @@ async function zeichneBereich() {
   personDatenKarte = await supaPersonDatenLaden(aktiverBereich.id);
   anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
   kasseScheine = scheine;
+  zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);
   zeichnePruefung(scheine);
