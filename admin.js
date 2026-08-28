@@ -581,11 +581,22 @@ function satzFelderParsen(felder, erbe) {
 }
 
 function artErkennen(wette) {
-  if (/[+-]\s?\d+[.,]?\d*\s*A[HIl]?/i.test(wette) || /\([+-]/.test(wette) || /\d[.,]5\s*AH/i.test(wette)) return "ASIA";
-  if (/DN[BE]/i.test(wette)) return "DNB";
-  if (/\(DC/i.test(wette)) return "DC";
-  if (/ber\s|under|over|tore/i.test(wette)) return "TORE";
-  if (/eck|corner/i.test(wette)) return "ECKEN";
+  const t = String(wette || "");
+  // Beide Mannschaften treffen: stand frueher gar nicht drin und landete
+  // deshalb faelschlich unter SIEG (an Karams Fotos vom 27.08. aufgefallen).
+  if (/\bBTTS\b|beide\s+treffen|both\s+teams/i.test(t)) return "BTTS";
+  if (/DN[BE]/i.test(t)) return "DNB";
+  if (/\(DC|\bDC\b/i.test(t)) return "DC";
+  // Ueber/Unter VOR dem Handicap pruefen: "OVER (2.5, 3)" hat Klammern und
+  // Zahlen und waere sonst als Handicap durchgegangen.
+  if (/\bover\b|\bunder\b|ber\s|tore|\bo\d|\bu\d/i.test(t)) return "TORE";
+  if (/eck|corner/i.test(t)) return "ECKEN";
+  if (/[+-]\s?\d+[.,]?\d*\s*A[HIl]?/i.test(t) || /\([+-]/.test(t) || /\d[.,]5\s*AH/i.test(t)) return "ASIA";
+  // Handicap OHNE Vorzeichen hinter HOME/AWAY, zum Beispiel
+  // "AWAY (0.5, 0.75)" - dieser Fall fehlte und galt als SIEG.
+  if (/\b(home|away)\b[^a-z0-9]*\(?\s*[+-]?\d/i.test(t)) return "ASIA";
+  // Vorgabe direkt hinter dem Namen, wie beim Basketball: "Swiss +9,5".
+  if (/[+-]\s?\d+([.,]\d+)?\s*$/.test(t)) return "ASIA";
   return "SIEG";
 }
 
