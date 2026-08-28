@@ -637,11 +637,28 @@ async function weckerPanelZeichnen() {
       "&#128276; Auf diesem Geraet einschalten</button></div>";
   }
 
+  // ---- Was soll ankommen? Zwei getrennte Schalter ----
+  // Die Meldung geht immer hinaus; der Service Worker entscheidet beim
+  // Ankommen, ob er sie zeigt. So wirkt der Schalter sofort und auf
+  // diesem Geraet, ohne dass der Server etwas davon wissen muss.
+  if (st === "an" || st === "halb") {
+    const w = weckerWunschLesen();
+    html += '<div class="wk-zeile"><b>Was soll auf diesem Gerät ankommen?</b>' +
+      '<label class="wk-schalter"><input type="checkbox"' + (w.nachrichten ? " checked" : "") +
+      ' onchange="weckerWunschSetzen(\'nachrichten\', this.checked)"> ' +
+      "&#128172; <b>Nachrichten</b> - wenn dir jemand schreibt</label>" +
+      '<label class="wk-schalter"><input type="checkbox"' + (w.anrufe ? " checked" : "") +
+      ' onchange="weckerWunschSetzen(\'anrufe\', this.checked)"> ' +
+      "&#128222; <b>Anrufe</b> - klingelt, bleibt stehen, mit Annehmen und Ablehnen</label>" +
+      '<p class="mini">Beides getrennt schaltbar. Schaltest du Anrufe aus, klingelt es hier nicht ' +
+      "mehr - auf deinen anderen Geräten schon.</p></div>";
+  }
+
   html += '<div class="wk-zeile"><b>Geht es wirklich?</b><br>' +
-    '<button onclick="weckerProbeHier()">Probe auf diesem Geraet</button> ' +
-    '<button onclick="weckerProbeServer()">Probe ueber den Server</button>' +
-    '<p class="mini">Die erste Probe zeigt sofort eine Meldung (ohne Server). Die zweite laeuft den ' +
-    "ganzen Weg ueber den Server zurueck auf all deine Geraete - genau wie ein echter Anruf.</p>" +
+    '<button onclick="weckerProbeHier()">&#128276; Probemeldung auf diesem Gerät</button>' +
+    '<p class="mini">Zeigt sofort eine Meldung. Damit siehst du: die Erlaubnis steht, und dieses ' +
+    "Gerät kann Meldungen anzeigen. Ob sie auch von außen ankommen, siehst du daran, dass dieses " +
+    "Gerät unten in der Liste steht - und spätestens, wenn dir jemand schreibt oder anruft.</p>" +
     '<div id="wk-probe" class="mini"></div></div>';
 
   html += '<div class="wk-zeile"><b>Deine angemeldeten Geraete</b><div id="wk-geraete" class="mini">Laedt...</div></div>';
@@ -749,28 +766,9 @@ async function weckerProbeHier() {
   } catch (e) { sag("Ging nicht: " + String(e.message || e).slice(0, 100)); }
 }
 
-async function weckerProbeServer() {
-  const ziel = document.getElementById("wk-probe");
-  const sag = t => { if (ziel) ziel.textContent = t; else weckerBalken(t, "gut"); };
-  const u = await supaNutzer();
-  if (!u) { sag("Dafuer musst du angemeldet sein."); return; }
-  sag("Probe laeuft...");
-  const r = await pushSenden(u.id, "test");
-  if (!r.ok) { sag("Der Server meldet: " + r.fehler); return; }
-  if (!r.test) {
-    sag("Der Server kennt den Selbsttest noch nicht - die neue Server-Fassung von push-senden " +
-      "muss noch hochgeladen werden. Die Probe auf diesem Geraet geht trotzdem.");
-    return;
-  }
-  if (r.geraete === 0) { sag("Du hast KEIN Geraet angemeldet. Deshalb kommt nichts an - oben einschalten."); return; }
-  if (r.gesendet === 0) {
-    sag("Es sind " + r.geraete + " Geraet(e) eingetragen, aber der Push-Dienst hat keines angenommen. " +
-      "Meist ist die Anmeldung veraltet: hier abschalten und wieder einschalten.");
-    return;
-  }
-  sag("Der Server hat " + r.gesendet + " von " + r.geraete + " Geraet(en) erreicht. " +
-    "Auf jedem davon muss jetzt eine Probe-Meldung sein.");
-}
+// weckerProbeServer ist entfallen: der Server weist eine Meldung an
+// einen selbst ab, die Probe konnte also gar nie etwas beweisen.
+// Der echte Beweis ist, dass dieses Geraet in der Liste unten steht.
 
 // ---------- Anmeldungen, die leise sterben, wieder einfangen ----------
 
@@ -930,3 +928,63 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(pruefeUpdate, 10 * 60 * 1000);          // alle 10 Minuten
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pruefeUpdate(); });
+
+// ============================================================
+// WAS SOLL ANKOMMEN? Nachrichten und Anrufe getrennt schaltbar.
+//
+// Der Wunsch steht im Browser (localStorage) UND in einer kleinen
+// Schublade (IndexedDB), weil der Service Worker den localStorage
+// nicht lesen kann. Er entscheidet beim Ankommen einer Meldung, ob
+// er sie zeigt. Vorteil: der Schalter wirkt sofort, ohne dass der
+// Server etwas davon wissen muss.
+// ============================================================
+
+const WK_WUNSCH_SCHLUESSEL = "kt_meldewunsch";
+
+function weckerWunschLesen() {
+  try {
+    const w = JSON.parse(localStorage.getItem(WK_WUNSCH_SCHLUESSEL) || "{}");
+    return { nachrichten: w.nachrichten !== false, anrufe: w.anrufe !== false };
+  } catch (e) { return { nachrichten: true, anrufe: true }; }
+}
+
+async function weckerWunschSetzen(was, an) {
+  const w = weckerWunschLesen();
+  w[was] = !!an;
+  try { localStorage.setItem(WK_WUNSCH_SCHLUESSEL, JSON.stringify(w)); } catch (e) { }
+  await weckerWunschInSchublade(w);
+  weckerBalken(was === "anrufe"
+    ? (an ? "Anrufe kommen auf diesem Gerät wieder an." : "Anrufe kommen auf diesem Gerät nicht mehr an.")
+    : (an ? "Nachrichten kommen auf diesem Gerät wieder an." : "Nachrichten kommen auf diesem Gerät nicht mehr an."),
+    "gut");
+}
+
+// Die Schublade, aus der auch der Service Worker lesen kann. Bewusst
+// DIESELBE wie fuer den Abo-Zettel (kt-wecker/merker), damit es nur eine
+// Stelle gibt.
+function weckerWunschInSchublade(w) {
+  return new Promise(fertig => {
+    try {
+      const anfrage = indexedDB.open("kt-wecker", 1);
+      anfrage.onupgradeneeded = () => {
+        const db = anfrage.result;
+        if (!db.objectStoreNames.contains("merker")) db.createObjectStore("merker");
+      };
+      anfrage.onsuccess = () => {
+        const db = anfrage.result;
+        try {
+          const t = db.transaction("merker", "readwrite");
+          t.objectStore("merker").put(w, "meldewunsch");
+          t.oncomplete = () => { db.close(); fertig(true); };
+          t.onerror = () => { db.close(); fertig(false); };
+        } catch (x) { fertig(false); }
+      };
+      anfrage.onerror = () => fertig(false);
+    } catch (x) { fertig(false); }
+  });
+}
+
+// Beim Laden einmal abgleichen, damit die Schublade nie veraltet ist.
+document.addEventListener("DOMContentLoaded", () => {
+  try { weckerWunschInSchublade(weckerWunschLesen()); } catch (e) { }
+});

@@ -57,12 +57,34 @@ function wkSchubladeLegen(zettel) {
   }));
 }
 
+// Was will dieses Geraet ueberhaupt sehen? Die Seite legt den Wunsch in
+// DIESELBE Schublade wie den Abo-Zettel (kt-wecker/merker) - eine zweite
+// Datenbank waere nur eine weitere Stelle, die auseinanderlaufen kann.
+// Steht dort nichts, kommt alles an.
+function wkWunschLesen() {
+  return wkSchubladeOeffnen().then(db => new Promise(fertig => {
+    try {
+      const t = db.transaction("merker", "readonly");
+      const g = t.objectStore("merker").get("meldewunsch");
+      g.onsuccess = () => {
+        const w = g.result || {};
+        fertig({ nachrichten: w.nachrichten !== false, anrufe: w.anrufe !== false });
+      };
+      g.onerror = () => fertig({ nachrichten: true, anrufe: true });
+    } catch (x) { fertig({ nachrichten: true, anrufe: true }); }
+  })).catch(() => ({ nachrichten: true, anrufe: true }));
+}
+
 // ---------- Push kommt herein ----------
 
-self.addEventListener("push", e => {
-  let d = {};
-  try { d = e.data.json(); } catch (x) { }
+async function wkPushZeigen(d) {
   const istAnruf = (d.art === "anruf") || String(d.tag || "").indexOf("anruf") === 0;
+  // Karams Schalter: hat er Anrufe oder Nachrichten auf DIESEM Geraet
+  // abgeschaltet, wird die Meldung hier gar nicht erst gezeigt. Die
+  // uebrigen Geraete bekommen sie trotzdem.
+  const wunsch = await wkWunschLesen();
+  if (istAnruf && !wunsch.anrufe) return;
+  if (!istAnruf && !wunsch.nachrichten) return;
   const einstellung = {
     body: d.text || "",
     icon: "logo-192.png",
@@ -81,7 +103,13 @@ self.addEventListener("push", e => {
       { action: "ablehnen", title: "Ablehnen" }
     ];
   }
-  e.waitUntil(self.registration.showNotification(d.titel || "Kombi-Tafel", einstellung));
+  await self.registration.showNotification(d.titel || "Kombi-Tafel", einstellung);
+}
+
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data.json(); } catch (x) { }
+  e.waitUntil(wkPushZeigen(d));
 });
 
 // ---------- Klick auf die Meldung ----------
