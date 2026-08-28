@@ -55,8 +55,11 @@ der Ordner entsteht dann von selbst), <b>Fotos hineinlegen</b>, <b>einlesen</b> 
 auf Kombi-Tafel, Kombi-Bau und Original-Tabelle angezeigt. Ordner mischen sich nie.</p>
 <div class="kern"><b>Neuen Ordner anlegen:</b>
   <input type="date" id="neusatz_datum">
+  <input id="neusatz_zusatz" placeholder="Zusatz, z.B. abend" size="12">
   <input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24">
-  <button class="haupt" onclick="tuSatzNeu()">&#10133; Ordner anlegen</button></div>
+  <button class="haupt" onclick="tuSatzNeu()">&#10133; Ordner anlegen</button>
+  <p class="mini">Am selben Tag mehrere Ordner? Dann einen <b>Zusatz</b> eintragen
+  (zum Beispiel "frueh" und "abend"). Ohne Zusatz heisst der Ordner einfach nach dem Datum.</p></div>
 <p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..."
   size="40" oninput="satzSuche(this.value)"></p>
 <div id="adm_ordner"><p class="mini">Lädt...</p></div>
@@ -117,11 +120,15 @@ async function zeichneOrdner() {
       ' <label class="fotoknopf">&#128247; Fotos hinzufügen' +
       '<input type="file" accept="image/*" multiple style="display:none" ' +
       'onchange="tuSatzFotos(this, \'' + sicherA(s.id) + '\')"></label>' +
-      (fotos.length ? ' <button class="haupt" onclick="satzEinlesen(\'' + sicherA(s.id) + '\')">&#128269; ' +
-        (wartet ? "Fotos einlesen (" + wartet + " neu)" : "Fotos noch einmal einlesen") + "</button>" : "") +
+      (fotos.length ? ' <button class="haupt" onclick="satzScannen(\'' + sicherA(s.id) + '\')">&#128270; ' +
+        "Ordner scannen (" + fotos.length + " Foto" + (fotos.length === 1 ? "" : "s") + ")</button>" : "") +
+      (fotos.length ? ' <button onclick="satzEinlesen(\'' + sicherA(s.id) + '\')" ' +
+        'title="Der alte Weg: die Texterkennung im Browser. Sie liest diese Tabellen sehr schlecht.">' +
+        "&#128269; alt: selbst einlesen</button>" : "") +
       ' <button onclick="tuWetteNeu(\'' + sicherA(s.id) + '\')">&#10133; Wette von Hand</button>' +
       ' <button id="satzweg_' + sicherA(s.id) + '" onclick="tuSatzWeg(\'' + sicherA(s.id) + '\')">&#128465; Ordner löschen</button>' +
       "</div>" +
+      '<div id="scan_' + sicherA(s.id) + '"></div>' +
       '<div id="vorschau_' + sicherA(s.id) + '"></div>' +
       '<div id="satzfotos_' + sicherA(s.id) + '"></div>' +
       '<h3>Wetten in diesem Ordner (' + meine.length + ")</h3>" +
@@ -892,13 +899,21 @@ function satzAufklappen(id) {
 async function tuSatzNeu() {
   const datum = elA("neusatz_datum").value;
   if (!datum) { meldungA("Bitte ein Datum wählen.", "warn"); return; }
+  // Der Zusatz macht aus einem Datum mehrere Ordner: 2026-08-27-abend.
+  // Nur Buchstaben, Ziffern und Bindestrich, damit die Kennung sauber bleibt.
+  const zusatzFeld = elA("neusatz_zusatz");
+  const zusatz = zusatzFeld ? zusatzFeld.value.trim().toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20) : "";
+  const kennung = zusatz ? datum + "-" + zusatz : datum;
   const t = elA("neusatz_titel").value.trim();
   const d = datum.split("-");
-  const titel = t || ("Fotos vom " + d[2] + "." + d[1] + "." + d[0]);
-  const r = await supaSatzAnlegen(datum, titel);
+  const titel = t || ("Fotos vom " + d[2] + "." + d[1] + "." + d[0] + (zusatz ? " (" + zusatz + ")" : ""));
+  const r = await supaSatzAnlegen(kennung, titel);
   if (r.error) { meldungA("Ordner nicht angelegt: " + sicherA(r.error.message), "warn"); return; }
-  meldungA("Ordner <b>" + sicherA(titel) + "</b> angelegt - er erscheint sofort in der Ordner-Leiste. " +
-    "Wetten unten hinzufügen oder Fotos zu diesem Datum hochladen und einlesen.", "gut");
+  meldungA("Ordner <b>" + sicherA(titel) + "</b> angelegt (Kennung " + sicherA(kennung) + ") - " +
+    "er erscheint sofort in der Ordner-Leiste. Fotos hineinlegen und dann auf " +
+    "<b>Ordner scannen</b> drücken.", "gut");
+  if (zusatzFeld) zusatzFeld.value = "";
   adminSaetze();
 }
 
@@ -946,4 +961,183 @@ async function tuSatzWeg(id) {
   if (r.error || !r.data || !r.data.length) { meldungA("Nicht gelöscht.", "warn"); return; }
   meldungA("Satz gelöscht.", "gut");
   adminSaetze();
+}
+
+// ============================================================
+// ORDNER SCANNEN: Karam laesst die Fotos von Claude lesen.
+//
+// Warum ueberhaupt: die Texterkennung im Browser (Tesseract) liest
+// diese Tabellen nicht. Gemessen am 28.08. an einem echten Foto:
+// sie fand die 12 Zeilen, aber KEINE EINZIGE war brauchbar - aus
+// "The New Saints FC" wurde "The New Sarmts FC", aus "19:45" wurde
+// "19 45". Bei Quoten und Anstosszeiten ist das mit echtem Geld
+// nicht zu gebrauchen. Deshalb dieser Weg.
+//
+// Der Ablauf in drei Schritten:
+//   1. Knopf druecken: es erscheint ein fertiger Satz zum Kopieren.
+//   2. Claude liest die Fotos und gibt die Zeilen zurueck.
+//   3. Zeilen hier einfuegen, pruefen lassen, uebernehmen.
+// Es wird NICHTS uebernommen, was nicht vollstaendig ist - lieber
+// eine Zeile weniger als eine falsche Quote.
+// ============================================================
+
+const SCAN_TRENNER = /\t|\s*\|\s*/;
+let scanGeprueft = {};   // Ordner -> gepruefte Zeilen
+
+function satzScannen(ordner) {
+  const box = elA("scan_" + ordner);
+  if (!box) return;
+  if (box.dataset.offen === "1") { box.innerHTML = ""; box.dataset.offen = ""; return; }
+  box.dataset.offen = "1";
+  const satz = "Lies die Fotos im Ordner " + ordner + " der Kombi-Tafel und gib mir die Zeilen.";
+  box.innerHTML =
+    '<div class="scankasten">' +
+    "<h3>&#128270; Ordner scannen</h3>" +
+    '<p class="mini">Die Texterkennung im Browser liest diese Tabellen nicht zuverlässig ' +
+    "(gemessen: 0 von 12 Zeilen brauchbar). Deshalb liest <b>Claude</b> die Fotos.</p>" +
+    '<ol class="scanschritte">' +
+    "<li><b>Diesen Satz an Claude schicken:</b><br>" +
+    '<code id="scan_satz_' + sicherA(ordner) + '">' + sicherA(satz) + "</code> " +
+    '<button onclick="scanSatzKopieren(\'' + sicherA(ordner) + '\')">kopieren</button></li>' +
+    "<li>Claude liest die Fotos und gibt dir die Zeilen zurück.</li>" +
+    "<li><b>Zeilen hier einfügen</b> und prüfen lassen:<br>" +
+    '<textarea id="scan_text_' + sicherA(ordner) + '" rows="8" spellcheck="false" ' +
+    'placeholder="Melder | Anstoß | Liga | Spiel | Wette | Quoten"></textarea><br>' +
+    '<button class="haupt" onclick="scanPruefen(\'' + sicherA(ordner) + '\')">' +
+    "&#128269; Zeilen prüfen</button></li></ol>" +
+    '<div id="scan_ergebnis_' + sicherA(ordner) + '"></div></div>';
+}
+
+function scanSatzKopieren(ordner) {
+  const c = elA("scan_satz_" + ordner);
+  if (!c) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(c.textContent).then(
+      () => meldungA("Satz kopiert - jetzt bei Claude einfügen.", "gut"),
+      () => meldungA("Kopieren ging nicht - bitte den Satz von Hand markieren.", "warn"));
+  } else {
+    meldungA("Dieser Browser kann nicht selbst kopieren - bitte den Satz von Hand markieren.", "warn");
+  }
+}
+
+// Wandelt eine Anstoss-Angabe in das Format des Programms um.
+// Erlaubt: 2026-08-29T15:00 | 2026-08-29 15:00 | 29.08.2026 15:00
+//          29/08/2026 15:00 | 29-08-2026, 15:00
+function scanZeit(roh) {
+  const t = String(roh || "").trim().replace(/,/g, " ").replace(/\s+/g, " ");
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2})[:.h](\d{2})$/i);
+  if (m) return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") +
+    "T" + m[4].padStart(2, "0") + ":" + m[5];
+  m = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})\s+(\d{1,2})[:.h](\d{2})$/i);
+  if (m) return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0") +
+    "T" + m[4].padStart(2, "0") + ":" + m[5];
+  return null;
+}
+
+// Mehrere Quoten je Zeile sind erlaubt (eine Wette mit mehreren Optionen).
+function scanQuoten(roh) {
+  return String(roh || "").split(/[\/;]/).map(x => {
+    const z = parseFloat(String(x).trim().replace(",", "."));
+    return isFinite(z) ? Math.round(z * 1000) / 1000 : null;
+  }).filter(z => z !== null && z >= 1.01 && z < 1000);
+}
+
+async function scanPruefen(ordner) {
+  const ziel = elA("scan_ergebnis_" + ordner);
+  const feld = elA("scan_text_" + ordner);
+  if (!ziel || !feld) return;
+  const roh = feld.value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  if (!roh.length) { ziel.innerHTML = '<div class="warnkern">Nichts eingefügt.</div>'; return; }
+
+  // Was schon im Ordner steht, wird NICHT doppelt angelegt.
+  const daWetten = (await supaWettenLaden()).filter(w => w.satz === ordner);
+  const bekannt = new Set(daWetten.map(w => (w.spiel + "|" + w.wette + "|" + w.an_zeit).toLowerCase()));
+
+  const gut = [], schlecht = [], doppelt = [];
+  roh.forEach((zeile, i) => {
+    const nr = i + 1;
+    if (/^\s*(melder|von)\s*(\||\t)/i.test(zeile)) return;   // Kopfzeile darf mit drin sein
+    const f = zeile.split(SCAN_TRENNER).map(x => x.trim());
+    if (f.length < 6) { schlecht.push([nr, "nur " + f.length + " Felder statt 6", zeile]); return; }
+    const von = f[0], liga = f[2], spiel = f[3], wette = f[4];
+    const an = scanZeit(f[1]);
+    const quoten = scanQuoten(f[5]);
+    if (!an) { schlecht.push([nr, "Anstoß nicht lesbar: " + f[1], zeile]); return; }
+    if (!spiel) { schlecht.push([nr, "Spiel fehlt", zeile]); return; }
+    if (!wette) { schlecht.push([nr, "Wette fehlt", zeile]); return; }
+    if (!quoten.length) { schlecht.push([nr, "keine gültige Quote (ab 1.01)", zeile]); return; }
+    const key = (spiel + "|" + wette + "|" + an).toLowerCase();
+    if (bekannt.has(key)) { doppelt.push(nr); return; }
+    bekannt.add(key);
+    gut.push({ von: von || "?", an_zeit: an, liga: liga, spiel: spiel, wette: wette,
+      s: artErkennen(wette), quoten: quoten });
+  });
+  scanGeprueft[ordner] = gut;
+
+  let h = '<div class="' + (schlecht.length ? "warnkern" : "kern") + '"><b>' + roh.length +
+    " Zeilen eingefügt:</b> " + gut.length + " in Ordnung" +
+    (doppelt.length ? ", " + doppelt.length + " stehen schon im Ordner" : "") +
+    (schlecht.length ? ", <b>" + schlecht.length + " mit Problem</b>" : "") + ".</div>";
+  if (schlecht.length) {
+    h += "<p><b>Diese Zeilen werden NICHT übernommen:</b></p><ul class='mini'>";
+    for (const x of schlecht.slice(0, 12))
+      h += "<li>Zeile " + x[0] + ": " + sicherA(x[1]) + "<br><code>" +
+        sicherA(String(x[2]).slice(0, 110)) + "</code></li>";
+    if (schlecht.length > 12) h += "<li>... und " + (schlecht.length - 12) + " weitere</li>";
+    h += "</ul>";
+  }
+  if (gut.length) {
+    h += '<div class="tabellenrand"><table><thead><tr><th>Melder</th><th>Anstoß</th><th>Liga</th>' +
+      "<th>Spiel</th><th>Wette</th><th>Art</th><th>Quoten</th></tr></thead><tbody>";
+    for (const z of gut.slice(0, 60))
+      h += "<tr><td>" + sicherA(z.von) + "</td><td class='mini'>" + sicherA(z.an_zeit) +
+        "</td><td>" + sicherA(z.liga) + "</td><td>" + sicherA(z.spiel) + "</td><td>" +
+        sicherA(z.wette) + "</td><td>" + z.s + "</td><td>" + z.quoten.join(" / ") + "</td></tr>";
+    h += "</tbody></table></div>";
+    if (gut.length > 60) h += '<p class="mini">(nur die ersten 60 gezeigt, übernommen werden alle ' +
+      gut.length + ")</p>";
+    h += '<p><button class="haupt" onclick="scanUebernehmen(\'' + sicherA(ordner) + '\')">' +
+      "&#9989; Diese " + gut.length + " Zeilen übernehmen</button></p>";
+  }
+  ziel.innerHTML = h;
+}
+
+async function scanUebernehmen(ordner) {
+  const gut = scanGeprueft[ordner] || [];
+  if (!gut.length) { meldungA("Nichts zu übernehmen.", "warn"); return; }
+  const ziel = elA("scan_ergebnis_" + ordner);
+  if (ziel) ziel.innerHTML = '<div class="kern">Wird gespeichert...</div>';
+
+  // Den Ordner sicherheitshalber anlegen (er kann auch nur aus Fotos bestehen)
+  const t = String(ordner).split("-");
+  const titel = (t.length >= 3 && /^\d{4}$/.test(t[0]))
+    ? "Fotos vom " + t[2] + "." + t[1] + "." + t[0] + (t[3] ? " (" + t.slice(3).join("-") + ")" : "")
+    : String(ordner);
+  await supaSatzAnlegen(ordner, titel);
+  const daWetten = (await supaWettenLaden()).filter(w => w.satz === ordner);
+
+  let ok = 0;
+  const fehler = [];
+  for (let i = 0; i < gut.length; i++) {
+    const z = gut[i];
+    const o = z.quoten.length > 1
+      ? z.quoten.map((q, k) => [k === 0 ? z.wette : "Option " + (k + 1), q])
+      : [[z.wette, z.quoten[0]]];
+    const r = await supaWetteAnlegen(ordner, { pos: daWetten.length + i + 1, von: z.von,
+      an_zeit: z.an_zeit, liga: z.liga, spiel: z.spiel, wette: z.wette,
+      kat: z.s, s: z.s, o: o });
+    if (r.error) fehler.push(z.spiel + ": " + r.error.message);
+    else ok++;
+  }
+  await supa.from("kt_satz_uploads")
+    .update({ status: "eingelesen", gelesen_am: new Date().toISOString() })
+    .eq("satz_datum", ordner);
+
+  scanGeprueft[ordner] = [];
+  meldungA("<b>" + ok + " von " + gut.length + " Zeilen im Ordner " + sicherA(ordner) + ".</b>" +
+    (fehler.length ? " <b>" + fehler.length + " NICHT gespeichert:</b> " +
+      sicherA(fehler.slice(0, 2).join("; ")) : "") +
+    " Der Ordner steht jetzt auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle.",
+    fehler.length ? "warn" : "gut");
+  await zeichneOrdner();
 }

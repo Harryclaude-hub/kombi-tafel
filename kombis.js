@@ -61,9 +61,17 @@ function einstellungenLesen() {
 
 // ---------- Der Bau ----------
 
-function baueAlles() {
+// nurRest = true: die schon GESETZTEN Kombinationen bleiben unangetastet,
+// und nur aus den uebrigen Wetten wird neu gemischt. Das ist Karams Fall
+// "wenn was mit der Kombination nicht stimmt, alles neu mischen was noch
+// nicht gesetzt wurde".
+function baueAlles(nurRest) {
   const e = einstellungenLesen();
-  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)))
+  const behalten = nurRest ? gesetzteScheine() : [];
+  // Wetten, die in einer gesetzten Kombination stecken, sind verbraucht.
+  const verbraucht = new Set();
+  for (const s of behalten) for (const x of s.wetten) verbraucht.add(x.id);
+  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)) && !verbraucht.has(w.id))
     .sort((a, b) => liesAnstoss(anstossFeld(a)).zeit - liesAnstoss(anstossFeld(b)).zeit);
 
   // ---- Eingabe fuer den Verteiler bauen ----
@@ -95,8 +103,9 @@ function baueAlles() {
   // ---- Kombinationen in Scheine uebersetzen ----
   // Eine Kombination = eine Gruppen-Nummer (daran haengt die 400er-Rechnung).
   // Jeder Teil = ein Schein bei einem Anbieter mit seinem Einsatz.
-  const scheine = [];
+  const scheine = behalten.slice();
   let lfd = 0;
+  for (const s of behalten) if (s.nr > lfd) lfd = s.nr;
   for (const k of aus.kombis || []) {
     lfd++;
     const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
@@ -1168,6 +1177,41 @@ function neuBauen() {
   localStorage.removeItem(zustandSchluessel());
   baueAlles();
   meldung("Neu gebaut mit Mindestquote " + einstellungenLesen().mind.toFixed(2) + ".", "gut");
+  zeichne_();
+}
+
+// Welche Kombinationen sind schon gesetzt? Die stehen im Verlauf, und
+// zwar mit ihrer Schein-Kennung. Alle Teile derselben Kombination
+// (gleiche nr) gelten mit als gesetzt - sonst risse man eine halb
+// gesetzte Kombination auseinander.
+function gesetzteScheine() {
+  const z = liesZustand();
+  if (!z || !z.scheine) return [];
+  const satz = aktiverSatzId();
+  const ids = new Set();
+  for (const e of liesVerlauf()) if (e.satz === satz && e.scheinId) ids.add(e.scheinId);
+  if (!ids.size) return [];
+  const nummern = new Set();
+  for (const s of z.scheine) if (ids.has(s.id)) nummern.add(s.nr);
+  return z.scheine.filter(s => nummern.has(s.nr));
+}
+
+function restNeuMischen() {
+  const behalten = gesetzteScheine();
+  if (!behalten.length) {
+    meldung("Es ist noch nichts gesetzt - dann ist \"neu bauen\" das Richtige.", "warn");
+    return;
+  }
+  const f = document.getElementById("mischzahl");
+  if (f) f.value = (parseInt(f.value, 10) || 1) + 1;
+  // Den Zustand hier NICHT loeschen: baueAlles liest die gesetzten
+  // Kombinationen genau daraus. baueAlles speichert am Ende ohnehin neu.
+  const z = baueAlles(true);
+  const gruppen = new Set(z.scheine.map(s => s.nr)).size;
+  const behaltenGruppen = new Set(behalten.map(s => s.nr)).size;
+  meldung("<b>" + behaltenGruppen + " gesetzte Kombination" + (behaltenGruppen === 1 ? "" : "en") +
+    " bleiben unberührt</b>, der Rest ist neu gemischt (" + (gruppen - behaltenGruppen) +
+    " neue Kombinationen).", "gut");
   zeichne_();
 }
 

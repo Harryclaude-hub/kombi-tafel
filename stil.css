@@ -1285,3 +1285,13 @@ body[data-seite] h3, body[data-seite] h4 {
 /* ============================================================
    ENDE WECKER-SCHICHT 28.08.
    ============================================================ */
+
+/* ---------- Ordner scannen (Design-Schicht, loeschbar) ---------- */
+.scankasten { margin: 10px 0; padding: 10px 14px; border: 2px solid var(--kenn, #1a2c50);
+  border-radius: 9px; background: #fff; }
+.scanschritte { margin: 6px 0 6px 20px; padding: 0; }
+.scanschritte li { margin: 8px 0; }
+.scanschritte code { display: inline-block; padding: 3px 8px; background: #f2f4f8;
+  border: 1px solid #ccd; border-radius: 5px; font-size: 13px; }
+.scankasten textarea { width: 100%; font-family: monospace; font-size: 12.5px;
+  margin-top: 4px; padding: 6px; border: 1px solid #888; border-radius: 5px; }
