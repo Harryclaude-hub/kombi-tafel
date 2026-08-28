@@ -54,9 +54,26 @@ function augeHtml(feldId) {
     'this.textContent = (f.type === \'password\') ? \'zeigen\' : \'verbergen\';">zeigen</button>';
 }
 
+// Am Handy passen die beiden Kaesten nicht untereinander auf den Schirm:
+// der Knopf "Konto anlegen" lag bei 885 Pixeln, also UNTER dem Rand - man
+// sah nur das Anmelden und dachte, es gaebe kein Anlegen. Deshalb zwei
+// grosse Reiter, von denen am Handy immer nur einer offen ist. Am Rechner
+// stehen weiter beide nebeneinander.
+function authReiter(welcher) {
+  const bereich = el("authbereich");
+  if (bereich) bereich.dataset.zeigt = welcher;
+  const a = el("areiter_an"), n = el("areiter_neu");
+  if (a) a.classList.toggle("aktiv", welcher === "an");
+  if (n) n.classList.toggle("aktiv", welcher === "neu");
+}
+
 function zeigeAnmeldung() {
   el("inhalt").innerHTML = `
-<div class="auth">
+<div class="authreiter">
+  <button id="areiter_an" class="aktiv" onclick="authReiter('an')">Anmelden</button>
+  <button id="areiter_neu" onclick="authReiter('neu')">Neues Konto</button>
+</div>
+<div class="auth" id="authbereich">
   <div class="auth-kasten">
     <h2>Anmelden</h2>
     <label>Benutzername oder E-Mail<br><input id="an_user" autocomplete="username"></label>

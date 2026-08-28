@@ -62,6 +62,17 @@ function wkSchubladeLegen(zettel) {
 // Datenbank waere nur eine weitere Stelle, die auseinanderlaufen kann.
 // Steht dort nichts, kommt alles an.
 function wkWunschLesen() {
+  // HARTE ZEITGRENZE. Eine Meldung darf NIEMALS daran haengen, ob sich die
+  // Schublade oeffnen laesst: antwortet sie nicht binnen einer halben
+  // Sekunde (gesperrt, privater Modus, Speicher voll), zeigen wir die
+  // Meldung einfach. Lieber eine Meldung zu viel als eine, die nie kommt.
+  return Promise.race([
+    wkWunschHolen(),
+    new Promise(f => setTimeout(() => f({ nachrichten: true, anrufe: true }), 500))
+  ]).catch(() => ({ nachrichten: true, anrufe: true }));
+}
+
+function wkWunschHolen() {
   return wkSchubladeOeffnen().then(db => new Promise(fertig => {
     try {
       const t = db.transaction("merker", "readonly");
