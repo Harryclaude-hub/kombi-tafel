@@ -989,18 +989,55 @@ function satzScannen(ordner) {
   if (!box) return;
   if (box.dataset.offen === "1") { box.innerHTML = ""; box.dataset.offen = ""; return; }
   box.dataset.offen = "1";
-  const satz = "Lies die Fotos im Ordner " + ordner + " der Kombi-Tafel und gib mir die Zeilen.";
+  // Der vollstaendige Auftrag. Er enthaelt ALLES, was Claude braucht, um
+  // die Arbeit ohne Rueckfrage zu Ende zu bringen: wo die Fotos liegen,
+  // was gelesen werden soll, in welcher Form es in die Datenbank gehoert
+  // und was ausdruecklich NICHT eingetragen wird. Karam soll nichts mehr
+  // einfuegen muessen - die Zeilen landen direkt im Ordner, und der
+  // Kombi-Bau rechnet danach von selbst weiter.
+  const satz = [
+    "Bitte lies den Ordner " + ordner + " der Kombi-Tafel ein und trag die Zeilen selbst ein.",
+    "",
+    "WO DIE FOTOS LIEGEN: Supabase-Projekt mqmevpyatjsambervgtu, Tabelle kt_satz_uploads,",
+    "Spalte satz_datum = " + ordner + ". Sie stehen dort als Daten-URL und sind nur fuer",
+    "Admins lesbar. Sieh sie dir wirklich an, Bild fuer Bild.",
+    "",
+    "WAS ICH BRAUCHE:",
+    "1. Lies JEDE Zeile von JEDEM Foto. Keine Zeile ueberspringen.",
+    "2. Die Fotos ueberlappen sich oft - dieselbe Zeile darf nur EINMAL hinein.",
+    "3. Je Zeile: Melder, Anstoss, Liga, Spiel, Wette, Quote.",
+    "4. Stehen mehrere Quoten in einer Zeile (mit Schraegstrich getrennt), ist das EINE",
+    "   Wette mit mehreren Optionen - alle Werte mitnehmen.",
+    "5. Trag NUR die erste Quotenspalte ein, also die Rohquote. Die Interwetten-Spalte",
+    "   daneben NICHT eintragen: die rechnet das Programm selbst (geteilt durch 1,05).",
+    "",
+    "EINTRAGEN in die Tabelle kt_wetten mit satz = " + ordner + ", dazu pos, von,",
+    "an_zeit im Format 2026-08-29T15:00, liga, spiel, wette, kat und s (die Wettart",
+    "nach artErkennen aus admin.js) und o als Liste [[Name, Quote], ...].",
+    "Danach die Fotos in kt_satz_uploads auf status eingelesen setzen und gelesen_am fuellen.",
+    "",
+    "WICHTIG: rate NICHTS. Ist eine Zeile abgeschnitten oder unleserlich, lass sie weg",
+    "und sag mir am Ende genau, welche fehlt und warum. Lieber eine Zeile weniger als",
+    "eine falsche Quote - hier haengt echtes Geld dran.",
+    "",
+    "Sag mir zum Schluss, wie viele Zeilen jetzt im Ordner stehen."
+  ].join("\n");
   box.innerHTML =
     '<div class="scankasten">' +
     "<h3>&#128270; Ordner scannen</h3>" +
     '<p class="mini">Die Texterkennung im Browser liest diese Tabellen nicht zuverlässig ' +
     "(gemessen: 0 von 12 Zeilen brauchbar). Deshalb liest <b>Claude</b> die Fotos.</p>" +
     '<ol class="scanschritte">' +
-    "<li><b>Diesen Satz an Claude schicken:</b><br>" +
-    '<code id="scan_satz_' + sicherA(ordner) + '">' + sicherA(satz) + "</code> " +
-    '<button onclick="scanSatzKopieren(\'' + sicherA(ordner) + '\')">kopieren</button></li>' +
-    "<li>Claude liest die Fotos und gibt dir die Zeilen zurück.</li>" +
-    "<li><b>Zeilen hier einfügen</b> und prüfen lassen:<br>" +
+    "<li><b>Diesen Auftrag an Claude schicken</b> (er macht dann alles allein):<br>" +
+    '<button class="haupt" onclick="scanSatzKopieren(\'' + sicherA(ordner) + '\')">' +
+    "&#128203; Auftrag kopieren</button>" +
+    '<pre id="scan_satz_' + sicherA(ordner) + '" class="scanauftrag">' + sicherA(satz) + "</pre></li>" +
+    "<li>Claude liest die Fotos und trägt die Zeilen <b>selbst</b> in diesen Ordner ein. " +
+    "Danach hier nachsehen:<br>" +
+    '<button onclick="scanNachsehen(\'' + sicherA(ordner) + '\')">' +
+    "&#128260; Nachsehen, ob die Zeilen da sind</button></li>" +
+    "<li class='mini'><b>Nur als Rückweg</b>, falls du die Zeilen doch als Text bekommst: " +
+    "hier einfügen und prüfen lassen.<br>" +
     '<textarea id="scan_text_' + sicherA(ordner) + '" rows="8" spellcheck="false" ' +
     'placeholder="Melder | Anstoß | Liga | Spiel | Wette | Quoten"></textarea><br>' +
     '<button class="haupt" onclick="scanPruefen(\'' + sicherA(ordner) + '\')">' +
@@ -1140,4 +1177,34 @@ async function scanUebernehmen(ordner) {
     " Der Ordner steht jetzt auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle.",
     fehler.length ? "warn" : "gut");
   await zeichneOrdner();
+}
+
+// Nachsehen, ob Claude die Zeilen inzwischen eingetragen hat. Zeigt
+// ehrlich, was WIRKLICH im Ordner steht, und bietet danach das
+// Aktivieren an - erst damit erscheint der Ordner auf der Kombi-Tafel,
+// im Kombi-Bau und in der Original-Tabelle.
+async function scanNachsehen(ordner) {
+  const ziel = elA("scan_ergebnis_" + ordner);
+  if (!ziel) return;
+  ziel.innerHTML = '<div class="kern">Sehe nach...</div>';
+  const wetten = (await supaWettenLaden()).filter(w => w.satz === ordner);
+  if (!wetten.length) {
+    ziel.innerHTML = '<div class="warnkern"><b>Noch keine Zeile im Ordner.</b> ' +
+      "Entweder ist Claude noch nicht fertig, oder der Auftrag ist noch nicht abgeschickt. " +
+      "Gleich noch einmal nachsehen.</div>";
+    return;
+  }
+  const melder = {};
+  for (const w of wetten) melder[w.von || "?"] = (melder[w.von || "?"] || 0) + 1;
+  const offen = localStorage.getItem("kt_satz") === ordner;
+  ziel.innerHTML = '<div class="kern"><b>&#9989; ' + wetten.length +
+    " Zeilen stehen im Ordner " + sicherA(ordner) + ".</b> Nach Melder: " +
+    Object.entries(melder).map(x => sicherA(x[0]) + " " + x[1]).join(", ") + ".</div>" +
+    (offen
+      ? '<p class="mini gruen">Dieser Ordner ist bereits überall offen. ' +
+        '<a href="kombis.html"><b>Zum Kombi-Bau</b></a></p>'
+      : '<p><button class="haupt" onclick="satzAktivieren(\'' + sicherA(ordner) + '\')">' +
+        "&#9989; Diesen Ordner jetzt aktivieren</button> " +
+        '<span class="mini">Danach steht er auf der Kombi-Tafel, im Kombi-Bau und in der ' +
+        "Original-Tabelle.</span></p>");
 }
