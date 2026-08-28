@@ -1790,3 +1790,13 @@ details.anmk summary { min-height: 44px; display: block; padding: 11px 0; }
   .wk-schalter { padding: 13px 4px; font-size: 15px; }
   .wk-schalter input { width: 24px; height: 24px; }
 }
+
+/* ---------- Selbst-Diagnose im Klingel-Kasten (loeschbar) ---------- */
+.wk-diag { padding: 8px 10px; margin: 6px 0; border-radius: 7px;
+  border-left: 4px solid #bbb; background: #fafbfd; }
+.wk-diag-gut { border-left-color: #2fa84f; }
+.wk-diag-schlecht { border-left-color: #d08000; background: #fffaf0; }
+.wk-diag b { display: block; margin-bottom: 2px; }
+@media (max-width: 700px) {
+  .wk-diag { padding: 10px 12px; font-size: 14px; }
+}

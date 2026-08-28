@@ -616,7 +616,13 @@ async function weckerPanelZeichnen() {
     : st === "anmelden" ? "&#128100; Erst anmelden"
     : st === "geht nicht" ? "&#128683; Geht hier nicht"
     : "&#9898; Aus";
-  let html = '<div class="wk-zeile wk-st-' + st.replace(/[^a-z]/g, "-") + '"><b>' +
+  let html = '<div class="wk-zeile"><b>&#128269; Was ist hier los?</b><br>' +
+    '<button class="haupt" onclick="weckerDiagnoseZeigen()">Dieses Gerät jetzt prüfen</button>' +
+    '<p class="mini">Geht etwas nicht, sagt dir das Gerät hier selbst, woran es liegt - ' +
+    "Punkt für Punkt, mit dem nächsten Schritt dazu.</p>" +
+    '<div id="wk-diagnose"></div></div>';
+
+  html += '<div class="wk-zeile wk-st-' + st.replace(/[^a-z]/g, "-") + '"><b>' +
     schild + "</b> " + pushStatusText(st) + "</div>";
 
   if (st === "ios-install") {
@@ -988,3 +994,130 @@ function weckerWunschInSchublade(w) {
 document.addEventListener("DOMContentLoaded", () => {
   try { weckerWunschInSchublade(weckerWunschLesen()); } catch (e) { }
 });
+
+// ============================================================
+// WAS IST HIER LOS? Die Selbst-Diagnose.
+//
+// Karam sitzt mit seinem iPhone da und ich kann nicht hineinsehen.
+// Also sagt das Geraet selbst, woran es haengt - Punkt fuer Punkt,
+// in Klartext, mit dem naechsten Schritt dazu. Kein Fachwort.
+// ============================================================
+
+function wkPruefpunkt(gut, titel, wennGut, wennSchlecht) {
+  return { gut: !!gut, titel: titel, text: gut ? wennGut : wennSchlecht };
+}
+
+async function weckerDiagnose() {
+  const punkte = [];
+  const istApple = pushIstIos();
+  const alsApp = weckerIstStandalone();
+
+  // 1. Laeuft das ueberhaupt als App?
+  if (istApple) {
+    punkte.push(wkPruefpunkt(alsApp, "Läuft als App",
+      "Ja. Du hast die Kombi-Tafel vom Home-Bildschirm gestartet - so muss es sein.",
+      "NEIN, das ist der Haken. Du bist gerade im normalen Safari. Apple erlaubt " +
+      "Mitteilungen nur, wenn die App vom Home-Bildschirm läuft. WICHTIG: hast du " +
+      "sie schon einmal abgelegt, BEVOR das repariert war, dann ist das alte Symbol " +
+      "kaputt - erst löschen, Seite in Safari neu laden, dann Teilen und " +
+      "\"Zum Home-Bildschirm\", und von dort starten."));
+  } else {
+    punkte.push(wkPruefpunkt(true, "Gerät",
+      alsApp ? "Läuft als installierte App." : "Läuft im Browser. Am Rechner ist das völlig in Ordnung.", ""));
+  }
+
+  // 2. Kann der Browser Mitteilungen?
+  const kann = ("Notification" in window) && ("serviceWorker" in navigator) && ("PushManager" in window);
+  punkte.push(wkPruefpunkt(kann, "Kann dieses Gerät Mitteilungen?",
+    "Ja, alles da.",
+    istApple && !alsApp
+      ? "Noch nicht - das kommt erst, wenn die App vom Home-Bildschirm läuft (siehe oben)."
+      : "Dieser Browser kann keine Mitteilungen. Auf dem iPhone braucht es Safari und " +
+        "mindestens iOS 16.4."));
+
+  // 3. Erlaubnis
+  const erl = ("Notification" in window) ? Notification.permission : "geht nicht";
+  punkte.push(wkPruefpunkt(erl === "granted", "Deine Erlaubnis",
+    "Erteilt.",
+    erl === "denied"
+      ? (istApple
+          ? "GESPERRT. Wieder aufmachen: Einstellungen (graues Zahnrad) öffnen, ganz nach " +
+            "unten zur Kombi-Tafel, antippen, Mitteilungen erlauben."
+          : "GESPERRT. Links neben der Adresse auf das Schloss tippen und Benachrichtigungen erlauben.")
+      : "Noch nicht gefragt. Unten auf Einschalten drücken."));
+
+  // 4. Der Service Worker (der Teil, der Meldungen annimmt, wenn die App zu ist)
+  let swDa = false, swAdresse = "";
+  try {
+    const reg = await wkRegistrierung(4000);
+    swDa = !!(reg && reg.active);
+    swAdresse = swDa ? reg.active.scriptURL.split("/").pop() : "";
+  } catch (e) { }
+  punkte.push(wkPruefpunkt(swDa, "Der Empfänger auf diesem Gerät",
+    "Läuft (" + swAdresse + "). Er nimmt Meldungen an, auch wenn die App zu ist.",
+    "Läuft NICHT. Meist hilft: Seite einmal ganz schließen und neu öffnen. " +
+    "Im privaten Modus geht es grundsätzlich nicht."));
+
+  // 5. Anmeldung
+  let u = null;
+  try { u = await supaNutzer(); } catch (e) { }
+  punkte.push(wkPruefpunkt(!!u, "Angemeldet",
+    "Ja, als " + (u ? (u.email || "dein Konto") : ""),
+    istApple && alsApp
+      ? "NEIN. Das iPhone hält die App vom Home-Bildschirm getrennt von Safari - deine " +
+        "Anmeldung aus Safari gilt hier nicht. Melde dich HIER einmal an, dann bleibt es."
+      : "NEIN. Zuerst anmelden."));
+
+  // 6. Steht dieses Geraet in der Datenbank?
+  let inDb = false, geraeteZahl = 0;
+  if (u && window.supa) {
+    try {
+      const reg = await wkRegistrierung(3000);
+      const abo = reg && reg.pushManager ? await reg.pushManager.getSubscription() : null;
+      const r = await supa.from("kt_push_abos").select("id, endpoint").eq("nutzer", u.id);
+      geraeteZahl = (r.data || []).length;
+      inDb = !!(abo && (r.data || []).some(x => x.endpoint === abo.endpoint));
+    } catch (e) { }
+  }
+  punkte.push(wkPruefpunkt(inDb, "Dieses Gerät ist eingetragen",
+    "Ja. Der Server weiß, wohin er dir schreiben soll.",
+    geraeteZahl
+      ? "Dieses Gerät NICHT (es sind " + geraeteZahl + " andere eingetragen). Unten auf Einschalten drücken."
+      : "Noch kein einziges Gerät eingetragen. Solange das so ist, kommt bei geschlossener App nichts an."));
+
+  return punkte;
+}
+
+async function weckerDiagnoseZeigen() {
+  const ziel = document.getElementById("wk-diagnose");
+  if (!ziel) return;
+  ziel.innerHTML = '<p class="mini">Sehe nach...</p>';
+  let punkte = [];
+  try { punkte = await weckerDiagnose(); }
+  catch (e) { ziel.innerHTML = '<p class="mini">Prüfung nicht möglich.</p>'; return; }
+  const schlecht = punkte.filter(p => !p.gut).length;
+  const kasten = document.createElement("div");
+  const kopf = document.createElement("div");
+  kopf.className = schlecht ? "warnkern" : "kern";
+  kopf.innerHTML = schlecht
+    ? "<b>" + schlecht + " Sache" + (schlecht === 1 ? "" : "n") + " " +
+      (schlecht === 1 ? "fehlt" : "fehlen") + " noch.</b> Der erste rote Punkt unten ist der wichtigste."
+    : "<b>&#9989; Auf diesem Gerät ist alles in Ordnung.</b> Meldungen kommen an, auch wenn die App zu ist.";
+  kasten.appendChild(kopf);
+  for (const p of punkte) {
+    if (!p.text) continue;
+    const z = document.createElement("div");
+    z.className = "wk-diag " + (p.gut ? "wk-diag-gut" : "wk-diag-schlecht");
+    const t = document.createElement("b");
+    // Der Text kommt aus dem Programm, aber wir setzen ihn trotzdem als
+    // TEXT ein - dann kann auch spaeter nie etwas Fremdes hineinrutschen.
+    t.textContent = (p.gut ? "✅ " : "⚠️ ") + p.titel;
+    const s = document.createElement("div");
+    s.className = "mini";
+    s.textContent = p.text;
+    z.appendChild(t); z.appendChild(s);
+    kasten.appendChild(z);
+  }
+  ziel.innerHTML = "";
+  ziel.appendChild(kasten);
+}

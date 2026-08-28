@@ -71,7 +71,7 @@ function zeigeAnmeldung() {
       <input id="reg_mail" type="email" autocomplete="email"></label>
     <label>Passwort <span class="mini">(mindestens 6 Zeichen)</span><br>
       <input id="reg_pw" type="password" autocomplete="new-password"> ${augeHtml("reg_pw")}</label>
-    <button class="haupt" onclick="tuRegistrieren()">Konto anlegen</button>
+    <button class="haupt" id="reg_knopf" onclick="tuRegistrieren()">Konto anlegen</button>
   </div>
 </div>
 <p class="mini">Dein Bereich ist privat. Nur wer ihn von dir geteilt bekommt, kann ihn sehen.
@@ -86,10 +86,32 @@ async function tuAnmelden() {
 }
 
 async function tuRegistrieren() {
-  const r = await supaRegistrieren(el("reg_user").value.trim(), el("reg_mail").value.trim(), el("reg_pw").value);
+  const name = el("reg_user").value.trim();
+  const knopf = el("reg_knopf");
+  if (knopf) { knopf.disabled = true; knopf.textContent = "Konto wird angelegt..."; }
+  const r = await supaRegistrieren(name, el("reg_mail").value.trim(), el("reg_pw").value);
+  if (knopf) { knopf.disabled = false; knopf.textContent = "Konto anlegen"; }
   if (r.fehler) { meldungM(r.fehler, "warn"); return; }
+  // Die Bestaetigung muss das Neuladen ueberleben, sonst sieht sie niemand.
+  try { localStorage.setItem("kt_neu_angelegt", name); } catch (e) { }
   location.reload();
 }
+
+// Nach dem Neuladen: einmal deutlich sagen, dass es geklappt hat.
+function begruessungZeigen() {
+  let name = null;
+  try {
+    name = localStorage.getItem("kt_neu_angelegt");
+    if (name) localStorage.removeItem("kt_neu_angelegt");
+  } catch (e) { return; }
+  if (!name) return;
+  meldungM("<b>&#9989; Dein Konto ist angelegt, " + textSicherM(name) + ".</b> " +
+    "Du bist gleich angemeldet - du musst dich nicht noch einmal einloggen. " +
+    "Als Nächstes am besten oben auf die Glocke tippen und die Benachrichtigungen " +
+    "einschalten, damit du Nachrichten und Anrufe auch dann bekommst, wenn die App zu ist.",
+    "gut");
+}
+document.addEventListener("DOMContentLoaded", () => setTimeout(begruessungZeigen, 900));
 
 async function tuVergessen() {
   const mail = prompt("Deine E-Mail-Adresse (die vom Konto):");
