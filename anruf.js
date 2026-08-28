@@ -654,9 +654,15 @@ async function anrufProbeText() {
   const p = await anrufProbe(6);
   if (p.relay)
     return { gut: true, text: "Anrufe gehen von hier aus ueberall hinaus - auch im Mobilfunknetz." };
+  // KEINE Warnung mehr. Ueber WLAN finden sich die beiden Geraete direkt,
+  // und genau so wird die Kombi-Tafel benutzt - das ist der Normalfall und
+  // kein Mangel. Eine Selbstprobe, die staendig orange leuchtet, obwohl
+  // alles stimmt, bringt niemandem etwas: beim naechsten Mal schaut man
+  // gar nicht mehr hin, und dann faellt auch ein echter Fehler nicht auf.
   if (p.srflx && p.turnEingetragen === 0)
-    return { gut: true, warn: true, text: "Anrufe gehen im WLAN. In manchen Mobilfunknetzen kann der Ton " +
-      "fehlen, weil kein Umleitungs-Server eingetragen ist (anruf-server.js)." };
+    return { gut: true, text: "Anrufe gehen von diesem Geraet hinaus. Im WLAN klappt das " +
+      "praktisch immer. Nur in manchen Mobilfunknetzen kann der Ton fehlen - dafuer " +
+      "braeuchte es einen Umleitungs-Server (steht in anruf-server.js)." };
   if (p.srflx)
     return { gut: true, warn: true, text: "Anrufe gehen im WLAN. Der eingetragene Umleitungs-Server " +
       "antwortet aber nicht" + (p.fehler.length ? " (" + p.fehler[0] + ")" : "") + "." };
