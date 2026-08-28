@@ -1138,3 +1138,150 @@ body[data-seite] h3, body[data-seite] h4 {
 /* ============================================================
    ENDE WOHLFUEHL-SCHICHT 28.08.
    ============================================================ */
+
+/* ============================================================
+   WECKER-SCHICHT 28.08. (Benachrichtigungen und Anrufe)
+   Eine reine Design-Schicht: sie kann komplett geloescht werden,
+   ohne dass irgendetwas aufhoert zu funktionieren. Dann sehen
+   der Anruf-Vollbildschirm, die Einschalt-Frage, der Schalt-
+   Kasten und der Meldebalken nur nackt aus.
+   Regeln eingehalten: kein !important, keine Bedeutungsfarbe
+   umgefaerbt (gruen = annehmen, rot = ablehnen, orange = Warnung
+   bleiben genau das), im tbody wird nichts angefasst.
+   ============================================================ */
+
+/* ---- 1. Vollbild-Klingeln: der Anruf muss unuebersehbar sein ---- */
+#weckerruf {
+  position: fixed; inset: 0; z-index: 12000;
+  background: rgba(10, 16, 30, 0.93);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+#weckerruf .wk-karte {
+  width: 380px; max-width: 94vw; background: #fff; color: #1a2c50;
+  border: 3px solid #1a2c50; border-radius: 14px; padding: 26px 20px 22px 20px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+#weckerruf .wk-oben {
+  font-size: 13.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #55627a;
+}
+#weckerruf .wk-kreis {
+  width: 96px; height: 96px; margin: 16px auto 12px auto; border-radius: 50%;
+  background: #1a2c50; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px; font-weight: bold;
+  animation: wkpuls 1.6s ease-in-out infinite;
+}
+#weckerruf .wk-name { font-size: 26px; font-weight: bold; word-break: break-word; }
+#weckerruf .wk-art { font-size: 14px; color: #55627a; margin-top: 2px; }
+#weckerruf .wk-tonhinweis {
+  margin-top: 12px; font-size: 13px; color: #7a3d00;
+  background: #fff3e0; border: 1px solid #b35a00; border-radius: 7px; padding: 7px 9px;
+}
+#weckerruf .wk-tasten {
+  margin-top: 22px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+#weckerruf .wk-tasten button {
+  flex: 1 1 130px; font-size: 17px; font-weight: bold; padding: 14px 10px;
+  border-radius: 9px; color: #fff;
+}
+.wk-ja { background: #1a7a1a; border-color: #1a7a1a; color: #fff; }
+.wk-ja:hover { background: #146014; border-color: #146014; }
+.wk-nein { background: #a00000; border-color: #a00000; color: #fff; }
+.wk-nein:hover { background: #7a0000; border-color: #7a0000; }
+@keyframes wkpuls {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 44, 80, 0.5); }
+  50% { box-shadow: 0 0 0 16px rgba(26, 44, 80, 0); }
+}
+
+/* ---- 2. Die freundliche Frage nach dem Anmelden ---- */
+#weckerfrage {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 9500; width: 460px; max-width: 94vw;
+}
+#weckerfrage .wk-frage-karte {
+  background: #fff; border: 2px solid #1a2c50; border-radius: 12px;
+  padding: 16px 18px 14px 18px;
+  box-shadow: 0 10px 34px rgba(15, 25, 40, 0.28);
+}
+#weckerfrage .wk-frage-karte.wk-laeuft { opacity: 0.6; }
+#weckerfrage .wk-frage-kopf { font-size: 18px; font-weight: bold; color: #1a2c50; }
+#weckerfrage .wk-frage-text { margin: 8px 0 6px 0; font-size: 14.5px; }
+#weckerfrage .wk-frage-punkte { margin: 6px 0 4px 0; padding-left: 20px; font-size: 14px; }
+#weckerfrage .wk-frage-punkte li { margin: 3px 0; }
+#weckerfrage .wk-frage-schritte { margin: 6px 0; padding-left: 22px; font-size: 14px; }
+#weckerfrage .wk-frage-schritte li { margin: 4px 0; }
+#weckerfrage .wk-frage-tasten { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+#weckerfrage .wk-frage-tasten button { font-size: 15px; padding: 10px 16px; border-radius: 8px; }
+#weckerfrage .wk-spaeter { background: #f2f5fb; }
+#weckerfrage .wk-frage-fuss { margin: 10px 0 0 0; font-size: 12.5px; color: #55627a; }
+
+/* ---- 3. Der Schalt-Kasten (Glocken-Knopf oben, jede Seite) ---- */
+#weckerpanel {
+  position: fixed; top: 70px; right: 12px; width: 400px; max-width: 94vw;
+  max-height: 78vh; overflow-y: auto; background: #fff;
+  border: 2px solid #1a2c50; border-radius: 7px;
+  padding: 0 12px 12px 12px; z-index: 9400;
+}
+#weckerpanel .wk-zeile { margin: 10px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e6ee; }
+#weckerpanel .wk-zeile:last-child { border-bottom: none; }
+#weckerpanel .wk-st-an { color: #1a7a1a; }
+#weckerpanel .wk-st-halb, #weckerpanel .wk-st-unklar,
+#weckerpanel .wk-st-gesperrt, #weckerpanel .wk-st-ios-install { color: #7a3d00; }
+#weckerpanel .wk-geraet {
+  display: flex; gap: 8px; align-items: center; justify-content: space-between;
+  padding: 5px 7px; margin: 4px 0; border: 1px solid #cdd4e2; border-radius: 6px;
+}
+#weckerpanel .wk-geraet.wk-dieses { border-color: #1a2c50; background: #eef2fa; }
+#weckerpanel .wk-geraet button { font-size: 12px; padding: 4px 9px; }
+#weckerpanel .wk-probe { min-height: 1em; }
+
+/* Der Glocken-Knopf zeigt den Zustand, ohne zu luegen:
+   gruen nur, wenn Browser UND Datenbank es bestaetigen. */
+.navleiste a.navknopf.weckerknopf { font-size: 15px; }
+.navleiste a.navknopf.weckerknopf.wk-k-an { border-color: #1a7a1a; }
+.navleiste a.navknopf.weckerknopf.wk-k-halb { border-color: #b35a00; }
+.navleiste a.navknopf.weckerknopf.wk-k-aus { opacity: 0.75; }
+
+/* ---- 4. Der Meldebalken: was frueher still fehlschlug ---- */
+#weckerbalken {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+  z-index: 9600; width: 520px; max-width: 94vw;
+  background: #1a2c50; color: #fff; border-radius: 9px;
+  padding: 11px 13px; font-size: 14px;
+  display: flex; gap: 10px; align-items: flex-start; justify-content: space-between;
+  box-shadow: 0 8px 26px rgba(15, 25, 40, 0.3);
+}
+#weckerbalken.wk-warn { background: #7a3d00; }
+#weckerbalken.wk-gut { background: #146014; }
+#weckerbalken .wk-balken-text { flex: 1 1 auto; }
+#weckerbalken .wk-balken-zu {
+  flex: 0 0 auto; font-size: 12px; padding: 4px 9px;
+  background: rgba(255, 255, 255, 0.14); color: #fff; border-color: rgba(255, 255, 255, 0.5);
+}
+#weckerbalken .wk-balken-zu:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* ---- 5. Handy ---- */
+@media (max-width: 480px) {
+  #weckerruf .wk-karte { padding: 20px 14px 16px 14px; }
+  #weckerruf .wk-kreis { width: 78px; height: 78px; font-size: 36px; }
+  #weckerruf .wk-name { font-size: 22px; }
+  #weckerfrage { left: 6px; right: 6px; bottom: 8px; transform: none; width: auto; max-width: none; }
+  #weckerpanel { top: 58px; right: 6px; left: 6px; width: auto; }
+  #weckerbalken { left: 6px; right: 6px; transform: none; width: auto; max-width: none; }
+}
+
+/* ---- 6. Wer Bewegung abgeschaltet hat, bekommt keine ---- */
+@media (prefers-reduced-motion: reduce) {
+  #weckerruf .wk-kreis { animation: none; }
+}
+
+/* ---- 7. Beim Drucken hat all das nichts verloren ---- */
+@media print {
+  #weckerruf, #weckerfrage, #weckerpanel, #weckerbalken, #wecker_knopf { display: none; }
+}
+/* ============================================================
+   ENDE WECKER-SCHICHT 28.08.
+   ============================================================ */

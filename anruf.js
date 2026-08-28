@@ -18,52 +18,99 @@ let anrufEingehend = null;       // { von, name, offer, video, eis: [] }
 let anrufEigenerKanal = null;
 let anrufKlingelTimer = null;    // wiederholt das Klingeln beim Anrufer
 const _anrufKanaele = {};        // zielId -> subscribed channel
+let _anrufVersuche = 0;          // wie oft die Klingel-Leitung schon scheiterte
 
 // Auf jedem Seitenaufruf: eigenen Klingel-Kanal abonnieren
 async function anrufBereit() {
   try {
     const u = await supaNutzer();
     if (!u || anrufEigenerKanal) return;
-    anrufEigenerKanal = supa.channel("kt-anruf-" + u.id, { config: { broadcast: { self: true } } });
-    anrufEigenerKanal.on("broadcast", { event: "signal" }, p => anrufSignal(p.payload));
-    anrufEigenerKanal.subscribe(status => {
+    const k = supa.channel("kt-anruf-" + u.id, { config: { broadcast: { self: true } } });
+    anrufEigenerKanal = k;
+    k.on("broadcast", { event: "signal" }, p => anrufSignal(p.payload));
+    k.subscribe(status => {
       // ZWEI Kanaele mit demselben Topic vertragen sich nicht - der eigene
       // Hörer-Kanal ist deshalb auch der Sende-Kanal an mich selbst.
-      if (status === "SUBSCRIBED") _anrufKanaele[u.id] = anrufEigenerKanal;
+      if (status === "SUBSCRIBED") { _anrufKanaele[u.id] = k; _anrufVersuche = 0; return; }
+      // Frueher passierte hier NICHTS. Kam CHANNEL_ERROR, TIMED_OUT oder
+      // CLOSED, klingelte das Geraet die ganze Sitzung lang nicht mehr -
+      // ohne jede Meldung, und weil anrufEigenerKanal schon belegt war,
+      // stieg jeder neue Versuch sofort wieder aus.
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        try { supa.removeChannel(k); } catch (x) { }
+        if (_anrufKanaele[u.id] === k) delete _anrufKanaele[u.id];
+        if (anrufEigenerKanal === k) anrufEigenerKanal = null;
+        _anrufVersuche++;
+        if (_anrufVersuche <= 5) setTimeout(anrufBereit, Math.min(30000, 3000 * _anrufVersuche));
+        else if (typeof weckerBalken === "function")
+          weckerBalken("Die Klingel-Leitung steht gerade nicht: solange die App offen ist, kommen " +
+            "Anrufe auf diesem Geraet nicht an. Meist hilft: Seite neu laden.", "warn", "anrufkanal", 5);
+      }
     });
   } catch (e) { /* Anrufe stoeren nie die Seite */ }
 }
 
 function anrufKanalZu(zielId) {
   return new Promise(fertig => {
-    if (_anrufKanaele[zielId]) { fertig(_anrufKanaele[zielId]); return; }
+    const alt = _anrufKanaele[zielId];
+    if (alt) {
+      // Ein einmal gemerkter Kanal kann laengst tot sein. Frueher wurde er
+      // nie verworfen - dann ging jedes Klingeln stumm ins Leere.
+      if (alt === anrufEigenerKanal || alt.state === "joined") { fertig(alt); return; }
+      try { supa.removeChannel(alt); } catch (e) { }
+      delete _anrufKanaele[zielId];
+    }
     // self:true auch beim Sende-Kanal: noetig, damit Sender- und
     // Hörer-Kanal desselben Clients sich erreichen (Test und Sonderfaelle);
     // im normalen Zwei-Geräte-Anruf ohne Wirkung (kein Hörer hier).
     const k = supa.channel("kt-anruf-" + zielId, { config: { broadcast: { self: true } } });
+    let gemeldet = false;
+    const melde = wert => { if (!gemeldet) { gemeldet = true; fertig(wert); } };
     k.subscribe(status => {
-      if (status === "SUBSCRIBED") { _anrufKanaele[zielId] = k; fertig(k); }
+      if (status === "SUBSCRIBED") { _anrufKanaele[zielId] = k; melde(k); return; }
+      // Fehler sofort melden statt sechs Sekunden ins Leere zu warten
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        try { supa.removeChannel(k); } catch (e) { }
+        melde(null);
+      }
     });
-    setTimeout(() => fertig(_anrufKanaele[zielId] || null), 6000);
+    setTimeout(() => melde(_anrufKanaele[zielId] || null), 6000);
   });
 }
 
+// Gibt jetzt ein Ergebnis zurueck statt hart true:
+//   { ok: true }  oder  { ok: false, grund: "..." }
+// Frueher wurde die Antwort von k.send weggeworfen und IMMER true
+// gemeldet - ein nie zugestelltes Klingeln galt damit als zugestellt.
 async function anrufSenden(zielId, obj) {
   const key = await kryptoDm(zielId);
-  if (!key) return false;
+  if (!key) return { ok: false, grund: "kein Schluessel zu diesem Freund" };
   const u = await supaNutzer();
   const k = await anrufKanalZu(zielId);
-  if (!k) return false;
-  await k.send({ type: "broadcast", event: "signal",
-    payload: { von: u.id, daten: await e2eZu(key, JSON.stringify(obj)) } });
-  return true;
+  if (!k) return { ok: false, grund: "keine Leitung zum Freund" };
+  let antwort = "error";
+  try {
+    antwort = await k.send({ type: "broadcast", event: "signal",
+      payload: { von: u.id, daten: await e2eZu(key, JSON.stringify(obj)) } });
+  } catch (e) { antwort = "error"; }
+  if (antwort !== "ok")
+    return { ok: false, grund: antwort === "timed out" ? "Zeit abgelaufen" : "nicht hinausgegangen" };
+  return { ok: true };
 }
 
 async function anrufSignal(roh) {
   if (!roh || !roh.von) return;
   const key = await kryptoDm(roh.von);
   let s;
-  try { s = JSON.parse(await e2eAuf(key, roh.daten)); } catch (e) { return; }
+  try { s = JSON.parse(await e2eAuf(key, roh.daten)); } catch (e) {
+    // Frueher wurde hier kommentarlos aufgegeben: der Angerufene sah NICHTS,
+    // der Anrufer bekam nach 45 Sekunden "Keine Antwort". Meist fehlt nur
+    // der Ende-zu-Ende-Schluessel zu diesem Freund auf diesem Geraet.
+    if (typeof weckerBalken === "function")
+      weckerBalken("Jemand versucht dich anzurufen, aber auf diesem Geraet fehlt der Schluessel " +
+        "zu ihm. Einmal abmelden und wieder anmelden holt ihn zurueck.", "warn", "anruf-schluessel", 2);
+    return;
+  }
   if (!s || !s.typ) return;
 
   if (s.typ === "klingeln") {
@@ -75,14 +122,21 @@ async function anrufSignal(roh) {
     const p = await supa.from("kt_profiles").select("username").eq("id", roh.von).maybeSingle();
     anrufEingehend = { von: roh.von, name: (p.data && p.data.username) || "?",
       offer: s.offer, video: !!s.video, eis: [] };
-    anrufPanel("<b>" + anrufEingehend.name.replace(/</g, "&lt;") + "</b> ruft an (" +
-      (s.video ? "mit Video" : "Ton") + ")...",
-      '<button class="haupt" onclick="anrufAnnehmen()">Annehmen</button> ' +
-      '<button onclick="anrufAblehnen()">Ablehnen</button>');
+    // DER WECKER: Vollbild, echter Klingelton, Vibrieren. Und der Anruf
+    // raeumt sich nach 60 Sekunden selbst weg, damit ein toter Anruf nicht
+    // alle weiteren Anrufer auf "besetzt" laufen laesst.
+    anrufWeckerAn(anrufEingehend.name, !!s.video);
+    anrufEingehendUhrStellen();
     if (typeof benachrichtige === "function")
-      benachrichtige(anrufEingehend.name + " ruft dich an!", "In der Kombi-Tafel annehmen.", "anruf");
+      benachrichtige(anrufEingehend.name + " ruft dich an!", "Annehmen oder ablehnen.", "anruf",
+        { von: roh.von });
   } else if (s.typ === "annahme") {
     anrufKlingelStopp();
+    // Das Freizeichen MUSS hier aufhoeren, sonst tutet es beim Anrufer
+    // waehrend des ganzen Gespraechs weiter. Bewusst hier und NICHT in
+    // anrufKlingelStopp(): anrufStarten ruft das gleich nach dem
+    // Einschalten des Freizeichens auf und wuerde es sofort abwuergen.
+    anrufFreizeichenAus();
     // Nur der Angerufene selbst darf antworten - sonst könnte ein Dritter
     // mit Schlüssel die Verbindung übernehmen.
     if (anrufPc && anrufPartner && roh.von === anrufPartner.id) await anrufPc.setRemoteDescription(s.answer);
@@ -93,7 +147,9 @@ async function anrufSignal(roh) {
     const text = s.typ === "besetzt" ? "Besetzt: dort laeuft schon ein Anruf."
       : s.typ === "abgelehnt" ? "Anruf abgelehnt." : "Aufgelegt.";
     if (anrufPartner && roh.von === anrufPartner.id) anrufBeenden(text);
-    else if (anrufEingehend && roh.von === anrufEingehend.von) { anrufEingehend = null; anrufPanelZu(); }
+    else if (anrufEingehend && roh.von === anrufEingehend.von) {
+      anrufEingehend = null; anrufWeckerAus(); anrufPanelZu();
+    }
   }
 }
 
@@ -155,10 +211,29 @@ async function anrufStarten(partnerId, name, mitVideo) {
     '<button onclick="anrufAuflegen()">Auflegen</button>');
   const offer = await anrufPc.createOffer();
   await anrufPc.setLocalDescription(offer);
-  const ok = await anrufSenden(partnerId, { typ: "klingeln", offer: offer, video: mitVideo });
-  if (!ok) { anrufBeenden("Klingeln nicht zustellbar."); return; }
-  // Push aufs Geraet des Freundes (falls seine App gerade zu ist) ...
-  if (typeof pushSenden === "function") pushSenden(partnerId, "anruf");
+  const gesendet = await anrufSenden(partnerId, { typ: "klingeln", offer: offer, video: mitVideo });
+  // Der Push geht IMMER hinaus - auch wenn der Signalweg nicht steht.
+  // Frueher stand das return davor: ausgerechnet wenn die App des Freundes
+  // zu war, wurde gar nichts geschickt.
+  let pushErgebnis = null;
+  if (typeof pushSenden === "function") pushErgebnis = await pushSenden(partnerId, "anruf");
+  if (!gesendet.ok) {
+    const dazu = (pushErgebnis && pushErgebnis.ok && pushErgebnis.gesendet > 0)
+      ? " Eine Benachrichtigung auf sein Geraet ist aber hinausgegangen."
+      : " Auch eine Benachrichtigung auf sein Geraet ging nicht hinaus.";
+    anrufBeenden("Das Klingeln kam nicht durch (" + gesendet.grund + ")." + dazu);
+    return;
+  }
+  // Freizeichen fuer den Anrufer: man hoert, dass es wirklich laeuft.
+  if (typeof anrufFreizeichenAn === "function") anrufFreizeichenAn();
+  if (typeof weckerBalken === "function" && pushErgebnis) {
+    if (!pushErgebnis.ok)
+      weckerBalken("Hinweis: die Benachrichtigung auf sein Geraet ging nicht hinaus (" +
+        pushErgebnis.fehler + "). Merkt er den Anruf nicht, liegt es daran.", "warn", "anrufpush", 5);
+    else if (pushErgebnis.geraete === 0)
+      weckerBalken(String(name) + " hat auf keinem Geraet Benachrichtigungen eingeschaltet. " +
+        "Ist die App dort gerade zu, klingelt bei ihm gar nichts.", "warn", "anrufpush", 5);
+  }
   // ... und alle 3 Sekunden weiterklingeln, bis er annimmt oder 45 s um sind
   let versuche = 0;
   anrufKlingelStopp();
@@ -181,6 +256,7 @@ async function anrufAnnehmen() {
   const ein = anrufEingehend;
   if (!ein) return;
   anrufEingehend = null;   // sofort sperren: ein zweiter Klick baut sonst doppelt
+  anrufWeckerAus();        // Klingelton, Vibrieren und Vollbild aus
   const b = await anrufPcBauen(ein.von, ein.video);
   if (b.fehler) { alert(b.fehler); anrufSenden(ein.von, { typ: "abgelehnt" }); anrufPanelZu(); return; }
   anrufPartner = { id: ein.von, name: ein.name, video: ein.video };
@@ -196,6 +272,7 @@ async function anrufAnnehmen() {
 function anrufAblehnen() {
   if (anrufEingehend) anrufSenden(anrufEingehend.von, { typ: "abgelehnt" });
   anrufEingehend = null;
+  anrufWeckerAus();
   anrufPanelZu();
 }
 
@@ -206,6 +283,7 @@ function anrufAuflegen() {
 
 function anrufBeenden(meldungText) {
   anrufKlingelStopp();
+  anrufWeckerAus();
   if (anrufPc) { try { anrufPc.close(); } catch (e) {} }
   if (anrufStream) anrufStream.getTracks().forEach(t => t.stop());
   anrufPc = null; anrufStream = null; anrufPartner = null; anrufEingehend = null;
@@ -214,4 +292,210 @@ function anrufBeenden(meldungText) {
     anrufPanel(meldungText, '<button onclick="anrufPanelZu()">schliessen</button>');
     setTimeout(anrufPanelZu, 4000);
   }
+}
+
+// ============================================================
+// DER WECKER, Teil Anruf (28.08.)
+// Ein Anruf muss unmoeglich zu uebersehen sein - auch wenn die
+// App offen im Hintergrund liegt. Deshalb:
+//   1. Vollbild-Klingeln mit grossem gruenem Annehmen und rotem
+//      Ablehnen (wie beim Telefon).
+//   2. Ein echter Klingelton, im Browser SELBST erzeugt
+//      (Web-Audio, zwei Toene uebereinander) - keine fremde Datei,
+//      nichts nachzuladen, funktioniert auch offline.
+//   3. Vibrieren, solange es klingelt.
+//   4. Ein leises Freizeichen fuer den Anrufer, damit er hoert,
+//      dass es wirklich hinausgegangen ist.
+//   5. Ein eingehender Anruf raeumt sich nach 60 Sekunden selbst
+//      auf - vorher blieb ein toter Anruf haengen und alle
+//      weiteren Anrufer hoerten "besetzt".
+//
+// Alles hier ist Anzeige und Ton. Der Signalweg (WebRTC, die
+// verschluesselten Klingel-Signale) wird NICHT angefasst.
+// ============================================================
+
+let _wkTon = null;            // der Ton-Baukasten des Browsers
+let _wkKlingelUhr = null;     // Takt fuer das Klingeln
+let _wkFreiUhr = null;        // Takt fuer das Freizeichen
+let _wkEingehendUhr = null;   // raeumt einen toten Anruf nach 60 s weg
+
+function wkTonKontext() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!_wkTon) _wkTon = new AC();
+    if (_wkTon.state === "suspended") { try { _wkTon.resume(); } catch (e) { } }
+    return _wkTon;
+  } catch (e) { return null; }
+}
+
+// Ein Klingel-Stoss: zweimal kurz, zwei Toene uebereinander.
+// Gibt false zurueck, wenn der Browser Ton noch sperrt (dann sagen
+// wir das ehrlich, statt so zu tun, als klaenge etwas).
+function wkTonStoss(muster, laut, hoehen) {
+  const ac = wkTonKontext();
+  if (!ac || ac.state !== "running") return false;
+  const jetzt = ac.currentTime;
+  for (const teil of muster) {
+    for (const hz of hoehen) {
+      try {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = "sine";
+        o.frequency.value = hz;
+        g.gain.setValueAtTime(0.0001, jetzt + teil[0]);
+        g.gain.exponentialRampToValueAtTime(laut, jetzt + teil[0] + 0.04);
+        g.gain.setValueAtTime(laut, jetzt + teil[0] + teil[1] - 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, jetzt + teil[0] + teil[1]);
+        o.connect(g);
+        g.connect(ac.destination);
+        o.start(jetzt + teil[0]);
+        o.stop(jetzt + teil[0] + teil[1] + 0.03);
+      } catch (e) { return false; }
+    }
+  }
+  return true;
+}
+
+function wkKlingelStoss() { return wkTonStoss([[0, 0.42], [0.62, 0.42]], 0.09, [440, 660]); }
+function wkFreiStoss() { return wkTonStoss([[0, 0.9]], 0.035, [425]); }
+
+let _wkNachholen = null;   // haengt, solange der Ton auf den ersten Klick wartet
+
+function anrufKlingelnAus() {
+  if (_wkKlingelUhr) { clearInterval(_wkKlingelUhr); _wkKlingelUhr = null; }
+  try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) { }
+  // Die Zuhoerer vom stummen Klingeln wieder abraeumen. Ohne das kaeme bei
+  // jedem lautlos gebliebenen Anruf ein weiterer Satz dazu und sie
+  // haetten sich mit der Zeit angesammelt.
+  if (_wkNachholen) {
+    document.removeEventListener("click", _wkNachholen, true);
+    document.removeEventListener("keydown", _wkNachholen, true);
+    document.removeEventListener("touchstart", _wkNachholen, true);
+    _wkNachholen = null;
+  }
+}
+
+// Gibt zurueck, ob wirklich ein Ton kam.
+function anrufKlingelnAn() {
+  anrufKlingelnAus();
+  const einmal = () => {
+    wkKlingelStoss();
+    try { if (navigator.vibrate) navigator.vibrate([500, 250, 500]); } catch (e) { }
+  };
+  const gingLos = wkKlingelStoss();
+  try { if (navigator.vibrate) navigator.vibrate([500, 250, 500]); } catch (e) { }
+  _wkKlingelUhr = setInterval(einmal, 2400);
+  if (!gingLos) {
+    // Manche Browser lassen Ton erst zu, nachdem der Mensch einmal
+    // irgendwo geklickt hat. Dann holen wir es beim ersten Klick nach.
+    const nachholen = () => {
+      document.removeEventListener("click", nachholen, true);
+      document.removeEventListener("keydown", nachholen, true);
+      document.removeEventListener("touchstart", nachholen, true);
+      if (_wkNachholen === nachholen) _wkNachholen = null;
+      if (_wkKlingelUhr) einmal();
+    };
+    _wkNachholen = nachholen;
+    document.addEventListener("click", nachholen, true);
+    document.addEventListener("keydown", nachholen, true);
+    document.addEventListener("touchstart", nachholen, true);
+  }
+  return gingLos;
+}
+
+function anrufFreizeichenAus() {
+  if (_wkFreiUhr) { clearInterval(_wkFreiUhr); _wkFreiUhr = null; }
+}
+
+function anrufFreizeichenAn() {
+  anrufFreizeichenAus();
+  wkFreiStoss();
+  _wkFreiUhr = setInterval(wkFreiStoss, 4000);
+}
+
+// ---------- Das Vollbild-Klingeln ----------
+
+function anrufVollbildZu() {
+  const d = document.getElementById("weckerruf");
+  if (d) d.remove();
+}
+
+function anrufVollbild(name, mitVideo, tonHinweis) {
+  anrufVollbildZu();
+  if (!document.body) return;
+  const d = document.createElement("div");
+  d.id = "weckerruf";
+  d.innerHTML =
+    '<div class="wk-karte">' +
+    '<div class="wk-oben">Eingehender ' + (mitVideo ? "Video-Anruf" : "Anruf") + "</div>" +
+    '<div class="wk-kreis"><span class="wk-buchstabe"></span></div>' +
+    '<div class="wk-name"></div>' +
+    '<div class="wk-art">' + (mitVideo ? "mit Bild und Ton" : "nur Ton") + "</div>" +
+    (tonHinweis ? '<div class="wk-tonhinweis"></div>' : "") +
+    '<div class="wk-tasten">' +
+    '<button class="wk-ja" onclick="anrufAnnehmen()">&#128222; Annehmen</button>' +
+    '<button class="wk-nein" onclick="anrufAblehnen()">Ablehnen</button>' +
+    "</div></div>";
+  // Die TRAGENDE Geometrie steht direkt hier, nicht nur in stil.css.
+  // Grund: die Design-Schicht muss sich loeschen lassen, ohne dass etwas
+  // kaputtgeht (Karams Regel). Ohne diese Zeilen haenge der Anrufschirm
+  // als unformatierter Kasten ganz unten an der Seite und waere praktisch
+  // unsichtbar. Alles Schoene (Farben, Rundungen, Kreis) bleibt im CSS.
+  d.style.position = "fixed";
+  d.style.left = "0"; d.style.top = "0"; d.style.right = "0"; d.style.bottom = "0";
+  d.style.zIndex = "2147483000";
+  d.style.display = "flex";
+  d.style.alignItems = "center";
+  d.style.justifyContent = "center";
+  d.style.background = "rgba(10, 18, 32, 0.92)";
+  document.body.appendChild(d);
+  // Namen NIE als HTML einsetzen - so kann kein Benutzername Unfug bauen.
+  d.querySelector(".wk-name").textContent = name || "Unbekannt";
+  d.querySelector(".wk-buchstabe").textContent = String(name || "?").slice(0, 1).toUpperCase();
+  if (tonHinweis) d.querySelector(".wk-tonhinweis").textContent = tonHinweis;
+}
+
+// Klingeln komplett an: Bild, Ton, Vibrieren.
+function anrufWeckerAn(name, mitVideo) {
+  const tonKam = anrufKlingelnAn();
+  anrufVollbild(name, mitVideo, tonKam ? null :
+    "Ton konnte noch nicht starten - dieser Browser erlaubt ihn erst, wenn du einmal auf die Seite klickst.");
+}
+
+function anrufWeckerAus() {
+  anrufKlingelnAus();
+  anrufFreizeichenAus();
+  anrufVollbildZu();
+  if (_wkEingehendUhr) { clearTimeout(_wkEingehendUhr); _wkEingehendUhr = null; }
+}
+
+// Ein eingehender Anruf, der nie beantwortet und nie abgesagt wird
+// (Anrufer schliesst den Laptop, Netz weg), blockierte frueher fuer
+// immer: jeder weitere Anrufer bekam "besetzt". Jetzt raeumt er sich
+// nach 60 Sekunden selbst weg.
+function anrufEingehendUhrStellen() {
+  if (_wkEingehendUhr) clearTimeout(_wkEingehendUhr);
+  const derselbe = anrufEingehend;
+  _wkEingehendUhr = setTimeout(() => {
+    if (anrufEingehend && anrufEingehend === derselbe) {
+      const wer = anrufEingehend.name;
+      anrufEingehend = null;
+      anrufWeckerAus();
+      if (typeof weckerBalken === "function")
+        weckerBalken("Verpasster Anruf von " + wer + ".", "warn");
+    }
+  }, 60000);
+}
+
+// ---------- Was der Service Worker meldet ----------
+// Der Klick auf "Annehmen" oder "Ablehnen" in der Push-Meldung
+// landet hier, wenn die App offen ist.
+
+function anrufVomServiceWorker(d) {
+  try {
+    if (!d || !d.kt) return;
+    if (d.kt === "anruf-annehmen") { if (anrufEingehend) anrufAnnehmen(); }
+    else if (d.kt === "anruf-ablehnen") { if (anrufEingehend) anrufAblehnen(); }
+  } catch (e) { }
 }

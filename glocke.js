@@ -14,7 +14,15 @@ let glockePoll = null;
 
 async function glockeStart() {
   try {
-    if (!window.supa || typeof supaNutzer !== "function") return;
+    if (!window.supa || typeof supaNutzer !== "function") {
+      // Frueher stieg die Glocke hier still aus: keine Zaehlung, KEINE
+      // Anrufe - und auf sechs von sieben Seiten stand nirgends, warum.
+      if (typeof weckerBalken === "function")
+        weckerBalken("Die Verbindung zur Datenbank konnte nicht laden (Werbeblocker, Firmennetz " +
+          "oder kurze Netzstoerung). Solange das so ist, kommen hier keine Nachrichten und keine " +
+          "Anrufe an. Meist hilft: Seite neu laden.", "warn", "keine-supa", 30);
+      return;
+    }
     const knopf = document.getElementById("nav_nachrichten");
     if (!knopf) return;
     knopf.addEventListener("click", (ev) => { ev.preventDefault(); glockeUmschalten(); });
@@ -253,7 +261,7 @@ async function glockeSenden() {
   const feld = document.getElementById("gp-text");
   const text = feld.value.trim();
   if (!text) return;
-  const r = await supaDmSenden(glockePartner.partnerId, text);
+  const r = await supaDmSenden(glockePartner.partnerId, text, glockePartner.username);
   if (r.error) { alert("Nicht gesendet: " + r.error.message); return; }
   feld.value = "";
   glockeNachladen();
@@ -269,7 +277,7 @@ async function glockeMedienSenden(blob, art, name) {
   const key = await kryptoDm(glockePartner.partnerId);
   const r = await medienHochladen(key, medienDmPfad(u.id, glockePartner.partnerId), blob, art, name);
   if (r.fehler) { alert("Nicht gesendet: " + r.fehler); return; }
-  const s = await supaDmSenden(glockePartner.partnerId, r.text);
+  const s = await supaDmSenden(glockePartner.partnerId, r.text, glockePartner.username);
   if (s.error) { alert("Nicht gesendet: " + s.error.message); return; }
   glockeNachladen();
 }

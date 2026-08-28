@@ -212,8 +212,23 @@ async function supaNachrichtSenden(bereichId, text) {
   if (!key) return { error: { message: OHNE_SCHLUESSEL } };
   const r = await supa.from("kt_nachrichten").insert({ bereich: bereichId, autor: u.id, text: await e2eZu(key, text) });
   if (!r.error && typeof pushSenden === "function") {
-    if (bereichId !== u.id) pushSenden(bereichId, "chat");
-    else supaFreigabenVonMir().then(g => (g || []).forEach(x => pushSenden(x.gast, "chat"))).catch(() => {});
+    // Frueher bekam in einem FREMDEN Bereich nur der Besitzer eine Meldung -
+    // die uebrigen Gaeste erfuhren nie etwas. Jetzt verteilt der Server an
+    // alle im Bereich (Besitzer und Gaeste), den Absender ausgenommen.
+    pushSenden(bereichId, "chat", { bereich: bereichId }).then(async erg => {
+      if (erg && erg.ok && erg.verteilt) {
+        if (erg.geraete === 0 && typeof weckerBalken === "function")
+          weckerBalken("Niemand in diesem Bereich hat Benachrichtigungen eingeschaltet - deine " +
+            "Nachricht steht da, aber es klopft bei niemandem an.", "warn", "chat-" + bereichId, 30);
+        return;
+      }
+      // Aeltere Server-Fassung kann noch nicht verteilen: dann wie bisher.
+      // (Im fremden Bereich hat die erste Sendung den Besitzer schon erreicht.)
+      if (bereichId === u.id) {
+        const gaeste = await supaFreigabenVonMir().catch(() => []);
+        for (const x of (gaeste || [])) await pushSenden(x.gast, "chat");
+      }
+    }).catch(() => {});
   }
   return r;
 }
@@ -261,12 +276,14 @@ async function supaDmLaden(partnerId, abId) {
   return liste;
 }
 
-async function supaDmSenden(partnerId, text) {
+async function supaDmSenden(partnerId, text, name) {
   const u = await supaNutzer();
   const key = await kryptoDm(partnerId);
   if (!key) return { error: { message: "Dein Freund hat noch keinen Schlüssel - er muss sich einmal mit der neuen Version anmelden." } };
   const r = await supa.from("kt_direkt").insert({ von: u.id, an: partnerId, text: await e2eZu(key, text) });
-  if (!r.error && typeof pushSenden === "function") pushSenden(partnerId, "dm");
+  // Ehrlich statt Feuer und vergessen: hat der Freund kein Geraet
+  // angemeldet oder fehlt die Verbindung, erfaehrt der Absender es sofort.
+  if (!r.error && typeof pushMelden === "function") pushMelden(partnerId, "dm", name || null);
   return r;
 }
 

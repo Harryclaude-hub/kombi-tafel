@@ -287,16 +287,34 @@ async function benachKnopf() {
   const platz = el("benach_platz");
   if (!platz || typeof pushStatus !== "function") return;
   const status = await pushStatus();
+  // Frueher stand hier gruen "an", sobald der BROWSER eine Anmeldung hatte -
+  // auch wenn in der Datenbank nichts stand und nie etwas ankam. Und bei
+  // "geht nicht" wurde einfach gar nichts angezeigt (iPhone!).
+  // Jetzt sagt jede Zeile die Wahrheit und bietet den passenden Weg an.
   if (status === "an") {
-    platz.innerHTML = ' <span class="mini gruen">&#128276; Benachrichtigungen an</span>';
+    platz.innerHTML = ' <span class="mini gruen">&#128276; Benachrichtigungen an</span> ' +
+      '<button onclick="weckerPanelUmschalten()">Geraete und Probe</button>';
   } else if (status === "geht nicht") {
-    platz.innerHTML = "";
+    platz.innerHTML = ' <span class="mini">&#128276; Dieser Browser kann keine Benachrichtigungen.</span>';
+  } else if (status === "ios-install") {
+    platz.innerHTML = ' <button onclick="weckerPanelUmschalten()">&#128276; iPhone: so kommen Meldungen an</button>';
+  } else if (status === "gesperrt") {
+    platz.innerHTML = ' <button onclick="weckerPanelUmschalten()">&#128276; Benachrichtigungen sind gesperrt - so geht es auf</button>';
+  } else if (status === "unklar") {
+    platz.innerHTML = ' <span class="mini">&#128276; Benachrichtigungen: nicht sicher</span> ' +
+      '<button onclick="weckerPanelUmschalten()">nachsehen</button>';
+  } else if (status === "halb") {
+    platz.innerHTML = ' <button onclick="tuPushEinschalten()">&#128276; Benachrichtigungen reparieren</button>';
   } else {
     platz.innerHTML = ' <button onclick="tuPushEinschalten()">&#128276; Benachrichtigungen einschalten</button>';
   }
 }
 
+// Es gibt nur EINEN Weg zum Einschalten: den des Weckers. Sonst gaebe es
+// fuer dieselbe Lage zwei verschiedene Antworten - der Wecker kennt zum
+// Beispiel den iPhone-Fall und die Browser-Sperre, dieser Knopf frueher nicht.
 async function tuPushEinschalten() {
+  if (typeof weckerFrageJa === "function") { await weckerFrageJa(); benachKnopf(); return; }
   const r = await pushEinschalten();
   if (r.fehler) { meldungM("Nicht eingeschaltet: " + r.fehler, "warn"); return; }
   meldungM(r.nurLokal
