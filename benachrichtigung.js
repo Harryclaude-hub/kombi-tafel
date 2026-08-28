@@ -1085,6 +1085,20 @@ async function weckerDiagnose() {
       ? "Dieses Gerät NICHT (es sind " + geraeteZahl + " andere eingetragen). Unten auf Einschalten drücken."
       : "Noch kein einziges Gerät eingetragen. Solange das so ist, kommt bei geschlossener App nichts an."));
 
+  // 7. Gehen von hier aus ueberhaupt Anrufe hinaus?
+  //    Das ist eine ECHTE Messung: es wird eine Probeverbindung aufgebaut
+  //    (ohne Mikrofon, ohne dass jemand etwas merkt) und nachgesehen,
+  //    welche Wege der Browser fuer den Ton findet.
+  if (typeof anrufProbeText === "function") {
+    try {
+      const a = await anrufProbeText();
+      punkte.push(wkPruefpunkt(a.gut && !a.warn, "Anrufe von diesem Gerät", a.text, a.text));
+    } catch (e) {
+      punkte.push(wkPruefpunkt(false, "Anrufe von diesem Gerät", "",
+        "Die Probe ging nicht durch: " + String(e.message || e)));
+    }
+  }
+
   return punkte;
 }
 

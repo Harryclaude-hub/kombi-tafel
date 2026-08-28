@@ -1544,7 +1544,63 @@ let binAdmin = false;
 // Admin-Funktionen und Foto-Sätze leben jetzt auf der eigenen Seite
 // admin.html (admin.js) - hier gibt es nur noch den Verweis-Knopf oben.
 
-// ---------- Buchhaltung ----------
+// ---------- Buchhaltung als Bericht ("Das Armaturenbrett") ----------
+// BITTE NICHT ANFASSEN: die Rechenwege sind unveraendert geblieben.
+// Karams Formel bleibt Wort fuer Wort dieselbe:
+//   Gewinn = aktuelle Gesamtbalance + alle Auszahlungen
+//            - alle Einzahlungen - Startkapital
+// Neu ist allein, WIE die Zahlen gezeigt werden: oben ein Urteil in einem
+// Satz und die wichtigsten Zahlen als Kacheln, darunter der Rechenweg zum
+// Mitrechnen, ganz unten die Einzelheiten, die man weiter von Hand
+// bearbeiten kann. Keine Zahl wird anders gerundet, keine Summe anders
+// gebildet.
+
+// Geld immer mit zwei Nachkommastellen, genau wie vorher.
+function bbGeld(x) { return Number(x).toFixed(2) + " &euro;"; }
+function bbGeldVz(x) { return (Number(x) >= 0 ? "+" : "") + Number(x).toFixed(2) + " &euro;"; }
+
+// Eine Kachel des Armaturenbretts. Reine Anzeige.
+function bbKachel(titel, wert, unter, klasse) {
+  return '<div class="bb-kachel' + (klasse ? " " + klasse : "") + '">' +
+    '<div class="bb-kacheltitel">' + titel + "</div>" +
+    '<div class="bb-kachelwert">' + wert + "</div>" +
+    '<div class="bb-kachelunter">' + (unter || "") + "</div></div>";
+}
+
+// Wie viel liegt gerade in offenen Kombinationen? Das ist dieselbe
+// Rechnung wie in der Anbieter-Tabelle weiter oben (zeichneKontoDb):
+// der Einsatz aller Scheine mit Stand "offen". Nichts Neues erfunden.
+// Die Scheine liegen schon entschluesselt im Speicher (kasseScheine),
+// es wird nichts nachgeladen und nichts im Klartext weggeschrieben.
+function bbScheinLage() {
+  const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const offene = liste.filter(s => s.stand === "offen");
+  const imSpiel = offene.reduce((p, s) => p + ((s.daten && s.daten.einsatz) || 0), 0);
+  const moeglich = offene.reduce((p, s) => p + ((s.daten && s.daten.moeglich) || 0), 0);
+  const wartet = offene.filter(s => scheinWartet(s)).length;
+  return { anzahl: offene.length, imSpiel: imSpiel, moeglich: moeglich, wartet: wartet, gesamt: liste.length };
+}
+
+// Bei wem liegt das offene Geld gerade? Nur eine Aufteilung derselben
+// Einsaetze auf die Personen, keine zweite Rechnung.
+function bbPersonenOffen() {
+  const liste = (Array.isArray(kasseScheine) ? kasseScheine : []).filter(s => s.stand === "offen");
+  const karte = {};
+  for (const s of liste) {
+    const id = s.ordner || "";
+    if (!karte[id]) karte[id] = { id: id, n: 0, einsatz: 0 };
+    karte[id].n++;
+    karte[id].einsatz += (s.daten && s.daten.einsatz) || 0;
+  }
+  const raus = Object.keys(karte).map(k => karte[k]);
+  raus.sort((a, b) => b.einsatz - a.einsatz);
+  return raus;
+}
+
+// Welche Buchungsart zeigt Liste 1 gerade? Reine Ansicht, die Liste
+// selbst bleibt unveraendert in der Datenbank.
+let bbArtFilter = "alle";
+function tuBuchArtFilter(wert) { bbArtFilter = wert; zeichneBuchhaltung(); }
 
 async function zeichneBuchhaltung() {
   const box = el("buchhaltung");
@@ -1560,30 +1616,104 @@ async function zeichneBuchhaltung() {
   const einz = summe("einzahlung"), ausz = summe("auszahlung"), start = summe("startkapital");
   const letzteBalance = balancen.length ? parseFloat(balancen[balancen.length - 1].betrag) : null;
   const gewinn = (letzteBalance === null) ? null : letzteBalance + ausz - einz - start;
+  const balanceDatum = balancen.length ? balancen[balancen.length - 1].datum : null;
+  const lage = bbScheinLage();
 
-  let html = '<details open><summary>Buchhaltung (anklicken)</summary><div class="inhalt">' +
-    '<div class="kern"><b>Die Methode (deine zwei Listen):</b> Liste 1 sammelt jede Ein- und ' +
-    "Auszahlung mit Datum, Konto, Person und Betrag, dazu das Startkapital. Liste 2 ist die " +
-    "tägliche <b>Gesamtbalance aller Accounts zusammen</b>. Der Gewinn rechnet sich: " +
-    "<b>aktuelle Gesamtbalance + alle Auszahlungen &minus; alle Einzahlungen &minus; Startkapital</b>.</div>";
-
-  // Ergebnis-Kasten
+  // ---- 1. Das Urteil in einem Satz ----
+  let urteilKlasse, urteilZahl, urteilText;
   if (gewinn === null) {
-    html += '<div class="warnkern">Noch keine Tagesbalance eingetragen. Trag unten die heutige ' +
-      "Gesamtbalance aller Accounts ein, dann rechnet der Gewinn.</div>";
+    urteilKlasse = "bb-offen";
+    urteilZahl = "noch offen";
+    urteilText = "Noch keine Tagesbalance eingetragen. Trag unten die heutige " +
+      "Gesamtbalance aller Accounts ein, dann rechnet der Gewinn.";
   } else {
-    html += '<div class="' + (gewinn >= 0 ? "merk" : "warn") + '"><b>Reiner Gewinn nach der Formel:</b> ' +
-      letzteBalance.toFixed(2) + " (Balance vom " + balancen[balancen.length - 1].datum + ") + " +
-      ausz.toFixed(2) + " (Auszahlungen) &minus; " + einz.toFixed(2) + " (Einzahlungen) &minus; " +
-      start.toFixed(2) + " (Startkapital) = <b>" + (gewinn >= 0 ? "+" : "") + gewinn.toFixed(2) +
-      " &euro;</b></div>";
+    urteilKlasse = (gewinn >= 0) ? "bb-plus" : "bb-minus";
+    urteilZahl = bbGeldVz(gewinn);
+    urteilText = (gewinn >= 0)
+      ? "So steht es gerade: du bist " + gewinn.toFixed(2) + " Euro im Plus."
+      : "So steht es gerade: du bist " + Math.abs(gewinn).toFixed(2) + " Euro im Minus.";
+    urteilText += lage.anzahl
+      ? " Dazu liegen " + lage.imSpiel.toFixed(2) + " Euro in " +
+        (lage.anzahl === 1 ? "einer offenen Kombination" : lage.anzahl + " offenen Kombinationen") +
+        ". Was daraus wird, steht noch nicht fest."
+      : " In offenen Kombinationen liegt gerade nichts.";
   }
 
-  // Monats-Übersicht (kumuliert bis Monatsende, plus Monatsgewinn)
+  let html = '<details open class="bb-bericht"><summary>&#128202; Buchhaltung: der Bericht (anklicken)</summary>' +
+    '<div class="inhalt">' +
+    '<div class="bb-urteil ' + urteilKlasse + '">' +
+    '<div class="bb-urteilzahl">' + urteilZahl + "</div>" +
+    '<div class="bb-urteiltext">' + urteilText + "</div></div>";
+
+  // ---- 2. Was klemmt: nur was wirklich in den Daten steht ----
+  const klemmt = [];
+  if (balanceDatum && balanceDatum < heute) {
+    klemmt.push("Die letzte Gesamtbalance ist vom " + balanceDatum + " und nicht von heute. " +
+      "Trag unten die heutige ein, dann ist der Gewinn wieder aktuell.");
+  }
+  if (lage.wartet) {
+    klemmt.push((lage.wartet === 1 ? "Eine offene Kombination ist" : lage.wartet + " offene Kombinationen sind") +
+      " laut Anstoßzeit schon durch. Trag unter Kombinationen ein, ob gewonnen oder verloren.");
+  }
+  if (!buchungen.length) {
+    klemmt.push("In Liste 1 steht noch keine einzige Ein- oder Auszahlung. Ohne Startkapital " +
+      "und Einzahlungen ist der Gewinn nur die nackte Balance.");
+  }
+  if (klemmt.length) {
+    html += '<div class="bb-klemmt"><div class="bb-abschnitt">Das klemmt gerade</div><ul>' +
+      klemmt.map(k => "<li>" + k + "</li>").join("") + "</ul></div>";
+  }
+
+  // ---- 3. Die wichtigsten Zahlen als Kacheln ----
+  html += '<div class="bb-kacheln">' +
+    bbKachel("Gesamtbalance", (letzteBalance === null) ? "noch keine" : bbGeld(letzteBalance),
+      (balanceDatum ? "Stand vom " + balanceDatum : "trag sie unten in Liste 2 ein"), "") +
+    bbKachel("Ausgezahlt", bbGeld(ausz), "Geld, das du herausgeholt hast", "") +
+    bbKachel("Eingezahlt", bbGeld(einz), "Geld, das du hineingesteckt hast", "") +
+    bbKachel("Startkapital", bbGeld(start), "womit du angefangen hast", "") +
+    bbKachel("Im Spiel", bbGeld(lage.imSpiel),
+      lage.anzahl + (lage.anzahl === 1 ? " offene Kombination" : " offene Kombinationen"), "bb-warten") +
+    bbKachel("Möglich daraus", bbGeld(lage.moeglich), "wenn alle offenen aufgehen", "bb-warten") +
+    "</div>";
+
+  // ---- 4. Bei wem liegt das offene Geld ----
+  if (lage.anzahl) {
+    html += '<div class="bb-wem"><div class="bb-abschnitt">Bei wem liegt das Geld gerade</div><ul class="bb-wemliste">';
+    for (const p of bbPersonenOffen()) {
+      const name = p.id ? textSicherM(ordnerNameM(p.id) || "?") : "ohne Person";
+      html += '<li><span class="bb-wemname">' + name + "</span>" +
+        '<span class="bb-wemzahl">' + bbGeld(p.einsatz) + "</span>" +
+        '<span class="bb-wemmini">' + p.n + (p.n === 1 ? " Kombination" : " Kombinationen") + "</span></li>";
+    }
+    html += "</ul></div>";
+  }
+
+  // ---- 5. Der Rechenweg zum Mitrechnen ----
+  html += '<details open class="bb-teil bb-weg"><summary>Wie kommt diese Zahl zustande?</summary>' +
+    '<p class="mini">Deine zwei Listen: Liste 1 sammelt jede Ein- und Auszahlung mit Datum, ' +
+    "Konto, Person und Betrag, dazu das Startkapital. Liste 2 ist die t&auml;gliche " +
+    "<b>Gesamtbalance aller Accounts zusammen</b>. Daraus rechnet sich der Gewinn, Zeile f&uuml;r Zeile:</p>" +
+    '<div class="bb-rechnung">' +
+    '<div class="bb-rz"><span class="bb-rzname">Gesamtbalance' +
+      (balanceDatum ? " (Stand vom " + balanceDatum + ")" : "") + "</span>" +
+      '<span class="bb-rzwert">' + ((letzteBalance === null) ? "noch keine" : bbGeld(letzteBalance)) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">plus alle Auszahlungen</span>' +
+      '<span class="bb-rzwert">+ ' + bbGeld(ausz) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">minus alle Einzahlungen</span>' +
+      '<span class="bb-rzwert">&minus; ' + bbGeld(einz) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">minus Startkapital</span>' +
+      '<span class="bb-rzwert">&minus; ' + bbGeld(start) + "</span></div>" +
+    '<div class="bb-rz bb-rzende ' + ((gewinn === null) ? "bb-offen" : (gewinn >= 0 ? "bb-plus" : "bb-minus")) +
+      '"><span class="bb-rzname">= reiner Gewinn</span>' +
+      '<span class="bb-rzwert">' + ((gewinn === null) ? "noch offen" : bbGeldVz(gewinn)) + "</span></div>" +
+    "</div></details>";
+
+  // ---- 6. Die Einzelheiten: Monate ----
+  html += '<details open class="bb-teil"><summary>Monat f&uuml;r Monat</summary>';
   if (balancen.length) {
     const monate = [...new Set(balancen.map(b => b.datum.slice(0, 7)))].sort();
     let vorher = null;
-    html += "<h3>Monate</h3><table><thead><tr><th>Monat</th><th>letzte Balance</th>" +
+    html += '<div class="tabellenrand"><table><thead><tr><th>Monat</th><th>letzte Balance</th>' +
       "<th>Auszahlungen bis dahin</th><th>Einzahlungen bis dahin</th>" +
       "<th>Gewinn gesamt</th><th>Gewinn im Monat</th></tr></thead><tbody>";
     for (const m of monate) {
@@ -1604,11 +1734,15 @@ async function zeichneBuchhaltung() {
         "<td class='" + (imMonat >= 0 ? "gruen" : "rot") + "'>" + (imMonat >= 0 ? "+" : "") + imMonat.toFixed(2) + " &euro;</td></tr>";
       vorher = g;
     }
-    html += "</tbody></table>";
+    html += "</tbody></table></div>";
+  } else {
+    html += '<p class="mini">Sobald unten die erste Gesamtbalance steht, f&uuml;llt sich diese Tabelle von selbst.</p>';
   }
+  html += "</details>";
 
-  // Liste 1: Buchungen
-  html += "<h3>Liste 1: Ein- und Auszahlungen</h3>";
+  // ---- 7. Liste 1: Ein- und Auszahlungen (weiter bearbeitbar) ----
+  html += '<details open class="bb-teil"><summary>Liste 1: Ein- und Auszahlungen' +
+    (buchungen.length ? " (" + buchungen.length + ")" : "") + "</summary>";
   if (schreib) {
     html += '<div class="buch-eingabe">' +
       '<input type="date" id="bu_datum" value="' + heute + '">' +
@@ -1617,23 +1751,39 @@ async function zeichneBuchhaltung() {
       '<option value="startkapital">Startkapital</option></select>' +
       '<select id="bu_konto"><option>Interwetten</option><option>Bwin</option>' +
       '<option>Bet365</option><option>Stake</option><option>Sonstiges</option></select>' +
-      '<input id="bu_person" placeholder="Person" value="' + ich.username + '" style="width:110px">' +
+      '<input id="bu_person" placeholder="Person" value="' + textSicherM(ich.username) + '" style="width:110px">' +
       '<input type="number" step="0.01" min="0.01" id="bu_betrag" placeholder="Betrag" style="width:90px">' +
       '<button class="haupt" onclick="tuBuchen()">Eintragen</button></div>';
   }
   if (buchungen.length) {
-    html += "<table><thead><tr><th>Datum</th><th>Art</th><th>Konto</th><th>Person</th>" +
-      "<th>Betrag</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
-    for (const b of buchungen.slice().reverse()) {
-      html += "<tr><td>" + b.datum + "</td><td>" + b.art + "</td><td>" + b.konto + "</td>" +
-        "<td>" + b.person + "</td><td>" + parseFloat(b.betrag).toFixed(2) + " &euro;</td>" +
-        (schreib ? "<td><button onclick=\"tuBuchungWeg('" + b.id + "')\">weg</button></td>" : "") + "</tr>";
+    html += '<div class="bb-filter"><label for="bu_filter">Zeigen:</label>' +
+      '<select id="bu_filter" onchange="tuBuchArtFilter(this.value)">' +
+      ["alle", "einzahlung", "auszahlung", "startkapital"].map(a =>
+        '<option value="' + a + '"' + (bbArtFilter === a ? " selected" : "") + ">" +
+        (a === "alle" ? "alle" : a) + "</option>").join("") + "</select></div>";
+    const gezeigt = (bbArtFilter === "alle") ? buchungen : buchungen.filter(b => b.art === bbArtFilter);
+    if (gezeigt.length) {
+      html += '<div class="tabellenrand"><table><thead><tr><th>Datum</th><th>Art</th><th>Konto</th><th>Person</th>' +
+        "<th>Betrag</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
+      for (const b of gezeigt.slice().reverse()) {
+        // Diese vier Felder tippen Menschen selbst ein, und in einem geteilten
+        // Bereich darf das auch ein Mitarbeiter. Ohne textSicherM wuerde ein Name
+        // wie <b>Hallo</b> als HTML wirken statt als Text dazustehen.
+        html += "<tr><td>" + textSicherM(b.datum) + "</td><td>" + textSicherM(b.art) +
+          "</td><td>" + textSicherM(b.konto) + "</td>" +
+          "<td>" + textSicherM(b.person) + "</td><td>" + parseFloat(b.betrag).toFixed(2) + " &euro;</td>" +
+          (schreib ? "<td><button onclick=\"tuBuchungWeg('" + b.id + "')\">weg</button></td>" : "") + "</tr>";
+      }
+      html += "</tbody></table></div>";
+    } else {
+      html += '<p class="mini">Keine Buchung dieser Art. Stell oben auf "alle", dann kommt wieder alles.</p>';
     }
-    html += "</tbody></table>";
   } else html += '<p class="mini">Noch keine Buchungen.</p>';
+  html += "</details>";
 
-  // Liste 2: Tagesbalancen
-  html += "<h3>Liste 2: tägliche Gesamtbalance</h3>" +
+  // ---- 8. Liste 2: taegliche Gesamtbalance (weiter bearbeitbar) ----
+  html += '<details open class="bb-teil"><summary>Liste 2: t&auml;gliche Gesamtbalance' +
+    (balancen.length ? " (" + balancen.length + ")" : "") + "</summary>" +
     '<p class="mini">Ein Wert pro Tag: alle Account-Staende zusammengezaehlt. ' +
     "Gleicher Tag nochmal eingetragen ueberschreibt den Wert.</p>";
   if (schreib) {
@@ -1643,14 +1793,19 @@ async function zeichneBuchhaltung() {
       '<button class="haupt" onclick="tuBalance()">Speichern</button></div>';
   }
   if (balancen.length) {
-    html += "<table><thead><tr><th>Datum</th><th>Gesamtbalance</th>" +
+    html += '<div class="tabellenrand"><table><thead><tr><th>Datum</th><th>Gesamtbalance</th>' +
       (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
     for (const b of balancen.slice().reverse().slice(0, 31)) {
       html += "<tr><td>" + b.datum + "</td><td><b>" + parseFloat(b.betrag).toFixed(2) + " &euro;</b></td>" +
         (schreib ? "<td><button onclick=\"tuBalanceWeg('" + b.datum + "')\">weg</button></td>" : "") + "</tr>";
     }
-    html += "</tbody></table>";
+    html += "</tbody></table></div>";
+    if (balancen.length > 31) {
+      html += '<p class="mini">Gezeigt werden die letzten 31 Tage. &Auml;lteres bleibt in der ' +
+        "Datenbank und z&auml;hlt in der Monatstabelle weiter mit.</p>";
+    }
   } else html += '<p class="mini">Noch keine Balancen.</p>';
+  html += "</details>";
 
   box.innerHTML = html + "</div></details>";
 }

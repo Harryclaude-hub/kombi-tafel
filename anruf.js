@@ -9,8 +9,28 @@
 // ============================================================
 "use strict";
 
-const ANRUF_STUN = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+// WOHER DIE SERVER KOMMEN
+// Alles Einstellbare steht in anruf-server.js - eine Datei, eine Stelle.
+//
+// Gemessen am 29.08.2026 mit einer echten Probeverbindung: der frueher
+// hier eingetragene Gratis-Dienst openrelay.metered.ca antwortet nicht
+// mehr ("STUN host lookup received error", "400 TURN allocate error").
+// Er stand fuenf Minuten lang drin und war reiner Schaden: jeder Anruf
+// haette erst neun Sekunden auf eine Antwort gewartet, die nie kommt.
+// Deshalb: keine erfundenen Server. Was drinsteht, ist geprueft.
+//
+// TON UND BILD BLEIBEN IMMER VERSCHLUESSELT (DTLS-SRTP, fester Teil
+// von WebRTC). Ein Umleitungs-Server reicht nur weiter, er hoert nicht mit.
+function anrufEisBauen() {
+  const stun = (typeof window !== "undefined" && Array.isArray(window.KT_STUN) && window.KT_STUN.length)
+    ? window.KT_STUN : [{ urls: "stun:stun.l.google.com:19302" }];
+  const turn = (typeof window !== "undefined" && Array.isArray(window.KT_TURN)) ? window.KT_TURN : [];
+  return { iceServers: stun.concat(turn), iceCandidatePoolSize: 4 };
+}
 
+// Wird bei jedem Anruf frisch gelesen: so wirkt eine geaenderte
+// anruf-server.js sofort, ohne dass jemand etwas umstellen muss.
+let ANRUF_STUN = anrufEisBauen();
 let anrufPc = null;              // die laufende Verbindung
 let anrufStream = null;          // eigenes Mikro/Kamera
 let anrufPartner = null;         // { id, name, video }
@@ -122,6 +142,10 @@ async function anrufSignal(roh) {
     const p = await supa.from("kt_profiles").select("username").eq("id", roh.von).maybeSingle();
     anrufEingehend = { von: roh.von, name: (p.data && p.data.username) || "?",
       offer: s.offer, video: !!s.video, eis: [] };
+    anrufWartenWeg();
+    // Hat er schon auf dem Sperrbildschirm "Annehmen" gedrueckt, wird
+    // JETZT abgehoben - ohne dass er in der App noch einmal druecken muss.
+    if (anrufWunschEinloesen(roh.von)) return;
     // DER WECKER: Vollbild, echter Klingelton, Vibrieren. Und der Anruf
     // raeumt sich nach 60 Sekunden selbst weg, damit ein toter Anruf nicht
     // alle weiteren Anrufer auf "besetzt" laufen laesst.
@@ -170,6 +194,7 @@ function anrufPanelZu() {
 }
 
 async function anrufPcBauen(zielId, mitVideo) {
+  ANRUF_STUN = anrufEisBauen();
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia(
@@ -192,8 +217,20 @@ async function anrufPcBauen(zielId, mitVideo) {
     ziel.appendChild(el);
   };
   pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "connected" && typeof weckerBalken === "function") {
+      weckerBalken("Verbunden. Wenn du nichts hoerst: pruefe die Lautstaerke und ob das " +
+        "Mikrofon erlaubt ist.", "gut", "anruf-verbunden", 1);
+    }
     if (pc.connectionState === "failed" || pc.connectionState === "disconnected")
       anrufBeenden("Verbindung verloren.");
+  };
+  // Kommt gar keine Verbindung zustande, sagt das Programm WARUM - frueher
+  // hiess es nur "Verbindung verloren", ohne dass jemand wusste, woran es lag.
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === "failed" && typeof weckerBalken === "function") {
+      weckerBalken("Der Ton findet keinen Weg zwischen euren Geraeten. Das passiert in " +
+        "manchen Mobilfunknetzen. Versuch es ueber WLAN noch einmal.", "warn", "anruf-eis", 2);
+    }
   };
   anrufPc = pc;
   anrufStream = stream;
@@ -464,6 +501,7 @@ function anrufWeckerAn(name, mitVideo) {
 }
 
 function anrufWeckerAus() {
+  anrufWartenWeg();
   anrufKlingelnAus();
   anrufFreizeichenAus();
   anrufVollbildZu();
@@ -492,10 +530,118 @@ function anrufEingehendUhrStellen() {
 // Der Klick auf "Annehmen" oder "Ablehnen" in der Push-Meldung
 // landet hier, wenn die App offen ist.
 
+// Der Wunsch vom Sperrbildschirm, gemerkt bis das Klingeln da ist.
+let _anrufWunsch = null;   // { was: "annehmen"|"ablehnen", von, bis }
+
+function anrufWunschGueltig() {
+  if (_anrufWunsch && Date.now() > _anrufWunsch.bis) _anrufWunsch = null;
+  return _anrufWunsch;
+}
+
+// Passt der gemerkte Wunsch zu DIESEM Anrufer? Der Server schickt die
+// Kennung des Anrufers mit; fehlt sie (alte Meldung), gilt der Wunsch
+// fuer den naechsten Anruf ueberhaupt - besser als gar nicht abheben.
+function anrufWunschEinloesen(vonId) {
+  const w = anrufWunschGueltig();
+  if (!w) return false;
+  if (w.von && vonId && w.von !== vonId) return false;
+  _anrufWunsch = null;
+  if (w.was === "ablehnen") { anrufAblehnen(); return true; }
+  anrufAnnehmen();
+  return true;
+}
+
 function anrufVomServiceWorker(d) {
   try {
     if (!d || !d.kt) return;
-    if (d.kt === "anruf-annehmen") { if (anrufEingehend) anrufAnnehmen(); }
-    else if (d.kt === "anruf-ablehnen") { if (anrufEingehend) anrufAblehnen(); }
+    if (d.kt === "anruf-annehmen" || d.kt === "anruf-ablehnen") {
+      const was = d.kt === "anruf-annehmen" ? "annehmen" : "ablehnen";
+      // Ist der Anruf schon da: sofort. Sonst 45 Sekunden lang merken -
+      // genau so lange klingelt der Anrufer weiter.
+      if (anrufEingehend && (!d.von || anrufEingehend.von === d.von)) {
+        if (was === "ablehnen") anrufAblehnen(); else anrufAnnehmen();
+        return;
+      }
+      _anrufWunsch = { was: was, von: d.von || null, bis: Date.now() + 45000 };
+      if (was === "annehmen") anrufWartenZeigen();
+      return;
+    }
+    // Nur auf die Meldung getippt (am iPhone gibt es keine Knoepfe auf
+    // der Meldung): dann keinesfalls von selbst abheben, aber sofort
+    // zeigen, dass gleich ein Anruf kommt - statt einer leeren Seite.
+    if (d.kt === "anruf-oeffnen" && !anrufEingehend && !anrufPc) anrufWartenZeigen();
   } catch (e) { }
+}
+
+// Die kurze Luecke zwischen "App geht auf" und "Klingeln kommt an"
+// darf nicht wie ein Fehler aussehen.
+function anrufWartenZeigen() {
+  if (document.getElementById("anruf-warten")) return;
+  const d = document.createElement("div");
+  d.id = "anruf-warten";
+  d.className = "anruf-warten";
+  d.innerHTML = '<div class="aw-ring"></div>' +
+    '<div class="aw-text">Anruf wird verbunden...</div>' +
+    '<div class="aw-mini">Einen Augenblick, das Klingeln ist gleich da.</div>';
+  document.body.appendChild(d);
+  // Kommt in 12 Sekunden nichts, war der Anrufer schon weg.
+  setTimeout(() => {
+    const w = document.getElementById("anruf-warten");
+    if (w && !anrufEingehend && !anrufPc) {
+      w.querySelector(".aw-text").textContent = "Der Anruf ist nicht mehr da.";
+      w.querySelector(".aw-mini").textContent = "Wahrscheinlich hat er inzwischen aufgelegt.";
+      setTimeout(anrufWartenWeg, 4000);
+    }
+  }, 12000);
+}
+
+function anrufWartenWeg() {
+  const w = document.getElementById("anruf-warten");
+  if (w) w.remove();
+}
+
+// ============================================================
+// SELBSTPROBE: findet dieses Geraet einen Weg fuer den Ton?
+// Baut eine Probeverbindung ohne Mikrofon auf und schaut nach,
+// welche Wege der Browser findet:
+//   host  = nur im eigenen Netz (zu wenig)
+//   srflx = ueber STUN gefunden (reicht in fast jedem WLAN)
+//   relay = ueber einen Umleitungs-Server (geht ueberall)
+// ============================================================
+async function anrufProbe(sekunden) {
+  const erg = { host: false, srflx: false, relay: false, fehler: [], turnEingetragen: 0 };
+  try {
+    const einst = anrufEisBauen();
+    erg.turnEingetragen = einst.iceServers.filter(s =>
+      String(s.urls || "").indexOf("turn") === 0).length;
+    const pc = new RTCPeerConnection(einst);
+    pc.createDataChannel("probe");
+    pc.onicecandidate = e => {
+      if (!e.candidate) return;
+      const m = /typ (\w+)/.exec(e.candidate.candidate || "");
+      if (m && erg[m[1]] === false) erg[m[1]] = true;
+    };
+    pc.onicecandidateerror = e => {
+      if (erg.fehler.length < 4) erg.fehler.push((e.url || "?") + ": " + (e.errorText || e.errorCode));
+    };
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise(r => setTimeout(r, (sekunden || 6) * 1000));
+    pc.close();
+  } catch (e) { erg.fehler.push(String(e.message || e)); }
+  return erg;
+}
+
+// Dasselbe in einem Satz, den man ohne Fachwissen versteht.
+async function anrufProbeText() {
+  const p = await anrufProbe(6);
+  if (p.relay)
+    return { gut: true, text: "Anrufe gehen von hier aus ueberall hinaus - auch im Mobilfunknetz." };
+  if (p.srflx && p.turnEingetragen === 0)
+    return { gut: true, warn: true, text: "Anrufe gehen im WLAN. In manchen Mobilfunknetzen kann der Ton " +
+      "fehlen, weil kein Umleitungs-Server eingetragen ist (anruf-server.js)." };
+  if (p.srflx)
+    return { gut: true, warn: true, text: "Anrufe gehen im WLAN. Der eingetragene Umleitungs-Server " +
+      "antwortet aber nicht" + (p.fehler.length ? " (" + p.fehler[0] + ")" : "") + "." };
+  return { gut: false, text: "Dieses Geraet findet gar keinen Weg nach draussen. Anrufe werden hier " +
+    "nicht funktionieren" + (p.fehler.length ? " (" + p.fehler[0] + ")" : "") + "." };
 }

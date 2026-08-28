@@ -176,7 +176,12 @@ self.addEventListener("notificationclick", e => {
     return;
   }
   e.waitUntil(wkFensterAnsprechen(d.url, {
-    kt: e.action === "annehmen" ? "anruf-annehmen" : "meldung-geklickt",
+    // Auf dem iPhone gibt es KEINE Knoepfe auf der Meldung - dort wird
+    // immer nur die Meldung selbst angetippt. Bei einem Anruf heisst das:
+    // die App aufmachen und das Anruf-Bild zeigen (abgehoben wird erst
+    // mit einem echten Druck auf Annehmen).
+    kt: e.action === "annehmen" ? "anruf-annehmen"
+      : ((d.art === "anruf") ? "anruf-oeffnen" : "meldung-geklickt"),
     art: d.art || null, von: d.von || null
   }));
 });

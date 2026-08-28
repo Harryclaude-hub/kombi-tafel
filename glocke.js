@@ -184,6 +184,12 @@ function glockeUmschalten() {
   glockeListe();
 }
 
+// Klappt am Handy die Anhang-Zeichen auf und zu.
+function glockeMehr() {
+  const e = document.getElementById("gp-eingabe");
+  if (e) e.classList.toggle("offen");
+}
+
 // Zeigt am Handy entweder die Liste oder das Gespraech.
 function glockeSpalteZeigen(was) {
   const i = document.getElementById("gp-inhalt");
@@ -254,7 +260,9 @@ async function glockeThread(partnerId, username) {
     '<div class="gp-gkopf">' +
     '<button class="gp-zurueck" onclick="glockeSpalteZeigen(\'liste\')" title="Zurück zur Liste">&#8592;</button>' +
     '<span id="gp-kopfbild"></span>' +
+    '<span class="gp-kopfmitte">' +
     '<span class="gp-kopfname" id="gp-kopfname"></span>' +
+    '<span class="gp-kopfuser" id="gp-kopfuser"></span></span>' +
     '<button class="gp-ruf" onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, false)" ' +
     'title="Anrufen">&#128222;</button>' +
     '<button class="gp-ruf" onclick="anrufStarten(glockePartner.partnerId, glockePartner.username, true)" ' +
@@ -263,7 +271,10 @@ async function glockeThread(partnerId, username) {
     '<div id="gp-vorschau"></div>' +
     '<div id="gp-liste" class="chatliste gp-liste"></div>' +
     '<div id="gp-tippt" class="gp-tippt"></div>' +
-    '<div class="chateingabe">' +
+    '<div class="chateingabe" id="gp-eingabe">' +
+    '<button class="gp-ikon gp-mehr" onclick="glockeMehr()" ' +
+    'title="Foto, Ton, Kombination anhängen">&#43;</button>' +
+    '<span class="gp-extras">' +
     '<label class="gp-ikon fotoknopf" title="Foto oder Datei">&#128206;' +
     '<input type="file" style="display:none" onchange="glockeDatei(this)"></label>' +
     '<button id="gp-ton" class="gp-ikon" onclick="glockeTon()" title="Sprachnachricht">&#127908;</button>' +
@@ -271,7 +282,7 @@ async function glockeThread(partnerId, username) {
     '<button class="gp-ikon" onclick="anhangWaehlen(&quot;kombi&quot;)" ' +
     'title="Kombination anhängen (oder k- tippen)">&#127919;</button>' +
     '<button class="gp-ikon" onclick="anhangWaehlen(&quot;person&quot;)" ' +
-    'title="Person zeigen (oder p- tippen)">&#128100;</button>' +
+    'title="Person zeigen (oder p- tippen)">&#128100;</button></span>' +
     '<input id="gp-text" placeholder="Nachricht, oder k- für eine Kombination" autocomplete="off" ' +
     'oninput="tippMelden(); anhangTippen(this)" onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
     '<button class="haupt gp-senden" onclick="glockeSenden()" title="Senden">&#10148;</button>' +
@@ -279,6 +290,10 @@ async function glockeThread(partnerId, username) {
 
   const kb = document.getElementById("gp-kopfbild");
   if (kb && typeof profilBildEl === "function") kb.appendChild(profilBildEl(partnerId, username, 36));
+  const ku = document.getElementById("gp-kopfuser");
+  // Nur der Benutzername des ANDEREN. Wer wen geschrieben hat, steht
+  // ohnehin ueber jeder Blase - ein Satz dazu waere nur Gedraenge.
+  if (ku) ku.textContent = "@" + username;
   const kn = document.getElementById("gp-kopfname");
   if (kn) kn.appendChild(typeof profilNameEl === "function"
     ? profilNameEl(partnerId, username) : document.createTextNode(username));
@@ -362,7 +377,15 @@ async function glockeNachladen() {
   for (const n of neue) {
     glockeLetzteId = Math.max(glockeLetzteId, n.id);
     const z = document.createElement("div");
-    z.className = "chatzeile" + (n.von === u.id ? " vonmir" : "");
+    const istMeine = n.von === u.id;
+    z.className = "chatzeile" + (istMeine ? " vonmir" : "");
+    // Wer hat das geschrieben? Bei mir steht "Du", beim anderen sein Name.
+    const wer = document.createElement("span");
+    wer.className = "gp-wer";
+    wer.textContent = istMeine ? "Du" :
+      ((typeof profilName === "function")
+        ? profilName(glockePartner.partnerId, glockePartner.username)
+        : glockePartner.username);
     const m = (typeof medienLesen === "function") ? medienLesen(n.text) : null;
     // Ist es ein Anhang (Kombination oder Person)? Dann eine Karte statt Text.
     const karte = (typeof anhangLesen === "function") ? anhangLesen(n.text) : null;
@@ -377,6 +400,7 @@ async function glockeNachladen() {
         : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
       z.innerHTML = uhr + inhalt;
     }
+    z.insertBefore(wer, z.firstChild);
     box.appendChild(z);
     if (m) nachzuladen.push(m);
   }
@@ -387,6 +411,8 @@ async function glockeNachladen() {
 }
 
 async function glockeSenden() {
+  const _e = document.getElementById("gp-eingabe");
+  if (_e) _e.classList.remove("offen");
   const feld = document.getElementById("gp-text");
   const text = feld.value.trim();
   if (!text) return;

@@ -393,14 +393,23 @@ button.freundknopf.aktiv { background: var(--blau); color: #fff; }
 
 /* ---- Nachrichten-Fenster (Glocke) und Satz-Waehler ---- */
 .navleiste a.glocke { margin-left: auto; }   /* Nachrichten-Knopf ganz rechts */
-#glockenpanel { position: fixed; top: 12px; right: 12px; width: 340px; max-width: 92vw;
+/* Das Fenster war 340 Pixel breit und ohne feste Hoehe - darin konnte man
+   weder lesen noch schreiben. Jetzt: breit, hoch, und die Gespraechsliste
+   nimmt nur einen schmalen Streifen, der Text bekommt den ganzen Rest. */
+#glockenpanel {
+  position: fixed; top: 12px; right: 12px;
+  width: 880px; max-width: calc(100vw - 24px);
+  height: 82vh; max-height: calc(100vh - 24px);
+  display: flex; flex-direction: column;
   background: #fff; border: 2px solid var(--blau); z-index: 1000;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+  box-shadow: 0 6px 26px rgba(0,0,0,0.3);
+}
+#gp-inhalt { flex: 1 1 auto; min-height: 0; }
 .gp-kopf { background: var(--blau); color: #fff; font-weight: bold; padding: 7px 12px;
   display: flex; justify-content: space-between; align-items: center; }
 .gp-zu { font-size: 11px; padding: 2px 8px; border: 1px solid #fff; background: transparent;
   color: #fff; cursor: pointer; }
-#gp-inhalt { padding: 8px 10px; }
+/* padding entfaellt: die zwei Spalten bringen ihr eigenes mit */
 .gp-freund { display: block; width: 100%; text-align: left; font-size: 14px;
   padding: 7px 10px; margin: 3px 0; border: 1px solid var(--blau); background: #fff;
   color: var(--blau); font-weight: bold; cursor: pointer; }
@@ -2057,3 +2066,324 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
   .ah-karte { font-size: 14px; }
   .ah-waehlzeile { min-height: 54px; font-size: 15px; }
 }
+
+
+/* ============================================================
+   BUCHHALTUNG ALS BERICHT: "Das Armaturenbrett"
+   (Design-Schicht, komplett loeschbar)
+
+   Nimmt man diesen ganzen Block hier heraus, bleibt der Bericht
+   vollstaendig lesbar und weiter bedienbar, nur eben nuechtern.
+   Nichts hier drin rechnet, nichts aendert Reihenfolgen.
+
+   BEDEUTUNGSFARBEN, unveraendert:
+     gruen        = Plus, gewonnen
+     rot          = Minus, Warnung
+     braun-orange = offen, wartet noch
+   Die Farbe hoert oberhalb der Tabellen auf: INNERHALB von tbody
+   wird hier keine einzige Farbe angefasst.
+   Alle Regeln haengen an #buchhaltung oder an .bb-... und koennen
+   den Rest der Website deshalb nicht erreichen.
+   ============================================================ */
+
+/* ---- Das Urteil in einem Satz: die eine Zahl, die zaehlt ---- */
+#buchhaltung .bb-urteil {
+  margin: 8px 0 12px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #ccd3e0;
+  border-left: 7px solid #6b7a90;
+  background: #f7f9fc;
+}
+#buchhaltung .bb-urteilzahl {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+  color: #22314c;
+}
+#buchhaltung .bb-urteiltext {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #33415c;
+  max-width: 62ch;
+}
+
+/* gruen = Plus */
+#buchhaltung .bb-urteil.bb-plus { border-left-color: #1a7a1a; background: #f1f8f1; }
+#buchhaltung .bb-urteil.bb-plus .bb-urteilzahl { color: #146014; }
+/* rot = Minus */
+#buchhaltung .bb-urteil.bb-minus { border-left-color: #a2231b; background: #fdf2f1; }
+#buchhaltung .bb-urteil.bb-minus .bb-urteilzahl { color: #8f1f18; }
+/* braun-orange = noch offen */
+#buchhaltung .bb-urteil.bb-offen { border-left-color: #b35a00; background: #fff8ef; }
+#buchhaltung .bb-urteil.bb-offen .bb-urteilzahl { color: #8a4600; font-size: 26px; }
+
+/* ---- "Das klemmt gerade": rot, weil es eine Warnung ist ---- */
+#buchhaltung .bb-abschnitt {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #5a6478;
+  margin-bottom: 6px;
+}
+#buchhaltung .bb-klemmt {
+  margin: 0 0 12px 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border-left: 5px solid #a2231b;
+  background: #fdf2f1;
+}
+#buchhaltung .bb-klemmt ul { margin: 0; padding-left: 20px; }
+#buchhaltung .bb-klemmt li { margin: 4px 0; font-size: 14px; line-height: 1.5; color: #4a2a27; }
+
+/* ---- Die Kacheln: was rein geht, was raus geht, was im Spiel ist ---- */
+#buchhaltung .bb-kacheln {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
+  margin: 0 0 12px 0;
+}
+#buchhaltung .bb-kachel {
+  padding: 11px 12px;
+  border: 1px solid #d3d9e4;
+  border-top: 4px solid #97a2b5;
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0;
+}
+#buchhaltung .bb-kacheltitel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5a6478;
+  line-height: 1.3;
+}
+#buchhaltung .bb-kachelwert {
+  font-size: 19px;
+  font-weight: 700;
+  color: #22314c;
+  line-height: 1.25;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+#buchhaltung .bb-kachelunter {
+  font-size: 11.5px;
+  color: #6d7789;
+  line-height: 1.35;
+  margin-top: 3px;
+  min-height: 1em;
+}
+/* braun-orange: das Geld, das noch unterwegs ist */
+#buchhaltung .bb-kachel.bb-warten { border-top-color: #b35a00; background: #fffaf3; }
+#buchhaltung .bb-kachel.bb-warten .bb-kachelwert { color: #8a4600; }
+
+/* ---- Bei wem liegt das offene Geld ---- */
+#buchhaltung .bb-wem { margin: 0 0 12px 0; }
+#buchhaltung .bb-wemliste { list-style: none; margin: 0; padding: 0; }
+#buchhaltung .bb-wemliste li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #e0e5ee;
+  border-radius: 9px;
+  background: #fff;
+  margin-bottom: 5px;
+}
+#buchhaltung .bb-wemname { flex: 1 1 120px; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+#buchhaltung .bb-wemzahl { flex: 0 0 auto; font-weight: 700; color: #8a4600; overflow-wrap: anywhere; }
+#buchhaltung .bb-wemmini { flex: 0 0 auto; font-size: 12px; color: #6d7789; }
+
+/* ---- Der Rechenweg zum Mitrechnen ---- */
+#buchhaltung .bb-rechnung {
+  border: 1px solid #d3d9e4;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  max-width: 520px;
+}
+#buchhaltung .bb-rz {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 13px;
+  border-bottom: 1px solid #eceff5;
+  font-size: 14.5px;
+}
+#buchhaltung .bb-rz:last-child { border-bottom: 0; }
+#buchhaltung .bb-rzname { flex: 1 1 auto; min-width: 0; color: #3c4761; }
+#buchhaltung .bb-rzwert {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #22314c;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+#buchhaltung .bb-rzende { border-top: 2px solid #c9d1e0; background: #f7f9fc; font-size: 16px; }
+#buchhaltung .bb-rzende .bb-rzname { font-weight: 700; }
+#buchhaltung .bb-rzende .bb-rzwert { font-weight: 800; }
+#buchhaltung .bb-rzende.bb-plus  { background: #f1f8f1; }
+#buchhaltung .bb-rzende.bb-plus  .bb-rzwert { color: #146014; }
+#buchhaltung .bb-rzende.bb-minus { background: #fdf2f1; }
+#buchhaltung .bb-rzende.bb-minus .bb-rzwert { color: #8f1f18; }
+#buchhaltung .bb-rzende.bb-offen { background: #fff8ef; }
+#buchhaltung .bb-rzende.bb-offen .bb-rzwert { color: #8a4600; }
+
+/* ---- Die Einzelheiten darunter: dicht, aber greifbar ---- */
+#buchhaltung details.bb-teil {
+  margin: 10px 0;
+  border: 1px solid #dde2ec;
+  border-radius: 10px;
+  background: #fdfdfe;
+  padding: 0 12px 10px 12px;
+}
+#buchhaltung details.bb-teil > summary {
+  padding: 11px 0;
+  margin: 0 -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #22314c;
+  cursor: pointer;
+  list-style-position: inside;
+}
+#buchhaltung details.bb-teil[open] > summary { border-bottom: 1px solid #eceff5; margin-bottom: 8px; }
+
+/* Der Ansichts-Filter von Liste 1: aendert nur, WAS gezeigt wird. */
+#buchhaltung .bb-filter { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+#buchhaltung .bb-filter select { font-size: 14px; padding: 5px 8px; }
+
+/* Tabellen im Bericht duerfen seitlich schieben statt die Seite
+   quer zu ziehen. Farben in tbody bleiben unangetastet. */
+#buchhaltung .tabellenrand { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ============================================================
+   AM HANDY: lesen im Stehen, Tippziele mindestens 44 Pixel.
+   ============================================================ */
+@media (max-width: 700px) {
+  #buchhaltung .bb-urteil { padding: 14px 14px; }
+  #buchhaltung .bb-urteilzahl { font-size: 30px; }
+  #buchhaltung .bb-urteil.bb-offen .bb-urteilzahl { font-size: 23px; }
+  #buchhaltung .bb-urteiltext { font-size: 15.5px; }
+
+  #buchhaltung .bb-kacheln { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; }
+  #buchhaltung .bb-kachel { padding: 10px 11px; }
+  #buchhaltung .bb-kachelwert { font-size: 18px; }
+
+  #buchhaltung .bb-wemliste li { min-height: 44px; align-items: center; }
+
+  #buchhaltung .bb-rz { font-size: 15px; padding: 10px 12px; }
+  #buchhaltung .bb-rzende { font-size: 16.5px; }
+
+  /* Aufklappen ist ein Tippziel, kein Fadenkreuz. */
+  #buchhaltung details.bb-teil > summary { min-height: 44px; display: flex; align-items: center; font-size: 15.5px; }
+  #buchhaltung .bb-bericht > summary { min-height: 44px; display: flex; align-items: center; }
+
+  /* Eingabefelder: 16 Pixel, damit das iPhone nicht hineinzoomt. */
+  #buchhaltung .buch-eingabe input,
+  #buchhaltung .buch-eingabe select,
+  #buchhaltung .bb-filter select { font-size: 16px; min-height: 44px; padding: 8px 10px; }
+  #buchhaltung .buch-eingabe button { min-height: 44px; font-size: 15px; }
+
+  /* Die "weg"-Knoepfe in den Listen bleiben treffbar.
+     Nur die Groesse, keine Farbe. */
+  #buchhaltung tbody button { min-height: 44px; min-width: 44px; }
+}
+
+
+/* ---------- Chat-Fenster gross und aufgeraeumt (loeschbar) ---------- */
+/* Die Gespraechsliste bleibt schmal, damit der Text viel Platz hat. */
+.gp-spalte { flex: 0 0 210px; }
+.gp-gkopf { padding: 9px 11px; gap: 10px; }
+.gp-kopfname { font-size: 17px; font-weight: 600; }
+/* Wer schreibt mit wem: der Name des ANDEREN steht gross im Kopf, der
+   eigene Name kommt im Gespraech gar nicht vor. */
+.gp-kopfuser { color: #667; font-size: 12.5px; }
+.gp-liste { padding: 8px 11px; }
+.chatzeile { max-width: 78%; }
+
+@media (max-width: 700px) {
+  /* Am Handy fuellt das Fenster den ganzen Schirm. */
+  #glockenpanel {
+    top: 0; right: 0; left: 0; bottom: 0;
+    width: auto; max-width: none; height: auto; max-height: none;
+    border-width: 0; border-radius: 0;
+  }
+  .gp-spalte { flex: 1 1 auto; }
+  .chatzeile { max-width: 88%; }
+}
+/* ---------- Wer schreibt mit wem (loeschbar) ---------- */
+/* Karam sah im Chat seinen EIGENEN Namen und wusste nicht, mit wem er
+   spricht. Jetzt steht der andere gross im Kopf, und ueber jeder Blase
+   steht, von wem sie ist ("Du" oder der Name des anderen). */
+.gp-kopfmitte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.gp-kopfmitte > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-wer {
+  display: block; font-size: 11.5px; font-weight: 700;
+  color: #566; margin-bottom: 1px; letter-spacing: 0.2px;
+}
+.chatzeile.vonmir .gp-wer { text-align: right; }
+@media (max-width: 700px) { .gp-wer { font-size: 12px; } }
+/* ---------- Anruf wird verbunden (loeschbar) ---------- */
+.anruf-warten {
+  position: fixed; inset: 0; z-index: 3000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 24px;
+  background: linear-gradient(160deg, #0d1b2a, #1b3a5c);
+  color: #fff;
+}
+.anruf-warten .aw-ring {
+  width: 78px; height: 78px; border-radius: 50%;
+  border: 4px solid rgba(255,255,255,0.25); border-top-color: #7fd4ff;
+  animation: aw-dreh 1s linear infinite;
+}
+@keyframes aw-dreh { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .anruf-warten .aw-ring { animation: none; } }
+.anruf-warten .aw-text { font-size: 20px; font-weight: 700; }
+.anruf-warten .aw-mini { font-size: 14px; opacity: 0.8; max-width: 320px; }
+/* ---------- Schreibzeile: Platz zum Tippen (loeschbar) ---------- */
+/* Am Laptop stehen alle Zeichen nebeneinander, das Plus wird nicht
+   gebraucht. Am Handy ist es genau umgekehrt. */
+.gp-extras { display: flex; align-items: center; gap: 6px; }
+.chateingabe .gp-mehr { display: none; }
+.chateingabe { flex-wrap: wrap; }
+#gp-text { flex: 1 1 auto; min-width: 0; }
+
+@media (max-width: 700px) {
+  /* Gemessen: dem Schreibfeld blieben 24 Pixel. Deshalb wandern die
+     Anhang-Zeichen hinter das Plus und kommen als eigene Zeile. */
+  .chateingabe .gp-mehr { display: inline-flex; }
+  .chateingabe .gp-extras { display: none; }
+  .chateingabe.offen .gp-extras {
+    display: flex; flex: 1 0 100%; order: -1;
+    justify-content: space-around; padding-bottom: 6px;
+    border-bottom: 1px solid var(--rand, #dde);
+    margin-bottom: 6px;
+  }
+  .chateingabe.offen .gp-mehr { background: var(--blau); color: #fff; }
+  #gp-text { min-width: 90px; }
+}
+/* ---------- Gespraech fuellt den Handy-Schirm (loeschbar) ---------- */
+/* Gemessen: unter dem Schreibfeld blieben rund 300 Pixel leer, weil das
+   Gespraech in der Handy-Spalte nicht mitwuchs. Nur die Nachrichtenliste
+   soll rollen, nicht das ganze Fenster. */
+@media (max-width: 700px) {
+  #gp-inhalt.gp-zeigt-gespraech { overflow: hidden; }
+  #gp-inhalt.gp-zeigt-gespraech .gp-gespraech { flex: 1 1 auto; min-height: 0; }
+  #gp-inhalt.gp-zeigt-liste .gp-spalte { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
+
+/* ---------- Nachrichtenliste fuellt das Fenster (loeschbar) ---------- */
+/* Gemessen am Laptop: das Fenster war 656 hoch, die Nachrichtenliste
+   blieb bei 260 stehen - darunter klaffte eine leere Flaeche. Schuld war
+   ein altes max-height aus der Zeit, als der Chat nur ein schmaler
+   Kasten war. */
+#glockenpanel .gp-liste,
+#glockenpanel .chatliste { max-height: none; flex: 1 1 auto; min-height: 0; }
