@@ -268,8 +268,12 @@ async function glockeThread(partnerId, username) {
     '<input type="file" style="display:none" onchange="glockeDatei(this)"></label>' +
     '<button id="gp-ton" class="gp-ikon" onclick="glockeTon()" title="Sprachnachricht">&#127908;</button>' +
     '<button id="gp-video" class="gp-ikon" onclick="glockeVideo()" title="Video">&#128249;</button>' +
-    '<input id="gp-text" placeholder="Nachricht..." autocomplete="off" ' +
-    'oninput="tippMelden()" onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
+    '<button class="gp-ikon" onclick="anhangWaehlen(&quot;kombi&quot;)" ' +
+    'title="Kombination anhängen (oder k- tippen)">&#127919;</button>' +
+    '<button class="gp-ikon" onclick="anhangWaehlen(&quot;person&quot;)" ' +
+    'title="Person zeigen (oder p- tippen)">&#128100;</button>' +
+    '<input id="gp-text" placeholder="Nachricht, oder k- für eine Kombination" autocomplete="off" ' +
+    'oninput="tippMelden(); anhangTippen(this)" onkeydown="if(event.key===\'Enter\')glockeSenden()">' +
     '<button class="haupt gp-senden" onclick="glockeSenden()" title="Senden">&#10148;</button>' +
     "</div>";
 
@@ -360,11 +364,19 @@ async function glockeNachladen() {
     const z = document.createElement("div");
     z.className = "chatzeile" + (n.von === u.id ? " vonmir" : "");
     const m = (typeof medienLesen === "function") ? medienLesen(n.text) : null;
-    const inhalt = m ? medienPlatzhalter(m)
-      : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-    z.innerHTML = "<span class='mini'>" +
+    // Ist es ein Anhang (Kombination oder Person)? Dann eine Karte statt Text.
+    const karte = (typeof anhangLesen === "function") ? anhangLesen(n.text) : null;
+    const uhr = "<span class='mini'>" +
       new Date(n.created_at).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) +
-      "</span> " + inhalt;
+      "</span> ";
+    if (karte) {
+      z.innerHTML = uhr;
+      z.appendChild(anhangKarteEl(karte));
+    } else {
+      const inhalt = m ? medienPlatzhalter(m)
+        : n.text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      z.innerHTML = uhr + inhalt;
+    }
     box.appendChild(z);
     if (m) nachzuladen.push(m);
   }

@@ -2021,3 +2021,39 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
   .gp-senden { min-width: 56px; min-height: 46px; }
   .chateingabe #gp-text { min-height: 46px; }
 }
+
+/* ---------- Anhaenge im Chat: Kombination und Person (loeschbar) ---------- */
+.ah-karte {
+  display: block; margin: 4px 0 2px 0; padding: 9px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.18); border-left: 4px solid #1a2c50;
+  border-radius: 9px; background: #f7f9fd; font-size: 13.5px; line-height: 1.45;
+  max-width: 100%; word-break: break-word;
+}
+.ah-karte.ah-person { border-left-color: #6a2a86; }
+.ah-kopf { font-weight: 700; margin-bottom: 3px; }
+.ah-name { font-size: 16px; font-weight: 600; }
+.ah-zeile1 { color: #334; margin-bottom: 4px; }
+.ah-wetten { margin: 4px 0 5px 16px; padding: 0; }
+.ah-wetten li { margin: 1px 0; }
+.ah-zahlen { font-weight: 600; }
+.ah-fuss { color: #778; margin-top: 4px; }
+
+/* Der Auswahl-Kasten */
+.ah-waehlkasten {
+  background: #fff; border-radius: 13px; padding: 14px;
+  width: calc(100% - 32px); max-width: 460px; max-height: 78vh;
+  display: flex; flex-direction: column; gap: 9px;
+  box-shadow: 0 10px 40px rgba(10, 18, 32, 0.4);
+}
+.ah-waehlkopf { font-weight: 700; font-size: 16px; }
+.ah-waehlliste { overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+.ah-waehlzeile {
+  display: block; width: 100%; text-align: left; min-height: 48px;
+  padding: 8px 11px; border: 1px solid #c3cad8; border-radius: 9px; background: #fff;
+}
+.ah-waehlkasten > button:last-child { min-height: 46px; }
+
+@media (max-width: 700px) {
+  .ah-karte { font-size: 14px; }
+  .ah-waehlzeile { min-height: 54px; font-size: 15px; }
+}
