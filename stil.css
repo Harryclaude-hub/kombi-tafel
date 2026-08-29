@@ -2530,3 +2530,83 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
     bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
   #anrufpanel .anruf-taste { font-size: 14px; min-height: 50px; }
 }
+/* ============================================================
+   ZEILEN-SCHICHT (loeschbar)
+
+   Faerbt jede zweite Zeile der grossen Tabellen und kann sie
+   nummerieren. Gesteuert ueber zwei Merkmale am <html>-Element,
+   die zeilen.js setzt. Loescht man zeilen.js und diesen Block,
+   sehen die Tabellen aus wie vorher.
+
+   WICHTIG: die Einfaerbung sitzt auf der ZEILE, nie auf einer Zelle.
+   So malt jede Zelle mit Bedeutungsfarbe (gruen fuer den besten Wert,
+   rot fuer Warnungen) weiter obendrauf und gewinnt immer.
+   Die Toene sind absichtlich sehr blass, damit Gruen und Rot ihre
+   Bedeutung behalten und nichts mit ihnen verwechselt wird.
+   ============================================================ */
+
+.zeilenschalter {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin: 8px 0 10px 0; font-size: 13px;
+}
+.zeilenschalter .zl-titel { color: #55627a; margin-right: 2px; }
+.zeilenschalter .zl-knopf {
+  border: 1px solid #c3c9d8; background: #fff; cursor: pointer;
+  padding: 5px 11px; border-radius: 7px; font-size: 13px; line-height: 1.2;
+}
+.zeilenschalter .zl-knopf:hover { border-color: #8c93a8; }
+.zeilenschalter .zl-knopf.aktiv { border-color: #1a2c50; border-width: 2px; font-weight: bold; }
+/* Der Knopf zeigt seine eigene Farbe als schmalen Streifen, damit man
+   sieht, was man waehlt, ohne es ausprobieren zu muessen. */
+.zeilenschalter .zl-blau { border-left: 5px solid #1a2c50; }
+.zeilenschalter .zl-rot  { border-left: 5px solid #a00000; }
+.zeilenschalter .zl-gelb { border-left: 5px solid #b38600; }
+.zeilenschalter .zl-lila { border-left: 5px solid #5b2a86; }
+.zeilenschalter .zl-nummern { display: flex; align-items: center; gap: 5px; margin-left: 6px; }
+.zeilenschalter .zl-nummern input { width: 17px; height: 17px; }
+
+/* ---- jede zweite Zeile ---- */
+html[data-zeilen="blau"] tbody tr:nth-child(even) { background: rgba(26, 44, 80, 0.075); }
+html[data-zeilen="rot"]  tbody tr:nth-child(even) { background: rgba(160, 0, 0, 0.055); }
+html[data-zeilen="gelb"] tbody tr:nth-child(even) { background: rgba(179, 134, 0, 0.085); }
+html[data-zeilen="lila"] tbody tr:nth-child(even) { background: rgba(91, 42, 134, 0.07); }
+
+/* ---- der mittlere Teil im Kombi-Bau ---- */
+/* Karam: die Scheinkarten sollen nicht weiss sein, damit man sie
+   auseinanderhaelt. Sehr blass, damit die Tabelle darin lesbar bleibt. */
+html[data-zeilen="blau"] body[data-seite="bau"] .schein { background: rgba(26, 44, 80, 0.045); }
+html[data-zeilen="rot"]  body[data-seite="bau"] .schein { background: rgba(160, 0, 0, 0.035); }
+html[data-zeilen="gelb"] body[data-seite="bau"] .schein { background: rgba(179, 134, 0, 0.055); }
+html[data-zeilen="lila"] body[data-seite="bau"] .schein { background: rgba(91, 42, 134, 0.045); }
+
+/* ---- laufende Nummer vor der Zeile ---- */
+/* Nur auf den drei grossen Tabellen, nicht in Mein Bereich. Reine
+   CSS-Zaehlung: es steht KEINE Nummer in den Daten, und sie hat nichts
+   mit der Schein-Nummer zu tun. */
+html[data-zeilennr="ja"] body[data-seite="tafel"] tbody,
+html[data-zeilennr="ja"] body[data-seite="original"] tbody,
+html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody { counter-reset: ktzeile; }
+html[data-zeilennr="ja"] body[data-seite="tafel"] tbody > tr,
+html[data-zeilennr="ja"] body[data-seite="original"] tbody > tr,
+html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody > tr { counter-increment: ktzeile; }
+html[data-zeilennr="ja"] body[data-seite="tafel"] tbody > tr > td:first-child::before,
+html[data-zeilennr="ja"] body[data-seite="original"] tbody > tr > td:first-child::before,
+html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody > tr > td:first-child::before {
+  content: counter(ktzeile) ".\00a0";
+  color: #8c93a8; font-size: 11px; font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+  /* Am Handy etwas kraeftiger: dort ist der Bildschirm heller und die
+     Zeilen stehen enger, da geht ein zu blasser Ton unter. */
+  html[data-zeilen="blau"] tbody tr:nth-child(even) { background: rgba(26, 44, 80, 0.105); }
+  html[data-zeilen="rot"]  tbody tr:nth-child(even) { background: rgba(160, 0, 0, 0.08); }
+  html[data-zeilen="gelb"] tbody tr:nth-child(even) { background: rgba(179, 134, 0, 0.12); }
+  html[data-zeilen="lila"] tbody tr:nth-child(even) { background: rgba(91, 42, 134, 0.1); }
+  /* 44 Pixel ist die Grenze, unter der man am Handy danebentippt. */
+  .zeilenschalter .zl-knopf { min-height: 44px; padding: 9px 14px; }
+  .zeilenschalter .zl-nummern input { width: 20px; height: 20px; }
+  /* Gemessen: das Kaestchen allein war 20 Pixel hoch. Am Handy wird das
+     ganze Etikett zum Tippziel, damit man es sicher trifft. */
+  .zeilenschalter .zl-nummern { min-height: 44px; padding: 0 8px; }
+}

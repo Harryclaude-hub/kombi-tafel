@@ -47,6 +47,49 @@ function liesZustand() {
 }
 function speichereZustand(z) { localStorage.setItem(zustandSchluessel(), JSON.stringify(z)); }
 
+// ---------- Die laufende Schein-Nummer ----------
+// Geht nur nach oben und ueberlebt das Loeschen von Scheinen, den
+// Neuaufbau und den Wechsel des Ordners. Eine einmal vergebene Nummer
+// kommt nie wieder - auch dann nicht, wenn der Schein nie gespeichert
+// wurde. Genau darum ging es: beim Suchen darf es nie zwei mit
+// derselben Zahl geben.
+const NR_SCHLUESSEL = "kt_schein_nr";
+let _nrGewarnt = false;
+
+function nrStand() {
+  try { return parseInt(localStorage.getItem(NR_SCHLUESSEL) || "0", 10) || 0; }
+  catch (e) { return 0; }
+}
+
+function nrMerken(n) {
+  try { localStorage.setItem(NR_SCHLUESSEL, String(n)); return true; }
+  catch (e) {
+    // Voller Speicher. Dann koennte eine Nummer doch noch einmal
+    // vergeben werden - das muss man wissen, statt es zu erraten.
+    if (!_nrGewarnt && typeof meldung === "function") {
+      _nrGewarnt = true;
+      meldung("Der Speicher dieses Browsers ist voll. Die Schein-Nummern koennen sich " +
+        "deshalb wiederholen. Alte Scheinfotos loeschen, dann stimmt es wieder.", "warn");
+    }
+    return false;
+  }
+}
+
+// Holt den Zaehler ueber alles, was schon da ist. Noetig fuer Scheine,
+// die vor dem Zaehler angelegt wurden.
+function nrAufholen(z) {
+  let hoch = nrStand();
+  for (const s of ((z && z.scheine) || [])) if ((s.nr || 0) > hoch) hoch = s.nr;
+  if (hoch !== nrStand()) nrMerken(hoch);
+  return hoch;
+}
+
+function nrNaechste() {
+  const n = nrStand() + 1;
+  nrMerken(n);
+  return n;
+}
+
 function einstellungenLesen() {
   const anb = [];
   document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
@@ -123,10 +166,11 @@ function baueAlles(nurRest) {
   // Eine Kombination = eine Gruppen-Nummer (daran haengt die 400er-Rechnung).
   // Jeder Teil = ein Schein bei einem Anbieter mit seinem Einsatz.
   const scheine = behalten.slice();
-  let lfd = 0;
-  for (const s of behalten) if (s.nr > lfd) lfd = s.nr;
+  // Frueher stand hier: lfd = hoechste Nummer im Bestand. Nach dem
+  // Loeschen eines Scheins kam dieselbe Nummer dadurch ein zweites Mal.
+  nrAufholen({ scheine: behalten });
   for (const k of aus.kombis || []) {
-    lfd++;
+    const lfd = nrNaechste();
     const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
     const teile = (k.teile && k.teile.length) ? k.teile
       : [{ kz: e.anbieter[0], einsatz: e.ziel, sicherheit: "geschaetzt" }];
@@ -171,7 +215,7 @@ function baueAlles(nurRest) {
       i--;
     }
     if (gruppe.length === 3) {
-      lfd++;
+      const lfd = nrNaechste();
       // Bet365 ist auch hier die letzte Wahl (R6): der erste erlaubte
       // Nicht-b3-Anbieter bekommt den Niedrig-Schein.
       const kzN = e.anbieter.find(kz => kz !== "b3") || e.anbieter[0];
@@ -915,7 +959,8 @@ function eigenbauAnlegen() {
     kennungen.add(k);
   }
   const z = liesZustand() || baueAlles();
-  const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
+  nrAufholen(z);
+  const nr = nrNaechste();
   z.scheine.push({
     id: "E" + Date.now(), nr: nr, kz: (z.einst && z.einst.anbieter && z.einst.anbieter[0]) || "bw",
     art: "eigen",
