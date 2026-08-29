@@ -178,7 +178,11 @@ function stelleBauen(w, kz, mind, ersatz) {
   if (roh === null) return null;        // ohne jede Zahl geht gar nichts
 
   var echt = roh / teiler;
-  if (echt < mind - 1e-9) return null;  // R5, harte Grenze
+  // R5, harte Grenze: die ANGEZEIGTE Quote muss die Untergrenze dieser
+  // Wette erreichen. Die Untergrenze steht an der Wette selbst (w.mind,
+  // die Foto-Quote aus der Tabelle); fehlt sie, gilt die alte feste Zahl.
+  var grenze = istZahl(w.mind) ? w.mind : mind;
+  if (roh < grenze - 1e-9) return null;
 
   var v = (w.verf && w.verf[kz]) ? String(w.verf[kz]).toUpperCase() : "";
   var belegt = !!(w.belegt && w.belegt[kz]);
@@ -931,9 +935,11 @@ function bereiteVor(eingabe) {
       }
       gueteZeile.push(g);
 
-      // R5 ist die einzige harte Quotenregel: echte Quote nach Gebuehr
-      // muss die Mindestquote erreichen. Ohne jede Quote geht gar nichts.
-      if (roh !== null && echt >= mind - 1e-9) {
+      // R5 ist die einzige harte Quotenregel. Sie prueft die ANGEZEIGTE
+      // Quote gegen die Untergrenze DIESER Wette (Foto-Quote aus der
+      // Tabelle). Ohne jede Quote geht gar nichts.
+      var grenzeW = istZahl(w.mind) ? w.mind : mind;
+      if (roh !== null && roh >= grenzeW - 1e-9) {
         maske |= (1 << a);
         if (g >= 3) knapp++;
         if (g >= GUETE_BELEGT) belegAnzahl++;
@@ -1449,7 +1455,11 @@ function baueTipps(v, loesung) {
     if (besterA < 0) besterA = 0;
     var kzB = v.anbieter[besterA];
     var teiler = GEBUEHREN_TEILER[kzB] || 1;
-    var noetig = Math.ceil(v.mind * teiler * 100) / 100;
+    // Frueher: Mindestquote mal Gebuehrenteiler. Jetzt ist die Untergrenze
+    // schon die angezeigte Quote, also kein Teiler mehr.
+    var noetigRoh = istZahl(v.wetten && v.wetten[i2] && v.wetten[i2].mind)
+      ? v.wetten[i2].mind : (v.mind * teiler);
+    var noetig = Math.ceil(noetigRoh * 100) / 100;
     // Wie viel waere zu holen? Nur etwas, wenn zwei weitere Wetten mit
     // freier Kapazitaet und anderen Spielen bei diesem Anbieter warten.
     var partner = 0;

@@ -35,6 +35,15 @@ function zielQuote(w, optIdx, kz) {
   return { roh: ref, echt: ref / teiler, quelle: "Foto " + ref.toFixed(2), fest: false };
 }
 
+// Die Untergrenze DIESER Wette: die Quote aus Saschas Tabelle.
+// Karams Entscheidung vom 29.08.2026 - keine feste Zahl mehr fuer alle.
+// Verglichen wird sie mit der ANGEZEIGTEN Quote (siehe verteiler.js).
+function mindFuer(w, optIdx) {
+  const o = w && w.o && w.o[optIdx || 0];
+  const q = o ? Number(o[1]) : 0;
+  return (isFinite(q) && q > 1) ? q : 0;
+}
+
 function spielKennung(w) { return w.doppel || (w.liga + "|" + w.spiel); }
 
 function wetteNachId(id) { return WETTEN.find(w => w.id === id); }
@@ -163,7 +172,8 @@ function baueAlles(nurRest) {
       belegt[kz] = q.fest === true || q.quelle === "Screenshot";
       verf[kz] = v[kz] || "J";
     }
-    eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt, verf: verf });
+    eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt,
+      verf: verf, mind: mindFuer(w, optIdx) });
   }
 
   // ---- Verteilen: beide Verfahren rechnen, das bessere gewinnt ----
@@ -208,7 +218,7 @@ function baueAlles(nurRest) {
   for (const w of offen) {
     if (inKombi.has(w.id)) continue;
     const irgendwoUeber = e.anbieter.some(kz =>
-      zielQuote(w, optVon[w.id], kz).echt >= e.mind - 0.0001);
+      zielQuote(w, optVon[w.id], kz).roh >= mindFuer(w, optVon[w.id]) - 0.0001);
     (irgendwoUeber ? uebrig : zuNiedrig).push(w);
   }
   const topfN = mische(zuNiedrig.slice(), e.saat + 7);
@@ -386,7 +396,7 @@ function findeErsatz(z, kz, scheinId, maxNutzung) {
   for (const w of frei) {
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (q.echt >= e.mind - 0.0001)
+    if (q.roh >= mindFuer(w, optIdx) - 0.0001)
       bewertet.push({ w: w, optIdx: optIdx, echt: q.echt, schonBenutzt: nutzung[w.id] || 0 });
   }
   const info = { imOrdner: imOrdner.length, offen: offen.length, frei: frei.length,
@@ -720,7 +730,9 @@ function scheinHtml(s, z) {
     const v = verfuegbarkeit(w)[s.kz];
     gesamt *= q.echt; gesamtRoh *= q.roh;
     if (!q.fest) alleFest = false;
-    const unter = q.echt < mind - 0.0001;
+    // Untergrenze DIESER Wette gegen die ANGEZEIGTE Quote.
+    const grenze = mindFuer(w, eintrag.optIdx);
+    const unter = q.roh < grenze - 0.0001;
     const opt = w.o[eintrag.optIdx][0];
     const eigen = liesEingabe(w.id, opt, s.kz);
     return "<tr" + (unter ? ' class="unterquote"' : "") + ">" +
@@ -731,14 +743,13 @@ function scheinHtml(s, z) {
         (v === "D" ? '<div class="duenn">Markt dort duenn, prüfen</div>' :
          (v === "N" ? '<div class="duenn">Einschätzung: evtl. nicht im Angebot, prüfen</div>' : "")) + "</td>" +
       "<td class='s-ziel'>" + q.roh.toFixed(2) + '<div class="mini">' + q.quelle + "</div></td>" +
-      // Die Mindestquote gilt fuer die ECHTE Quote nach Gebuehr. Hier steht
-      // sie aber neben Zahlen, die man beim Anbieter ABLIEST. Bei Interwetten
-      // (Quote geteilt durch 1,05) sind das zwei verschiedene Zahlen: fuer
-      // real 1,80 muss auf dem Schirm 1,89 stehen. Frueher stand hier auch
-      // dort 1,80 - wer sich danach richtet, setzt in Wirklichkeit auf 1,71.
-      "<td class='s-mind'>" + (mind * GEBUEHREN_TEILER[s.kz]).toFixed(2) +
+      // Die Untergrenze DIESER Wette: die Quote aus der Tabelle. Sie steht
+      // in derselben Waehrung wie die Spalte daneben - das ist die Zahl,
+      // die beim Anbieter auf dem Schirm stehen muss.
+      "<td class='s-mind'>" + grenze.toFixed(2) +
         (GEBUEHREN_TEILER[s.kz] !== 1
-          ? '<div class="mini">= real ' + mind.toFixed(2) + "</div>" : "") + "</td>" +
+          ? '<div class="mini">= real ' + (grenze / GEBUEHREN_TEILER[s.kz]).toFixed(2) + "</div>"
+          : "") + "</td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
         (eigen ? "value='" + eigen + "' " : "") +
         "onchange=\"quoteEintragen('" + s.id + "','" + w.id + "',this)\">" +
@@ -939,7 +950,7 @@ function scheinNeuMischen(scheinId) {
     if (schonDrin.has(k)) continue;
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (q.echt >= e.mind - 0.0001) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
+    if (q.roh >= mindFuer(w, optIdx) - 0.0001) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
     if (passend.length === 3) break;
   }
   if (passend.length < 3) {
