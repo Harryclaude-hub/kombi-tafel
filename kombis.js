@@ -198,11 +198,14 @@ function baueAlles(nurRest) {
   // Eine Kombination = eine Gruppen-Nummer (daran haengt die 400er-Rechnung).
   // Jeder Teil = ein Schein bei einem Anbieter mit seinem Einsatz.
   const scheine = behalten.slice();
-  // Frueher stand hier: lfd = hoechste Nummer im Bestand. Nach dem
-  // Loeschen eines Scheins kam dieselbe Nummer dadurch ein zweites Mal.
-  nrAufholen({ scheine: behalten });
+  // Diese Nummer ist NUR zum Zusammenhalten der Teile einer Kombination.
+  // Sie wird nie angezeigt und darf sich deshalb ruhig wiederholen. Die
+  // sichtbare Nummer entsteht beim Zeichnen (anzeigeNr), die feste erst
+  // beim Speichern.
+  let lfdIntern = 0;
+  for (const s of behalten) if ((s.nr || 0) > lfdIntern) lfdIntern = s.nr;
   for (const k of aus.kombis || []) {
-    const lfd = nrNaechste();
+    const lfd = ++lfdIntern;
     const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
     const teile = (k.teile && k.teile.length) ? k.teile
       : [{ kz: e.anbieter[0], einsatz: e.ziel, sicherheit: "geschaetzt" }];
@@ -247,7 +250,7 @@ function baueAlles(nurRest) {
       i--;
     }
     if (gruppe.length === 3) {
-      const lfd = nrNaechste();
+      const lfd = ++lfdIntern;
       // Bet365 ist auch hier die letzte Wahl (R6): der erste erlaubte
       // Nicht-b3-Anbieter bekommt den Niedrig-Schein.
       const kzN = e.anbieter.find(kz => kz !== "b3") || e.anbieter[0];
@@ -801,8 +804,16 @@ function zeichne_() {
   if (typeof einzelnZeichnen === "function") einzelnZeichnen();
 }
 
+// Die sichtbare Nummer: 1 bis zur Zahl der gebauten Kombinationen.
+// Teile derselben Kombination teilen sich eine Nummer.
+function anzeigeNr(z, nr) {
+  const alle = [...new Set((z.scheine || []).map(s => s.nr))].sort((a, b) => a - b);
+  const i = alle.indexOf(nr);
+  return i < 0 ? nr : (i + 1);
+}
+
 function scheinHtml(s, z) {
-  const mind = z.einst.mind;
+  const mind = mindWert(z);
   let gesamt = 1, gesamtRoh = 1, alleFest = true;
   const zeilen = s.wetten.map(eintrag => {
     const w = wetteNachId(eintrag.id);
@@ -858,10 +869,15 @@ function scheinHtml(s, z) {
       ">" + a.name + "</option>").join("") + "</select>";
 
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
-    "Schein " + s.nr + (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
+    // Zuerst und am groessten: WO soll er suchen. marke() schreibt den
+    // Namen schon selbst - ihn hier noch einmal zu setzen ergab "StakeStake".
+    '<span class="s-wo"><span class="s-wo-name">' + anbieterName(s.kz) +
+    '</span><span class="s-wo-mini">hier suchen</span></span>' +
+    "Kombination " + anzeigeNr(z, s.nr) +
+    (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
     (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
       (s.variante ? " (andere Mischung für den Rest)" : " (gleiche Wetten, weiterer Anbieter)") + "</span>" : "") +
-    " " + marke(s.kz) + wahl +
+    " " + wahl +
     (s.sicherheit === "unsicher"
       ? ' <span class="s-warn">&#9888; nicht bestätigt - vor dem Setzen beim Anbieter prüfen</span>'
       : s.sicherheit === "geschaetzt"
@@ -1132,8 +1148,8 @@ function eigenbauAnlegen() {
     kennungen.add(k);
   }
   const z = liesZustand() || baueAlles();
-  nrAufholen(z);
-  const nr = nrNaechste();
+  // Auch der Eigenbau nimmt nur eine interne Nummer.
+  const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
   z.scheine.push({
     // Der selbst gebaute Schein geht an den ersten erlaubten Anbieter -
     // das ist jetzt Stake, frueher stand hier Bwin als Rueckfall.
@@ -1198,8 +1214,12 @@ function baueVerlaufsEintrag(scheinId) {
     return { id: w.id, spiel: w.spiel, wette: w.wette, linie: w.o[eintrag.optIdx][0],
              quote: rund2(q.echt), quelle: q.quelle };
   });
+  // HIER entsteht die feste Nummer, und nur hier: eine Kombination, die
+  // wirklich gesetzt wird, bekommt eine, die es nie wieder gibt. Blosses
+  // Bauen und Mischen verbraucht keine.
   const eintrag = {
     zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz, satz: aktiverSatzId(),
+    nummer: nrNaechste(),
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   };
@@ -1232,8 +1252,8 @@ function scheinLokalMerken(scheinId, ohneKonto) {
   v.unshift(b.eintrag);
   speichereVerlauf(v);
   meldung(ohneKonto
-    ? "Schein " + b.s.nr + " auf diesem Gerät gespeichert. Melde dich in <a href=\"mein.html\"><b>Mein Bereich</b></a> an, um ihn ins Konto zu holen und zu teilen."
-    : "Schein " + b.s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
+    ? "Schein " + b.eintrag.nummer + " auf diesem Gerät gespeichert. Melde dich in <a href=\"mein.html\"><b>Mein Bereich</b></a> an, um ihn ins Konto zu holen und zu teilen."
+    : "Schein " + b.eintrag.nummer + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
   // Im Einzel-Modus ist die Kombination damit erledigt und wandert ans
@@ -1298,7 +1318,8 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
     box.dataset.laeuft = "1";
     box.innerHTML = '<div class="ordnerpflicht mini">Wird gespeichert...</div>';
   }
-  supaScheinAnlegen(bereichId, b.eintrag, b.foto, b.fotoName, ordnerId).then(r => {
+  // Die feste Nummer wandert mit ins Konto - danach sucht Karam.
+  supaScheinAnlegen(bereichId, b.eintrag, b.foto, b.fotoName, ordnerId, b.eintrag.nummer).then(r => {
     if (box) box.dataset.laeuft = "";
     if (r.error) {
       meldung("Nicht ins Konto gespeichert: " + r.error.message, "warn");
@@ -1306,7 +1327,7 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
       return;
     }
     ordnerWahlZu(scheinId);
-    meldung("Schein " + b.s.nr + " in dein Konto gespeichert und der Person zugeordnet: " +
+    meldung("Schein " + b.eintrag.nummer + " in dein Konto gespeichert und der Person zugeordnet: " +
       '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");
     zeichneKonto();
   });

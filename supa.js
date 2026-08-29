@@ -214,7 +214,9 @@ async function supaScheineLaden(bereichId) {
   return mitFehler(liste, r);
 }
 
-async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
+// nummer ist Karams feste Scheinnummer. Die Spalte gab es schon, wurde
+// aber nie gefuellt - deshalb stand im Chat-Anhang immer "K-?".
+async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, nummer) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
   if (!key) return { error: { message: OHNE_SCHLUESSEL } };
@@ -223,6 +225,7 @@ async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
     daten: key ? { e2e: await e2eZu(key, JSON.stringify(daten)) } : daten,
     foto: foto ? await e2eZu(key, foto) : null,
     foto_name: fotoName ? await e2eZu(key, fotoName) : null,
+    nummer: (typeof nummer === "number" && isFinite(nummer)) ? nummer : null,
     stand: daten.stand || "offen",
     notiz: await e2eZu(key, daten.notiz || "") || "",
     ordner: ordnerId || null

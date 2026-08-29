@@ -2745,3 +2745,19 @@ button.merken, button.aufloesen, label.fotoknopf.klein,
 .s-fuss button, .s-fuss label.fotoknopf {
   min-height: 30px; padding: 5px 12px; font-size: 12.5px;
 }
+
+/* ---------- Wo soll ich suchen? (loeschbar) ---------- */
+/* Karam hatte den ganzen Abend nur bei Stake nachgesehen, waehrend ein
+   Teil der Scheine laengst bei Interwetten stand. Der Anbieter steht
+   deshalb jetzt als Erstes und am groessten im Kopf jedes Scheins. */
+.s-wo {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #1a2c50; color: #fff;
+  padding: 5px 12px 5px 8px; border-radius: 10px; margin-right: 10px;
+}
+.s-wo-name { font-size: 15px; font-weight: bold; letter-spacing: 0.2px; }
+.s-wo-mini { font-size: 11px; opacity: 0.75; }
+.s-kopf { flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .s-wo { width: 100%; margin: 0 0 6px 0; justify-content: center; }
+}

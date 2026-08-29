@@ -148,7 +148,9 @@ function einzelnNaechste(ersteRunde) {
     return;
   }
   z.scheine.unshift({
-    nr: nrNaechste(), id: "EZ" + Date.now(), kz: kz, art: "normal",
+    // Auch hier nur eine interne Nummer - die feste kommt beim Speichern.
+    nr: z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1,
+    id: "EZ" + Date.now(), kz: kz, art: "normal",
     einzeln: true, entfernt: [], wetten: drei
   });
   speichereZustand(z);
