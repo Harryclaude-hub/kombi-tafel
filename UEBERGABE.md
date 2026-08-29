@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **29.08.2026**, Fassung `20260829ai`.
+Stand: **29.08.2026**, Fassung `20260829am`.
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -95,14 +95,38 @@ oben auf jeder Karte: **„Stake · hier suchen"**.
 
 ### Die Mindestquote
 
-Die **feste Zahl** gilt. Die Quote vom Foto ist nur eine Schätzung.
+**Sie steht im Foto, nicht im Feld oben.** In der Tabelle hat jede Zeile
+zwei Quotenspalten: links die Quote, rechts die **Mindestquote**. Die rechte
+gilt, und zwar genau für diese eine Zeile.
 
-- drüber → **grün**
-- drunter → **rot**
-- genau drauf → **grün**
+```js
+mindFuer(w, optIdx, ersatz)   // logik.js
+// 1. Foto-Wert aus o[optIdx][2]
+// 2. sonst das Feld oben im Kombi-Bau (nur noch Ersatz)
+// 3. sonst MIND_STANDARD = 1.78
+```
+
+Gespeichert als dritter Platz einer Option: `[Linie, Quote, Mindestquote]`.
+Alte Wetten haben nur `[Linie, Quote]` und laufen unverändert weiter.
+
+**Mehrere Linien zum selben Spiel** wie `AWAY (-1.5, -1, -0.5)` sind drei
+verschiedene Wetten auf dasselbe Spiel. Karam setzt nur EINE davon, braucht
+aber je Linie die eigene Quote und die eigene Mindestquote. `optionName()`
+macht daraus "AWAY -1.5", "AWAY -1", "AWAY -0.5" - aber nur, wenn zu jeder
+Linie auch eine Quote gehört.
+
+**Noch offen:** der Einleser in `admin.js` hält die zweite Quotenspalte
+weiter für eine weitere Option. Beim nächsten Foto erst hinsehen, wie die
+zwei Spalten stehen, dann umstellen. Nicht raten.
+
+Die Quote vom Foto ist nur eine Schätzung, die Mindestquote entscheidet.
+
+- drüber -> **grün**
+- drunter -> **rot**
+- genau drauf -> **grün**
 
 Beim Runden gilt: wo eine Untergrenze gemeint ist, wird **auf**gerundet.
-`toFixed` rundet ab — eine geforderte Quote von 1,8476 als „1,84"
+`toFixed` rundet ab - eine geforderte Quote von 1,8476 als "1,84"
 anzuzeigen und dann gegen 1,84 zu prüfen, wäre zu wenig.
 
 ### Die drei Baurregeln
@@ -112,6 +136,27 @@ anzuzeigen und dann gegen 1,84 zu prüfen, wäre zu wenig.
 2. Alle drei Wetten eines Scheins liegen beim **gleichen Anbieter**
 3. Jedes **Spiel kommt nur einmal** vor, sonst hängen zwei Scheine
    aneinander und fallen gemeinsam
+
+### Freigaben: sehen UND mitarbeiten
+
+Karams Wunsch: wer Zugriff auf einen fremden Bereich hat, soll **alles**
+sehen, überall navigieren und als `close` auch alles ändern können.
+
+Die Rechte stimmen längst (`darfSchreiben()` gibt für `close` true). Was
+fehlte, war der Schlüssel. `supaTeilen` schreibt den Bereichsschlüssel nur
+mit, wenn der Gast zu dem Zeitpunkt schon einen `pubkey` hat. War er noch
+nie angemeldet, geht die Freigabe ohne Schlüssel raus, und der Gast sieht
+überall nur "[verschlüsselt - Schlüssel fehlt]".
+
+`supaSchluesselNachliefern()` (supa.js) sucht das jetzt bei jedem Laden von
+Mein Bereich selbst und trägt nach.
+
+**Wichtig:** der Bereichsschlüssel liegt NUR im Browser des Besitzers
+(`kt_e2e_bereich_<uid>`). Kein Server, kein Admin und kein MCP kann ihn
+herausgeben. Beide Seiten müssen sich also einmal anmelden, damit jeder dem
+anderen liefert. Steht in `kt_freigaben.schluessel` NULL, ist immer das die
+Ursache.
+
 
 ### Das Ziel: 400 € je Kombination
 
