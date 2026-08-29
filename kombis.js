@@ -58,6 +58,19 @@ function liesZustand() {
 }
 function speichereZustand(z) { localStorage.setItem(zustandSchluessel(), JSON.stringify(z)); }
 
+// Zaehlt jeden Bau-Durchgang mit. Wird nirgends angezeigt und hat mit
+// Karams Schein-Nummer nichts zu tun: sie sorgt allein dafuer, dass zwei
+// Durchgaenge nie dieselben Kennungen vergeben.
+const BAU_SCHLUESSEL = "kt_bau_lfd";
+
+function bauMarke() {
+  let n = 0;
+  try { n = parseInt(localStorage.getItem(BAU_SCHLUESSEL) || "0", 10) || 0; } catch (e) { }
+  n++;
+  try { localStorage.setItem(BAU_SCHLUESSEL, String(n)); } catch (e) { }
+  return n;
+}
+
 // ---------- Die laufende Schein-Nummer ----------
 // Geht nur nach oben und ueberlebt das Loeschen von Scheinen, den
 // Neuaufbau und den Wechsel des Ordners. Eine einmal vergebene Nummer
@@ -88,12 +101,9 @@ function nrMerken(n) {
 
 // Holt den Zaehler ueber alles, was schon da ist. Noetig fuer Scheine,
 // die vor dem Zaehler angelegt wurden.
-function nrAufholen(z) {
-  let hoch = nrStand();
-  for (const s of ((z && z.scheine) || [])) if ((s.nr || 0) > hoch) hoch = s.nr;
-  if (hoch !== nrStand()) nrMerken(hoch);
-  return hoch;
-}
+// (nrAufholen ist entfallen: sie zog den festen Zaehler auf die hoechste
+//  interne nr hoch. Seit die interne nr bei jedem Bauen wieder bei 1
+//  anfaengt, waere das ein Verstellen ohne Anlass.)
 
 function nrNaechste() {
   const n = nrStand() + 1;
@@ -204,6 +214,9 @@ function baueAlles(nurRest) {
   // beim Speichern.
   let lfdIntern = 0;
   for (const s of behalten) if ((s.nr || 0) > lfdIntern) lfdIntern = s.nr;
+  // Eine Marke fuer diesen Durchgang, damit die Kennungen der neuen
+  // Scheine nicht auf die von gestern fallen (siehe oben bei bauMarke).
+  const marke = bauMarke();
   for (const k of aus.kombis || []) {
     const lfd = ++lfdIntern;
     const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
@@ -212,7 +225,7 @@ function baueAlles(nurRest) {
     teile.forEach((t, ti) => {
       scheine.push({
         nr: lfd,
-        id: "S" + lfd + (ti ? "_t" + (ti + 1) : ""),
+        id: "S" + marke + "-" + lfd + (ti ? "_t" + (ti + 1) : ""),
         kz: t.kz,
         art: "normal",
         teil: ti ? ti + 1 : undefined,
@@ -254,7 +267,7 @@ function baueAlles(nurRest) {
       // Bet365 ist auch hier die letzte Wahl (R6): der erste erlaubte
       // Nicht-b3-Anbieter bekommt den Niedrig-Schein.
       const kzN = e.anbieter.find(kz => kz !== "b3") || e.anbieter[0];
-      scheine.push(macheSchein(lfd, kzN,
+      scheine.push(macheSchein(marke, lfd, kzN,
         gruppe.map(w => ({ id: w.id, optIdx: optVon[w.id] || 0 })), "niedrig"));
     } else {
       for (const w of gruppe) uebrigN.push({ kz: "", id: w.id });
@@ -340,10 +353,10 @@ function anbieterWechseln(scheinId, neuKz) {
   zeichne_();
 }
 
-function macheSchein(nr, kz, gruppe, art) {
+function macheSchein(marke, nr, kz, gruppe, art) {
   return {
     nr: nr,
-    id: "S" + nr,
+    id: "S" + marke + "-" + nr,
     kz: kz,
     art: art,                 // "normal" oder "niedrig"
     wetten: gruppe.map(k => ({ id: k.id, optIdx: k.optIdx })),
@@ -770,7 +783,7 @@ function zeichne_() {
     z.scheine = z.scheine.filter(sch => sch.wetten.length > 0);
     speichereZustand(z);
     meldung(archiviert + " abgelaufene Wette(n) automatisch archiviert, " +
-      nachgerückt + " Ersatz nachgerückt. Dein Verlauf in Mein Bereich bleibt unberuehrt.", "gut");
+      nachgerückt + " Ersatz nachgerückt. Dein Verlauf in Mein Bereich bleibt unberührt.", "gut");
   }
 
   // Einstellungen zurueckspiegeln
@@ -802,6 +815,7 @@ function zeichne_() {
   zeichneVerlauf();
   zeichneKonto();
   if (typeof einzelnZeichnen === "function") einzelnZeichnen();
+  zeichnePanel();
 }
 
 // Die sichtbare Nummer: 1 bis zur Zahl der gebauten Kombinationen.
@@ -966,7 +980,20 @@ function zeichneReste(z) {
 // Anbieter gesetzt - jeder Teil hat sein eigenes Einsatzfeld.
 function zielEinsatz() {
   const f = document.getElementById("ziel");
-  return f ? (parseFloat(f.value) || 400) : 400;
+  const z = f ? (parseFloat(f.value) || 400) : zielGemerkt();
+  // Mitschreiben, damit der Mein-Bereich dasselbe Ziel kennt: dort
+  // gibt es das Feld nicht, und ohne den Wert waere die Trennung
+  // "voll gesetzt / nicht voll" dort schlicht geraten.
+  if (f) { try { localStorage.setItem("kt_ziel", String(z)); } catch (e) { } }
+  return z;
+}
+
+function zielGemerkt() {
+  try {
+    const w = parseFloat(localStorage.getItem("kt_ziel"));
+    if (isFinite(w) && w > 0) return w;
+  } catch (e) { }
+  return 400;
 }
 
 // ---------- Karams Ziel-Logik: 400 Euro je Kombination ----------
@@ -1159,7 +1186,9 @@ function eigenbauAnlegen() {
     entfernt: []
   });
   speichereZustand(z);
-  meldung("<b>Eigener Schein " + nr + "</b> mit " + gewaehlt.length + " Wetten angelegt - " +
+  // anzeigeNr erst NACH dem Speichern: vorher steht der neue Schein
+  // noch nicht in der Liste, ueber die gezaehlt wird.
+  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> mit " + gewaehlt.length + " Wetten angelegt - " +
     "oben bei den Scheinen: Anbieter wählen, Einsatz eintragen, fertig.", "gut");
   zeichne_();
 }
@@ -1764,4 +1793,131 @@ function merkerLoeschen(wettId) {
   meldung("<b>" + (w ? w.spiel : wettId) + "</b> ist wieder frei. " +
     "Beim nächsten <b>Scheine neu bauen</b> kann sie wieder in eine Kombination.", "gut");
   zeichne_();
+}
+// ============================================================
+// DAS PANEL OBEN: wo steht was?
+//
+// Karam will auf einen Blick drei Dinge sehen:
+//   1. was gebaut, aber noch NICHT gesetzt ist
+//   2. was gesetzt ist, aber den Ziel-Einsatz nicht erreicht hat
+//   3. was voll gesetzt ist
+// Dazu, wie viel Geld in jeder Gruppe steckt und wie viel noch offen ist.
+//
+// Die Zahlen entstehen hier NICHT neu: sie kommen aus dem Zustand
+// (gebaut) und aus dem Verlauf (gesetzt). Es wird nichts gespeichert.
+// ============================================================
+
+// Teile derselben Kombination gehoeren zusammen. Beim Setzen bekommt
+// jeder Teil einen eigenen Verlaufseintrag, aber die scheinId verraet
+// die Herkunft: S41, S41_t2, S41_m2 gehoeren alle zu S41.
+function stammId(scheinId) {
+  // MEHRFACH abschneiden: ein Teil kann noch einmal geteilt werden
+  // (S7-3_t2_m2). Mit nur einem Schnitt haette der als eigene
+  // Kombination gezaehlt und waere ewig "nicht voll gesetzt".
+  return String(scheinId || "").replace(/(_(t|m)\d+)+$/, "");
+}
+
+function panelZahlen() {
+  const ziel = zielEinsatz();
+  const z = liesZustand();
+
+  // 1. Gebaut, aber noch nichts gesetzt: alles im Zustand, dessen Stamm
+  //    im Verlauf noch gar nicht vorkommt.
+  let v = [];
+  try { v = liesVerlauf() || []; } catch (e) { v = []; }
+  const gesetztProStamm = {};
+  for (const e of v) {
+    const s = stammId(e.scheinId);
+    if (!gesetztProStamm[s]) gesetztProStamm[s] = { einsatz: 0, teile: [], zeit: e.zeit };
+    gesetztProStamm[s].einsatz += Number(e.einsatz) || 0;
+    gesetztProStamm[s].teile.push(e);
+  }
+
+  const offeneNrn = new Set();
+  for (const s of ((z && z.scheine) || [])) {
+    if (gesetztProStamm[stammId(s.id)]) continue;
+    offeneNrn.add(s.nr);
+  }
+
+  const voll = [], unter = [];
+  for (const s of Object.keys(gesetztProStamm)) {
+    const g = gesetztProStamm[s];
+    g.stamm = s;
+    g.fehlt = rund2(Math.max(0, ziel - g.einsatz));
+    (g.fehlt <= 0.004 ? voll : unter).push(g);
+  }
+  unter.sort((a, b) => b.fehlt - a.fehlt);
+
+  const summe = liste => rund2(liste.reduce((p, x) => p + x.einsatz, 0));
+  return {
+    ziel: ziel,
+    offen: { anzahl: offeneNrn.size, moeglich: rund2(offeneNrn.size * ziel) },
+    unter: { anzahl: unter.length, gesetzt: summe(unter),
+             fehlt: rund2(unter.reduce((p, x) => p + x.fehlt, 0)), liste: unter },
+    voll: { anzahl: voll.length, gesetzt: summe(voll) }
+  };
+}
+
+function zeichnePanel() {
+  const kasten = document.getElementById("panel");
+  if (!kasten) return;
+  const p = panelZahlen();
+  const geld = x => Number(x).toFixed(2) + " &euro;";
+
+  kasten.innerHTML =
+    '<div class="pn-kachel pn-offen">' +
+      '<div class="pn-zahl">' + p.offen.anzahl + "</div>" +
+      '<div class="pn-titel">noch nichts gesetzt</div>' +
+      '<div class="pn-mini">' + geld(p.offen.moeglich) + " möglich bei " +
+        geld(p.ziel) + " je Kombination</div></div>" +
+
+    '<div class="pn-kachel pn-unter">' +
+      '<div class="pn-zahl">' + p.unter.anzahl + "</div>" +
+      '<div class="pn-titel">gesetzt, aber nicht voll</div>' +
+      '<div class="pn-mini">' + geld(p.unter.gesetzt) + " gesetzt, <b>" +
+        geld(p.unter.fehlt) + "</b> fehlen noch</div>" +
+      (p.unter.anzahl
+        ? '<button onclick="panelRestMischen()">Rest neu mischen</button>'
+        : "") + "</div>" +
+
+    '<div class="pn-kachel pn-voll">' +
+      '<div class="pn-zahl">' + p.voll.anzahl + "</div>" +
+      '<div class="pn-titel">voll gesetzt</div>' +
+      '<div class="pn-mini">' + geld(p.voll.gesetzt) + " im Spiel</div></div>" +
+
+    '<div class="pn-kachel pn-summe">' +
+      '<div class="pn-zahl">' + geld(p.unter.gesetzt + p.voll.gesetzt) + "</div>" +
+      '<div class="pn-titel">insgesamt gesetzt</div>' +
+      '<div class="pn-mini">' + (p.voll.anzahl + p.unter.anzahl) +
+        " Kombinationen im Verlauf</div></div>";
+
+  // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
+  if (p.unter.anzahl) {
+    let h = '<div class="pn-luecken"><b>Wo noch etwas fehlt:</b><ul>';
+    for (const g of p.unter.liste.slice(0, 8)) {
+      const wo = [...new Set(g.teile.map(t => t.anbieter))].join(", ");
+      h += "<li>" + textSicherK2(wo) + ": " + geld(g.einsatz) + " gesetzt, <b>" +
+        geld(g.fehlt) + "</b> fehlen</li>";
+    }
+    if (p.unter.liste.length > 8) h += "<li class='mini'>und " +
+      (p.unter.liste.length - 8) + " weitere</li>";
+    h += "</ul></div>";
+    kasten.insertAdjacentHTML("beforeend", h);
+  }
+}
+
+// Karam: was nicht voll gesetzt werden konnte, soll neu gemischt werden -
+// dieselbe Kombination geht beim naechsten Anbieter selten genauso durch.
+// Deshalb wird NEU gebaut, nicht kopiert. Die schon gesetzten bleiben
+// unberuehrt, das macht restNeuMischen ohnehin.
+function panelRestMischen() {
+  const p = panelZahlen();
+  if (!p.unter.anzahl) { meldung("Es fehlt nirgends etwas.", "gut"); return; }
+  const frage = "Bei " + p.unter.anzahl + " Kombination(en) fehlen zusammen " +
+    p.unter.fehlt.toFixed(2) + " Euro.\n\n" +
+    "Ich mische die noch nicht gesetzten Wetten neu, damit du das Geld anders " +
+    "unterbringen kannst. Die schon gesetzten Kombinationen bleiben unberührt.\n\n" +
+    "Neu mischen?";
+  if (!confirm(frage)) return;
+  restNeuMischen();
 }

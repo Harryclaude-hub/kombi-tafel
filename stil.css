@@ -2761,3 +2761,51 @@ button.merken, button.aufloesen, label.fotoknopf.klein,
 @media (max-width: 700px) {
   .s-wo { width: 100%; margin: 0 0 6px 0; justify-content: center; }
 }
+
+/* ---------- Panel oben: wo steht was (loeschbar) ---------- */
+.panel { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px 0; }
+.panel:empty { display: none; }
+.pn-kachel {
+  flex: 1 1 170px; border: 1.5px solid #c3c9d8; border-left-width: 6px;
+  border-radius: 10px; padding: 10px 13px; background: #fff;
+}
+.pn-zahl { font-size: 25px; font-weight: bold; line-height: 1.1; }
+.pn-titel { font-size: 13.5px; font-weight: bold; margin-top: 1px; }
+.pn-mini { font-size: 12px; color: #55627a; margin-top: 3px; }
+.pn-kachel button { margin-top: 8px; font-size: 12.5px; padding: 5px 11px; }
+/* Bedeutungsfarben: blau = liegt bereit, orange = da fehlt Geld,
+   gruen = erledigt. Kein Rot - nichts davon ist ein Fehler. */
+.pn-offen { border-left-color: #1a2c50; }
+.pn-unter { border-left-color: #b35a00; background: #fffaf3; }
+.pn-unter .pn-zahl { color: #b35a00; }
+.pn-voll { border-left-color: #1a7a1a; }
+.pn-voll .pn-zahl { color: #1a7a1a; }
+.pn-summe { border-left-color: #55627a; }
+.pn-luecken {
+  flex: 1 1 100%; border: 1px solid #e6d3b8; border-radius: 10px;
+  padding: 9px 13px; background: #fffaf3; font-size: 13px;
+}
+.pn-luecken ul { margin: 5px 0 0 0; padding-left: 20px; }
+@media (max-width: 700px) {
+  .pn-kachel { flex-basis: 100%; }
+}
+/* ---------- Zwei Verlaeufe: Schalter (loeschbar) ---------- */
+.vf-schalter { display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin: 8px 0 10px 0; }
+.vf-schalter:empty { display: none; }
+.vf-knopf { font-size: 13.5px; padding: 6px 13px; }
+.vf-knopf.aktiv { background: #1a2c50; color: #fff; border-color: #1a2c50; }
+.vf-zahl { opacity: .75; font-weight: normal; }
+.vf-ziel { font-size: 12.5px; color: #55627a; }
+.vf-ziel input { width: 76px; padding: 4px 6px; font-size: 13px; }
+.vf-fehlt { font-size: 12.5px; color: #b35a00; }
+.vf-ok { font-size: 12.5px; color: #1a7a1a; }
+/* Die Zeile selbst bleibt ruhig: nur ein Streifen links, keine
+   Flaechenfarbe - sonst kaempft sie mit der Zebra-Schicht. */
+#scheine_db tr.unterziel > td:first-child { box-shadow: inset 4px 0 0 #b35a00; }
+.unterziel-mark { color: #b35a00; font-weight: bold; }
+@media (max-width: 700px) {
+  .vf-schalter { gap: 6px; }
+  .vf-knopf { flex: 1 1 auto; }
+  .vf-ziel, .vf-fehlt, .vf-ok { flex-basis: 100%; }
+}

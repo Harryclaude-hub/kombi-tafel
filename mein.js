@@ -223,6 +223,7 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
+<div id="verlaufschalter" class="vf-schalter"></div>
 <div id="scheine_db"></div>
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
@@ -942,8 +943,28 @@ function zeichneKontoDb(scheine) {
 // dieser Reihenfolge. Wer hier umsortiert, muss sie dort nachziehen -
 // sonst steht eine falsche Ueberschrift ueber einer richtigen Zahl.
 function zeichneScheineDb(scheine) {
+  zeichneVerlaufSchalter(scheine);
   if (!scheine.length) { el("scheine_db").innerHTML = '<p class="mini">Noch keine Scheine hier. ' +
     'Im <a href="kombis.html">Kombi-Bau</a> Scheine bauen und "In den Verlauf" drücken.</p>'; return; }
+
+  // Die zwei Verlaeufe. Gefiltert wird erst HIER, damit der Schalter
+  // immer alle Zahlen zeigt - sonst stuende auf dem Knopf "Voll (0)",
+  // nur weil gerade nach "unter" gefiltert ist.
+  const gruppen = verlaufGruppen(scheine);
+  const filter = verlaufFilterLesen();
+  const alleZahl = scheine.length;
+  if (filter !== "alle") scheine = scheine.filter(s => {
+    const g = gruppen[stammIdM(s.daten && s.daten.scheinId)];
+    return g && (filter === "voll" ? g.voll : !g.voll);
+  });
+  if (!scheine.length) {
+    el("scheine_db").innerHTML = '<p class="mini">' +
+      (filter === "unter"
+        ? "Alles ist voll gesetzt - hier ist nichts offen."
+        : "Noch keine Kombination hat den vollen Einsatz erreicht.") +
+      ' (' + alleZahl + ' Einträge ausgeblendet)</p>';
+    return;
+  }
   const schreib = darfSchreiben();
   let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Person</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Möglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
@@ -958,6 +979,8 @@ function zeichneScheineDb(scheine) {
     const zklassen = [];
     if (!s.ordner) zklassen.push("ohneordner");
     if (scheinWartet(s)) zklassen.push("fertigzeile");
+    const gr = gruppen[stammIdM(d.scheinId)];
+    if (gr && !gr.voll) zklassen.push("unterziel");
     html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
       // Spiel, Linie, Fotoname und das Foto selbst kommen von Menschen und
@@ -967,7 +990,8 @@ function zeichneScheineDb(scheine) {
       (s.foto ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
         '<div><img src="' + textSicherM(s.foto) + '" class="minifoto"></div>' : "") +
       anmerkungenBlock(s) + "</td>" +
-      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
+      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;" +
+        luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + echtZelle(s, schreib) + "</td>" +
       "<td>" + (schreib
@@ -2889,4 +2913,105 @@ async function tuStandSetzen(ordnerId, art, schluessel, jetzt) {
 function anbieterNameM(kz) {
   const x = KASSE_ANBIETER.find(a => a[0] === kz);
   return x ? x[1] : kz;
+}
+// ============================================================
+// ZWEI VERLAEUFE: voll gesetzt und nicht voll gesetzt
+//
+// Karam setzt eine Kombination bei einem Anbieter. Laesst der ihn nicht
+// den vollen Betrag setzen, bleibt ein Rest offen. Beides steht im
+// Verlauf, aber es sind zwei verschiedene Dinge:
+//   voll  = da ist nichts mehr zu tun
+//   unter = da liegt noch Geld herum, das untergebracht werden muss
+//
+// Eine Kombination kann in mehreren Teilen gesetzt sein (derselbe
+// Schein bei zwei Anbietern). Die Teile heissen S41, S41_t2, S41_m2 -
+// sie zaehlen ZUSAMMEN gegen das Ziel, sonst waere jeder Teil einzeln
+// "nicht voll" und die Trennung waere wertlos.
+// ============================================================
+
+function stammIdM(scheinId) {
+  // Mehrfach abschneiden, siehe stammId in kombis.js.
+  return String(scheinId || "").replace(/(_(t|m)\d+)+$/, "");
+}
+
+function zielM() {
+  try {
+    const w = parseFloat(localStorage.getItem("kt_ziel"));
+    if (isFinite(w) && w > 0) return w;
+  } catch (e) { }
+  return 400;
+}
+
+function verlaufFilterLesen() {
+  let f = "alle";
+  try { f = localStorage.getItem("kt_verlauf_filter") || "alle"; } catch (e) { }
+  return ["alle", "voll", "unter"].indexOf(f) < 0 ? "alle" : f;
+}
+
+function verlaufFilterSetzen(f) {
+  try { localStorage.setItem("kt_verlauf_filter", f); } catch (e) { }
+  zeichneBereich();
+}
+
+function zielSetzenM(wert) {
+  const w = parseFloat(String(wert).replace(",", "."));
+  if (!isFinite(w) || w <= 0) { meldungM("Bitte eine Zahl größer als 0.", "warn"); return; }
+  try { localStorage.setItem("kt_ziel", String(w)); } catch (e) { }
+  zeichneBereich();
+}
+
+// Summiert die Teile je Kombination und sagt, was noch fehlt.
+function verlaufGruppen(scheine) {
+  const ziel = zielM();
+  const g = {};
+  for (const s of scheine) {
+    const st = stammIdM(s.daten && s.daten.scheinId);
+    if (!g[st]) g[st] = { einsatz: 0, teile: 0 };
+    g[st].einsatz += (s.daten && Number(s.daten.einsatz)) || 0;
+    g[st].teile++;
+  }
+  for (const st of Object.keys(g)) {
+    g[st].fehlt = Math.round(Math.max(0, ziel - g[st].einsatz) * 100) / 100;
+    g[st].voll = g[st].fehlt <= 0.004;
+  }
+  return g;
+}
+
+function zeichneVerlaufSchalter(scheine) {
+  const kasten = el("verlaufschalter");
+  if (!kasten) return;
+  if (!scheine || !scheine.length) { kasten.innerHTML = ""; return; }
+
+  const g = verlaufGruppen(scheine);
+  const stt = Object.keys(g);
+  const nVoll = stt.filter(s => g[s].voll).length;
+  const nUnter = stt.length - nVoll;
+  const fehltGesamt = stt.reduce((p, s) => p + g[s].fehlt, 0);
+  const f = verlaufFilterLesen();
+
+  const knopf = (wert, text, zahl) =>
+    '<button type="button" class="vf-knopf' + (f === wert ? ' aktiv' : '') + '"' +
+    ' onclick="verlaufFilterSetzen(&quot;' + wert + '&quot;)">' + text +
+    ' <span class="vf-zahl">' + zahl + '</span></button>';
+
+  kasten.innerHTML =
+    knopf("alle", "Alle", stt.length) +
+    knopf("voll", "Voll gesetzt", nVoll) +
+    knopf("unter", "Nicht voll gesetzt", nUnter) +
+    '<span class="vf-ziel">Ziel je Kombination: ' +
+    '<input type="text" inputmode="decimal" value="' + zielM().toFixed(2) + '"' +
+    ' onchange="zielSetzenM(this.value)"> &euro;</span>' +
+    (nUnter
+      ? '<span class="vf-fehlt">Es fehlen zusammen <b>' + fehltGesamt.toFixed(2) +
+        ' &euro;</b> &ndash; im <a href="kombis.html">Kombi-Bau</a> neu mischen.</span>'
+      : '<span class="vf-ok">Alles voll gesetzt.</span>');
+}
+
+// Zeigt in der Einsatz-Spalte, was an dieser Kombination noch fehlt.
+// Bei mehreren Teilen steht dazu, dass die Summe gemeint ist - sonst
+// sieht es aus, als fehle der Betrag bei jedem Teil einzeln.
+function luecken(g) {
+  if (!g || g.voll) return "";
+  return '<div class="mini unterziel-mark">es fehlen ' + g.fehlt.toFixed(2) + ' &euro;' +
+    (g.teile > 1 ? ' (' + g.teile + ' Teile zusammen)' : '') + '</div>';
 }
