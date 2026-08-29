@@ -2625,3 +2625,10 @@ html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody > tr > td:firs
 /* Kurzes Aufblitzen, damit man sieht, wo man gelandet ist. */
 .hervor { outline: 3px solid var(--blau, #1a2c50); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .hervor { outline-width: 2px; } }
+/* ---------- Ampel an der Quote (loeschbar) ---------- */
+/* Karams Regel: erreicht die echte Quote die Mindestquote, ist sie gruen;
+   darunter rot. Genau auf der Grenze zaehlt als erreicht, also gruen.
+   Bedeutungsfarbe, kein Schmuck - deshalb bleibt sie auch, wenn man den
+   Rest der Design-Schicht loescht, indem sie hier ganz unten steht. */
+.uebergruen { color: #1a7a1a; font-size: 10.5px; font-weight: bold; }
+tr.unterquote td { background: #fdf3f3; }

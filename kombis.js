@@ -35,14 +35,16 @@ function zielQuote(w, optIdx, kz) {
   return { roh: ref, echt: ref / teiler, quelle: "Foto " + ref.toFixed(2), fest: false };
 }
 
-// Die Untergrenze DIESER Wette: die Quote aus Saschas Tabelle.
-// Karams Entscheidung vom 29.08.2026 - keine feste Zahl mehr fuer alle.
-// Verglichen wird sie mit der ANGEZEIGTEN Quote (siehe verteiler.js).
-function mindFuer(w, optIdx) {
-  const o = w && w.o && w.o[optIdx || 0];
-  const q = o ? Number(o[1]) : 0;
-  return (isFinite(q) && q > 1) ? q : 0;
+// Die Mindestquote gilt fuer ALLE Wetten gleich und steht im Feld oben.
+// Sie prueft immer die ECHTE Quote nach Gebuehr. Die Foto-Quote ist nur
+// eine Einschaetzung und entscheidet nichts.
+function mindWert(z) {
+  const m = z && z.einst ? Number(z.einst.mind) : NaN;
+  return isFinite(m) && m > 0 ? m : 1.5;
 }
+
+// Erreicht diese Quote die Mindestquote? Genau darauf zaehlt als erreicht.
+function ueberMind(echt, mind) { return echt >= mind - 0.0001; }
 
 function spielKennung(w) { return w.doppel || (w.liga + "|" + w.spiel); }
 
@@ -173,7 +175,7 @@ function baueAlles(nurRest) {
       verf[kz] = v[kz] || "J";
     }
     eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt,
-      verf: verf, mind: mindFuer(w, optIdx) });
+      verf: verf });
   }
 
   // ---- Verteilen: beide Verfahren rechnen, das bessere gewinnt ----
@@ -218,7 +220,7 @@ function baueAlles(nurRest) {
   for (const w of offen) {
     if (inKombi.has(w.id)) continue;
     const irgendwoUeber = e.anbieter.some(kz =>
-      zielQuote(w, optVon[w.id], kz).roh >= mindFuer(w, optVon[w.id]) - 0.0001);
+      ueberMind(zielQuote(w, optVon[w.id], kz).echt, e.mind));
     (irgendwoUeber ? uebrig : zuNiedrig).push(w);
   }
   const topfN = mische(zuNiedrig.slice(), e.saat + 7);
@@ -396,7 +398,7 @@ function findeErsatz(z, kz, scheinId, maxNutzung) {
   for (const w of frei) {
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (q.roh >= mindFuer(w, optIdx) - 0.0001)
+    if (ueberMind(q.echt, e.mind))
       bewertet.push({ w: w, optIdx: optIdx, echt: q.echt, schonBenutzt: nutzung[w.id] || 0 });
   }
   const info = { imOrdner: imOrdner.length, offen: offen.length, frei: frei.length,
@@ -730,9 +732,9 @@ function scheinHtml(s, z) {
     const v = verfuegbarkeit(w)[s.kz];
     gesamt *= q.echt; gesamtRoh *= q.roh;
     if (!q.fest) alleFest = false;
-    // Untergrenze DIESER Wette gegen die ANGEZEIGTE Quote.
-    const grenze = mindFuer(w, eintrag.optIdx);
-    const unter = q.roh < grenze - 0.0001;
+    // Die Mindestquote gegen die ECHTE Quote nach Gebuehr.
+    // Genau auf der Grenze gilt als erreicht - also gruen.
+    const unter = !ueberMind(q.echt, mind);
     const opt = w.o[eintrag.optIdx][0];
     const eigen = liesEingabe(w.id, opt, s.kz);
     return "<tr" + (unter ? ' class="unterquote"' : "") + ">" +
@@ -743,17 +745,17 @@ function scheinHtml(s, z) {
         (v === "D" ? '<div class="duenn">Markt dort duenn, prüfen</div>' :
          (v === "N" ? '<div class="duenn">Einschätzung: evtl. nicht im Angebot, prüfen</div>' : "")) + "</td>" +
       "<td class='s-ziel'>" + q.roh.toFixed(2) + '<div class="mini">' + q.quelle + "</div></td>" +
-      // Die Untergrenze DIESER Wette: die Quote aus der Tabelle. Sie steht
-      // in derselben Waehrung wie die Spalte daneben - das ist die Zahl,
-      // die beim Anbieter auf dem Schirm stehen muss.
-      "<td class='s-mind'>" + grenze.toFixed(2) +
+      // Die Mindestquote, aber in der Waehrung der Spalte daneben: das ist
+      // die Zahl, die beim Anbieter auf dem Schirm stehen muss. Bei
+      // Interwetten sind das 1,89 fuer real 1,80.
+      "<td class='s-mind'>" + (mind * GEBUEHREN_TEILER[s.kz]).toFixed(2) +
         (GEBUEHREN_TEILER[s.kz] !== 1
-          ? '<div class="mini">= real ' + (grenze / GEBUEHREN_TEILER[s.kz]).toFixed(2) + "</div>"
-          : "") + "</td>" +
+          ? '<div class="mini">= real ' + mind.toFixed(2) + "</div>" : "") + "</td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
         (eigen ? "value='" + eigen + "' " : "") +
         "onchange=\"quoteEintragen('" + s.id + "','" + w.id + "',this)\">" +
-        '<div class="' + (unter ? "unterrot" : "real") + '">real ' + rund2(q.echt).toFixed(2) +
+        // Karams Ampel: drueber gruen, drunter rot, genau drauf gruen.
+        '<div class="' + (unter ? "unterrot" : "uebergruen") + '">real ' + rund2(q.echt).toFixed(2) +
         (unter ? " zu niedrig" : "") + "</div></td>" +
       "<td class='s-raus'>" +
         "<select onchange=\"if(this.value){wetteRaus('" + s.id + "','" + w.id + "',this.value);}\">" +
@@ -946,7 +948,7 @@ function scheinNeuMischen(scheinId) {
     if (schonDrin.has(k)) continue;
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (q.roh >= mindFuer(w, optIdx) - 0.0001) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
+    if (ueberMind(q.echt, e.mind)) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
     if (passend.length === 3) break;
   }
   if (passend.length < 3) {
@@ -1432,7 +1434,7 @@ function anbieterTraegt(wetten, kz) {
     const w = wetteNachId(eintrag.id);
     if (!w) return false;
     const q = zielQuote(w, eintrag.optIdx, kz);
-    if (!(q.roh >= mindFuer(w, eintrag.optIdx) - 0.0001)) return false;
+    if (!ueberMind(q.echt, mindWert(liesZustand() || {}))) return false;
   }
   return true;
 }
