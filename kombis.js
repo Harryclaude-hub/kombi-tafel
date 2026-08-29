@@ -337,41 +337,68 @@ function mische(liste, saat) {
 
 // ---------- Wette rausnehmen und Ersatz nachruecken ----------
 
-// Alle Wett-Ids, die gerade irgendwo verbaut sind
-function verbraucht(z) {
-  const s = new Set();
-  for (const sch of z.scheine) for (const w of sch.wetten) s.add(w.id);
-  // auch die Spiel-Kennungen sperren, damit kein doppeltes Spiel nachrueckt
-  return s;
+// Die frueheren Helfer verbraucht() und verbrauchteKennungen() sind hier
+// weg. Sie sperrten global jede schon verbaute Wette und jedes schon
+// vorkommende Spiel - damit war der Topf fuer den Nachruecker praktisch
+// immer leer. Was jetzt gilt, steht bei findeErsatz.
+
+// Wie oft steckt jede Wette gerade in einem Schein? R3 erlaubt zwei.
+function nutzungZaehlen(z) {
+  const n = {};
+  for (const sch of z.scheine) for (const w of sch.wetten) n[w.id] = (n[w.id] || 0) + 1;
+  return n;
 }
 
-function verbrauchteKennungen(z) {
-  const s = new Set();
-  for (const sch of z.scheine) for (const w of sch.wetten) {
-    const ww = wetteNachId(w.id);
-    if (ww) s.add(spielKennung(ww));
-  }
-  return s;
-}
+const ERSATZ_MAX_NUTZUNG = 2;   // R3, dieselbe Zahl wie beim Verteilen
 
-function findeErsatz(z, kz, ausgeschlossen) {
+function findeErsatz(z, kz, scheinId) {
   const e = z.einst;
-  const drin = verbraucht(z);
-  const kenn = verbrauchteKennungen(z);
-  const raus = new Set(ausgeschlossen || []);
-  const frei = satzWetten().filter(w => !istVorbei(anstossFeld(w)))
-    .filter(w => !drin.has(w.id) && !raus.has(w.id) && !kenn.has(spielKennung(w)));
-  const mitMarkt = frei;   // kein 100%-Ausschluss mehr, Karam prüft selbst
+  const sch = z.scheine.find(s => s.id === scheinId);
+  const leer = { imOrdner: 0, offen: 0, frei: 0, mitMarkt: 0, passend: 0 };
+  if (!sch) return { treffer: null, info: leer };
+
+  const nutzung = nutzungZaehlen(z);
+
+  // Was steht in DIESEM Schein schon - als Wette und als Spiel?
+  const drinHier = new Set(sch.wetten.map(w => w.id));
+  const spieleHier = new Set();
+  for (const w of sch.wetten) {
+    const ww = wetteNachId(w.id);
+    if (ww) spieleHier.add(spielKennung(ww));
+  }
+  // Was Karam aus GENAU DIESEM Schein herausgenommen hat, kommt hier nicht
+  // zurueck - er hatte einen Grund. In einem anderen Schein darf es stehen.
+  const rausHier = new Set((sch.entfernt || []).map(x => x.id));
+
+  // NUR aus dem offenen Ordner. satzWetten() gibt ausschliesslich Wetten
+  // dieses Ordners zurueck - eine zweite Quelle gibt es hier nicht.
+  const imOrdner = satzWetten();
+  const offen = imOrdner.filter(w => !istVorbei(anstossFeld(w)));
+  const frei = offen.filter(w =>
+    !drinHier.has(w.id) &&
+    !rausHier.has(w.id) &&
+    !spieleHier.has(spielKennung(w)) &&
+    (nutzung[w.id] || 0) < ERSATZ_MAX_NUTZUNG);
+
   const bewertet = [];
-  for (const w of mitMarkt) {
+  for (const w of frei) {
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (q.echt >= e.mind - 0.0001) bewertet.push({ w: w, optIdx: optIdx, echt: q.echt });
+    if (q.echt >= e.mind - 0.0001)
+      bewertet.push({ w: w, optIdx: optIdx, echt: q.echt, schonBenutzt: nutzung[w.id] || 0 });
   }
-  const info = { frei: frei.length, mitMarkt: mitMarkt.length, passend: bewertet.length };
+  const info = { imOrdner: imOrdner.length, offen: offen.length, frei: frei.length,
+    mitMarkt: frei.length, passend: bewertet.length };
   if (!bewertet.length) return { treffer: null, info: info };
-  bewertet.sort((a, b) => liesAnstoss(anstossFeld(a.w)).zeit - liesAnstoss(anstossFeld(b.w)).zeit);
-  return { treffer: { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx }, info: info };
+
+  // Erst die, die noch gar nicht verbaut sind - so haengen nicht zwei
+  // Scheine an derselben Wette. Danach der fruehere Anstoss.
+  bewertet.sort(function (a, b) {
+    if (a.schonBenutzt !== b.schonBenutzt) return a.schonBenutzt - b.schonBenutzt;
+    return liesAnstoss(anstossFeld(a.w)).zeit - liesAnstoss(anstossFeld(b.w)).zeit;
+  });
+  return { treffer: { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx,
+    schonBenutzt: bewertet[0].schonBenutzt }, info: info };
 }
 
 function wetteRaus(scheinId, wettId, grund) {
@@ -386,24 +413,29 @@ function wetteRaus(scheinId, wettId, grund) {
   sch.wetten.splice(pos, 1);
   speichereZustand(z);
 
-  // Ersatz suchen, der beim GLEICHEN Anbieter verfügbar ist
-  const ausgeschlossen = [];
-  for (const s of z.scheine) for (const en of s.entfernt) ausgeschlossen.push(en.id);
-  const suche = findeErsatz(z, sch.kz, ausgeschlossen);
+  // Ersatz suchen: gleicher Anbieter, gleicher Ordner, und nur was in
+  // DIESEN Schein passt. Frueher wurde global gesperrt, deshalb war der
+  // Topf fast immer leer.
+  const suche = findeErsatz(z, sch.kz, sch.id);
   if (suche.treffer) {
-    sch.wetten.splice(pos, 0, suche.treffer);
+    sch.wetten.splice(pos, 0, { id: suche.treffer.id, optIdx: suche.treffer.optIdx });
     speichereZustand(z);
-    meldung("Ersatz nachgerückt: <b>" + wetteNachId(suche.treffer.id).spiel + "</b> " +
-      "(bei " + anbieterName(sch.kz) + " verfügbar und über der Mindestquote).", "gut");
+    const nw = wetteNachId(suche.treffer.id);
+    meldung("<b>Nachgerückt:</b> " + (nw ? nw.spiel : suche.treffer.id) +
+      " - der Schein hat wieder " + sch.wetten.length + " Wetten. " +
+      "(Bei " + anbieterName(sch.kz) + " über der Mindestquote" +
+      (suche.treffer.schonBenutzt ? ", steht auch in einem zweiten Schein" : "") +
+      ", aus dem offenen Ordner.)", "gut");
   } else {
     const i = suche.info;
     let grundText;
-    if (i.frei === 0) grundText = "Es ist keine einzige Wette mehr frei, alle stecken schon in Scheinen.";
-    else if (i.mitMarkt === 0) grundText = "Von den " + i.frei + " freien Wetten führt " +
-      anbieterName(sch.kz) + " keine einzige.";
-    else grundText = "Von den " + i.frei + " freien Wetten führt " + anbieterName(sch.kz) +
-      " zwar " + i.mitMarkt + ", aber keine davon schafft deine Mindestquote " +
-      z.einst.mind.toFixed(2) + ".";
+    if (i.offen === 0) grundText = "In diesem Ordner ist keine Wette mehr offen - alle Spiele " +
+      "haben schon angefangen.";
+    else if (i.frei === 0) grundText = "Von den " + i.offen + " noch offenen Wetten des Ordners " +
+      "passt keine in diesen Schein: entweder steht das Spiel schon darin, oder die Wette " +
+      "steckt bereits in zwei Scheinen, oder du hast sie hier vorher herausgenommen.";
+    else grundText = "Von den " + i.frei + " Wetten, die hier hineinpassen würden, schafft keine " +
+      "bei " + anbieterName(sch.kz) + " deine Mindestquote " + z.einst.mind.toFixed(2) + ".";
     meldung("<b>Kein Ersatz gefunden.</b> " + grundText +
       " Der Schein hat jetzt " + sch.wetten.length + " Wetten. Deine Möglichkeiten: " +
       "als " + sch.wetten.length + "er stehen lassen, oder oben auf <b>Anders mischen</b> " +
