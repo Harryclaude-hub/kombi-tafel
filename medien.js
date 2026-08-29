@@ -140,18 +140,39 @@ let _aufnahme = null;   // { rec, teile, art, stream }
 
 async function aufnahmeStart(art, quelle) {
   if (_aufnahme) return { fehler: "Es laeuft schon eine Aufnahme." };
+  // SOFORT belegen, noch vor der Erlaubnisfrage. Die dauert beim ersten
+  // Mal mehrere Sekunden, und in dieser Zeit kamen zwei Antippen beide
+  // durch: zwei Aufnahmen liefen, nur die zweite war noch erreichbar,
+  // und das Mikrofon blieb bis zum Neuladen an.
+  _aufnahme = { laedt: true, art: art, quelle: quelle || "" };
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia(
       art === "video" ? { video: true, audio: true } : { audio: true });
   } catch (e) {
+    _aufnahme = null;   // wieder freigeben, sonst geht nie wieder eine
     return { fehler: (art === "video" ? "Kamera" : "Mikrofon") +
       " nicht erlaubt oder nicht vorhanden (" + e.name + ")." };
   }
-  const rec = new MediaRecorder(stream);
+  // Auch der Recorder selbst kann scheitern (Format nicht unterstuetzt).
+  let rec;
+  try { rec = new MediaRecorder(stream); }
+  catch (e) {
+    for (const s of stream.getTracks()) { try { s.stop(); } catch (x) { } }
+    _aufnahme = null;
+    return { fehler: "Dieser Browser kann so nicht aufnehmen (" + e.name + ")." };
+  }
   const teile = [];
   rec.ondataavailable = ev => { if (ev.data.size) teile.push(ev.data); };
   rec.start(250);
+  // Wurde waehrend der Erlaubnisfrage abgebrochen (Glocke zu, Seite
+  // gewechselt), ist _aufnahme jetzt null. Dann den frisch bekommenen
+  // Stream sofort wieder abschalten - sonst leuchtet die Kamera weiter.
+  if (_aufnahme === null) {
+    try { rec.stop(); } catch (e) { }
+    for (const s of stream.getTracks()) { try { s.stop(); } catch (e) { } }
+    return { fehler: "Aufnahme wurde abgebrochen." };
+  }
   _aufnahme = { rec: rec, teile: teile, art: art, stream: stream, quelle: quelle || "" };
   return { ok: true, stream: stream };
 }
@@ -161,6 +182,10 @@ function aufnahmeStopp() {
     if (!_aufnahme) { fertig(null); return; }
     const a = _aufnahme;
     _aufnahme = null;
+    // Die Aufnahme steckt noch in der Erlaubnisfrage: es gibt weder einen
+    // Recorder noch einen Stream. Ohne diese Zeile wuerde a.rec.onstop
+    // werfen und der Aufrufer wartete fuer immer auf ein Ergebnis.
+    if (a.laedt || !a.rec) { fertig(null); return; }
     a.rec.onstop = () => {
       a.stream.getTracks().forEach(t => t.stop());
       fertig(new Blob(a.teile, { type: a.rec.mimeType || (a.art === "video" ? "video/webm" : "audio/webm") }));
@@ -173,8 +198,12 @@ function aufnahmeAbbrechen() {
   if (!_aufnahme) return;
   const a = _aufnahme;
   _aufnahme = null;
+  // Auch hier kann noch die Erlaubnisfrage laufen - dann gibt es nichts
+  // zu stoppen. Der Stream, der danach vielleicht noch kommt, wird in
+  // aufnahmeStart wieder abgeraeumt, weil _aufnahme dort geprueft wird.
+  if (a.laedt || !a.rec) return;
   try { a.rec.stop(); } catch (e) {}
-  a.stream.getTracks().forEach(t => t.stop());
+  try { a.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
 }
 
 function aufnahmeLaeuft(quelle) {

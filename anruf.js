@@ -182,13 +182,76 @@ function anrufPanel(text, tasten) {
   if (!p) {
     p = document.createElement("div");
     p.id = "anrufpanel";
+    // Ohne diese Zeilen haengt das Fenster unformatiert am Seitenende
+    // und die Knoepfe waeren praktisch unerreichbar.
+    p.style.position = "fixed";
+    p.style.zIndex = "2147482000";
     document.body.appendChild(p);
+    anrufFensterSchiebbar(p);
+    anrufFensterStellen(p);
   }
-  p.innerHTML = '<div class="anruf-text">' + text + "</div>" +
+  p.innerHTML =
+    '<div class="anruf-griff" title="Zum Verschieben ziehen">' +
+    '<span class="anruf-griffbalken"></span></div>' +
+    '<div class="anruf-kopf"><span id="anruf-bild" class="anruf-bild"></span>' +
+    '<span class="anruf-wer"><span class="anruf-text">' + text + "</span>" +
+    '<span id="anruf-dauer" class="anruf-dauer mini"></span></span></div>' +
     '<div id="anruf-medien"></div><div class="anruf-tasten">' + (tasten || "") + "</div>";
+  return p;
+}
+
+// ---------- Verschieben mit Maus und Finger ----------
+// Ein einziger Satz Zeiger-Ereignisse, damit es am Laptop und am Handy
+// gleich funktioniert. Das Fenster bleibt immer im Bild.
+function anrufFensterSchiebbar(p) {
+  let ab = null;
+  const runter = e => {
+    // Nur am Griff ziehen, sonst kaeme man an die Knoepfe nicht mehr heran.
+    if (!e.target.closest || !e.target.closest(".anruf-griff")) return;
+    const r = p.getBoundingClientRect();
+    ab = { x: e.clientX - r.left, y: e.clientY - r.top };
+    p.classList.add("anruf-faehrt");
+    try { p.setPointerCapture(e.pointerId); } catch (x) { }
+    e.preventDefault();
+  };
+  const zieht = e => {
+    if (!ab) return;
+    const r = p.getBoundingClientRect();
+    const x = Math.max(4, Math.min(window.innerWidth - r.width - 4, e.clientX - ab.x));
+    const y = Math.max(4, Math.min(window.innerHeight - r.height - 4, e.clientY - ab.y));
+    p.style.left = x + "px"; p.style.top = y + "px";
+    p.style.right = "auto"; p.style.bottom = "auto";
+    e.preventDefault();
+  };
+  const hoch = () => {
+    if (!ab) return;
+    ab = null;
+    p.classList.remove("anruf-faehrt");
+    try { localStorage.setItem("kt_anrufplatz",
+      JSON.stringify({ left: p.style.left, top: p.style.top })); } catch (x) { }
+  };
+  p.addEventListener("pointerdown", runter);
+  p.addEventListener("pointermove", zieht);
+  p.addEventListener("pointerup", hoch);
+  p.addEventListener("pointercancel", hoch);
+}
+
+// Dorthin stellen, wo es zuletzt stand - aber nur, wenn das noch im Bild
+// ist (anderer Bildschirm, Fenster kleiner gemacht).
+function anrufFensterStellen(p) {
+  try {
+    const o = JSON.parse(localStorage.getItem("kt_anrufplatz") || "null");
+    if (!o || !o.left || !o.top) return;
+    const x = parseInt(o.left, 10), y = parseInt(o.top, 10);
+    if (isNaN(x) || isNaN(y)) return;
+    if (x < 0 || y < 0 || x > window.innerWidth - 80 || y > window.innerHeight - 60) return;
+    p.style.left = x + "px"; p.style.top = y + "px";
+    p.style.right = "auto"; p.style.bottom = "auto";
+  } catch (e) { }
 }
 
 function anrufPanelZu() {
+  anrufDauerStoppen();
   const p = document.getElementById("anrufpanel");
   if (p) p.remove();
 }
@@ -217,6 +280,13 @@ async function anrufPcBauen(zielId, mitVideo) {
     ziel.appendChild(el);
   };
   pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "connected") {
+      // Jetzt steht das Gespraech: die Bedienung einblenden und die Uhr starten.
+      const t = document.querySelector("#anrufpanel .anruf-tasten");
+      if (t && !document.getElementById("anruf-stumm"))
+        t.innerHTML = anrufTastenLeiste(!!(anrufPartner && anrufPartner.video));
+      if (!_anrufDauerUhr) anrufDauerStarten();
+    }
     if (pc.connectionState === "connected" && typeof weckerBalken === "function") {
       weckerBalken("Verbunden. Wenn du nichts hoerst: pruefe die Lautstaerke und ob das " +
         "Mikrofon erlaubt ist.", "gut", "anruf-verbunden", 1);
@@ -298,7 +368,9 @@ async function anrufAnnehmen() {
   if (b.fehler) { alert(b.fehler); anrufSenden(ein.von, { typ: "abgelehnt" }); anrufPanelZu(); return; }
   anrufPartner = { id: ein.von, name: ein.name, video: ein.video };
   anrufPanel("Im Gespraech mit <b>" + ein.name.replace(/</g, "&lt;") + "</b>",
-    '<button onclick="anrufAuflegen()">Auflegen</button>');
+    anrufTastenLeiste(ein.video));
+  anrufKopfSchmuecken(ein.von, ein.name);
+  anrufDauerStarten();
   await anrufPc.setRemoteDescription(ein.offer);
   for (const eis of ein.eis) { try { await anrufPc.addIceCandidate(eis); } catch (e) {} }
   const answer = await anrufPc.createAnswer();
@@ -750,4 +822,80 @@ async function anrufVerpasstMerken(vonId, name) {
       data: { url: "mein.html", art: "verpasst", von: vonId }
     });
   } catch (e) { }
+}
+// ---------- Die Bedienung waehrend des Gespraechs ----------
+
+function anrufTastenLeiste(mitVideo) {
+  return '<button id="anruf-stumm" class="anruf-taste" onclick="anrufStumm()" ' +
+    'title="Mikrofon aus- und einschalten">&#127908; Stumm</button>' +
+    (mitVideo ? '<button id="anruf-kamera" class="anruf-taste" onclick="anrufKamera()" ' +
+      'title="Kamera aus- und einschalten">&#128247; Kamera</button>' : "") +
+    '<button class="anruf-taste anruf-auf" onclick="anrufAuflegen()" ' +
+    'title="Auflegen">&#128222; Auflegen</button>';
+}
+
+// Gesicht und Anzeigename in den Kopf des Fensters.
+async function anrufKopfSchmuecken(vonId, name) {
+  try {
+    const b = document.getElementById("anruf-bild");
+    if (b && typeof profilBildEl === "function") {
+      b.innerHTML = "";
+      b.appendChild(profilBildEl(vonId, name, 34));
+    }
+  } catch (e) { }
+}
+
+// ---------- Stumm ----------
+// Es wird die Spur selbst abgeschaltet (enabled = false). Dann geht
+// WIRKLICH nichts mehr hinaus - anders als beim blossen Leiserdrehen.
+function anrufStumm() {
+  if (!anrufStream) return;
+  const spuren = anrufStream.getAudioTracks();
+  if (!spuren.length) return;
+  const anJetzt = !spuren[0].enabled;
+  for (const s of spuren) s.enabled = anJetzt;
+  const k = document.getElementById("anruf-stumm");
+  if (k) {
+    k.classList.toggle("anruf-aus", !anJetzt);
+    k.innerHTML = anJetzt ? "&#127908; Stumm" : "&#128263; Stumm AN";
+    k.title = anJetzt ? "Mikrofon ist an - antippen zum Stummschalten"
+      : "Mikrofon ist AUS - er hoert dich nicht";
+  }
+  if (typeof weckerBalken === "function")
+    weckerBalken(anJetzt ? "Mikrofon wieder an." : "Mikrofon aus - er hoert dich nicht.",
+      anJetzt ? "gut" : "warn", "anruf-stumm", 0);
+}
+
+function anrufKamera() {
+  if (!anrufStream) return;
+  const spuren = anrufStream.getVideoTracks();
+  if (!spuren.length) return;
+  const anJetzt = !spuren[0].enabled;
+  for (const s of spuren) s.enabled = anJetzt;
+  const k = document.getElementById("anruf-kamera");
+  if (k) {
+    k.classList.toggle("anruf-aus", !anJetzt);
+    k.innerHTML = anJetzt ? "&#128247; Kamera" : "&#128247; Kamera AUS";
+  }
+}
+
+// ---------- Die laufende Gespraechsdauer ----------
+let _anrufDauerUhr = null, _anrufBegonnen = 0;
+
+function anrufDauerStarten() {
+  anrufDauerStoppen();
+  _anrufBegonnen = Date.now();
+  const zeigen = () => {
+    const e = document.getElementById("anruf-dauer");
+    if (!e) { anrufDauerStoppen(); return; }
+    const s = Math.floor((Date.now() - _anrufBegonnen) / 1000);
+    e.textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" +
+      String(s % 60).padStart(2, "0");
+  };
+  zeigen();
+  _anrufDauerUhr = setInterval(zeigen, 1000);
+}
+
+function anrufDauerStoppen() {
+  if (_anrufDauerUhr) { clearInterval(_anrufDauerUhr); _anrufDauerUhr = null; }
 }

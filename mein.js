@@ -590,7 +590,24 @@ async function tuTeilen() {
   zeichneTeilen();
 }
 
-async function tuRolle(gastId, rolle) { await supaTeilen(gastId, rolle); meldungM("Rolle geändert.", "gut"); }
+// Frueher hiess es IMMER "Rolle geaendert" - auch wenn gar nichts
+// gespeichert wurde, und auch dann, wenn der Schluessel fehlte.
+async function tuRolle(gastId, rolle) {
+  const r = await supaTeilen(gastId, rolle);
+  if (r && r.error) {
+    meldungM("Rolle NICHT geändert: " + textSicherM(String(r.error.message).slice(0, 120)), "warn");
+    return;
+  }
+  if (r && r.ohneSchluessel) {
+    meldungM("Rolle geändert. <b>Hinweis:</b> auf diesem Gerät fehlt gerade der Schlüssel, " +
+      "deshalb konnte keiner mitgegeben werden. Ein bereits vergebener Schlüssel bleibt " +
+      "unverändert gültig - drück später einmal Teilen, wenn der rote Kasten oben weg ist.", "warn");
+    zeichneTeilen();
+    return;
+  }
+  meldungM("Rolle geändert.", "gut");
+  zeichneTeilen();
+}
 async function tuTeilenEnde(gastId) { await supaTeilenBeenden(gastId); zeichneTeilen(); meldungM("Teilen beendet.", "gut"); }
 
 // ---------- Lokale Scheine übernehmen ----------
@@ -793,6 +810,29 @@ async function tuScheinOrdner(id, wert) {
 // Warnt, wenn Scheine auf DIESEM Geraet nicht lesbar sind. Solange das so
 // ist, sind alle Geldsummen darunter zu niedrig - das muss man sehen,
 // bevor man ihnen glaubt.
+// Zeigt einen roten Kasten und laesst ALLES andere stehen, wie es war.
+function zeichneLadefehler(grund) {
+  const alt = document.getElementById("ladefehler");
+  if (alt) alt.remove();
+  const ziel = el("scheine_titel");
+  if (!ziel || !ziel.parentNode) return;
+  const d = document.createElement("div");
+  d.id = "ladefehler";
+  d.className = "gesperrtwarn";
+  d.innerHTML = "<b>&#9888; Laden fehlgeschlagen - es wurde NICHTS geändert.</b>" +
+    "<p>Deine Daten liegen unverändert auf dem Server. Nur das Holen hat gerade nicht " +
+    "geklappt, deshalb steht hier noch der alte Stand. <b>Trag jetzt nichts Neues ein</b> - " +
+    "lad die Seite in einem Moment einfach neu.</p>" +
+    '<p class="mini">Grund: ' + textSicherM(String(grund).slice(0, 160)) + "</p>";
+  ziel.parentNode.insertBefore(d, ziel.nextSibling);
+}
+
+// Raeumt den roten Kasten weg, sobald es wieder geht.
+function zeichneLadefehlerWeg() {
+  const alt = document.getElementById("ladefehler");
+  if (alt) alt.remove();
+}
+
 function zeichneGesperrtWarnung(scheine) {
   const alt = document.getElementById("gesperrt_warnung");
   if (alt) alt.remove();
@@ -821,12 +861,19 @@ async function zeichneBereich() {
   el("scheine_titel").textContent = (aktiverBereich.rolle === "ich")
     ? "&#127919; Meine Kombinationen" : "&#127919; Kombinationen von " + aktiverBereich.username;
   const scheine = await supaScheineLaden(aktiverBereich.id);
-  ordnerListe = await supaOrdnerLaden(aktiverBereich.id);
+  const ordnerNeu = await supaOrdnerLaden(aktiverBereich.id);
+  // Ging EINES der Laden schief, wird gar nichts neu gezeichnet. Sonst
+  // stuende ueberall 0,00 Euro - und es saehe genauso aus, als waeren die
+  // Daten weg. Genau dieses Bild gab es hier schon einmal.
+  const ladefehler = scheine._fehler || ordnerNeu._fehler;
+  if (ladefehler) { zeichneLadefehler(ladefehler); return; }
+  ordnerListe = ordnerNeu;
   if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
   personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
   personDatenKarte = await supaPersonDatenLaden(aktiverBereich.id);
   anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
+  zeichneLadefehlerWeg();
   kasseScheine = scheine;
   zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
@@ -902,9 +949,12 @@ function zeichneScheineDb(scheine) {
     if (scheinWartet(s)) zklassen.push("fertigzeile");
     html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
-      "<td class='mini'>" + (d.wetten || []).map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
-      (s.foto ? '<div class="fotoname mini">' + (s.foto_name || "") + "</div>" +
-        '<div><img src="' + s.foto + '" class="minifoto"></div>' : "") +
+      // Spiel, Linie, Fotoname und das Foto selbst kommen von Menschen und
+      // muessen als TEXT eingesetzt werden, nie als HTML (siehe textSicherM).
+      "<td class='mini'>" + (d.wetten || []).map(t =>
+        textSicherM(t.spiel) + " (" + textSicherM(t.linie) + ")").join("<br>") +
+      (s.foto ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
+        '<div><img src="' + textSicherM(s.foto) + '" class="minifoto"></div>' : "") +
       anmerkungenBlock(s) + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
@@ -915,8 +965,11 @@ function zeichneScheineDb(scheine) {
         : s.stand) +
       (scheinWartet(s) ? "<div class='mini fertigmark'>alle Spiele aus - Ergebnis?</div>" : "") + "</td>" +
       "<td class='notizzelle'>" + (schreib
-        ? "<textarea class='notizfeld' onchange=\"tuNotiz('" + s.id + "', this.value)\">" + (s.notiz || "") + "</textarea>"
-        : "<span class='mini'>" + (s.notiz || "") + "</span>") + "</td>" +
+        // Auch die Notiz: sie steht zwar in einem textarea, aber ein
+        // </textarea> darin wuerde das Feld schliessen und den Rest als
+        // HTML in die Seite entlassen.
+        ? "<textarea class='notizfeld' onchange=\"tuNotiz('" + s.id + "', this.value)\">" + textSicherM(s.notiz || "") + "</textarea>"
+        : "<span class='mini'>" + textSicherM(s.notiz || "") + "</span>") + "</td>" +
       "<td>" + (aktiverBereich.rolle !== "ich"
         ? "<button onclick=\"tuKopieren('" + s.id + "')\">zu mir kopieren</button> " : "") +
         (schreib ? "<button onclick=\"tuLoeschen('" + s.id + "')\">weg</button>" : "") + "</td></tr>";

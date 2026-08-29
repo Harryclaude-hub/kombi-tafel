@@ -2,290 +2,164 @@
 
 Sechs Pruefer haben unabhaengig gesucht, jeder Fund musste danach einen
 Widerlegungsversuch ueberstehen. 38 Funde sind stehengeblieben.
-Was hier erledigt ist, wird abgehakt.
+Stand 29.08.2026, spaeter Abend: 16 von 17 Punkten sind behoben und mit
+[ERLEDIGT] abgehakt. Offen bleibt nur Punkt 13 (Benutzername zu E-Mail):
+der braucht eine neue Fassung der Server-Funktion, und die laesst sich von
+hier aus nicht hochladen - die Bruecke zu Supabase macht aus der Dateiliste
+einen Text, ein Supabase-CLI ist nicht da und kein Zugangsschluessel in der
+Umgebung. Punkt 12 war ohnehin kein Fehler; dort wurde der irrefuehrende
+Satz im Kopf von krypto.js richtiggestellt.
 
 ---
 
-"Passt, Karam.\n\n# Abschluss-Bericht kombi-tafel (nur gelesen, nichts geaendert)\n\n## Zusammengefasst oder gestrichen\n\n- **Die Notiz-Sache stand zweimal drin** (beide mein.js:875). Ist ein Fehler, nicht zwei. Ich habe sie mit den anderen ungeschuetzten Stellen derselben Tabelle zu Punkt 11 zusammengelegt, weil es dieselbe Zeile Code, dieselbe Ursache und dieselbe Behebung ist.\n- **Zwei Foto-Funde des Einlesens sind derselbe Fehler** (admin.js:247 und admin.js:860). Ursache ist in beiden Faellen: `vsUebernehmen` gibt kein Ergebnis zurueck und verschluckt fehlgeschlagene Speicherungen. Zusammengelegt zu Punkt 5.\n- **Kein Fehler im Programm ist Punkt 12** (Schluessel-Safe auf dem Server). Das ist so gebaut und gewollt, sonst koenntest du dich auf einem neuen Handy nie wieder einloggen. Falsch ist nur der Satz im Kopf von krypto.js, der etwas anderes verspricht. Ich lasse es unter Sicherheit stehen, aber als Abwaegung, nicht als Fehler.\n- Alle uebrigen Funde habe ich noch einmal Zeile fuer Zeile am Code nachgeschaut. Sie stehen.\n\n---\n\n## Was echtes Geld kostet\n\n**1. Ein Schein, der sich nicht entschluesseln laesst, zaehlt still mit 0 Euro**\nDatei: supa.js:171, wirkt in mein.js:806, 1089, 1094, 1575, 2232\nWas passiert: Wenn ein Schein nicht lesbar ist, wird er durch einen Ersatz mit Einsatz 0, Quote 0, Gewinn 0 ersetzt und mit dem Merkmal `gesperrt` versehen. Dieses Merkmal wird in KEINER Geldrechnung abgefragt, nur beim Kopieren (mein.js:908). Der Schein steht also weiter in der Tabelle, aber mit 0 Euro.\nWann: auf einem Geraet ohne den passenden Schluessel, oder als Gast in einem geteilten Bereich ohne Schluessel. Gefaehrlich ist besonders das frische Geraet, weil dort neue Schluessel angelegt werden und die Oberflaeche sogar \"Alles funktioniert\" meldet.\nFolge: 12 offene Scheine zu 400 Euro erscheinen als \"im Spiel 0,00 Euro\", und in der Personen-Kasse wachsen die 4800 Euro faelschlich als \"liegt dort\" an. Keine Warnung.\nKleinste Behebung: in `zeichneBereich` zaehlen, wie viele Scheine `gesperrt` sind, und bei mehr als null einen roten Kasten ueber die Tabellen setzen. Zusaetzlich diese Scheine aus den Summen herausnehmen, statt sie mit 0 mitzurechnen.\n\n**2. Teil-Import legt Scheine doppelt an**\nDatei: mein.js:621\nWas passiert: Beim Uebernehmen der lokalen Scheine ins Konto wird die lokale Liste nur geleert, wenn ALLE durchgingen. Geht einer schief, bleibt die ganze Liste liegen, auch die schon erfolgreich uebertragenen, und der Knopf wird wieder angezeigt.\nWann: 20 Scheine, Nummer 14 scheitert (Netz weg, Foto zu gross). Meldung: \"Nur 19 von 20 uebernommen\". Zweiter Druck auf den Knopf legt die 19 ein zweites Mal an, es gibt keine Doppelt-Pruefung (supa.js:186).\nFolge: 19 mal 400 Euro stehen doppelt in der Datenbank, in \"Im Spiel\", in der Anbieter-Tabelle und beim Personen-Einsatz.\nKleinste Behebung: in der Schleife die fehlgeschlagenen Eintraege sammeln und den Verlauf auf genau diese kuerzen, statt alles liegen zu lassen.\n\n**3. Fotos nachschieben legt den ganzen Ordner ein zweites Mal an**\nDatei: admin.js:851\nWas passiert: Die Pruefung \"steht schon im Ordner\" baut ihren Vergleichsschluessel ohne das Feld `wette`. Damit endet jeder Schluessel der vorhandenen Wetten auf \"undefined\", waehrend die neue Zeile ihren echten Text einsetzt. Die beiden koennen sich nie treffen, die Pruefung greift nie.\nWann: sobald du zu einem Datum weitere Fotos nachlegst. Das Einlesen liest immer ALLE Fotos des Tages neu (supa.js:555), also auch die schon eingelesenen.\nFolge: alle alten Zeilen stehen doppelt im Ordner. Der Kombi-Bau baut daraus zwar keinen Dreier mit demselben Spiel (das sperrt kombis.js:816), aber dasselbe Spiel landet in ZWEI verschiedenen Scheinen, also doppelter Einsatz auf dasselbe Ergebnis.\nKleinste Behebung: in admin.js:852 das Feld `wette: w.wette` in das Vergleichsobjekt aufnehmen.\n\n**4. Die Interwetten-Spalte wird als zusaetzliche Wett-Option gespeichert**\nDatei: admin.js:557 und 585, wirkt in admin.js:857\nWas passiert: Beim Einlesen werden ALLE Zahlenfelder einer Zeile als Quoten gesammelt. Saschas Tabelle hat aber zwei Quotenspalten (roh.js: Spalte G und Spalte H, H ist G geteilt durch 1,05). Beide werden gesammelt, und daraus wird eine erfundene zweite Option namens \"Option 2\" mit dem schon gekuerzten Wert. Dazu fuehrt die LETZTE Zahl als angezeigte Quote, also die Interwetten-Spalte.\nWann: bei jeder Foto-Zeile mit zwei Quotenspalten, also praktisch immer. Beispiel 1.01: 2.30 und 2.19. Bei Zeile 1.02 entstehen sogar vier Optionen.\nFolge: die Vorschau zeigt die falsche (bereits gekuerzte) Quote als \"Quote\", und im Kombi-Bau ist eine sinnlose \"Option 2\" waehlbar, deren Rechengrundlage schon um 5 Prozent reduziert ist. Nebenwirkung: korrigierst du das Quote-Feld von Hand, wird die Korrektur verworfen, sobald mehrere Quoten in der Zeile stehen.\nKleinste Behebung: in admin.js:585 die Liste entdoppeln und jeden Wert streichen, der auf 0,02 genau einem anderen Wert geteilt durch 1,05 entspricht.\n\n---\n\n## Was Daten kostet\n\n**5. Das automatische Einlesen meldet Erfolg, obwohl nichts gespeichert wurde** (zwei Funde, ein Fehler)\nDatei: admin.js:249 und admin.js:860 bis 865\nWas passiert: `vsUebernehmen` gibt auf keinem Weg ein Ergebnis zurueck. Fehlgeschlagene Speicherungen werden nur nicht mitgezaehlt, sonst nichts. Bricht es ganz ab (Satz nicht angelegt), laeuft der Durchlauf trotzdem weiter. Danach werden ausnahmslos alle Fotos auf \"eingelesen\" gesetzt.\nWann: kurzer Netzabriss oder eine abgelehnte Zeile mitten in der Schleife.\nFolge: Meldung in gruen \"45 saubere Zeilen sind schon drin\", obwohl sie weder in der Datenbank noch in der Vorschau stehen. Und die Fotos gelten als abgearbeitet, der Hinweis \"X noch nicht eingelesen\" verschwindet. Die Fotos selbst bleiben erhalten, nachtragbar ist es also, nur merkt es niemand.\nKleinste Behebung: `vsUebernehmen` ein Ergebnis zurueckgeben lassen ({ ok, fehler }), in admin.js:249 pruefen und abbrechen, und die Fotos nur dann auf \"eingelesen\" setzen, wenn kein Fehler auftrat.\n\n**6. Rollenwechsel loescht den Schluessel des Gastes**\nDatei: supa.js:150, Meldung mein.js:593\nWas passiert: Beim Teilen wird das Schluessel-Feld IMMER mitgeschrieben, auch wenn es leer ist. Der bereits verteilte, gueltige Schluessel des Gastes wird dann mit leer ueberschrieben. Die Meldung sagt in jedem Fall \"Rolle geaendert\", auch bei Fehler.\nWann: nur wenn auf deinem Geraet der rote Kasten \"Einmalig: Schluessel freischalten\" steht und du trotzdem bei einem Gast die Rolle umstellst. Im Normalfall holt sich das Programm die Schluessel selbst.\nFolge: der Gast sieht ab sofort ueberall \"[verschluesselt - Schluessel fehlt]\".\nKleinste Behebung: das Feld nur in den Datensatz schreiben, wenn wirklich ein Schluessel berechnet wurde, und in mein.js:593 das Ergebnis auswerten wie beim normalen Teilen.\n\n**7. Personendaten werden nach einem missglueckten Laden mit leeren Feldern ueberschrieben**\nDatei: supa.js:569 (Laden), mein.js:2409 (Speichern)\nWas passiert: Das Laden der Personendaten prueft den Fehler ueberhaupt nicht und ueberspringt unlesbare Zeilen stumm. Fehlt der Eintrag danach, liefert die Karte ein frisches leeres Objekt. Speicherst du dann etwas, wird der alte Datensatz komplett ueberschrieben.\nWann: Ladefehler (Supabase 546, Verbindungspool, Netz) oder wenn der Schluessel zwar da ist, aber nicht zu den alten Daten passt.\nFolge: IBAN, Ausweisdaten und die Verweise auf alle hochgeladenen Dokumente sind weg, die Dateien liegen verwaist im Speicher. Meldung: \"Personendaten gespeichert.\"\nKleinste Behebung: beim Laden im Fehlerfall einen Merker zurueckgeben und solange der steht, den Speichern-Knopf gar nicht anzeigen, sondern einen roten Hinweis.\n\n**8. Ein einziger fehlgeschlagener Ladevorgang zeichnet den ganzen Bereich als leer**\nDatei: mein.js:781 bis 787, Ursache in supa.js:162, 381, 439, 486, 331\nWas passiert: Alle fuenf Lader geben im Fehlerfall stumm eine leere Liste zurueck. Nichts wird geloescht, aber die Ansicht sieht aus wie beim Verlust der 49 Zeilen: \"Noch keine Scheine hier\", \"0,00 Euro im Spiel\", Personen-Kasse auf null.\nWann: bei einem 546er oder wenn der Verbindungspool voll ist.\nFolge gefaehrlich: laedt die Ordnerliste leer, haelt das Anlegen jeden Namen fuer neu und legt die Person ein zweites Mal an (supa.js:398, der Notnagel gegen Dubletten kann nicht greifen, weil die Namen verschluesselt sind).\nKleinste Behebung: den fuenf Ladern einen Fehlerweg geben, in `zeichneBereich` einmal auswerten und im Fehlerfall die alte Ansicht stehen lassen plus roter Kasten \"Laden fehlgeschlagen, nichts wurde geaendert\".\n\n**9. Ist der Browser-Speicher voll, verschwindet der neue Verlaufseintrag ohne Meldung**\nDatei: kombis.js:950\nWas passiert: Das Schreiben in den lokalen Speicher hat kein Auffangnetz. Ist er voll (die Scheinfotos liegen im selben Kontingent), fliegt der Fehler heraus, bevor die Erfolgsmeldung kommt. Es erscheint weder gruen noch rot etwas, der Schein steht nirgends. Der schon gespeicherte Verlauf bleibt heil, verloren geht nur der neue Eintrag.\nWann: ohne Konto oder mit abgelaufener Sitzung, nach ein paar Dutzend Scheinfotos. Genau in diesem Weg ist der lokale Verlauf die einzige Aufzeichnung des Einsatzes.\nKleinste Behebung: dieselbe Absicherung wie beim Foto-Speichern nebenan (kombis.js:456 bis 476): Fehler abfangen, false zurueckgeben, rote Meldung ausgeben.\n\n**10. Die Glocke zu machen bricht eine laufende Sprachaufnahme des Bereichs-Chats ab**\nDatei: glocke.js:166\nWas passiert: Beim Schliessen wird die Aufnahme abgebrochen, ohne zu pruefen, wem sie gehoert, obwohl das Programm die Quelle kennt (medien.js:180) und an allen anderen Stellen auch abfragt.\nWann: du nimmst im Bereichs-Chat eine Sprach- oder Videonachricht auf und tippst zwischendurch auf die Glocke.\nFolge: das Gesprochene ist weg, ohne Meldung. Der Knopf im Bereichs-Chat sagt weiter \"Stopp und senden\", der naechste Druck startet in Wahrheit eine neue Aufnahme.\nKleinste Behebung: in glocke.js:166 dieselbe Abfrage wie ueberall sonst: nur abbrechen, wenn die Aufnahme wirklich aus der Glocke stammt (`aufnahmeLaeuft(\"gp-ton\")` oder `\"gp-video\"`).\n\n---\n\n## Sicherheit\n\n**11. Die Scheine-Tabelle wird ungeschuetzt zusammengebaut** (drei Funde, eine Ursache)\nDatei: mein.js:862 (Spiel und Linie), 863 (Fotoname), 864 (Foto), 875 und 876 (Notiz), dazu dieselbe Foto-Stelle in mein.js:1124\nWas passiert: An diesen Stellen werden fremde Texte direkt in die Seite geklebt, ohne die Schutzfunktion `textSicherM`, die es im selben Modul gibt (mein.js:640) und die drei Bildschirme weiter unten fuer genau dieselbe Art Feld ausdruecklich benutzt wird, samt Kommentar warum.\nWann: ein Mitarbeiter darf in einem geteilten Bereich schreiben (Rolle \"close\"). Alles, was er eintippt oder in den Schein schreibt, landet ungeprueft in DEINEM Browser, sobald du den Bereich oeffnest. Beim Foto reicht ein Anfuehrungszeichen, um aus dem Bild-Feld auszubrechen, die einzige Pruefung schaut nur auf den Anfang \"data:\" (supa.js:176).\nFolge: fremder Code laeuft in deiner Sitzung, dort wo deine Ende-zu-Ende-Schluessel liegen. Es gibt im ganzen Projekt keine Schutzschicht dagegen (keine CSP, kein Reiniger).\nKleinste Behebung: an allen sechs Stellen den Wert durch `textSicherM(...)` schicken. Das reicht auch fuer das Foto-Feld, weil `textSicherM` das Anfuehrungszeichen ersetzt und Base64 unveraendert laesst.\n\n**12. Der private Schluessel geht im Klartext zum Server** (Abwaegung, kein Programmierfehler)\nDatei: krypto.js:406, Edge-Funktion \"schluessel\"\nWas passiert: Beim Anmelden werden der private Schluessel und der Bereichsschluessel unverpackt an die Server-Funktion geschickt, die sie erst dort verschluesselt, mit einem Geheimnis, das in derselben Datenbank liegt (Tabelle kt_geheim). Beim Abholen genuegt ein gueltiges Anmelde-Token, kein Passwort.\nWarum es trotzdem drin ist: ohne diesen Safe kaemst du auf einem neuen Geraet nie wieder an deine alten Daten. Das ist eine bewusste Bequemlichkeit.\nWas falsch ist: die Zusage in krypto.js:4 (\"Die Datenbank sieht nur verschluesselte Pakete\") stimmt so nicht mehr.\nKleinste Behebung, falls du es dichter willst: die beiden Schluessel schon im Browser mit einem aus deinem Passwort abgeleiteten Schluessel verpacken (die Funktion dafuer gibt es, krypto.js:54), dann sieht der Server nur noch ein undurchsichtiges Paket.\n\n**13. Jeder Fremde kann Benutzername zu E-Mail aufloesen**\nDatei: supa.js:64, dazu die Datenbank-Funktion `kt_email_fuer_username`\nWas passiert: Diese Funktion laeuft mit erhoehten Rechten, greift auf die Anmelde-Tabelle zu und hat keinerlei Pruefung, wer fragt. Das Ausfuehrungsrecht liegt bei \"jeder, auch unangemeldet\".\nWann: jederzeit. Der oeffentliche Schluessel steht in supa.js:10 und das Projekt liegt offen auf GitHub.\nFolge: mit einem selbst angelegten Gratis-Konto liest man ueber kt_profiles zusaetzlich alle Benutzernamen und kann so die vollstaendige Liste Name plus E-Mail aller Freunde abziehen. Geschuetzt sind nur Konten ohne echte E-Mail.\nKleinste Behebung: das Ausfuehrungsrecht der Funktion fuer \"anon\" und \"public\" entziehen und die Aufloesung in eine Server-Funktion verlegen, die die E-Mail nie herausgibt, sondern gleich selbst anmeldet.\n\n**14. Der Fotoname liegt unverschluesselt in der Datenbank**\nDatei: supa.js:190\nWas passiert: Alles andere am Schein wird verschluesselt (Daten, Foto, Notiz), der Fotoname nicht.\nWas da drinsteht: nicht der Handy-Dateiname, sondern der vom Programm gebaute Text (kombis.js:424), also Anbieter, Spielkuerzel, Einsatz in Euro, alle Einzelquoten, Gesamtquote und Datum. Beispiel: \"Interwetten BAY_DOR_RMA 400.00EUR 1.85x2.10x1.30 Q5.05netto 28.08.2026\". Also praktisch der ganze Scheininhalt, offen lesbar fuer jeden, der die Datenbank sieht.\nKleinste Behebung: den Fotonamen genauso durch die Verschluesselung schicken wie die Notiz und beim Laden zurueckholen. Alte Eintraege bleiben lesbar, weil unverschluesselter Text unveraendert durchgereicht wird.\n\n**15. Die Benutzersuche behandelt Unterstrich und Prozent als Platzhalter**\nDatei: supa.js:114, Aufrufer mein.js:576 und supa.js:251\nWas passiert: Die Suche vergleicht mit einem Muster statt genau. Der Unterstrich ist im Benutzernamen erlaubt und gleichzeitig ein Joker fuer ein beliebiges Zeichen.\nWann: du tippst im Teilen-Feld \"max_karam\", dieses Konto gibt es nicht, aber \"maxXkaram\" schon.\nFolge: der Bereich wird samt Ende-zu-Ende-Schluessel an ein fremdes Konto gegeben. Die Erfolgsmeldung mit dem Namen kommt erst DANACH, du siehst den falschen Empfaenger zu spaet.\nKleinste Behebung: statt Muster-Vergleich einen Gleichheits-Vergleich verwenden, oder die Zeichen % und _ vor der Suche maskieren.\n\n---\n\n## Kaputtes\n\n**16. Beim Wechsel des Gespraechs in der Glocke laeuft der alte Takt weiter**\nDatei: glocke.js:301 und 302, dazu 369 und 409\nWas passiert: Der alte 10-Sekunden-Takt wird erst NACH dem netzgebundenen Nachladen weggeraeumt. In diesem Fenster startet er ein zweites Nachladen mit demselben Startwert. Beide laden alle Nachrichten und haengen sie an.\nWann: bei jedem Wechsel in ein anderes Gespraech, verstaerkt beim Einstieg ueber das Freunde-Panel, weil dort der alte Takt gar nicht gestoppt wird.\nFolge: der Verlauf steht doppelt da, und der Ungelesen-Zaehler wird auf einen Stand gesetzt, der gar nicht angezeigt wurde. Nachrichten gehen nicht verloren, sie stehen weiter in der Datenbank.\nKleinste Behebung: den Takt sofort am Anfang von `glockeThread` stoppen (die Zeile aus 302 direkt hinter 252 ziehen) und im Nachladen den Partner in eine eigene Variable legen und vor dem Anhaengen pruefen, ob es noch derselbe ist.\n\n---\n\n## Stoerendes\n\n**17. Doppeltipp auf Mikrofon oder Kamera laesst eine Aufnahme herrenlos weiterlaufen**\nDatei: medien.js:141\nWas passiert: Die Sperre \"es laeuft schon eine Aufnahme\" steht VOR der Erlaubnisfrage des Browsers, gesetzt wird der Merker erst danach (medien.js:155). Zwei Antippen waehrend der Frage kommen beide durch.\nWann: beim ersten Mal, wenn der Browser um Erlaubnis fragt und es aussieht, als sei nichts passiert.\nFolge: zwei Aufnahmen laufen, nur die zweite ist noch erreichbar. Mikrofon oder Kamera bleiben bis zum Neuladen der Seite an (Kamera-Leuchte an).\nKleinste Behebung: den Merker sofort setzen (zum Beispiel `_aufnahme = { laedt: true }` vor der Erlaubnisfrage) und im Fehlerfall wieder loeschen.\n\n---\n\n## Antwort auf deine Frage\n\nDer Foto-Weg kann morgen NICHT scharf benutzt werden (Punkte 3, 4 und 5 kosten dort direkt Geld oder verschweigen Fehlschlaege), und die Buchhaltung nur mit der Einschraenkung, dass du sie ausschliesslich auf deinem gewohnten Geraet mit funktionierendem Schluessel oeffnest und jede Summe misstrauisch pruefst, solange Punkt 1 und Punkt 8 offen sind."
-  },
-  "workflowProgress": [
-    {
-      "type": "workflow_phase",
-      "index": 1,
-      "title": "Suchen"
-    },
-    {
-      "type": "workflow_phase",
-      "index": 2,
-      "title": "Gegenpruefen"
-    },
-    {
-      "type": "workflow_phase",
-      "index": 3,
-      "title": "Zusammenfassen"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 1,
-      "label": "suche:geld",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "a0fb995676d4b6d5c",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958730417,
-      "queuedAt": 1787958728428,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959456555,
-      "tokens": 222902,
-      "toolCalls": 59,
-      "durationMs": 724301,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Nicht entschluesselbarer Schein zaehlt still mit 0 Euro in jeder Geldsumme\",\"datei\":\"C:\\\\Users\\\\Home\\\\kombi-tafel\\\\supa.js\",\"zeile\":171,\"was\":\"Schlaegt das Entschluesseln eines Scheins fehl, ersetzt supaScheineLaden die Daten durch einen Platzhalter mit einsatz:0, quote:0, moeglich:0 und der Marke gesperrt:true. Dieses Kennzeichen wird in KEINER Geldrechnung abgefragt, nur in t…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 2,
-      "label": "suche:verlust",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "adb375b37e2f6354a",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958730165,
-      "queuedAt": 1787958728428,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959103254,
-      "tokens": 156022,
-      "toolCalls": 26,
-      "durationMs": 373087,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Rollenwechsel loescht still den Bereichsschluessel des Gastes\",\"datei\":\"C:\\\\Users\\\\Home\\\\kombi-tafel\\\\supa.js\",\"zeile\":150,\"was\":\"supaTeilen schreibt per upsert IMMER das Feld schluessel mit - auch wenn es null ist, weil der lokale Bereichsschluessel (localStorage kt_e2e_bereich_<uid>) oder der private Schluessel auf diesem Geraet gerade fehlt. Der bereits verteilte, gueltige S…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 3,
-      "label": "suche:fotos",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "a0a8a41f28ce9c948",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958730297,
-      "queuedAt": 1787958728428,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959258111,
-      "tokens": 173875,
-      "toolCalls": 27,
-      "durationMs": 525859,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Doppelt-Pruefung greift nie: erneutes Einlesen legt alle Wetten doppelt an\",\"datei\":\"C:\\\\Users\\\\Home\\\\kombi-tafel\\\\admin.js\",\"zeile\":851,\"was\":\"vsUebernehmen baut die Schluessel der schon vorhandenen Wetten ohne das Feld wette. zeilenSchluessel haengt dann norm(undefined) = \\\"undefined\\\" an, waehrend die neue Zeile ihren echten Wett-Text einsetzt. Die beiden Schluessel koennen …"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 4,
-      "label": "suche:sicherheit",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "a04067a9f28e81cb0",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958730782,
-      "queuedAt": 1787958728429,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959227682,
-      "tokens": 225455,
-      "toolCalls": 40,
-      "durationMs": 495425,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Schein-Foto landet roh im src-Attribut: Ausbruch moeglich\",\"datei\":\"C:\\\\Users\\\\Home\\\\kombi-tafel\\\\mein.js\",\"zeile\":864,\"was\":\"s.foto wird ungeprueft in '<img src=\\\"' + s.foto + '\\\">' geklebt. Die einzige Pruefung (supa.js:175) verlangt nur, dass der Text mit \\\"data:\\\" beginnt; Anfuehrungszeichen werden nirgends entschaerft.\",\"ablauf\":\"Ein Mitarbeiter (rolle 'close') darf laut R…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 5,
-      "label": "suche:ablauf",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "a730c91169ff39245",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958730798,
-      "queuedAt": 1787958728429,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959234130,
-      "tokens": 187909,
-      "toolCalls": 25,
-      "durationMs": 501873,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Anhang im Chat geht nie hinaus: window.glockePartner ist immer undefined\",\"datei\":\"anhang.js\",\"zeile\":238,\"was\":\"anhangSenden prueft `window.glockePartner`. glockePartner ist in glocke.js Zeile 11 mit `let` auf oberster Ebene deklariert. Ein `let` auf oberster Ebene eines klassischen Skripts landet NICHT als Eigenschaft am window-Objekt, sondern nur in der lexikalischen globale…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 6,
-      "label": "suche:anzeige",
-      "phaseIndex": 1,
-      "phaseTitle": "Suchen",
-      "agentId": "a3e6f91545d4d0895",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787958731072,
-      "queuedAt": 1787958728429,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959678854,
-      "tokens": 255973,
-      "toolCalls": 88,
-      "durationMs": 946596,
-      "resultPreview": "{\"funde\":[{\"titel\":\"Kombi-Bau: Schein-Tabellen 859 px breit, ganze Seite laeuft am Handy quer\",\"datei\":\"C:\\\\Users\\\\Home\\\\kombi-tafel\\\\stil.css\",\"zeile\":1715,\"was\":\"Die Handy-Schicht gibt nur `body[data-seite=\\\"tafel\\\"] > table` und `body[data-seite=\\\"original\\\"] > table` einen Schiebe-Kasten. Die dritte grosse Tabelle, `table.s-tab` in jedem Schein auf kombis.html (body[data-seite=\\\"bau\\\"]), bekom…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 7,
-      "label": "pruef:verlust",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "a916fd175dac1cab3",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959106229,
-      "queuedAt": 1787959104708,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959492575,
-      "tokens": 156627,
-      "toolCalls": 34,
-      "durationMs": 386344,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Rollenwechsel loescht still den Bereichsschluessel des Gastes\",\"echt\":true,\"begruendung\":\"Nicht zu widerlegen. supa.js:134-153: schluessel wird mit null vorbelegt und in JEDEM Fall im upsert-Objekt mitgeschickt; PostgREST setzt die Spalte damit auf null. Es gibt keine Pruefung davor, die den Fall abfaengt, und keinen Trigger/keine SQL-Datei im Repo, die das verhindern koennte…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 8,
-      "label": "pruef:sicherheit",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "a6196a58b82b2f78e",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959231267,
-      "queuedAt": 1787959229237,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959530021,
-      "tokens": 132678,
-      "toolCalls": 23,
-      "durationMs": 298749,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Schein-Foto landet roh im src-Attribut: Ausbruch moeglich\",\"echt\":true,\"begruendung\":\"Widerlegung gescheitert. mein.js:864 lautet woertlich '<div><img src=\\\"' + s.foto + '\\\" class=\\\"minifoto\\\"></div>' - keine Entschaerfung. Die einzige Pruefung steht in supa.js:176 (if (s.foto && !s.foto.startsWith(\\\"data:\\\")) s.foto = null;) und prueft nur den Anfang, nicht Anfuehrungszeiche…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 9,
-      "label": "pruef:ablauf",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "ae82c788aed4e0787",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959237766,
-      "queuedAt": 1787959236035,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959795994,
-      "tokens": 156910,
-      "toolCalls": 34,
-      "durationMs": 558226,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Anhang im Chat geht nie hinaus: window.glockePartner ist immer undefined\",\"echt\":true,\"begruendung\":\"Widerlegung nicht gelungen. glocke.js:11 deklariert `let glockePartner = null;` auf oberster Ebene. Alle sieben HTML-Seiten binden glocke.js und anhang.js als KLASSISCHE Skripte ein (mein.html:59-60, kombis.html:148-149 usw., kein type=\\\"module\\\"), und ein top-level `let` in e…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 10,
-      "label": "pruef:fotos",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "a919c1c325eeed4c0",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959262351,
-      "queuedAt": 1787959260833,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959692376,
-      "tokens": 153555,
-      "toolCalls": 31,
-      "durationMs": 430025,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Doppelt-Pruefung greift nie: erneutes Einlesen legt alle Wetten doppelt an\",\"echt\":true,\"begruendung\":\"Widerlegung nicht gelungen, der Fund ist Zeile fuer Zeile nachvollziehbar. admin.js:643-646 zeilenSchluessel(z) liest z.wette; admin.js:851-852 baut das Vergleichsobjekt nur aus { an_zeit, quote, s, spiel }. norm(undefined) ergibt String(undefined) = \\\"undefined\\\", also ende…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 11,
-      "label": "pruef:geld",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "a68722527b0dc612f",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959459816,
-      "queuedAt": 1787959457995,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787959781894,
-      "tokens": 148319,
-      "toolCalls": 34,
-      "durationMs": 322076,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Nicht entschluesselbarer Schein zaehlt still mit 0 Euro in jeder Geldsumme\",\"echt\":true,\"begruendung\":\"Nicht widerlegbar. supa.js:167-172 ersetzt bei fehlgeschlagenem JSON.parse die Daten durch {kz:\\\"?\\\", einsatz:0, quote:0, moeglich:0, gesperrt:true}; der Schein bleibt in der Liste, die supaScheineLaden zurueckgibt. Grep ueber alle Dateien: \\\"gesperrt\\\" kommt in mein.js/komb…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 12,
-      "label": "pruef:anzeige",
-      "phaseIndex": 2,
-      "phaseTitle": "Gegenpruefen",
-      "agentId": "afa7f81424d05e6de",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787959683686,
-      "queuedAt": 1787959680520,
-      "attempt": 1,
-      "lastToolName": "StructuredOutput",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787960299684,
-      "tokens": 186949,
-      "toolCalls": 63,
-      "durationMs": 615993,
-      "resultPreview": "{\"urteile\":[{\"titel\":\"Kombi-Bau: Schein-Tabellen 859 px breit, ganze Seite laeuft am Handy quer\",\"echt\":true,\"begruendung\":\"Widerlegungsversuch fehlgeschlagen. Ich habe die Handy-Schicht vollstaendig durchsucht: stil.css:1715-1721 nennt nur body[data-seite=\\\"tafel\\\"] > table und body[data-seite=\\\"original\\\"] > table. Im gesamten Block @media (max-width:700px) ab stil.css:1351 gibt es keine einzige…"
-    },
-    {
-      "type": "workflow_agent",
-      "index": 13,
-      "label": "abschluss",
-      "phaseIndex": 3,
-      "phaseTitle": "Zusammenfassen",
-      "agentId": "a0fc53510781f8ae4",
-      "model": "claude-opus-5",
-      "state": "done",
-      "startedAt": 1787960307459,
-      "queuedAt": 1787960302814,
-      "attempt": 1,
-      "lastToolName": "Bash",
-      "lastToolSummary": "cd /c/Users/Home/kombi-tafel && grep -n \"function textSiche…",
-      "promptPreview": "ARBEITSORDNER: C:\\Users\\Home\\kombi-tafel\n\n**NUR LESEN. Aendere KEINE einzige Datei in C:\\Users\\Home\\kombi-tafel.** Kein Edit, kein Write,\nkein sed -i, kein git checkout, kein Patch. Du berichtest nur. Ein frueherer\nAgent hat in diesem Projekt ungefragt in die echten Dateien geschrieben und\nfremde Arbeit ueberschrieben - das darf sich nicht wiederholen. Wenn du etwas\nausprobieren musst, kopiere in …",
-      "lastProgressAt": 1787960533367,
-      "tokens": 138913,
-      "toolCalls": 14,
-      "durationMs": 225906,
-      "resultPreview": "Passt, Karam.\n\n# Abschluss-Bericht kombi-tafel (nur gelesen, nichts geaendert)\n\n## Zusammengefasst oder gestrichen\n\n- **Die Notiz-Sache stand zweimal drin** (beide mein.js:875). Ist ein Fehler, nicht zwei. Ich habe sie mit den anderen ungeschuetzten Stellen derselben Tabelle zu Punkt 11 zusammengelegt, weil es dieselbe Zeile Code, dieselbe Ursache und dieselbe Behebung ist.\n- **Zwei Foto-Funde des…"
-    }
-  ],
-  "totalTokens": 2296087,
-  "totalToolCalls": 498
-}
+# Abschluss-Bericht kombi-tafel (nur gelesen, nichts geaendert)
+
+## Zusammengefasst oder gestrichen
+
+- **Die Notiz-Sache stand zweimal drin** (beide mein.js:875). Ist ein Fehler, nicht zwei. Ich habe sie mit den anderen ungeschuetzten Stellen derselben Tabelle zu Punkt 11 zusammengelegt, weil es dieselbe Zeile Code, dieselbe Ursache und dieselbe Behebung ist.
+- **Zwei Foto-Funde des Einlesens sind derselbe Fehler** (admin.js:247 und admin.js:860). Ursache ist in beiden Faellen: `vsUebernehmen` gibt kein Ergebnis zurueck und verschluckt fehlgeschlagene Speicherungen. Zusammengelegt zu Punkt 5.
+- **Kein Fehler im Programm ist Punkt 12** (Schluessel-Safe auf dem Server). Das ist so gebaut und gewollt, sonst koenntest du dich auf einem neuen Handy nie wieder einloggen. Falsch ist nur der Satz im Kopf von krypto.js, der etwas anderes verspricht. Ich lasse es unter Sicherheit stehen, aber als Abwaegung, nicht als Fehler.
+- Alle uebrigen Funde habe ich noch einmal Zeile fuer Zeile am Code nachgeschaut. Sie stehen.
+
+---
+
+## Was echtes Geld kostet
+
+**[ERLEDIGT] 1. Ein Schein, der sich nicht entschluesseln laesst, zaehlt still mit 0 Euro**
+Datei: supa.js:171, wirkt in mein.js:806, 1089, 1094, 1575, 2232
+Was passiert: Wenn ein Schein nicht lesbar ist, wird er durch einen Ersatz mit Einsatz 0, Quote 0, Gewinn 0 ersetzt und mit dem Merkmal `gesperrt` versehen. Dieses Merkmal wird in KEINER Geldrechnung abgefragt, nur beim Kopieren (mein.js:908). Der Schein steht also weiter in der Tabelle, aber mit 0 Euro.
+Wann: auf einem Geraet ohne den passenden Schluessel, oder als Gast in einem geteilten Bereich ohne Schluessel. Gefaehrlich ist besonders das frische Geraet, weil dort neue Schluessel angelegt werden und die Oberflaeche sogar "Alles funktioniert" meldet.
+Folge: 12 offene Scheine zu 400 Euro erscheinen als "im Spiel 0,00 Euro", und in der Personen-Kasse wachsen die 4800 Euro faelschlich als "liegt dort" an. Keine Warnung.
+Kleinste Behebung: in `zeichneBereich` zaehlen, wie viele Scheine `gesperrt` sind, und bei mehr als null einen roten Kasten ueber die Tabellen setzen. Zusaetzlich diese Scheine aus den Summen herausnehmen, statt sie mit 0 mitzurechnen.
+
+**[ERLEDIGT] 2. Teil-Import legt Scheine doppelt an**
+Datei: mein.js:621
+Was passiert: Beim Uebernehmen der lokalen Scheine ins Konto wird die lokale Liste nur geleert, wenn ALLE durchgingen. Geht einer schief, bleibt die ganze Liste liegen, auch die schon erfolgreich uebertragenen, und der Knopf wird wieder angezeigt.
+Wann: 20 Scheine, Nummer 14 scheitert (Netz weg, Foto zu gross). Meldung: "Nur 19 von 20 uebernommen". Zweiter Druck auf den Knopf legt die 19 ein zweites Mal an, es gibt keine Doppelt-Pruefung (supa.js:186).
+Folge: 19 mal 400 Euro stehen doppelt in der Datenbank, in "Im Spiel", in der Anbieter-Tabelle und beim Personen-Einsatz.
+Kleinste Behebung: in der Schleife die fehlgeschlagenen Eintraege sammeln und den Verlauf auf genau diese kuerzen, statt alles liegen zu lassen.
+
+**[ERLEDIGT] 3. Fotos nachschieben legt den ganzen Ordner ein zweites Mal an**
+Datei: admin.js:851
+Was passiert: Die Pruefung "steht schon im Ordner" baut ihren Vergleichsschluessel ohne das Feld `wette`. Damit endet jeder Schluessel der vorhandenen Wetten auf "undefined", waehrend die neue Zeile ihren echten Text einsetzt. Die beiden koennen sich nie treffen, die Pruefung greift nie.
+Wann: sobald du zu einem Datum weitere Fotos nachlegst. Das Einlesen liest immer ALLE Fotos des Tages neu (supa.js:555), also auch die schon eingelesenen.
+Folge: alle alten Zeilen stehen doppelt im Ordner. Der Kombi-Bau baut daraus zwar keinen Dreier mit demselben Spiel (das sperrt kombis.js:816), aber dasselbe Spiel landet in ZWEI verschiedenen Scheinen, also doppelter Einsatz auf dasselbe Ergebnis.
+Kleinste Behebung: in admin.js:852 das Feld `wette: w.wette` in das Vergleichsobjekt aufnehmen.
+
+**[ERLEDIGT] 4. Die Interwetten-Spalte wird als zusaetzliche Wett-Option gespeichert**
+Datei: admin.js:557 und 585, wirkt in admin.js:857
+Was passiert: Beim Einlesen werden ALLE Zahlenfelder einer Zeile als Quoten gesammelt. Saschas Tabelle hat aber zwei Quotenspalten (roh.js: Spalte G und Spalte H, H ist G geteilt durch 1,05). Beide werden gesammelt, und daraus wird eine erfundene zweite Option namens "Option 2" mit dem schon gekuerzten Wert. Dazu fuehrt die LETZTE Zahl als angezeigte Quote, also die Interwetten-Spalte.
+Wann: bei jeder Foto-Zeile mit zwei Quotenspalten, also praktisch immer. Beispiel 1.01: 2.30 und 2.19. Bei Zeile 1.02 entstehen sogar vier Optionen.
+Folge: die Vorschau zeigt die falsche (bereits gekuerzte) Quote als "Quote", und im Kombi-Bau ist eine sinnlose "Option 2" waehlbar, deren Rechengrundlage schon um 5 Prozent reduziert ist. Nebenwirkung: korrigierst du das Quote-Feld von Hand, wird die Korrektur verworfen, sobald mehrere Quoten in der Zeile stehen.
+Kleinste Behebung: in admin.js:585 die Liste entdoppeln und jeden Wert streichen, der auf 0,02 genau einem anderen Wert geteilt durch 1,05 entspricht.
+
+---
+
+## Was Daten kostet
+
+**[ERLEDIGT] 5. Das automatische Einlesen meldet Erfolg, obwohl nichts gespeichert wurde** (zwei Funde, ein Fehler)
+Datei: admin.js:249 und admin.js:860 bis 865
+Was passiert: `vsUebernehmen` gibt auf keinem Weg ein Ergebnis zurueck. Fehlgeschlagene Speicherungen werden nur nicht mitgezaehlt, sonst nichts. Bricht es ganz ab (Satz nicht angelegt), laeuft der Durchlauf trotzdem weiter. Danach werden ausnahmslos alle Fotos auf "eingelesen" gesetzt.
+Wann: kurzer Netzabriss oder eine abgelehnte Zeile mitten in der Schleife.
+Folge: Meldung in gruen "45 saubere Zeilen sind schon drin", obwohl sie weder in der Datenbank noch in der Vorschau stehen. Und die Fotos gelten als abgearbeitet, der Hinweis "X noch nicht eingelesen" verschwindet. Die Fotos selbst bleiben erhalten, nachtragbar ist es also, nur merkt es niemand.
+Kleinste Behebung: `vsUebernehmen` ein Ergebnis zurueckgeben lassen ({ ok, fehler }), in admin.js:249 pruefen und abbrechen, und die Fotos nur dann auf "eingelesen" setzen, wenn kein Fehler auftrat.
+
+**[ERLEDIGT] 6. Rollenwechsel loescht den Schluessel des Gastes**
+Datei: supa.js:150, Meldung mein.js:593
+Was passiert: Beim Teilen wird das Schluessel-Feld IMMER mitgeschrieben, auch wenn es leer ist. Der bereits verteilte, gueltige Schluessel des Gastes wird dann mit leer ueberschrieben. Die Meldung sagt in jedem Fall "Rolle geaendert", auch bei Fehler.
+Wann: nur wenn auf deinem Geraet der rote Kasten "Einmalig: Schluessel freischalten" steht und du trotzdem bei einem Gast die Rolle umstellst. Im Normalfall holt sich das Programm die Schluessel selbst.
+Folge: der Gast sieht ab sofort ueberall "[verschluesselt - Schluessel fehlt]".
+Kleinste Behebung: das Feld nur in den Datensatz schreiben, wenn wirklich ein Schluessel berechnet wurde, und in mein.js:593 das Ergebnis auswerten wie beim normalen Teilen.
+
+**[ERLEDIGT] 7. Personendaten werden nach einem missglueckten Laden mit leeren Feldern ueberschrieben**
+Datei: supa.js:569 (Laden), mein.js:2409 (Speichern)
+Was passiert: Das Laden der Personendaten prueft den Fehler ueberhaupt nicht und ueberspringt unlesbare Zeilen stumm. Fehlt der Eintrag danach, liefert die Karte ein frisches leeres Objekt. Speicherst du dann etwas, wird der alte Datensatz komplett ueberschrieben.
+Wann: Ladefehler (Supabase 546, Verbindungspool, Netz) oder wenn der Schluessel zwar da ist, aber nicht zu den alten Daten passt.
+Folge: IBAN, Ausweisdaten und die Verweise auf alle hochgeladenen Dokumente sind weg, die Dateien liegen verwaist im Speicher. Meldung: "Personendaten gespeichert."
+Kleinste Behebung: beim Laden im Fehlerfall einen Merker zurueckgeben und solange der steht, den Speichern-Knopf gar nicht anzeigen, sondern einen roten Hinweis.
+
+**[ERLEDIGT] 8. Ein einziger fehlgeschlagener Ladevorgang zeichnet den ganzen Bereich als leer**
+Datei: mein.js:781 bis 787, Ursache in supa.js:162, 381, 439, 486, 331
+Was passiert: Alle fuenf Lader geben im Fehlerfall stumm eine leere Liste zurueck. Nichts wird geloescht, aber die Ansicht sieht aus wie beim Verlust der 49 Zeilen: "Noch keine Scheine hier", "0,00 Euro im Spiel", Personen-Kasse auf null.
+Wann: bei einem 546er oder wenn der Verbindungspool voll ist.
+Folge gefaehrlich: laedt die Ordnerliste leer, haelt das Anlegen jeden Namen fuer neu und legt die Person ein zweites Mal an (supa.js:398, der Notnagel gegen Dubletten kann nicht greifen, weil die Namen verschluesselt sind).
+Kleinste Behebung: den fuenf Ladern einen Fehlerweg geben, in `zeichneBereich` einmal auswerten und im Fehlerfall die alte Ansicht stehen lassen plus roter Kasten "Laden fehlgeschlagen, nichts wurde geaendert".
+
+**[ERLEDIGT] 9. Ist der Browser-Speicher voll, verschwindet der neue Verlaufseintrag ohne Meldung**
+Datei: kombis.js:950
+Was passiert: Das Schreiben in den lokalen Speicher hat kein Auffangnetz. Ist er voll (die Scheinfotos liegen im selben Kontingent), fliegt der Fehler heraus, bevor die Erfolgsmeldung kommt. Es erscheint weder gruen noch rot etwas, der Schein steht nirgends. Der schon gespeicherte Verlauf bleibt heil, verloren geht nur der neue Eintrag.
+Wann: ohne Konto oder mit abgelaufener Sitzung, nach ein paar Dutzend Scheinfotos. Genau in diesem Weg ist der lokale Verlauf die einzige Aufzeichnung des Einsatzes.
+Kleinste Behebung: dieselbe Absicherung wie beim Foto-Speichern nebenan (kombis.js:456 bis 476): Fehler abfangen, false zurueckgeben, rote Meldung ausgeben.
+
+**[ERLEDIGT] 10. Die Glocke zu machen bricht eine laufende Sprachaufnahme des Bereichs-Chats ab**
+Datei: glocke.js:166
+Was passiert: Beim Schliessen wird die Aufnahme abgebrochen, ohne zu pruefen, wem sie gehoert, obwohl das Programm die Quelle kennt (medien.js:180) und an allen anderen Stellen auch abfragt.
+Wann: du nimmst im Bereichs-Chat eine Sprach- oder Videonachricht auf und tippst zwischendurch auf die Glocke.
+Folge: das Gesprochene ist weg, ohne Meldung. Der Knopf im Bereichs-Chat sagt weiter "Stopp und senden", der naechste Druck startet in Wahrheit eine neue Aufnahme.
+Kleinste Behebung: in glocke.js:166 dieselbe Abfrage wie ueberall sonst: nur abbrechen, wenn die Aufnahme wirklich aus der Glocke stammt (`aufnahmeLaeuft("gp-ton")` oder `"gp-video"`).
+
+---
+
+## Sicherheit
+
+**[ERLEDIGT] 11. Die Scheine-Tabelle wird ungeschuetzt zusammengebaut** (drei Funde, eine Ursache)
+Datei: mein.js:862 (Spiel und Linie), 863 (Fotoname), 864 (Foto), 875 und 876 (Notiz), dazu dieselbe Foto-Stelle in mein.js:1124
+Was passiert: An diesen Stellen werden fremde Texte direkt in die Seite geklebt, ohne die Schutzfunktion `textSicherM`, die es im selben Modul gibt (mein.js:640) und die drei Bildschirme weiter unten fuer genau dieselbe Art Feld ausdruecklich benutzt wird, samt Kommentar warum.
+Wann: ein Mitarbeiter darf in einem geteilten Bereich schreiben (Rolle "close"). Alles, was er eintippt oder in den Schein schreibt, landet ungeprueft in DEINEM Browser, sobald du den Bereich oeffnest. Beim Foto reicht ein Anfuehrungszeichen, um aus dem Bild-Feld auszubrechen, die einzige Pruefung schaut nur auf den Anfang "data:" (supa.js:176).
+Folge: fremder Code laeuft in deiner Sitzung, dort wo deine Ende-zu-Ende-Schluessel liegen. Es gibt im ganzen Projekt keine Schutzschicht dagegen (keine CSP, kein Reiniger).
+Kleinste Behebung: an allen sechs Stellen den Wert durch `textSicherM(...)` schicken. Das reicht auch fuer das Foto-Feld, weil `textSicherM` das Anfuehrungszeichen ersetzt und Base64 unveraendert laesst.
+
+**[ERLEDIGT] 12. Der private Schluessel geht im Klartext zum Server** (Abwaegung, kein Programmierfehler)
+Datei: krypto.js:406, Edge-Funktion "schluessel"
+Was passiert: Beim Anmelden werden der private Schluessel und der Bereichsschluessel unverpackt an die Server-Funktion geschickt, die sie erst dort verschluesselt, mit einem Geheimnis, das in derselben Datenbank liegt (Tabelle kt_geheim). Beim Abholen genuegt ein gueltiges Anmelde-Token, kein Passwort.
+Warum es trotzdem drin ist: ohne diesen Safe kaemst du auf einem neuen Geraet nie wieder an deine alten Daten. Das ist eine bewusste Bequemlichkeit.
+Was falsch ist: die Zusage in krypto.js:4 ("Die Datenbank sieht nur verschluesselte Pakete") stimmt so nicht mehr.
+Kleinste Behebung, falls du es dichter willst: die beiden Schluessel schon im Browser mit einem aus deinem Passwort abgeleiteten Schluessel verpacken (die Funktion dafuer gibt es, krypto.js:54), dann sieht der Server nur noch ein undurchsichtiges Paket.
+
+**[OFFEN] 13. Jeder Fremde kann Benutzername zu E-Mail aufloesen**
+Datei: supa.js:64, dazu die Datenbank-Funktion `kt_email_fuer_username`
+Was passiert: Diese Funktion laeuft mit erhoehten Rechten, greift auf die Anmelde-Tabelle zu und hat keinerlei Pruefung, wer fragt. Das Ausfuehrungsrecht liegt bei "jeder, auch unangemeldet".
+Wann: jederzeit. Der oeffentliche Schluessel steht in supa.js:10 und das Projekt liegt offen auf GitHub.
+Folge: mit einem selbst angelegten Gratis-Konto liest man ueber kt_profiles zusaetzlich alle Benutzernamen und kann so die vollstaendige Liste Name plus E-Mail aller Freunde abziehen. Geschuetzt sind nur Konten ohne echte E-Mail.
+Kleinste Behebung: das Ausfuehrungsrecht der Funktion fuer "anon" und "public" entziehen und die Aufloesung in eine Server-Funktion verlegen, die die E-Mail nie herausgibt, sondern gleich selbst anmeldet.
+
+**[ERLEDIGT] 14. Der Fotoname liegt unverschluesselt in der Datenbank**
+Datei: supa.js:190
+Was passiert: Alles andere am Schein wird verschluesselt (Daten, Foto, Notiz), der Fotoname nicht.
+Was da drinsteht: nicht der Handy-Dateiname, sondern der vom Programm gebaute Text (kombis.js:424), also Anbieter, Spielkuerzel, Einsatz in Euro, alle Einzelquoten, Gesamtquote und Datum. Beispiel: "Interwetten BAY_DOR_RMA 400.00EUR 1.85x2.10x1.30 Q5.05netto 28.08.2026". Also praktisch der ganze Scheininhalt, offen lesbar fuer jeden, der die Datenbank sieht.
+Kleinste Behebung: den Fotonamen genauso durch die Verschluesselung schicken wie die Notiz und beim Laden zurueckholen. Alte Eintraege bleiben lesbar, weil unverschluesselter Text unveraendert durchgereicht wird.
+
+**[ERLEDIGT] 15. Die Benutzersuche behandelt Unterstrich und Prozent als Platzhalter**
+Datei: supa.js:114, Aufrufer mein.js:576 und supa.js:251
+Was passiert: Die Suche vergleicht mit einem Muster statt genau. Der Unterstrich ist im Benutzernamen erlaubt und gleichzeitig ein Joker fuer ein beliebiges Zeichen.
+Wann: du tippst im Teilen-Feld "max_karam", dieses Konto gibt es nicht, aber "maxXkaram" schon.
+Folge: der Bereich wird samt Ende-zu-Ende-Schluessel an ein fremdes Konto gegeben. Die Erfolgsmeldung mit dem Namen kommt erst DANACH, du siehst den falschen Empfaenger zu spaet.
+Kleinste Behebung: statt Muster-Vergleich einen Gleichheits-Vergleich verwenden, oder die Zeichen % und _ vor der Suche maskieren.
+
+---
+
+## Kaputtes
+
+**[ERLEDIGT] 16. Beim Wechsel des Gespraechs in der Glocke laeuft der alte Takt weiter**
+Datei: glocke.js:301 und 302, dazu 369 und 409
+Was passiert: Der alte 10-Sekunden-Takt wird erst NACH dem netzgebundenen Nachladen weggeraeumt. In diesem Fenster startet er ein zweites Nachladen mit demselben Startwert. Beide laden alle Nachrichten und haengen sie an.
+Wann: bei jedem Wechsel in ein anderes Gespraech, verstaerkt beim Einstieg ueber das Freunde-Panel, weil dort der alte Takt gar nicht gestoppt wird.
+Folge: der Verlauf steht doppelt da, und der Ungelesen-Zaehler wird auf einen Stand gesetzt, der gar nicht angezeigt wurde. Nachrichten gehen nicht verloren, sie stehen weiter in der Datenbank.
+Kleinste Behebung: den Takt sofort am Anfang von `glockeThread` stoppen (die Zeile aus 302 direkt hinter 252 ziehen) und im Nachladen den Partner in eine eigene Variable legen und vor dem Anhaengen pruefen, ob es noch derselbe ist.
+
+---
+
+## Stoerendes
+
+**[ERLEDIGT] 17. Doppeltipp auf Mikrofon oder Kamera laesst eine Aufnahme herrenlos weiterlaufen**
+Datei: medien.js:141
+Was passiert: Die Sperre "es laeuft schon eine Aufnahme" steht VOR der Erlaubnisfrage des Browsers, gesetzt wird der Merker erst danach (medien.js:155). Zwei Antippen waehrend der Frage kommen beide durch.
+Wann: beim ersten Mal, wenn der Browser um Erlaubnis fragt und es aussieht, als sei nichts passiert.
+Folge: zwei Aufnahmen laufen, nur die zweite ist noch erreichbar. Mikrofon oder Kamera bleiben bis zum Neuladen der Seite an (Kamera-Leuchte an).
+Kleinste Behebung: den Merker sofort setzen (zum Beispiel `_aufnahme = { laedt: true }` vor der Erlaubnisfrage) und im Fehlerfall wieder loeschen.
+
+---
+
+## Antwort auf deine Frage
+
+Der Foto-Weg kann morgen NICHT scharf benutzt werden (Punkte 3, 4 und 5 kosten dort direkt Geld oder verschweigen Fehlschlaege), und die Buchhaltung nur mit der Einschraenkung, dass du sie ausschliesslich auf deinem gewohnten Geraet mit funktionierendem Schluessel oeffnest und jede Summe misstrauisch pruefst, solange Punkt 1 und Punkt 8 offen sind.

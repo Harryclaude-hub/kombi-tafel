@@ -48,8 +48,17 @@ for (const f of fs.readdirSync(".").filter(x => x.endsWith(".html"))) {
   for (const m of fs.readFileSync(f, "utf8").matchAll(/v=(\d{8}[a-z]*)/g)) vergeben.add(m[1]);
 }
 
+// Die Nummer darf NIE zurueckspringen. Am 29.08. waere sonst nach dem
+// hochgeladenen g wieder ein f gekommen, weil f zwar lokal gesetzt, aber
+// nie festgeschrieben worden war. Unschaedlich, aber verwirrend - und beim
+// naechsten Mal koennte daraus echtes Durcheinander werden.
+let hoechste = "";
+for (const v of vergeben) if (v.slice(0, 8) === heute && v > hoechste) hoechste = v;
 let neu = null;
-for (const b of buchstaben) { if (!vergeben.has(heute + b)) { neu = heute + b; break; } }
+for (const b of buchstaben) {
+  const k = heute + b;
+  if (!vergeben.has(k) && k > hoechste) { neu = k; break; }
+}
 if (!neu) { console.error("Alle 26 Nummern von heute sind vergeben."); process.exit(1); }
 
 if (process.argv.indexOf("--setzen") < 0) {

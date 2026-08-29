@@ -947,7 +947,23 @@ function rechneGewinn(scheinId, gesamt) {
 function liesVerlauf() {
   try { return JSON.parse(localStorage.getItem("verlauf") || "[]"); } catch (e) { return []; }
 }
-function speichereVerlauf(v) { localStorage.setItem("verlauf", JSON.stringify(v)); }
+// Gibt true/false zurueck und sagt es laut, wenn der Speicher voll ist.
+// Der schon gespeicherte Verlauf bleibt dabei heil - verloren waere nur
+// der neue Eintrag, und genau das darf nicht stillschweigend passieren.
+function speichereVerlauf(v) {
+  try {
+    localStorage.setItem("verlauf", JSON.stringify(v));
+    return true;
+  } catch (e) {
+    const text = "Der Speicher dieses Browsers ist voll - der Eintrag konnte NICHT " +
+      "gesichert werden. Meist liegt es an den vielen Scheinfotos. Alte Scheine " +
+      "loeschen oder ein Konto anlegen, dann liegt alles auf dem Server.";
+    if (typeof meldung === "function") meldung(text, "warn");
+    else if (typeof weckerBalken === "function") weckerBalken(text, "warn");
+    else alert(text);
+    return false;
+  }
+}
 
 function baueVerlaufsEintrag(scheinId) {
   const z = liesZustand();

@@ -2469,3 +2469,64 @@ a .profilname { color: inherit; font-family: inherit; font-weight: inherit; }
   .vl-zeile { padding: 10px 8px; }
   .vl-bild { flex-basis: 40px; width: 40px; height: 40px; }
 }
+/* ---------- Die Punkte an der eigenen Nachricht (loeschbar) ---------- */
+/* Bedeutungsfarbe: grau = unterwegs, gruen = gelesen. Sonst nichts. */
+.dm-haken { display: inline-flex; gap: 2px; margin-left: 7px; vertical-align: middle; }
+.dm-punkt {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #8c93a8; display: inline-block;
+}
+.dm-h4 .dm-punkt { background: #1a7a1a; }
+/* Noch nicht hinausgegangen: der eine Punkt ist hohl, damit man den
+   Unterschied auch ohne Farbe sieht. */
+.dm-h1 .dm-punkt { background: transparent; border: 1px solid #8c93a8; width: 6px; height: 6px; }
+.dm-unterwegs { opacity: 0.72; }
+.dm-fehlt { opacity: 1; }
+.dm-fehlt .dm-punkt { border-color: #a00000; }
+@media (max-width: 700px) {
+  .dm-punkt { width: 6px; height: 6px; }
+  .dm-h1 .dm-punkt { width: 7px; height: 7px; }
+}
+/* ---------- Das kleine Anruf-Fenster (loeschbar) ---------- */
+#anrufpanel {
+  bottom: 20px; right: 20px; width: 264px; max-width: calc(100vw - 24px);
+  background: #16233d; color: #fff; border: 0; border-radius: 14px;
+  padding: 0 12px 12px 12px;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.45);
+  touch-action: none;   /* sonst scrollt das Handy beim Ziehen die Seite */
+}
+/* Der Griff: nur hier wird gezogen, damit die Knoepfe bedienbar bleiben. */
+#anrufpanel .anruf-griff {
+  padding: 8px 0 6px 0; cursor: grab; display: flex; justify-content: center;
+}
+#anrufpanel.anruf-faehrt .anruf-griff { cursor: grabbing; }
+#anrufpanel .anruf-griffbalken {
+  width: 38px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3);
+}
+#anrufpanel .anruf-kopf { display: flex; align-items: center; gap: 9px; }
+#anrufpanel .anruf-bild { flex: 0 0 auto; }
+#anrufpanel .anruf-wer { display: flex; flex-direction: column; min-width: 0; }
+#anrufpanel .anruf-text { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#anrufpanel .anruf-dauer { color: #9fb0cc; font-variant-numeric: tabular-nums; }
+#anrufpanel .anruf-tasten { margin-top: 11px; display: flex; gap: 8px; }
+#anrufpanel .anruf-taste {
+  flex: 1 1 0; min-height: 44px; border: 0; border-radius: 10px;
+  background: rgba(255,255,255,0.14); color: #fff; font-size: 13px;
+  cursor: pointer; padding: 6px 4px;
+}
+#anrufpanel .anruf-taste:hover { background: rgba(255,255,255,0.24); }
+/* Bedeutungsfarben: rot legt auf, gelb heisst "er hoert dich nicht". */
+#anrufpanel .anruf-auf { background: #a00000; }
+#anrufpanel .anruf-auf:hover { background: #c40000; }
+/* Hoehere Gewichtung als noetig, mit Absicht: beim Messen im Browser hat
+   die knappere Fassung nicht durchgegriffen. Kein !important - das wuerde
+   nur die naechste Absicht brechen. */
+#anrufpanel button.anruf-taste.anruf-aus { background: #b35a00; }
+#anrufpanel video { border-radius: 10px; margin-top: 9px; }
+
+@media (max-width: 700px) {
+  /* Am Handy breiter und weiter oben, damit die Tastatur es nicht verdeckt. */
+  #anrufpanel { width: calc(100vw - 20px); right: 10px; left: 10px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #anrufpanel .anruf-taste { font-size: 14px; min-height: 50px; }
+}

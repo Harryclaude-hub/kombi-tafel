@@ -2,6 +2,16 @@
 // KRYPTO: die Ende-zu-Ende-Schicht der Kombi-Tafel.
 // Alles mit dem eingebauten WebCrypto des Browsers, KEINE fremde
 // Bibliothek. Die Datenbank sieht nur verschlüsselte Pakete.
+// EINSCHRAENKUNG, damit der Satz oben nicht mehr verspricht, als er haelt:
+// Beim Anmelden gehen der private Schluessel und der Bereichsschluessel
+// EINMAL unverpackt an die Server-Funktion "schluessel", die sie erst
+// dort verschluesselt - mit einem Geheimnis, das in derselben Datenbank
+// liegt. Zum Abholen genuegt ein gueltiges Anmelde-Token, kein Passwort.
+// Das ist bewusst so: ohne diesen Safe kaeme man auf einem neuen Geraet
+// nie wieder an seine alten Daten. Wer es dichter will, muesste die
+// beiden Schluessel schon hier im Browser mit einem aus dem Passwort
+// abgeleiteten Schluessel verpacken - die Funktion dafuer gibt es weiter
+// unten. Fuer alles andere gilt der Satz oben unveraendert.
 //
 // Bausteine:
 //  - PBKDF2: aus dem Login-Passwort wird ein Schutz-Schlüssel

@@ -137,21 +137,24 @@ async function glockeZaehlen() {
     n += r.count || 0;
   }
   const kontakte = await supaKontakteLaden();
+  // Merken, bei WEM etwas Neues liegt - fuer die Meldung weiter unten.
+  const neuVon = [];
   for (const k of kontakte) {
     const gelesen = parseInt(localStorage.getItem("kt_dm_gelesen_" + k.partnerId) || "0", 10);
     const r = await supa.from("kt_direkt").select("id", { count: "exact", head: true })
       .eq("an", u.id).eq("von", k.partnerId).gt("id", gelesen);
-    n += r.count || 0;
+    const wieviel = r.count || 0;
+    if (wieviel) neuVon.push({ id: k.partnerId, username: k.username, wieviel: wieviel });
+    n += wieviel;
   }
   const b = knopf.querySelector(".badge");
   if (b) {
     b.textContent = n > 99 ? "99+" : String(n);
     b.style.display = n > 0 ? "inline-block" : "none";
   }
-  // Kam etwas Neues dazu, waehrend die Seite im Hintergrund liegt? Melden.
-  if (_glockeVorher >= 0 && n > _glockeVorher && typeof benachrichtige === "function") {
-    benachrichtige("Neue Nachricht", "In der Kombi-Tafel lesen.", "nachricht");
-  }
+  // Kam etwas Neues dazu, waehrend die Seite im Hintergrund liegt? Melden -
+  // und zwar MIT Namen und Bild, nicht mehr nur "Neue Nachricht".
+  if (_glockeVorher >= 0 && n > _glockeVorher) glockeNeuesMelden(neuVon);
   _glockeVorher = n;
 }
 
@@ -163,7 +166,12 @@ function glockeUmschalten() {
   if (!glockeOffen) {
     if (panel) panel.remove();
     if (glockePoll) clearInterval(glockePoll);
-    if (typeof aufnahmeAbbrechen === "function") aufnahmeAbbrechen();
+    // NUR die eigene Aufnahme abbrechen. Frueher wurde jede abgebrochen -
+    // auch eine Sprachnachricht, die gerade im Bereichs-Chat lief. Das
+    // Gesprochene war dann weg, ohne dass irgendetwas gemeldet wurde.
+    if (typeof aufnahmeLaeuft === "function" &&
+        (aufnahmeLaeuft("gp-ton") || aufnahmeLaeuft("gp-video")) &&
+        typeof aufnahmeAbbrechen === "function") aufnahmeAbbrechen();
     tippKanalZu();
     return;
   }
@@ -249,6 +257,10 @@ async function glockeListe(nurListe) {
 }
 
 async function glockeThread(partnerId, username) {
+  // ZUERST den alten Takt stoppen, noch vor allem, was auf das Netz
+  // wartet. Frueher stand das ganz unten - in der Zwischenzeit lud der
+  // alte Takt munter weiter und haengte alles ein zweites Mal an.
+  if (glockePoll) { clearInterval(glockePoll); glockePoll = null; }
   glockePartner = { partnerId: partnerId, username: username };
   glockeLetzteId = 0;
   const ziel = document.getElementById("gp-gespraech");
@@ -299,7 +311,7 @@ async function glockeThread(partnerId, username) {
     ? profilNameEl(partnerId, username) : document.createTextNode(username));
 
   await glockeNachladen();
-  if (glockePoll) clearInterval(glockePoll);
+  if (glockePoll) clearInterval(glockePoll);   // falls inzwischen einer lief
   glockePoll = setInterval(glockeNachladen, 10000);
   tippKanalAuf(partnerId);
   glockeListe(true);            // die Liste markiert das offene Gespraech
@@ -368,9 +380,17 @@ async function tippMelden() {
 
 async function glockeNachladen() {
   if (!glockePartner || !document.getElementById("gp-liste")) return;
+  // Den Partner festhalten: waehrend das Laden laeuft, kann laengst ein
+  // anderes Gespraech offen sein. Ohne diese Pruefung landen die
+  // Nachrichten des einen im Fenster des anderen.
+  const wer = glockePartner.partnerId;
+  const abId = glockeLetzteId || null;
   const u = await supaNutzer();
-  const neue = await supaDmLaden(glockePartner.partnerId, glockeLetzteId || null);
-  if (!neue.length) return;
+  const neue = await supaDmLaden(wer, abId);
+  if (!glockePartner || glockePartner.partnerId !== wer) return;
+  // Auch wenn NICHTS Neues kommt, koennen sich meine Punkte geaendert
+  // haben (er hat gelesen). Deshalb hier und nicht erst weiter unten.
+  if (!neue.length) { hakenAuffrischen(); return; }
   const box = document.getElementById("gp-liste");
   const key = await kryptoDm(glockePartner.partnerId);
   const nachzuladen = [];
@@ -401,6 +421,12 @@ async function glockeNachladen() {
       z.innerHTML = uhr + inhalt;
     }
     z.insertBefore(wer, z.firstChild);
+    // Die Punkte gehoeren nur an MEINE Nachrichten - beim anderen weiss
+    // ich ja ohnehin, dass ich sie habe.
+    if (istMeine) {
+      z.dataset.dmId = String(n.id);
+      z.appendChild(hakenEl(n));
+    }
     box.appendChild(z);
     if (m) nachzuladen.push(m);
   }
@@ -408,6 +434,9 @@ async function glockeNachladen() {
   box.scrollTop = box.scrollHeight;
   localStorage.setItem("kt_dm_gelesen_" + glockePartner.partnerId, String(glockeLetzteId));
   glockeZaehlen();
+  // Ich habe das Gespraech offen: seine Nachrichten sind zugestellt UND
+  // gelesen. Und meine eigenen Punkte frisch holen.
+  supaDmGelesen(glockePartner.partnerId).then(() => hakenAuffrischen()).catch(() => { });
 }
 
 async function glockeSenden() {
@@ -416,9 +445,25 @@ async function glockeSenden() {
   const feld = document.getElementById("gp-text");
   const text = feld.value.trim();
   if (!text) return;
-  const r = await supaDmSenden(glockePartner.partnerId, text, glockePartner.username);
-  if (r.error) { alert("Nicht gesendet: " + r.error.message); return; }
+  // Sofort zeigen, dass es unterwegs ist: eine Blase mit EINEM Punkt.
+  // Ohne sie sieht man bei schlechtem Netz sekundenlang gar nichts und
+  // tippt zweimal.
+  const vorlaeufig = hakenBlaseZeigen(text);
   feld.value = "";
+  const r = await supaDmSenden(glockePartner.partnerId, text, glockePartner.username);
+  if (r.error) {
+    // Stehen lassen mit einem Punkt - der Text ist nicht verloren.
+    if (vorlaeufig) {
+      vorlaeufig.classList.add("dm-fehlt");
+      vorlaeufig.title = "Nicht hinausgegangen: " + String(r.error.message);
+    }
+    if (typeof weckerBalken === "function")
+      weckerBalken("Nicht gesendet: " + String(r.error.message).slice(0, 120) +
+        " Die Nachricht steht noch da, du kannst sie kopieren.", "warn");
+    else alert("Nicht gesendet: " + r.error.message);
+    return;
+  }
+  if (vorlaeufig) vorlaeufig.remove();
   glockeNachladen();
 }
 
@@ -479,4 +524,121 @@ async function glockeVideo() {
     schau.innerHTML = '<video id="gp-live" autoplay muted class="medienvideo"></video>';
     document.getElementById("gp-live").srcObject = s.stream;
   }
+}
+
+// Baut die Meldung ueber neue Nachrichten. Kommt von mehreren Leuten
+// etwas, wird EINE Meldung daraus - sonst blinkt der Bildschirm voll.
+async function glockeNeuesMelden(neuVon) {
+  if (typeof benachrichtige !== "function" || !neuVon || !neuVon.length) return;
+  try {
+    if (neuVon.length > 1) {
+      const summe = neuVon.reduce((p, x) => p + x.wieviel, 0);
+      benachrichtige(summe + " neue Nachrichten",
+        "Von " + neuVon.length + " Leuten. In der Kombi-Tafel lesen.", "nachricht");
+      return;
+    }
+    const w = neuVon[0];
+    let anzeige = w.username, bild = null;
+    try {
+      if (typeof profileLaden === "function") await profileLaden([w.id]);
+      if (typeof profilName === "function") anzeige = profilName(w.id, w.username);
+      // Auf das Bild hoechstens 800 Millisekunden warten - eine Meldung
+      // darf nie an einem Bild haengen.
+      if (typeof profilFotoLaden === "function") {
+        bild = await Promise.race([
+          profilFotoLaden(w.id),
+          new Promise(f => setTimeout(() => f(null), 800))
+        ]);
+      }
+    } catch (e) { }
+    benachrichtige(anzeige + (w.wieviel > 1 ? " (" + w.wieviel + " Nachrichten)" : ""),
+      "Hat dir geschrieben.", "nachricht", { von: w.id, bild: bild });
+  } catch (e) { /* Meldungen stoeren nie die Seite */ }
+}
+// ============================================================
+// DIE PUNKTE
+//
+//   1 Punkt   noch nicht hinausgegangen (kein Netz)
+//   2 Punkte  beim Server, sein Geraet hat sie noch nicht geholt
+//   3 Punkte  sein Geraet hat sie geholt
+//   gruen     er hat sie gelesen
+//
+// Absichtlich Punkte und keine Haken: Haken sehen aus wie "erledigt",
+// und beim Wetten unter Freunden ist "angekommen" nicht "erledigt".
+// ============================================================
+
+function hakenStufe(n) {
+  if (!n || n.lokal) return 1;              // noch gar nicht hinausgegangen
+  if (n.gelesen) return 4;                  // gelesen (gruen)
+  if (n.zugestellt) return 3;               // auf seinem Geraet
+  return 2;                                 // beim Server
+}
+
+function hakenTitel(stufe) {
+  return stufe === 1 ? "Noch nicht hinausgegangen - kein Netz."
+    : stufe === 2 ? "Verschickt. Sein Geraet hat sie noch nicht geholt."
+    : stufe === 3 ? "Auf seinem Geraet angekommen."
+    : "Gelesen.";
+}
+
+function hakenEl(n) {
+  const stufe = hakenStufe(n);
+  const e = document.createElement("span");
+  e.className = "dm-haken dm-h" + stufe;
+  e.title = hakenTitel(stufe);
+  for (let i = 0; i < Math.min(stufe, 3); i++) {
+    const p = document.createElement("i");
+    p.className = "dm-punkt";
+    e.appendChild(p);
+  }
+  return e;
+}
+
+function hakenSetzen(el, n) {
+  const neu = hakenEl(n);
+  if (el.className === neu.className) return;   // nichts geaendert
+  el.replaceWith(neu);
+}
+
+// Holt die Haken meiner letzten Nachrichten und faerbt die Punkte nach.
+let _hakenLaeuft = false;
+async function hakenAuffrischen() {
+  if (_hakenLaeuft || !glockePartner) return;
+  const box = document.getElementById("gp-liste");
+  if (!box) return;
+  const meine = box.querySelectorAll("[data-dm-id]");
+  if (!meine.length) return;
+  _hakenLaeuft = true;
+  try {
+    const partner = glockePartner.partnerId;
+    const liste = await supaDmHaken(partner, 40);
+    // Ist inzwischen ein anderes Gespraech offen, gehoert das Ergebnis
+    // nicht mehr hierher.
+    if (!glockePartner || glockePartner.partnerId !== partner) return;
+    const karte = {};
+    for (const x of liste) karte[String(x.id)] = x;
+    for (const z of box.querySelectorAll("[data-dm-id]")) {
+      const n = karte[z.dataset.dmId];
+      const el = z.querySelector(".dm-haken");
+      if (n && el) hakenSetzen(el, n);
+    }
+  } catch (e) { } finally { _hakenLaeuft = false; }
+}
+// Die vorlaeufige Blase, solange die Nachricht noch nicht hinaus ist.
+function hakenBlaseZeigen(text) {
+  const box = document.getElementById("gp-liste");
+  if (!box) return null;
+  const z = document.createElement("div");
+  z.className = "chatzeile vonmir dm-unterwegs";
+  const wer = document.createElement("span");
+  wer.className = "gp-wer";
+  wer.textContent = "Du";
+  z.appendChild(wer);
+  const t = document.createElement("span");
+  t.textContent = text;                       // NIE als HTML
+  z.appendChild(t);
+  z.appendChild(hakenEl({ lokal: true }));
+  box.appendChild(z);
+  box.scrollTop = box.scrollHeight;
+  return z;
 }

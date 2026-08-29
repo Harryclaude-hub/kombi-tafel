@@ -111,8 +111,20 @@ async function supaMeinProfil() {
 }
 
 async function supaProfilSuchen(username) {
-  const r = await supa.from("kt_profiles").select("id, username").ilike("username", username).maybeSingle();
-  return r.data || null;
+  const gesucht = String(username == null ? "" : username).trim();
+  if (!gesucht) return null;
+  // Die Joker entschaerfen: in einem LIKE-Muster steht _ fuer ein
+  // beliebiges Zeichen und % fuer beliebig viele. Beide sind in
+  // Benutzernamen erlaubt, also muessen sie hier woertlich gemeint sein.
+  const muster = gesucht.replace(/([\\%_])/g, "\\$1");
+  const r = await supa.from("kt_profiles").select("id, username").ilike("username", muster).maybeSingle();
+  const p = r.data || null;
+  // ZWEITE SICHERUNG, und die ist die wichtige: egal wie der Server das
+  // Muster auslegt - was zurueckkommt, muss WOERTLICH der gesuchte Name
+  // sein (Gross- und Kleinschreibung darf abweichen). Hier haengt dran,
+  // an wen ein ganzer Bereich samt Schluessel geht.
+  if (!p || String(p.username).toLowerCase() !== gesucht.toLowerCase()) return null;
+  return p;
 }
 
 async function supaFreigabenVonMir() {
@@ -147,7 +159,13 @@ async function supaTeilen(gastId, rolle) {
       schluessel = await kryAes(paar, raw);
     }
   }
-  const r = await supa.from("kt_freigaben").upsert({ owner: u.id, gast: gastId, rolle: rolle, schluessel: schluessel });
+  // Das Feld "schluessel" NUR mitschreiben, wenn wirklich einer berechnet
+  // wurde. Frueher ging es auch als null hinaus und hat einen laengst
+  // verteilten, gueltigen Schluessel des Gastes ueberschrieben - danach
+  // sah der Gast ueberall nur noch "Schluessel fehlt".
+  const satz = { owner: u.id, gast: gastId, rolle: rolle };
+  if (schluessel) satz.schluessel = schluessel;
+  const r = await supa.from("kt_freigaben").upsert(satz);
   r.ohneSchluessel = !schluessel;
   return r;
 }
@@ -155,6 +173,20 @@ async function supaTeilen(gastId, rolle) {
 async function supaTeilenBeenden(gastId) {
   const u = await supaNutzer();
   return await supa.from("kt_freigaben").delete().eq("owner", u.id).eq("gast", gastId);
+}
+
+// Haengt einen Fehler-Merker an eine Liste, ohne dass er beim Zaehlen
+// oder Durchlaufen mitkommt. So bleibt jeder bestehende Aufrufer heil.
+//
+// WOZU: alle Lader gaben im Fehlerfall stumm eine leere Liste zurueck.
+// Nichts war geloescht, aber die Ansicht sah aus wie beim Verlust der
+// 49 Zeilen - "noch keine Scheine", "0,00 Euro im Spiel". Und laedt die
+// Ordnerliste leer, haelt das Anlegen jeden Namen fuer neu und legt die
+// Person ein zweites Mal an.
+function mitFehler(liste, r) {
+  Object.defineProperty(liste, "_fehler",
+    { value: (r && r.error) ? String(r.error.message || r.error) : null, enumerable: false });
+  return liste;
 }
 
 // ---------- Scheine ----------
@@ -175,8 +207,11 @@ async function supaScheineLaden(bereichId) {
       if (s.foto && !s.foto.startsWith("data:")) s.foto = null;
     }
     if (s.notiz) s.notiz = await e2eAuf(key, s.notiz);
+    // Der Fotoname traegt praktisch den ganzen Schein (Anbieter, Einsatz,
+    // alle Quoten). Frueher stand er offen in der Datenbank.
+    if (s.foto_name) s.foto_name = await e2eAuf(key, s.foto_name);
   }
-  return liste;
+  return mitFehler(liste, r);
 }
 
 async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
@@ -187,7 +222,7 @@ async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId) {
     bereich: bereichId, angelegt_von: u.id,
     daten: key ? { e2e: await e2eZu(key, JSON.stringify(daten)) } : daten,
     foto: foto ? await e2eZu(key, foto) : null,
-    foto_name: fotoName || null,
+    foto_name: fotoName ? await e2eZu(key, fotoName) : null,
     stand: daten.stand || "offen",
     notiz: await e2eZu(key, daten.notiz || "") || "",
     ordner: ordnerId || null
@@ -276,7 +311,7 @@ async function supaKontaktEntfernen(partnerId) {
 
 async function supaDmLaden(partnerId, abId) {
   const u = await supaNutzer();
-  let q = supa.from("kt_direkt").select("id, von, an, text, created_at")
+  let q = supa.from("kt_direkt").select("id, von, an, text, created_at, zugestellt, gelesen")
     .or("and(von.eq." + u.id + ",an.eq." + partnerId + "),and(von.eq." + partnerId + ",an.eq." + u.id + ")")
     .order("id", { ascending: true }).limit(200);
   if (abId) q = q.gt("id", abId);
@@ -285,6 +320,39 @@ async function supaDmLaden(partnerId, abId) {
   const key = await kryptoDm(partnerId);
   for (const n of liste) n.text = await e2eAuf(key, n.text);
   return liste;
+}
+
+// Holt nur die Haken meiner eigenen letzten Nachrichten an diesen Freund.
+// Absichtlich ohne Text: das ist eine kleine, haeufige Abfrage.
+async function supaDmHaken(partnerId, wieviel) {
+  const u = await supaNutzer();
+  if (!u) return [];
+  const r = await supa.from("kt_direkt").select("id, zugestellt, gelesen")
+    .eq("von", u.id).eq("an", partnerId)
+    .order("id", { ascending: false }).limit(wieviel || 40);
+  return r.data || [];
+}
+
+// Ich habe die Nachrichten dieses Freundes auf meinem Geraet - zweiter Punkt
+// wird zum dritten. Laeuft still: klappt es nicht, bleibt es beim zweiten.
+async function supaDmZugestellt(partnerId) {
+  try {
+    const u = await supaNutzer();
+    if (!u) return;
+    await supa.from("kt_direkt").update({ zugestellt: new Date().toISOString() })
+      .eq("an", u.id).eq("von", partnerId).is("zugestellt", null);
+  } catch (e) { }
+}
+
+// Ich habe das Gespraech offen - die Punkte werden gruen.
+async function supaDmGelesen(partnerId) {
+  try {
+    const u = await supaNutzer();
+    if (!u) return;
+    const jetzt = new Date().toISOString();
+    await supa.from("kt_direkt").update({ zugestellt: jetzt, gelesen: jetzt })
+      .eq("an", u.id).eq("von", partnerId).is("gelesen", null);
+  } catch (e) { }
 }
 
 async function supaDmSenden(partnerId, text, name) {
@@ -382,7 +450,7 @@ async function supaOrdnerLaden(bereichId) {
   const key = await kryptoBereich(bereichId);
   for (const o of liste) o.name = await e2eAuf(key, o.name);
   liste.sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
-  return liste;
+  return mitFehler(liste, r);
 }
 
 // Ohne Schlüssel wird NICHTS gespeichert - sonst laege der Klartext
@@ -439,7 +507,7 @@ async function supaPersonBuchungenLaden(bereichId) {
   const liste = r.data || [];
   const key = await kryptoBereich(bereichId);
   for (const b of liste) if (b.notiz) b.notiz = await e2eAuf(key, b.notiz);
-  return liste;
+  return mitFehler(liste, r);
 }
 
 async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, betrag, notiz) {
@@ -486,7 +554,7 @@ async function supaAnmerkungenLaden(bereichId) {
   const liste = r.data || [];
   const key = await kryptoBereich(bereichId);
   for (const a of liste) a.text = await e2eAuf(key, a.text);
-  return liste;
+  return mitFehler(liste, r);
 }
 
 async function supaAnmerken(bereichId, scheinId, text) {
@@ -566,15 +634,24 @@ async function supaUploadStatus(id, status) {
 // Je Person EIN Datensatz: ein JSON mit allen Angaben, als Ganzes
 // Ende-zu-Ende verschluesselt. Die Datenbank sieht nur Datenmuell.
 
+// Gibt die Karte zurueck und haengt zwei Merker daran:
+//   _fehler   das Laden selbst ging schief
+//   _unlesbar wie viele Zeilen da waren, sich aber nicht oeffnen liessen
+// Beide muessen das Speichern sperren: sonst schreibt ein leeres Formular
+// ueber Daten, die es in Wirklichkeit noch gibt.
 async function supaPersonDatenLaden(bereichId) {
   const r = await supa.from("kt_person_daten").select("ordner, daten")
     .eq("bereich", bereichId);
   const key = await kryptoBereich(bereichId);
   const karte = {};
+  let unlesbar = 0;
   for (const z of r.data || []) {
     const klar = await e2eAuf(key, z.daten);
-    try { karte[z.ordner] = JSON.parse(klar); } catch (e) { /* unlesbar: ueberspringen */ }
+    try { karte[z.ordner] = JSON.parse(klar); }
+    catch (e) { unlesbar++; }
   }
+  Object.defineProperty(karte, "_fehler", { value: r.error ? String(r.error.message) : null, enumerable: false });
+  Object.defineProperty(karte, "_unlesbar", { value: unlesbar, enumerable: false });
   return karte;
 }
 
