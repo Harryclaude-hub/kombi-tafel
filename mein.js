@@ -210,6 +210,10 @@ Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können
 <div id="bereichtabs" class="navleiste"></div>
 <div id="mb_navi" class="mb-navi"></div>
 
+<div id="blk_tag" class="mb-block">
+<div id="tagesuebersicht"></div>
+</div>
+
 <div id="blk_kombis" class="mb-block">
 <h2>&#128100; Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
@@ -384,6 +388,7 @@ async function tuPushEinschalten() {
 
 const MB_BLOECKE = [
   ["profil", "&#128100; Mein Profil"],
+  ["tag", "&#128197; Tagesübersicht"],
   ["kombis", "&#127919; Kombinationen und Personen"],
   ["buch", "&#128210; Buchhaltung"],
   ["freunde", "&#128101; Freunde und Teilen"],
@@ -407,6 +412,9 @@ function mbBlockZeigen(kurz) {
       if (typeof profilBlockFuellen === "function") profilBlockFuellen();
     }
   }
+  // Die Tagesuebersicht wird erst beim Aufmachen gerechnet - sie geht
+  // ueber alle Personen und soll nicht bei jedem Zeichnen mitlaufen.
+  if (kurz === "tag" && typeof zeichneTagesuebersicht === "function") zeichneTagesuebersicht();
   for (const [k] of MB_BLOECKE) {
     const blk = el("blk_" + k);
     if (blk) blk.classList.toggle("offen", k === kurz);
@@ -884,6 +892,9 @@ async function zeichneBereich() {
     : scheine.filter(s => s.ordner === ordnerFilter);
   zeichneKontoDb(gefiltert);
   zeichneScheineDb(gefiltert);
+  // Steht die Tagesuebersicht gerade offen, muss sie die neuen Zahlen sehen.
+  if (mbAktiverBlock() === "tag" && typeof zeichneTagesuebersicht === "function")
+    zeichneTagesuebersicht();
   await ladeChat(true);
   if (chatTimer) clearInterval(chatTimer);
   chatTimer = setInterval(() => ladeChat(false), 10000);
@@ -2542,4 +2553,206 @@ async function tuPersonDokumentWeg(ordnerId, pfadWert) {
   try { await supa.storage.from("kt-medien").remove([pfadWert]); } catch (e) { /* Verweis ist weg, Rest egal */ }
   meldungM("Datei gelöscht.", "gut");
   zeichnePersonenKasse(kasseScheine);
+}
+
+// ============================================================
+// TAGESUEBERSICHT
+//
+// Drei Fragen auf einem Blatt:
+//   1. Welche Personen habe ich an diesem Tag bearbeitet?
+//   2. Wie viel Geld liegt bei welchem Anbieter?
+//   3. Wer haelt gerade wie viel von meinem Geld?
+//
+// WICHTIG: hier wird NICHTS neu gerechnet. Jede Zahl kommt aus
+// personPruefen() - derselben Funktion, aus der auch die Personen-Kasse
+// lebt. Wuerde hier ein zweiter Rechenweg stehen, liefen die beiden
+// Ansichten frueher oder spaeter auseinander, und niemand wuesste,
+// welche stimmt.
+// ============================================================
+
+// Welcher Tag wird gezeigt? Vorgabe heute.
+function tagGewaehlt() {
+  const f = el("tag_datum");
+  if (f && f.value) return f.value;
+  return tagHeute();
+}
+
+function tagHeute() {
+  // ORTSZEIT, nicht UTC: sonst waere abends nach 22 Uhr schon der
+  // naechste Tag gemeint und die Uebersicht waere leer.
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+    "-" + String(d.getDate()).padStart(2, "0");
+}
+
+// Faellt ein Zeitstempel auf diesen Tag? Auch hier Ortszeit.
+function tagPasst(zeitstempel, tag) {
+  if (!zeitstempel) return false;
+  const d = new Date(zeitstempel);
+  if (isNaN(d.getTime())) return String(zeitstempel).slice(0, 10) === tag;
+  return (d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+    "-" + String(d.getDate()).padStart(2, "0")) === tag;
+}
+
+function tagGeld(x) { return Number(x || 0).toFixed(2) + " &euro;"; }
+function tagGeldVz(x) {
+  const n = Number(x || 0);
+  return "<span class='" + (n >= 0 ? "e-gew" : "e-ver") + "'>" +
+    (n >= 0 ? "+" : "") + n.toFixed(2) + " &euro;</span>";
+}
+
+function tagDatumSetzen(wert) {
+  const f = el("tag_datum");
+  if (f) f.value = wert;
+  zeichneTagesuebersicht();
+}
+
+function tagVerschieben(tage) {
+  const d = new Date(tagGewaehlt() + "T12:00:00");
+  if (isNaN(d.getTime())) return;
+  d.setDate(d.getDate() + tage);
+  tagDatumSetzen(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+    "-" + String(d.getDate()).padStart(2, "0"));
+}
+
+function zeichneTagesuebersicht() {
+  const box = el("tagesuebersicht");
+  if (!box) return;
+  const tag = tagGewaehlt();
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const personen = Array.isArray(ordnerListe) ? ordnerListe : [];
+
+  let html = tagKopfHtml(tag);
+
+  if (!personen.length) {
+    box.innerHTML = html + '<p class="mini">Noch keine Personen angelegt. Sobald du unter ' +
+      '"Kombinationen und Personen" jemanden anlegst, steht hier die Uebersicht.</p>';
+    return;
+  }
+
+  // Einmal je Person rechnen - mit DERSELBEN Funktion wie die Personen-Kasse.
+  const zeilen = [];
+  for (const p of personen) {
+    const pr = personPruefen(p.id, scheine);
+    const meine = scheine.filter(s => s.ordner === p.id);
+    const neu = meine.filter(s => tagPasst(s.created_at, tag));
+    const geaendert = meine.filter(s => s.updated_at && tagPasst(s.updated_at, tag) &&
+      !tagPasst(s.created_at, tag));
+    const zahlungen = (pr.buch || []).filter(b => String(b.datum || "").slice(0, 10) === tag);
+    zeilen.push({ person: p, pr: pr, neu: neu, geaendert: geaendert, zahlungen: zahlungen,
+      haelt: pr.aufWegen + pr.beiAnbietern + pr.imSpiel });
+  }
+
+  html += tagBearbeitetHtml(zeilen, tag);
+  html += tagAnbieterHtml(zeilen);
+  html += tagHalterHtml(zeilen);
+  box.innerHTML = html;
+}
+
+function tagKopfHtml(tag) {
+  const heute = tagHeute();
+  return '<div class="tag-kopf">' +
+    '<h2>&#128197; Tagesübersicht</h2>' +
+    '<div class="tag-wahl">' +
+    '<button onclick="tagVerschieben(-1)" title="Ein Tag zurück">&#8592;</button>' +
+    '<input type="date" id="tag_datum" value="' + tag + '" onchange="zeichneTagesuebersicht()">' +
+    '<button onclick="tagVerschieben(1)" title="Ein Tag vor">&#8594;</button>' +
+    '<button class="haupt" onclick="tagDatumSetzen(&quot;' + heute + '&quot;)">Heute</button>' +
+    (tag === heute ? '' : '<span class="mini tag-nichtheute">Du siehst einen anderen Tag als heute.</span>') +
+    '</div></div>';
+}
+
+// ---------- 1. Wen habe ich an diesem Tag bearbeitet? ----------
+function tagBearbeitetHtml(zeilen, tag) {
+  const dran = zeilen.filter(z => z.neu.length || z.geaendert.length || z.zahlungen.length);
+  let html = '<div class="tag-teil"><h3>&#128221; An diesem Tag bearbeitet</h3>';
+  if (!dran.length) {
+    return html + '<p class="mini">An diesem Tag hast du bei keiner Person etwas eingetragen. ' +
+      'Die Zahlen weiter unten gelten trotzdem - sie zeigen immer den Stand von <b>jetzt</b>.</p></div>';
+  }
+  html += '<div class="tabellenrand"><table><thead><tr><th>Person</th><th>Neue Kombinationen</th>' +
+    '<th>Geändert</th><th>Zahlungen</th><th>Hält gerade</th></tr></thead><tbody>';
+  let nNeu = 0, nGeaendert = 0, nZahl = 0;
+  for (const z of dran) {
+    nNeu += z.neu.length; nGeaendert += z.geaendert.length; nZahl += z.zahlungen.length;
+    const einsatzNeu = z.neu.reduce((p, s) => p + (s.daten.einsatz || 0), 0);
+    const zahlSumme = z.zahlungen.reduce((p, b) => p + (Number(b.betrag) || 0), 0);
+    html += "<tr><td><b>" + textSicherM(z.person.name) + "</b></td>" +
+      "<td>" + (z.neu.length ? z.neu.length + " <span class='mini'>(" + tagGeld(einsatzNeu) + ")</span>" : "-") + "</td>" +
+      "<td>" + (z.geaendert.length || "-") + "</td>" +
+      "<td>" + (z.zahlungen.length ? z.zahlungen.length + " <span class='mini'>(" + tagGeld(zahlSumme) + ")</span>" : "-") + "</td>" +
+      "<td>" + tagGeld(z.haelt) + "</td></tr>";
+  }
+  html += "</tbody><tfoot><tr><td><b>" + dran.length + " Person" + (dran.length === 1 ? "" : "en") +
+    "</b></td><td><b>" + nNeu + "</b></td><td><b>" + nGeaendert + "</b></td><td><b>" + nZahl +
+    // Hier bewusst KEINE Summe: es waere nur die Summe der an diesem Tag
+    // bearbeiteten Personen, nicht aller - das laedt zum Verwechseln ein.
+    "</b></td><td class=mini>siehe unten</td></tr></tfoot></table></div>";
+  html += '<p class="mini">"Geändert" heißt: die Kombination stand schon vorher da und wurde an ' +
+    'diesem Tag angefasst - meist der Eintrag gewonnen oder verloren.</p>';
+  return html + "</div>";
+}
+
+// ---------- 2. Geldstand bei den Anbietern ----------
+function tagAnbieterHtml(zeilen) {
+  const summe = {};
+  for (const [kz] of KASSE_ANBIETER)
+    summe[kz] = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, guthaben: 0, imSpiel: 0, moeglichOffen: 0, wartet: 0 };
+  for (const z of zeilen) for (const [kz] of KASSE_ANBIETER) {
+    const a = z.pr.anbieter[kz];
+    if (!a) continue;
+    for (const f of ["einge", "geholt", "einsatz", "gewonnen", "guthaben", "imSpiel", "moeglichOffen", "wartet"])
+      summe[kz][f] += a[f] || 0;
+  }
+  let html = '<div class="tag-teil"><h3>&#127974; Geldstand bei den Anbietern</h3>' +
+    '<div class="tabellenrand"><table><thead><tr><th>Anbieter</th><th>eingezahlt</th>' +
+    '<th>zurückgeholt</th><th>gesetzt</th><th>gewonnen</th><th>im Spiel</th>' +
+    '<th>Guthaben dort</th></tr></thead><tbody>';
+  let g = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, imSpiel: 0, guthaben: 0 };
+  for (const [kz, name] of KASSE_ANBIETER) {
+    const a = summe[kz];
+    for (const f in g) g[f] += a[f] || 0;
+    html += "<tr><td><b>" + name + "</b>" +
+      (a.wartet ? " <span class='mini fertigmark'>" + a.wartet + " fertig, Ergebnis fehlt</span>" : "") +
+      "</td><td>" + tagGeld(a.einge) + "</td><td>" + tagGeld(a.geholt) + "</td>" +
+      "<td>" + tagGeld(a.einsatz) + "</td><td>" + tagGeld(a.gewonnen) + "</td>" +
+      "<td>" + tagGeld(a.imSpiel) + "</td>" +
+      "<td><b>" + tagGeld(a.guthaben) + "</b></td></tr>";
+  }
+  html += "</tbody><tfoot><tr><td><b>Zusammen</b></td><td><b>" + tagGeld(g.einge) + "</b></td>" +
+    "<td><b>" + tagGeld(g.geholt) + "</b></td><td><b>" + tagGeld(g.einsatz) + "</b></td>" +
+    "<td><b>" + tagGeld(g.gewonnen) + "</b></td><td><b>" + tagGeld(g.imSpiel) + "</b></td>" +
+    "<td><b>" + tagGeld(g.guthaben) + "</b></td></tr></tfoot></table></div>";
+  html += '<p class="mini"><b>Guthaben dort</b> = eingezahlt - zurückgeholt - gesetzt + gewonnen. ' +
+    'Was noch <b>im Spiel</b> ist, steckt in offenen Kombinationen und ist darin schon abgezogen.</p>';
+  return html + "</div>";
+}
+
+// ---------- 3. Wer haelt gerade wie viel? ----------
+function tagHalterHtml(zeilen) {
+  const mitGeld = zeilen.slice().sort((a, b) => b.haelt - a.haelt);
+  let html = '<div class="tag-teil"><h3>&#128188; Wer hält gerade wie viel</h3>' +
+    '<div class="tabellenrand"><table><thead><tr><th>Person</th><th>auf den Wegen</th>' +
+    '<th>bei den Anbietern</th><th>im Spiel</th><th>hält zusammen</th>' +
+    '<th>unterm Strich</th></tr></thead><tbody>';
+  let g = { wege: 0, anb: 0, spiel: 0, haelt: 0, bilanz: 0 };
+  for (const z of mitGeld) {
+    g.wege += z.pr.aufWegen; g.anb += z.pr.beiAnbietern;
+    g.spiel += z.pr.imSpiel; g.haelt += z.haelt; g.bilanz += z.pr.bilanz;
+    html += "<tr><td><b>" + textSicherM(z.person.name) + "</b>" +
+      (z.pr.probleme.length ? " <span class='mini e-ver'>&#9888; " + z.pr.probleme.length +
+        " Hinweis" + (z.pr.probleme.length === 1 ? "" : "e") + "</span>" : "") + "</td>" +
+      "<td>" + tagGeld(z.pr.aufWegen) + "</td><td>" + tagGeld(z.pr.beiAnbietern) + "</td>" +
+      "<td>" + tagGeld(z.pr.imSpiel) + "</td><td><b>" + tagGeld(z.haelt) + "</b></td>" +
+      "<td>" + tagGeldVz(z.pr.bilanz) + "</td></tr>";
+  }
+  html += "</tbody><tfoot><tr><td><b>Zusammen</b></td><td><b>" + tagGeld(g.wege) + "</b></td>" +
+    "<td><b>" + tagGeld(g.anb) + "</b></td><td><b>" + tagGeld(g.spiel) + "</b></td>" +
+    "<td><b>" + tagGeld(g.haelt) + "</b></td><td><b>" + tagGeldVz(g.bilanz) + "</b></td>" +
+    "</tr></tfoot></table></div>";
+  html += '<p class="mini"><b>Auf den Wegen</b> ist Geld, das die Person erhalten, aber noch nicht ' +
+    'zum Anbieter gebracht hat (PayPal, Paysafe, Neteller, Skrill). <b>Unterm Strich</b> ist ' +
+    'Gewinn oder Verlust bei dieser Person. Die Zahlen sind dieselben wie in der Personen-Kasse - ' +
+    'sie kommen aus derselben Rechnung.</p>';
+  return html + "</div>";
 }
