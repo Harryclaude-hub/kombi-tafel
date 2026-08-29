@@ -350,8 +350,10 @@ function nutzungZaehlen(z) {
 }
 
 const ERSATZ_MAX_NUTZUNG = 2;   // R3, dieselbe Zahl wie beim Verteilen
+const ERSATZ_NOTFALL_NUTZUNG = 3;   // die Ausnahme, damit drei drin bleiben
 
-function findeErsatz(z, kz, scheinId) {
+function findeErsatz(z, kz, scheinId, maxNutzung) {
+  const grenze = maxNutzung || ERSATZ_MAX_NUTZUNG;
   const e = z.einst;
   const sch = z.scheine.find(s => s.id === scheinId);
   const leer = { imOrdner: 0, offen: 0, frei: 0, mitMarkt: 0, passend: 0 };
@@ -378,7 +380,7 @@ function findeErsatz(z, kz, scheinId) {
     !drinHier.has(w.id) &&
     !rausHier.has(w.id) &&
     !spieleHier.has(spielKennung(w)) &&
-    (nutzung[w.id] || 0) < ERSATZ_MAX_NUTZUNG);
+    (nutzung[w.id] || 0) < grenze);
 
   const bewertet = [];
   for (const w of frei) {
@@ -398,7 +400,7 @@ function findeErsatz(z, kz, scheinId) {
     return liesAnstoss(anstossFeld(a.w)).zeit - liesAnstoss(anstossFeld(b.w)).zeit;
   });
   return { treffer: { id: bewertet[0].w.id, optIdx: bewertet[0].optIdx,
-    schonBenutzt: bewertet[0].schonBenutzt }, info: info };
+    schonBenutzt: bewertet[0].schonBenutzt }, info: info, grenze: grenze };
 }
 
 function wetteRaus(scheinId, wettId, grund) {
@@ -414,26 +416,40 @@ function wetteRaus(scheinId, wettId, grund) {
   speichereZustand(z);
 
   // Ersatz suchen: gleicher Anbieter, gleicher Ordner, und nur was in
-  // DIESEN Schein passt. Frueher wurde global gesperrt, deshalb war der
-  // Topf fast immer leer.
-  const suche = findeErsatz(z, sch.kz, sch.id);
+  // DIESEN Schein passt.
+  // Stufe 1: hoechstens zwei Scheine je Wette (R3).
+  let suche = findeErsatz(z, sch.kz, sch.id, ERSATZ_MAX_NUTZUNG);
+  // Stufe 2: ist der Ordner voll verbaut - und das ist er nach einem
+  // vollen Bau IMMER, gemessen 51 Wetten auf 102 Plaetze - dann darf eine
+  // Wette ausnahmsweise in einen dritten Schein. Sonst bliebe hier auf
+  // Dauer ein Zweier stehen.
+  if (!suche.treffer) suche = findeErsatz(z, sch.kz, sch.id, ERSATZ_NOTFALL_NUTZUNG);
   if (suche.treffer) {
     sch.wetten.splice(pos, 0, { id: suche.treffer.id, optIdx: suche.treffer.optIdx });
     speichereZustand(z);
     const nw = wetteNachId(suche.treffer.id);
+    const schon = suche.treffer.schonBenutzt || 0;
+    // Bei der Ausnahme MUSS klar dastehen, was sie bedeutet: die Wette
+    // entscheidet dann ueber drei Kombinationen statt ueber zwei.
+    const zusatz = (schon >= ERSATZ_MAX_NUTZUNG)
+      ? " <b>Achtung:</b> im Ordner war nichts Freies mehr, deshalb steht diese Wette " +
+        "jetzt in <b>drei</b> Scheinen. Geht sie schief, sind alle drei weg."
+      : (schon ? " (steht auch in einem zweiten Schein)" : "");
     meldung("<b>Nachgerückt:</b> " + (nw ? nw.spiel : suche.treffer.id) +
       " - der Schein hat wieder " + sch.wetten.length + " Wetten. " +
-      "(Bei " + anbieterName(sch.kz) + " über der Mindestquote" +
-      (suche.treffer.schonBenutzt ? ", steht auch in einem zweiten Schein" : "") +
-      ", aus dem offenen Ordner.)", "gut");
+      "Bei " + anbieterName(sch.kz) + " über der Mindestquote, aus dem offenen Ordner." +
+      zusatz, schon >= ERSATZ_MAX_NUTZUNG ? "warn" : "gut");
   } else {
     const i = suche.info;
     let grundText;
+    // Hier ist schon Stufe 2 gelaufen, also war auch ein dritter Schein
+    // je Wette erlaubt. Was jetzt noch fehlt, fehlt wirklich.
     if (i.offen === 0) grundText = "In diesem Ordner ist keine Wette mehr offen - alle Spiele " +
       "haben schon angefangen.";
     else if (i.frei === 0) grundText = "Von den " + i.offen + " noch offenen Wetten des Ordners " +
-      "passt keine in diesen Schein: entweder steht das Spiel schon darin, oder die Wette " +
-      "steckt bereits in zwei Scheinen, oder du hast sie hier vorher herausgenommen.";
+      "passt keine in diesen Schein - auch dann nicht, wenn eine Wette ausnahmsweise in einen " +
+      "dritten Schein dürfte. Entweder steht das Spiel schon in diesem Schein, oder du hast " +
+      "die Wette hier vorher selbst herausgenommen.";
     else grundText = "Von den " + i.frei + " Wetten, die hier hineinpassen würden, schafft keine " +
       "bei " + anbieterName(sch.kz) + " deine Mindestquote " + z.einst.mind.toFixed(2) + ".";
     meldung("<b>Kein Ersatz gefunden.</b> " + grundText +
