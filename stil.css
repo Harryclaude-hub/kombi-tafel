@@ -2821,3 +2821,48 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
 @media (max-width: 700px) {
   .s-drin { display: block; margin: 5px 0 0 0; width: fit-content; }
 }
+/* ---------- Panel: aufklappbare Kacheln + Liste (loeschbar) ---------- */
+.pn-kachel.anklick { cursor: pointer; }
+.pn-kachel.anklick:hover { border-color: #1a2c50; }
+.pn-kachel.anklick.offen { box-shadow: 0 0 0 2px #1a2c50 inset; }
+.pn-doppelt { border-left-color: #a00000; background: #fdf3f3; }
+.pn-doppelt .pn-zahl { color: #a00000; }
+.pn-liste {
+  flex: 1 1 100%; border: 1.5px solid #c3c9d8; border-radius: 10px;
+  padding: 11px 14px; background: #fff;
+}
+.pn-liste > .mini { margin-bottom: 6px; }
+.pn-liste ul { list-style: none; margin: 0; padding: 0; }
+.pl-zeile {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  padding: 7px 0; border-top: 1px solid #eceff5;
+}
+.pl-kopf { flex: 1 1 220px; }
+.pl-spiele { flex: 1 1 100%; color: #55627a; }
+.pl-wo { color: #8a93a6; }
+.pl-warn { color: #a00000; font-weight: bold; }
+.pn-liste > button { margin-top: 9px; }
+@media (max-width: 700px) {
+  .pl-zeile { gap: 3px 8px; }
+  .pl-kopf { flex-basis: 100%; }
+}
+/* ---------- Doppelt gespeicherte Kombinationen (loeschbar) ---------- */
+/* Roter Streifen links, wie der orange bei "nicht voll" - keine
+   Flaechenfarbe, sonst kaempft sie mit der Zebra-Schicht. */
+#scheine_db tr.doppelzeile > td:first-child { box-shadow: inset 4px 0 0 #a00000; }
+.doppelmark { font-size: 12px; color: #a00000; font-weight: bold; margin-top: 4px; }
+#scheine_db tr.doppelzeile.unterziel > td:first-child {
+  box-shadow: inset 4px 0 0 #a00000, inset 8px 0 0 #b35a00;
+}
+/* ---------- Panel-Liste: ein Kasten je Kombination (loeschbar) ---------- */
+.pl-block { border-top: 1px solid #eceff5; padding: 8px 0; }
+.pl-blockkopf { font-size: 13.5px; }
+.pl-block > ul { margin: 2px 0 0 0; padding-left: 12px; border-left: 2px solid #eceff5; }
+.pl-block .pl-zeile { border-top: none; padding: 4px 0; }
+.pl-fehlt { color: #b35a00; font-weight: bold; font-size: 12.5px; }
+/* ---------- Panel-Warnungen (loeschbar) ---------- */
+.pn-warn {
+  flex: 1 1 100%; border: 1.5px solid #a00000; border-left-width: 6px;
+  border-radius: 10px; padding: 10px 13px; background: #fdf3f3;
+  font-size: 13px; color: #7a0000;
+}

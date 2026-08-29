@@ -1380,6 +1380,8 @@ function scheinLokalMerken(scheinId, ohneKonto) {
     : "Schein " + b.eintrag.nummer + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
+  if (typeof zeichnePanel === "function") zeichnePanel();
+  if (typeof einzelnKarteVergessen === "function") einzelnKarteVergessen();
   // Im Einzel-Modus ist die Kombination damit erledigt und wandert ans
   // Ende: sie steht jetzt im Verlauf und wird nie wieder vorgeschlagen.
   if (typeof einzelnAktiv === "function" && einzelnAktiv() && b.s && b.s.einzeln) {
@@ -1456,6 +1458,7 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
     zeichneKonto();
     // Frisch nachladen, sonst haelt der Kombi-Bau die Kombination
     // weiter fuer ungesetzt - genau der Fehler, der Karam aufgefallen ist.
+    if (typeof einzelnKarteVergessen === "function") einzelnKarteVergessen();
     kontoScheineLaden();
   });
 }
@@ -1625,7 +1628,7 @@ function gesetzteScheine() {
   if (!z || !z.scheine) return [];
   // BEIDE Ablagen (gesetzteEintraege), nicht nur die oertliche: wer
   // angemeldet ist, speichert ausschliesslich ins Konto.
-  const staemme = new Set(gesetzteEintraege().map(e => stammId(e.scheinId)));
+  const staemme = new Set(gesetzteEintraege().map(e => e.stamm));
   if (!staemme.size) return [];
   // Ueber den Stamm vergleichen: ein gesetzter Teil (S7-3_t2) haelt die
   // ganze Kombination fest, damit sie beim Neumischen nicht auseinander-
@@ -1928,7 +1931,8 @@ function panelZahlen() {
   const v = gesetzteEintraege();
   const gesetztProStamm = {};
   for (const e of v) {
-    const s = stammId(e.scheinId);
+    if (e.unlesbar) continue;   // eigene Warnung, siehe zeichnePanel
+    const s = e.stamm;
     if (!gesetztProStamm[s]) gesetztProStamm[s] = { einsatz: 0, teile: [] };
     gesetztProStamm[s].einsatz += Number(e.einsatz) || 0;
     gesetztProStamm[s].teile.push(e);
@@ -1964,24 +1968,28 @@ function zeichnePanel() {
   if (!kasten) return;
   const p = panelZahlen();
   const geld = x => Number(x).toFixed(2) + " &euro;";
+  const dopp = doppelte();
+  // Wie viele Eintraege sind zu viel? Je Gruppe alle ausser dem ersten.
+  const doppZuviel = dopp.reduce((q, g) => q + g.length - 1, 0);
+  const auf = w => panelAuf === w ? " offen" : "";
 
   kasten.innerHTML =
-    '<div class="pn-kachel pn-offen">' +
+    '<div class="pn-kachel pn-offen anklick' + auf("offen") + '" onclick="panelKlappe(\'offen\')">' +
       '<div class="pn-zahl">' + p.offen.anzahl + "</div>" +
       '<div class="pn-titel">noch nichts gesetzt</div>' +
       '<div class="pn-mini">' + geld(p.offen.moeglich) + " möglich bei " +
         geld(p.ziel) + " je Kombination</div></div>" +
 
-    '<div class="pn-kachel pn-unter">' +
+    '<div class="pn-kachel pn-unter anklick' + auf("unter") + '" onclick="panelKlappe(\'unter\')">' +
       '<div class="pn-zahl">' + p.unter.anzahl + "</div>" +
       '<div class="pn-titel">gesetzt, aber nicht voll</div>' +
       '<div class="pn-mini">' + geld(p.unter.gesetzt) + " gesetzt, <b>" +
         geld(p.unter.fehlt) + "</b> fehlen noch</div>" +
       (p.unter.anzahl
-        ? '<button onclick="panelRestMischen()">Rest neu mischen</button>'
+        ? '<button onclick="event.stopPropagation(); panelRestMischen()">Rest neu mischen</button>'
         : "") + "</div>" +
 
-    '<div class="pn-kachel pn-voll">' +
+    '<div class="pn-kachel pn-voll anklick' + auf("voll") + '" onclick="panelKlappe(\'voll\')">' +
       '<div class="pn-zahl">' + p.voll.anzahl + "</div>" +
       '<div class="pn-titel">voll gesetzt</div>' +
       '<div class="pn-mini">' + geld(p.voll.gesetzt) + " im Spiel</div></div>" +
@@ -1990,7 +1998,17 @@ function zeichnePanel() {
       '<div class="pn-zahl">' + geld(p.unter.gesetzt + p.voll.gesetzt) + "</div>" +
       '<div class="pn-titel">insgesamt gesetzt</div>' +
       '<div class="pn-mini">' + (p.voll.anzahl + p.unter.anzahl) +
-        " Kombinationen im Verlauf</div></div>";
+        " Kombinationen im Verlauf</div></div>" +
+
+    // Nur zeigen, wenn es wirklich etwas gibt - eine Kachel "0 doppelt"
+    // waere jeden Tag da und niemand sieht mehr hin.
+    (doppZuviel
+      ? '<div class="pn-kachel pn-doppelt anklick' + auf("doppelt") +
+        '" onclick="panelKlappe(\'doppelt\')">' +
+        '<div class="pn-zahl">' + doppZuviel + "</div>" +
+        '<div class="pn-titel">doppelt gespeichert</div>' +
+        '<div class="pn-mini">zählt in der Buchhaltung doppelt - antippen und wegräumen</div></div>'
+      : "");
 
   // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
   if (p.unter.anzahl) {
@@ -2005,6 +2023,25 @@ function zeichnePanel() {
     h += "</ul></div>";
     kasten.insertAdjacentHTML("beforeend", h);
   }
+
+  // Wenn etwas fehlt, muss es DASTEHEN. Ein Panel, das zu wenig zeigt,
+  // ist gefaehrlicher als gar keins: Karam setzt dann doppelt.
+  const unlesbar = gesetzteEintraege().filter(e => e.unlesbar).length;
+  let warnung = "";
+  if (unlesbar) warnung +=
+    '<div class="pn-warn"><b>&#9888; ' + unlesbar + " Kombination" +
+    (unlesbar === 1 ? "" : "en") + " aus deinem Konto " +
+    (unlesbar === 1 ? "lässt" : "lassen") + " sich nicht öffnen</b> " +
+    "(Schlüssel fehlt oder passt nicht). Was darin steht, weiß dieses Panel " +
+    "nicht - die Zahlen oben sind unvollständig. <b>Setz nichts neu, bevor das " +
+    "geklärt ist</b>, sonst geht dieselbe Wette zweimal raus.</div>";
+  if (!kontoGeladen && window.supa) warnung +=
+    '<div class="pn-warn">Die Kombinationen aus deinem Konto konnten nicht ' +
+    "geladen werden (Netz oder Anmeldung). Was hier steht, ist unvollständig.</div>";
+  if (warnung) kasten.insertAdjacentHTML("beforeend", warnung);
+
+  const liste = panelListeHtml(p);
+  if (liste) kasten.insertAdjacentHTML("beforeend", liste);
 }
 
 // Karam: was nicht voll gesetzt werden konnte, soll neu gemischt werden -
@@ -2037,31 +2074,51 @@ function panelRestMischen() {
 // das Panel weniger an, aber es erfindet nichts.
 // ============================================================
 let kontoScheine = [];
+let kontoOrdner = [];       // die Personen, fuer die Namen in der Liste
 let kontoGeladen = false;   // false = wir wissen es (noch) nicht
-let kontoLaeuft = false;
+let kontoLauf = null;       // das laufende Laden, damit man darauf warten kann
 
-async function kontoScheineLaden() {
-  if (kontoLaeuft) return;
+// Wie heisst die Person? Ohne Namen sagt die Rueckfrage nur "die Person" -
+// und wer loescht, muss sehen, WESSEN Guthaben sich aendert.
+function personName(ordnerId) {
+  if (!ordnerId) return "";
+  const o = kontoOrdner.find(x => x.id === ordnerId);
+  return o ? String(o.name || "") : "";
+}
+
+// Laeuft schon eines? Dann auf DAS warten, statt still nichts zu tun.
+function kontoScheineLaden() {
+  if (kontoLauf) return kontoLauf;
   if (!window.supa || typeof supaNutzer !== "function" ||
-      typeof supaScheineKurz !== "function") return;
-  kontoLaeuft = true;
-  try {
-    const u = await supaNutzer();
-    if (!u) { kontoScheine = []; kontoGeladen = false; return; }
-    // Der Kombi-Bau speichert immer in den EIGENEN Bereich (siehe
-    // scheinMerken: ordnerWahlZeigen(scheinId, u.id)). Also dort auch
-    // nachsehen - nicht in geteilten Bereichen.
-    const liste = await supaScheineKurz(u.id);
-    if (liste && liste._fehler) { kontoGeladen = false; return; }
-    kontoScheine = liste || [];
-    kontoGeladen = true;
-  } catch (e) {
-    kontoGeladen = false;
-  } finally {
-    kontoLaeuft = false;
-    if (typeof zeichnePanel === "function") zeichnePanel();
-    if (typeof zeichne_ === "function" && kontoGeladen) zeichne_();
-  }
+      typeof supaScheineKurz !== "function") return Promise.resolve();
+  kontoLauf = (async () => {
+    try {
+      const u = await supaNutzer();
+      if (!u) { kontoScheine = []; kontoOrdner = []; kontoGeladen = false; return; }
+      // Der Kombi-Bau speichert immer in den EIGENEN Bereich (siehe
+      // scheinMerken: ordnerWahlZeigen(scheinId, u.id)). Also dort auch
+      // nachsehen - nicht in geteilten Bereichen.
+      const liste = await supaScheineKurz(u.id);
+      if (liste && liste._fehler) { kontoGeladen = false; return; }
+      kontoScheine = liste || [];
+      kontoGeladen = true;
+      // Die Personen dazu. Schlaegt das fehl, bleibt nur der Name weg -
+      // die Kombinationen selbst sind wichtiger.
+      try {
+        if (typeof supaOrdnerLaden === "function") {
+          const o = await supaOrdnerLaden(u.id);
+          if (o && !o._fehler) kontoOrdner = o;
+        }
+      } catch (e2) { }
+    } catch (e) {
+      kontoGeladen = false;
+    } finally {
+      kontoLauf = null;
+      if (typeof zeichnePanel === "function") zeichnePanel();
+      if (typeof zeichne_ === "function" && kontoGeladen) zeichne_();
+    }
+  })();
+  return kontoLauf;
 }
 
 // Alle Kombinationen, die fuer DIESEN Ordner schon gesetzt sind -
@@ -2075,15 +2132,43 @@ function gesetzteEintraege() {
     // Alte Eintraege ohne satz gehoerten zum damals einzigen Ordner:
     // lieber mitzaehlen als eine gesetzte Kombination uebersehen.
     if (e.satz && e.satz !== satz) continue;
-    raus.push({ scheinId: e.scheinId, einsatz: Number(e.einsatz) || 0,
-                anbieter: e.anbieter, nummer: e.nummer, woher: "geraet" });
+    const eG = { scheinId: e.scheinId, einsatz: Number(e.einsatz) || 0,
+                 anbieter: e.anbieter, nummer: e.nummer, kz: e.kz,
+                 quote: Number(e.quote) || 0, wetten: e.wetten || [],
+                 zeit: e.zeit, woher: "geraet" };
+    // Ohne scheinId kein gemeinsamer Stamm - sonst faellt alles, was
+    // keine hat, zu EINER Kombination zusammen und die Einsaetze werden
+    // addiert.
+    eG.stamm = e.scheinId ? stammId(e.scheinId) : ("zeit:" + e.zeit);
+    eG.finger = kombiFinger(eG);
+    raus.push(eG);
   }
   for (const x of kontoScheine) {
     const d = x.daten;
-    if (!d) continue;                       // unlesbar: siehe supaScheineKurz
+    if (!d) {
+      // NICHT wegwerfen. supaScheineKurz merkt sich ausdruecklich
+      // "unlesbar", damit die Kombination nicht als leer durchgeht -
+      // sonst gilt sie als ungesetzt und Karam setzt sie ein zweites Mal.
+      // Ohne finger nimmt die Doppelt-Erkennung sie nicht auf, ohne
+      // Einsatz verfaelscht sie keine Summe. Sichtbar wird sie ueber
+      // unlesbar:true (siehe zeichnePanel).
+      raus.push({ scheinId: null, stamm: "db:" + x.id, einsatz: 0,
+                  anbieter: null, nummer: x.nummer, kz: null,
+                  quote: 0, wetten: [], finger: "", zeit: x.created_at,
+                  dbId: x.id, ordner: x.ordner, unlesbar: true, woher: "konto" });
+      continue;
+    }
     if (d.satz && d.satz !== satz) continue;
-    raus.push({ scheinId: d.scheinId, einsatz: Number(d.einsatz) || 0,
-                anbieter: d.anbieter, nummer: x.nummer || d.nummer, woher: "konto" });
+    const eK = { scheinId: d.scheinId, einsatz: Number(d.einsatz) || 0,
+                 anbieter: d.anbieter, nummer: x.nummer || d.nummer, kz: d.kz,
+                 quote: Number(d.quote) || 0, wetten: d.wetten || [],
+                 zeit: x.created_at, dbId: x.id,
+                 ordner: x.ordner, woher: "konto" };
+    // Uebernommene Alt-Scheine (tuImport) haben keine scheinId - jeder
+    // bekommt seinen eigenen Stamm ueber die Datenbank-Kennung.
+    eK.stamm = d.scheinId ? stammId(d.scheinId) : ("db:" + x.id);
+    eK.finger = kombiFinger(eK);
+    raus.push(eK);
   }
   return raus;
 }
@@ -2096,4 +2181,241 @@ function gesetzteEintraege() {
 function schonGesetzt(scheinId, gesetzt) {
   const liste = gesetzt || gesetzteEintraege();
   return liste.find(e => e.scheinId === scheinId) || null;
+}
+// ============================================================
+// DOPPELT GESPEICHERT
+//
+// Karam: "Einer hab ich es doppelt bei der Person." Passiert leicht:
+// speichern, nicht sicher sein, ob es angekommen ist, noch einmal
+// speichern. Danach zaehlt die Kombination in der Buchhaltung zweimal
+// und das Guthaben der Person ist um einen ganzen Einsatz zu niedrig.
+//
+// Zwei Eintraege sind dieselbe Kombination, wenn Anbieter und die drei
+// Wetten uebereinstimmen. Die LINIE gehoert dazu: dieselben drei Spiele
+// mit "ueber 2,5" statt "ueber 3,5" sind eine andere Wette, keine
+// Kopie. Der Einsatz gehoert NICHT dazu - wer zweimal speichert, tippt
+// beim zweiten Mal leicht etwas anderes ein.
+// ============================================================
+function kombiFinger(e) {
+  const kz = e.kz || "?";
+  const teile = (e.wetten || [])
+    .map(w => String(w.id) + ":" + String(w.linie === undefined ? "" : w.linie))
+    .sort();
+  if (!teile.length) return "";      // ohne Wetten kein Vergleich
+  // Die PERSON gehoert dazu. Dieselbe Kombination bei zwei Personen ist
+  // kein Doppeleintrag, sondern zweimal gesetztes Geld bei zwei Leuten.
+  // Ohne sie haette das Panel eine davon zum Loeschen angeboten.
+  return String(e.ordner || "-") + "|" + kz + "|" + teile.join("|");
+}
+
+// Gruppiert die gesetzten Eintraege nach Fingerabdruck und gibt nur die
+// Gruppen zurueck, die mehr als einen Eintrag haben.
+function doppelte(liste) {
+  const nach = {};
+  for (const e of (liste || gesetzteEintraege())) {
+    if (!e.finger) continue;
+    (nach[e.finger] = nach[e.finger] || []).push(e);
+  }
+  return Object.keys(nach).filter(f => nach[f].length > 1).map(f => nach[f]);
+}
+
+// ============================================================
+// DIE KACHELN SIND KNOEPFE
+//
+// Karam: "wenn ich auf Verlauf oder auf gesetzt-aber-nicht-vollstaendig
+// klicke, sollen auch die Kombinationen kommen, die dazugehoeren, und
+// ich die auch loeschen koennen."
+// ============================================================
+let panelAuf = "";   // "", "offen", "unter", "voll", "doppelt"
+
+function panelKlappe(welche) {
+  panelAuf = (panelAuf === welche) ? "" : welche;
+  zeichnePanel();
+  const liste = document.getElementById("panelliste");
+  if (liste && panelAuf) liste.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// Eine Zeile in der aufgeklappten Liste.
+function panelZeile(e, extra) {
+  const wer = e.woher === "konto" ? personName(e.ordner) : "";
+  const wohin = e.woher === "konto"
+    ? (wer ? "in deinem Konto, bei " + textSicherK2(wer) : "in deinem Konto")
+    : "nur auf diesem Gerät";
+  const spiele = (e.wetten || []).map(w => textSicherK2(w.spiel || w.id)).join(", ");
+  return '<li class="pl-zeile">' +
+    '<span class="pl-kopf"><b>' + (e.nummer ? "Nr. " + e.nummer : "ohne Nummer") + "</b> " +
+      textSicherK2(e.anbieter || "?") + " &middot; " +
+      Number(e.einsatz).toFixed(2) + " &euro;" +
+      (extra ? ' <span class="pl-warn">' + extra + "</span>" : "") + "</span>" +
+    (spiele ? '<span class="pl-spiele mini">' + spiele + "</span>" : "") +
+    '<span class="pl-wo mini">' + wohin + "</span>" +
+    '<button class="knopfweg" title="Diese Kombination aus dem Verlauf löschen" ' +
+      "onclick=\"verlaufEintragLoeschen('" + (e.dbId || "") + "','" +
+      String(e.zeit || "").replace(/'/g, "") + "')\">&#128465;</button>" +
+    "</li>";
+}
+
+function panelListeHtml(p) {
+  if (!panelAuf) return "";
+  const gesetzt = gesetzteEintraege();
+  const dopp = doppelte(gesetzt);
+  const doppFinger = new Set();
+  // Nur die ZWEITEN und weiteren einer Gruppe sind das Doppelte - der
+  // erste ist der richtige Eintrag.
+  const spaeter = new Set();
+  for (const g of dopp) {
+    doppFinger.add(g[0].finger);
+    const sortiert = g.slice().sort((a, b) => String(a.zeit || "").localeCompare(String(b.zeit || "")));
+    for (let i = 1; i < sortiert.length; i++) spaeter.add(sortiert[i]);
+  }
+
+  let titel = "", zeilen = "", hinweis = "";
+
+  if (panelAuf === "offen") {
+    // Hier gibt es nichts zu loeschen, was im Verlauf steht - das sind
+    // die noch NICHT gesetzten. Der Muelleimer sitzt an der Karte selbst.
+    const z = liesZustand();
+    const staemme = new Set(gesetzt.map(e => e.stamm));
+    const offen = ((z && z.scheine) || []).filter(s => !staemme.has(stammId(s.id)));
+    titel = "Noch nichts gesetzt";
+    hinweis = "Diese Kombinationen liegen nur im Kombi-Bau, beim Anbieter ist noch " +
+      "nichts abgeschickt. Der Mülleimer wirft sie aus dem Bau - im Verlauf " +
+      "steht davon ohnehin nichts.";
+    // Eine Zeile je KOMBINATION, nicht je Karte - sonst passt die Zahl
+    // in der Kachel nicht zur Zahl der Zeilen.
+    const nachNr = {};
+    for (const s of offen) (nachNr[s.nr] = nachNr[s.nr] || []).push(s);
+    zeilen = Object.keys(nachNr)
+      .sort((a, b) => anzeigeNr(z, Number(a)) - anzeigeNr(z, Number(b)))
+      .map(nr => {
+        const teile = nachNr[nr];
+        const haupt = teile.find(x => !x.teil) || teile[0];
+        const summe = teile.reduce((q, x) => q + (Number(einsatzWert(x, z)) || 0), 0);
+        const wo = [...new Set(teile.map(x => anbieterName(x.kz)))].join(", ");
+        return '<li class="pl-zeile"><span class="pl-kopf"><b>Kombination ' +
+          anzeigeNr(z, haupt.nr) + "</b> " + textSicherK2(wo) + " &middot; " +
+          summe.toFixed(2) + " &euro;" +
+          (teile.length > 1 ? ' <span class="mini">' + teile.length + " Teile</span>" : "") +
+          "</span>" +
+          '<button class="knopfweg" title="Diese Kombination aus dem Kombi-Bau löschen" ' +
+            "onclick=\"kombiLoeschen('" + haupt.id + "')\">&#128465;</button></li>";
+      }).join("");
+  } else if (panelAuf === "doppelt") {
+    titel = "Doppelt gespeichert";
+    const zuviel = dopp.reduce((q, g) => q + g.length - 1, 0);
+    hinweis = "Dieselben Wetten beim selben Anbieter stehen mehr als einmal im " +
+      "Verlauf. Der <b>erste</b> Eintrag ist der richtige - lösch die späteren. " +
+      "Hier stehen alle " + dopp.reduce((q, g) => q + g.length, 0) + " Einträge aus " +
+      dopp.length + " Gruppe" + (dopp.length === 1 ? "" : "n") + "; <b>" + zuviel +
+      "</b> davon " + (zuviel === 1 ? "ist" : "sind") + " zu viel - das ist die Zahl auf der Kachel.";
+    for (const g of dopp) {
+      const sortiert = g.slice().sort((a, b) => String(a.zeit || "").localeCompare(String(b.zeit || "")));
+      zeilen += sortiert.map((e, i) => panelZeile(e, i === 0 ? "der erste" : "später - das ist das Doppelte")).join("");
+    }
+  } else {
+    // voll oder unter: ueber die Gruppen des Panels gehen
+    const ziel = p.ziel;
+    const proStamm = {};
+    for (const e of gesetzt) {
+      if (e.unlesbar) continue;      // die stehen in ihrer eigenen Warnung
+      (proStamm[e.stamm] = proStamm[e.stamm] || []).push(e);
+    }
+    const gruppen = [];
+    for (const s of Object.keys(proStamm)) {
+      const summe = proStamm[s].reduce((q, x) => q + x.einsatz, 0);
+      // GENAU wie in panelZahlen runden, sonst faellt eine Kombination
+      // in der Kachel in die eine und in der Liste in die andere Gruppe.
+      const fehltR = rund2(Math.max(0, ziel - summe));
+      const voll = fehltR <= 0.004;
+      if ((panelAuf === "voll") === voll) gruppen.push({ stamm: s, teile: proStamm[s], summe: summe, fehlt: fehltR });
+    }
+    titel = panelAuf === "voll" ? "Voll gesetzt" : "Gesetzt, aber nicht voll";
+    hinweis = "Ein Kasten je Kombination, darin die einzelnen Einträge. Löschen nimmt " +
+      "den Eintrag aus dem Verlauf <b>und von der Person</b> - ihr Guthaben steigt " +
+      "danach um genau diesen Einsatz.";
+    zeilen = gruppen.map(g => {
+      const wo = [...new Set(g.teile.map(x => x.anbieter || "?"))].join(", ");
+      return '<li class="pl-block"><div class="pl-blockkopf"><b>' + textSicherK2(wo) + "</b> " +
+        g.summe.toFixed(2) + " &euro;" +
+        (g.teile.length > 1 ? ' <span class="mini">' + g.teile.length + " Einträge</span>" : "") +
+        (g.fehlt > 0.004 ? ' <span class="pl-fehlt">es fehlen ' + g.fehlt.toFixed(2) + " &euro;</span>" : "") +
+        "</div><ul>" +
+        g.teile.map(e => panelZeile(e, spaeter.has(e) ? "doppelt gespeichert" : "")).join("") +
+        "</ul></li>";
+    }).join("");
+  }
+
+  return '<div class="pn-liste" id="panelliste"><b>' + titel + "</b>" +
+    '<div class="mini">' + hinweis + "</div>" +
+    (zeilen ? "<ul>" + zeilen + "</ul>" : '<p class="mini">Hier ist nichts.</p>') +
+    '<button onclick="panelKlappe(\'' + panelAuf + '\')">zuklappen</button></div>';
+}
+
+// ============================================================
+// EINEN VERLAUFSEINTRAG LOESCHEN
+//
+// Karam: "wenn ich eine Kombination loesche, wird sie auch von der
+// Person geloescht, und das Geld startet wieder beim Account der Person."
+// Das Guthaben wird nicht gespeichert, sondern aus den Kombinationen
+// gerechnet (personPruefen in mein.js): faellt der Eintrag weg, ist der
+// Einsatz sofort wieder frei. Es muss also nichts "zurueckgebucht"
+// werden - aber es muss WIRKLICH geloescht werden, und das wird geprueft.
+// ============================================================
+async function verlaufEintragLoeschen(dbId, zeit) {
+  const gesetzt = gesetzteEintraege();
+  // Ueber die ZEIT, nicht ueber die scheinId: zwei doppelt gespeicherte
+  // Eintraege haben dieselbe scheinId, und dann loescht jeder Klick
+  // denselben - waehrend die Rueckfrage die Zahlen des anderen zeigt.
+  const e = dbId
+    ? gesetzt.find(x => x.dbId === dbId)
+    : gesetzt.find(x => x.woher === "geraet" && x.zeit === zeit);
+  if (!e) { meldung("Diese Kombination steht nicht mehr im Verlauf.", "warn"); return; }
+  const wer = personName(e.ordner);
+
+  if (!confirm(
+      "Diese Kombination aus dem Verlauf löschen?\n\n" +
+      "   " + (e.nummer ? "Nr. " + e.nummer + "  " : "") + (e.anbieter || "?") +
+      "  " + Number(e.einsatz).toFixed(2) + " Euro" +
+      (wer ? "\n   bei " + wer : "") + "\n\n" +
+      (e.woher === "konto"
+        ? "Sie verschwindet aus deinem Konto" + (wer ? " und von " + wer : " und von der Person") +
+          ". Das Guthaben " + (wer ? "von " + wer : "der Person") + " steigt danach um " +
+          Number(e.einsatz).toFixed(2) + " Euro.\n\n"
+        : "Sie verschwindet aus dem Verlauf auf diesem Gerät.\n\n") +
+      "Das lässt sich nicht rückgängig machen. Die Wette beim Anbieter " +
+      "bleibt davon unberührt - die musst du dort selbst ansehen.")) return;
+
+  if (e.woher === "konto") {
+    const r = await supaScheinLoeschen(e.dbId);
+    if (r.error) { meldung("Nicht gelöscht: " + r.error.message, "warn"); return; }
+    if (!r.data || !r.data.length) {
+      meldung("Nicht gelöscht: kein Recht dazu, oder sie war schon weg.", "warn");
+      await kontoScheineLaden();
+      return;
+    }
+    // SOFORT aus der oertlichen Liste nehmen. Das Nachladen kann still
+    // ausfallen (kein Netz, oder es laeuft gerade schon eines) - dann
+    // stuende die geloeschte Kombination weiter im Panel, waehrend die
+    // Meldung sagt, das Guthaben sei gestiegen.
+    kontoScheine = kontoScheine.filter(x => x.id !== e.dbId);
+    await kontoScheineLaden();
+  } else {
+    // Nur EINEN entfernen, nicht alle mit denselben Werten.
+    const alt = liesVerlauf();
+    const i = alt.findIndex(x => x.scheinId === e.scheinId && x.zeit === e.zeit);
+    if (i < 0) { meldung("Diese Kombination steht nicht mehr im Verlauf.", "warn"); return; }
+    alt.splice(i, 1);
+    if (!speichereVerlauf(alt)) return;
+  }
+
+  // ERST zeichnen, DANN melden: zeichne_ schreibt selbst in denselben
+  // Meldungskasten (abgelaufene Wetten) und wuerde die Bestaetigung
+  // sofort wieder ueberschreiben.
+  zeichne_();
+  meldung("Kombination gelöscht." +
+    (e.woher === "konto"
+      ? " Das Guthaben " + (wer ? "von " + textSicherK2(wer) : "der Person") + " ist um " +
+        Number(e.einsatz).toFixed(2) +
+        ' Euro höher - nachsehen in <a href="mein.html"><b>Mein Bereich</b></a>.'
+      : ""), "gut");
 }

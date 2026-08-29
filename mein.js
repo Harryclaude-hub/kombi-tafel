@@ -640,10 +640,14 @@ async function tuImport() {
   for (const e of lokal) {
     const foto = e.scheinId ? localStorage.getItem("foto_" + e.scheinId) : null;
     const fotoName = e.scheinId ? localStorage.getItem("foto_" + e.scheinId + "_name") : null;
+    // scheinId und satz MUESSEN mit: ohne sie kann der Kombi-Bau nicht
+    // erkennen, dass diese Kombination schon gesetzt ist, und alle
+    // uebernommenen Scheine fielen dort auf einen gemeinsamen Topf.
     const r = await supaScheinAnlegen(ich.id,
-      { zeit: e.zeit, kz: e.kz, anbieter: e.anbieter, einsatz: e.einsatz, quote: e.quote,
+      { zeit: e.zeit, scheinId: e.scheinId, satz: e.satz, nummer: e.nummer,
+        kz: e.kz, anbieter: e.anbieter, einsatz: e.einsatz, quote: e.quote,
         moeglich: e.moeglich, wetten: e.wetten, stand: e.stand, notiz: e.notiz || "" },
-      foto, fotoName);
+      foto, fotoName, null, e.nummer);
     if (!r.error) ok++;
     else {
       liegenGeblieben.push(e);
@@ -951,6 +955,10 @@ function zeichneScheineDb(scheine) {
   // immer alle Zahlen zeigt - sonst stuende auf dem Knopf "Voll (0)",
   // nur weil gerade nach "unter" gefiltert ist.
   const gruppen = verlaufGruppen(scheine);
+  // Ueber ALLE Kombinationen, nicht erst nach dem Filtern: sonst faende
+  // man die zwei Haelften eines Doppeleintrags nie zusammen.
+  const dopp = doppelteM(scheine);
+  const doppZuviel = Object.keys(dopp).filter(id => dopp[id].spaeter).length;
   const filter = verlaufFilterLesen();
   const alleZahl = scheine.length;
   if (filter !== "alle") scheine = scheine.filter(s => {
@@ -981,6 +989,8 @@ function zeichneScheineDb(scheine) {
     if (scheinWartet(s)) zklassen.push("fertigzeile");
     const gr = gruppen[stammIdM(d.scheinId)];
     if (gr && !gr.voll) zklassen.push("unterziel");
+    const dp = dopp[s.id];
+    if (dp && dp.spaeter) zklassen.push("doppelzeile");
     html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
       // Spiel, Linie, Fotoname und das Foto selbst kommen von Menschen und
@@ -989,6 +999,13 @@ function zeichneScheineDb(scheine) {
         textSicherM(t.spiel) + " (" + textSicherM(t.linie) + ")").join("<br>") +
       (s.foto ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
         '<div><img src="' + textSicherM(s.foto) + '" class="minifoto"></div>' : "") +
+      (dopp[s.id]
+        ? '<div class="doppelmark">' + (dopp[s.id].spaeter
+            ? "&#9888; doppelt gespeichert (" + dopp[s.id].platz + ". von " +
+              dopp[s.id].zahl + ") - diese hier kann weg"
+            : "steht " + dopp[s.id].zahl + "-mal im Verlauf - <b>das hier ist der erste</b>") +
+          "</div>"
+        : "") +
       anmerkungenBlock(s) + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + einsatzZelle(s, schreib) +
         luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +
@@ -1010,7 +1027,16 @@ function zeichneScheineDb(scheine) {
         (schreib ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
           "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>" : "") + "</td></tr>";
   }
-  el("scheine_db").innerHTML = html + "</tbody></table>";
+  el("scheine_db").innerHTML =
+    (doppZuviel
+      ? '<div class="warnkern"><b>&#9888; ' + doppZuviel + " Kombination" +
+        (doppZuviel === 1 ? "" : "en") + " doppelt gespeichert.</b> " +
+        "Dieselben Wetten beim selben Anbieter stehen mehr als einmal hier. " +
+        "Jeder Doppeleintrag zählt als zweiter Einsatz und drückt das Guthaben " +
+        "der Person um genau diesen Betrag. Die markierten Zeilen können weg - " +
+        "der erste Eintrag bleibt.</div>"
+      : "") +
+    html + "</tbody></table>";
 }
 
 async function tuStand(id, wert) {
@@ -3093,4 +3119,40 @@ async function tuEinsatz(id, wert) {
 
   meldungM("Einsatz geändert: " + alt.toFixed(2) + " -> " + zahl.toFixed(2) + " Euro.", "gut");
   zeichneBereich();
+}
+// Anbieter + die drei Wetten samt LINIE. Dieselben Spiele mit einer
+// anderen Linie sind eine andere Wette, keine Kopie. Der Einsatz zaehlt
+// NICHT mit: wer zweimal speichert, tippt beim zweiten Mal leicht etwas
+// anderes ein.
+function kombiFingerM(s) {
+  const d = s && s.daten;
+  if (!d) return "";
+  const teile = (d.wetten || [])
+    .map(w => String(w.id) + ":" + String(w.linie === undefined ? "" : w.linie))
+    .sort();
+  if (!teile.length) return "";
+  // Die PERSON gehoert dazu: dieselbe Kombination bei zwei Personen ist
+  // zweimal gesetztes Geld bei zwei Leuten, keine Kopie.
+  return String(s.ordner || "-") + "|" + (d.kz || "?") + "|" + teile.join("|");
+}
+
+// Gibt je Schein-Id zurueck, ob sie ein spaeterer Doppeleintrag ist und
+// wie viele es insgesamt sind. Der ERSTE gilt als der richtige.
+function doppelteM(scheine) {
+  const nach = {};
+  for (const s of scheine) {
+    const f = kombiFingerM(s);
+    if (!f) continue;
+    (nach[f] = nach[f] || []).push(s);
+  }
+  const raus = {};
+  for (const f of Object.keys(nach)) {
+    const g = nach[f];
+    if (g.length < 2) continue;
+    const sortiert = g.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    sortiert.forEach((s, i) => {
+      raus[s.id] = { zahl: g.length, spaeter: i > 0, platz: i + 1 };
+    });
+  }
+  return raus;
 }

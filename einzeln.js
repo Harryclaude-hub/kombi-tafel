@@ -63,8 +63,15 @@ let _einzelnGesetztKarte = null;
 function einzelnGesetztKarte() {
   if (_einzelnGesetztKarte) return _einzelnGesetztKarte;
   const karte = {};
+  // BEIDE Ablagen. liesVerlauf allein ist bei angemeldetem Nutzer leer -
+  // dann waere Regel 2 ("nicht zweimal beim selben Anbieter") wirkungslos
+  // und dieselbe Wette koennte zweimal beim selben Anbieter landen.
   let v = [];
-  try { v = liesVerlauf() || []; } catch (e) { v = []; }
+  try {
+    v = (typeof gesetzteEintraege === "function")
+      ? gesetzteEintraege()
+      : (liesVerlauf() || []);
+  } catch (e) { v = []; }
   for (const e of v) {
     if (!e || !e.kz || !Array.isArray(e.wetten)) continue;
     for (const x of e.wetten) if (x && x.id) karte[x.id + "|" + e.kz] = true;
