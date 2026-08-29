@@ -990,7 +990,7 @@ function zeichneScheineDb(scheine) {
       (s.foto ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
         '<div><img src="' + textSicherM(s.foto) + '" class="minifoto"></div>' : "") +
       anmerkungenBlock(s) + "</td>" +
-      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + (d.einsatz || 0).toFixed(2) + " &euro;" +
+      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + einsatzZelle(s, schreib) +
         luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + echtZelle(s, schreib) + "</td>" +
@@ -3014,4 +3014,83 @@ function luecken(g) {
   if (!g || g.voll) return "";
   return '<div class="mini unterziel-mark">es fehlen ' + g.fehlt.toFixed(2) + ' &euro;' +
     (g.teile > 1 ? ' (' + g.teile + ' Teile zusammen)' : '') + '</div>';
+}
+// ============================================================
+// EINSATZ NACHTRAEGLICH AENDERN
+//
+// Karam kann sich vertippen - er traegt die Zahl am Handy ein, waehrend
+// er beim Anbieter steht. Bisher war sie danach fuer immer falsch.
+//
+// Bewusst mit Rueckfrage und mit einer Anmerkung am Schein: eine stille
+// Aenderung an einer Geldzahl waere falsch. Wer spaeter abrechnet, muss
+// sehen koennen, dass hier jemand nachgebessert hat.
+// ============================================================
+function einsatzZelle(s, schreib) {
+  const d = s.daten || {};
+  const wert = Number(d.einsatz) || 0;
+  if (!schreib) return wert.toFixed(2) + " &euro;";
+  // type=text mit inputmode: type=number verschluckt je nach
+  // Spracheinstellung "250,50" stillschweigend.
+  return "<input type='text' inputmode='decimal' class='einsatz' value='" +
+    wert.toFixed(2) + "' onchange=\"tuEinsatz('" + s.id + "', this.value)\"> &euro;";
+}
+
+async function tuEinsatz(id, wert) {
+  const zahl = parseFloat(String(wert).replace(",", "."));
+  if (!isFinite(zahl) || zahl < 0) {
+    meldungM("Bitte einen gültigen Betrag eintragen.", "warn");
+    zeichneBereich(); return;
+  }
+
+  // FRISCH holen, nicht aus der Ansicht: die kann alt sein, und ein
+  // Ueberschreiben mit alten Werten faellt niemandem auf.
+  const holen = await supaScheinHolen(id);
+  if (holen.fehler) { meldungM("Nicht geändert: " + holen.fehler, "warn"); zeichneBereich(); return; }
+
+  const d = holen.daten || {};
+  const alt = Number(d.einsatz) || 0;
+  if (Math.abs(alt - zahl) < 0.005) { zeichneBereich(); return; }   // nichts zu tun
+
+  const quote = Number(d.quote) || 0;
+  const moeglichNeu = Math.round(zahl * quote * 100) / 100;
+
+  if (!confirm(
+    "Einsatz dieser Kombination ändern?\n\n" +
+    "   bisher:  " + alt.toFixed(2) + " Euro\n" +
+    "   neu:     " + zahl.toFixed(2) + " Euro\n\n" +
+    "Möglicher Gewinn ändert sich mit: " + (Number(d.moeglich) || 0).toFixed(2) +
+    " -> " + moeglichNeu.toFixed(2) + " Euro.\n\n" +
+    "Diese Zahl geht in Konto, Personenkasse und Buchhaltung ein. " +
+    "Die Änderung wird als Anmerkung am Schein vermerkt.")) { zeichneBereich(); return; }
+
+  d.einsatz = Math.round(zahl * 100) / 100;
+  d.moeglich = moeglichNeu;
+
+  const r = await supaScheinDatenSchreiben(id, holen.key, d);
+  if (r.error) { meldungM("Nicht geändert: " + r.error.message, "warn"); zeichneBereich(); return; }
+  if (!r.data || !r.data.length) {
+    // Die stille Falle: ohne select() saehe ein an den Rechten
+    // gescheitertes Update genauso aus wie ein gelungenes.
+    meldungM("Nicht geändert: kein Schreibrecht oder Kombination weg.", "warn");
+    zeichneBereich(); return;
+  }
+
+  // Die Spur. Schlaegt sie fehl, ist der Einsatz trotzdem geaendert -
+  // das muss dann auch so dastehen und nicht als Gesamtfehler.
+  try {
+    const a = await supaAnmerken(holen.bereich, id,
+      "Einsatz geändert: " + alt.toFixed(2) + " -> " + zahl.toFixed(2) + " Euro");
+    if (a && a.error) {
+      meldungM("Einsatz geändert auf " + zahl.toFixed(2) +
+        " Euro. Die Anmerkung dazu ließ sich nicht speichern: " + a.error.message, "warn");
+      zeichneBereich(); return;
+    }
+  } catch (e) {
+    meldungM("Einsatz geändert auf " + zahl.toFixed(2) +
+      " Euro. Die Anmerkung dazu ließ sich nicht speichern.", "warn");
+    zeichneBereich(); return;
+  }
+
+  meldungM("Einsatz geändert: " + alt.toFixed(2) + " -> " + zahl.toFixed(2) + " Euro.", "gut");
+  zeichneBereich();
 }

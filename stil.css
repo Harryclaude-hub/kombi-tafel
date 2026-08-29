@@ -2809,3 +2809,15 @@ button.merken, button.aufloesen, label.fotoknopf.klein,
   .vf-knopf { flex: 1 1 auto; }
   .vf-ziel, .vf-fehlt, .vf-ok { flex-basis: 100%; }
 }
+/* ---------- Merker "steht im Verlauf" (loeschbar) ---------- */
+.s-drin {
+  display: inline-block; margin-left: 8px; padding: 2px 9px;
+  border-radius: 999px; background: #e7f5e7; border: 1px solid #1a7a1a;
+  color: #145c14; font-size: 12px; font-weight: bold; vertical-align: middle;
+}
+/* Der Speichern-Knopf tritt zurueck, wenn schon gespeichert ist: er soll
+   nicht mehr der naechste selbstverstaendliche Schritt aussehen. */
+button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9d8; }
+@media (max-width: 700px) {
+  .s-drin { display: block; margin: 5px 0 0 0; width: fit-content; }
+}

@@ -214,6 +214,29 @@ async function supaScheineLaden(bereichId) {
   return mitFehler(liste, r);
 }
 
+// Nur zum NACHSEHEN, ob eine Kombination schon gesetzt ist: holt die
+// Kombinationen ohne Fotos. supaScheineLaden entschluesselt jedes Foto
+// mit - das sind schnell mehrere Megabyte, die der Kombi-Bau nicht
+// braucht. Hier wird nur daten entschluesselt.
+async function supaScheineKurz(bereichId) {
+  const r = await supa.from("kt_scheine")
+    .select("id, daten, stand, nummer, ordner, created_at")
+    .eq("bereich", bereichId).order("created_at", { ascending: false });
+  const liste = r.data || [];
+  const key = await kryptoBereich(bereichId);
+  for (const x of liste) {
+    if (x.daten && x.daten.e2e) {
+      const klar = await e2eAuf(key, x.daten.e2e);
+      // Kaputt oder falscher Schluessel: NICHT so tun, als waere die
+      // Kombination leer - sonst zaehlt sie als "noch nichts gesetzt"
+      // und Karam setzt sie ein zweites Mal.
+      try { x.daten = JSON.parse(klar); }
+      catch (e) { x.daten = null; x.unlesbar = true; }
+    }
+  }
+  return mitFehler(liste, r);
+}
+
 // nummer ist Karams feste Scheinnummer. Die Spalte gab es schon, wurde
 // aber nie gefuellt - deshalb stand im Chat-Anhang immer "K-?".
 async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, nummer) {
@@ -230,6 +253,32 @@ async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, num
     notiz: await e2eZu(key, daten.notiz || "") || "",
     ordner: ordnerId || null
   });
+}
+
+// EINE Kombination frisch holen und entschluesseln. Fuer Aenderungen,
+// bei denen der verschluesselte Block neu geschrieben werden muss:
+// die Ansicht auf dem Schirm kann alt sein.
+async function supaScheinHolen(id) {
+  const r = await supa.from("kt_scheine").select("id, bereich, daten").eq("id", id).maybeSingle();
+  if (r.error) return { fehler: r.error.message };
+  if (!r.data) return { fehler: "Die Kombination gibt es nicht mehr." };
+  const key = await kryptoBereich(r.data.bereich);
+  if (!key) return { fehler: "Kein Schlüssel für diesen Bereich." };
+  let daten = r.data.daten;
+  if (daten && daten.e2e) {
+    const klar = await e2eAuf(key, daten.e2e);
+    try { daten = JSON.parse(klar); }
+    catch (e) { return { fehler: "Die Kombination ist nicht lesbar (falscher Schlüssel?)." }; }
+  }
+  return { id: r.data.id, bereich: r.data.bereich, daten: daten, key: key };
+}
+
+// Schreibt den verschluesselten Block zurueck. NUR ueber diesen Weg,
+// damit niemand aus Versehen Klartext in die Datenbank legt.
+async function supaScheinDatenSchreiben(id, key, daten) {
+  return await supa.from("kt_scheine")
+    .update({ daten: { e2e: await e2eZu(key, JSON.stringify(daten)) } })
+    .eq("id", id).select("id");
 }
 
 async function supaScheinAendern(id, felder) {

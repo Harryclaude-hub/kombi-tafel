@@ -794,6 +794,9 @@ function zeichne_() {
   const niedrig = z.scheine.filter(s => s.art === "niedrig");
   const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
+  // Einmal fuer alle Karten (siehe Kommentar unten bei scheinHtml).
+  const gesetztJetzt = gesetzteEintraege();
+
   const gruppenZahl = new Set(normal.map(s => s.nr)).size;
   document.getElementById("uebersicht").innerHTML =
     "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (" + z.einst.mind.toFixed(2) + ")" +
@@ -803,12 +806,12 @@ function zeichne_() {
     " blieben übrig." + tippsHtml(z);
 
   document.getElementById("scheine").innerHTML =
-    (normal.length ? normal.map(s => scheinHtml(s, z)).join("") :
+    (normal.length ? normal.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
       '<div class="warnkern">Keine Scheine über der Mindestquote. Senk sie oben, oder trag ' +
       'in der Kombi-Tafel echte Quoten ein.</div>');
 
   document.getElementById("niedrig").innerHTML =
-    (niedrig.length ? niedrig.map(s => scheinHtml(s, z)).join("") :
+    (niedrig.length ? niedrig.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
       '<p class="mini">Keine Wetten unter der Mindestquote.</p>');
 
   zeichneReste(z);
@@ -826,8 +829,14 @@ function anzeigeNr(z, nr) {
   return i < 0 ? nr : (i + 1);
 }
 
-function scheinHtml(s, z) {
+// gesetzt ist die EINE Liste je Zeichnung (gesetzteEintraege). Fehlt sie,
+// holt schonGesetzt sie selbst - dann stimmt die Anzeige auch, es kostet
+// nur mehr.
+function scheinHtml(s, z, gesetzt) {
   const mind = mindWert(z);
+  // EXAKTE Kennung: ein zweiter Teil ist beim Anbieter eine eigene
+  // Wette und braucht seinen eigenen Eintrag.
+  const imVerlauf = schonGesetzt(s.id, gesetzt);
   let gesamt = 1, gesamtRoh = 1, alleFest = true;
   const zeilen = s.wetten.map(eintrag => {
     const w = wetteNachId(eintrag.id);
@@ -888,6 +897,11 @@ function scheinHtml(s, z) {
     '<span class="s-wo"><span class="s-wo-name">' + anbieterName(s.kz) +
     '</span><span class="s-wo-mini">hier suchen</span></span>' +
     "Kombination " + anzeigeNr(z, s.nr) +
+    (imVerlauf
+      ? ' <span class="s-drin" title="Diese Kombination ist gespeichert - du findest sie in Mein Bereich.">' +
+        '&#10003; im Verlauf' + (imVerlauf.nummer ? ' als Nr. ' + imVerlauf.nummer : '') +
+        (imVerlauf.einsatz ? ', ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') + '</span>'
+      : "") +
     (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
     (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
       (s.variante ? " (andere Mischung für den Rest)" : " (gleiche Wetten, weiterer Anbieter)") + "</span>" : "") +
@@ -913,12 +927,13 @@ function scheinHtml(s, z) {
     "<div class='s-fuss'>Einsatz <input type='number' step='0.5' min='0' class='einsatz' " +
       "id='e_" + s.id + "' value='" + einsatzWert(s, z) + "' oninput=\"einsatzGeaendert('" + s.id + "', this.value, " + gesamt + ")\"> &euro;" +
       ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(einsatzWert(s, z) * gesamt).toFixed(2) + " &euro;</b>" +
-      '<button class="merken" onclick="scheinMerken(\'' + s.id + '\')">In den Verlauf</button>' +
+      '<button class="merken' + (imVerlauf ? ' schonda' : '') + '" ' +
+        'onclick="scheinMerken(\'' + s.id + '\')">' +
+        (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
       '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Der Anbieter lässt nicht mehr zu? Gleiche Wetten zusätzlich bei einem weiteren Anbieter setzen.">&#10133; Rest bei weiterem Anbieter</button>' +
       '<button onclick="scheinNeuMischen(\'' + s.id + '\')" title="Geht auch beim anderen Anbieter nicht mehr? Andere Wetten aus dem Ordner zu einer neuen Mischung, damit der Rest trotzdem gesetzt wird.">&#128256; Andere Mischung für den Rest</button>' +
-      (s.wetten.length !== 3 || s.art === "eigen" || s.teil
-        ? '<button class="aufloesen" onclick="scheinAufloesen(\'' + s.id + '\')">Schein auflösen</button>'
-        : "") +
+      '<button class="knopfweg" title="Diese Kombination löschen" ' +
+        'onclick="kombiLoeschen(\'' + s.id + '\')">&#128465; Löschen</button>' +
       '<label class="fotoknopf">&#128247; Foto vom Wettschein' +
         '<input type="file" accept="image/*" style="display:none" ' +
         'onchange="fotoHochladen(\'' + s.id + '\', this)"></label>' +
@@ -1193,12 +1208,83 @@ function eigenbauAnlegen() {
   zeichne_();
 }
 
-function scheinAufloesen(scheinId) {
+// Alter Name, gleiche Sache - damit nichts ins Leere laeuft.
+function scheinAufloesen(scheinId) { kombiLoeschen(scheinId); }
+
+// Haengt an DIESER Kennung noch ein Verlaufseintrag? Dann darf das Foto
+// nicht weg: der oertliche Verlauf (kombis.js) und der spaetere
+// Konto-Import (mein.js) holen es beide ueber "foto_"+scheinId.
+function fotoNochGebraucht(scheinId) {
+  try {
+    for (const e of (liesVerlauf() || [])) if (e.scheinId === scheinId) return true;
+  } catch (e) { return true; }   // im Zweifel behalten
+  return false;
+}
+
+function kombiLoeschen(scheinId) {
   const z = liesZustand();
-  z.scheine = z.scheine.filter(s => s.id !== scheinId);
+  if (!z || !z.scheine) return;
+  const s = z.scheine.find(x => x.id === scheinId);
+  if (!s) return;
+
+  // Hauptkarte nimmt alle Teile mit, eine Teil-Karte nur sich selbst.
+  const gruppe = gruppeScheine(z, s.nr);
+  const weg = s.teil ? [s] : gruppe;
+  const nr = anzeigeNr(z, s.nr);
+
+  // Was davon steht schon im Verlauf? Das ist der gefaehrliche Fall:
+  // eine geloeschte Kombination gilt beim naechsten Mischen als NICHT
+  // gesetzt, und dieselben Wetten koennten ein zweites Mal rausgehen.
+  const gesetzt = gesetzteEintraege();
+  const schonDrin = weg.filter(x => gesetzt.some(e => e.scheinId === x.id));
+
+  let frage = s.teil
+    ? "Teil " + s.teil + " von Kombination " + nr + " bei " + anbieterName(s.kz) +
+      // "Die anderen 1 Teile" - Karam liest das am Handy, das darf nicht holpern.
+      " löschen?\n\n" + (gruppe.length === 2
+        ? "Der andere Teil bleibt stehen."
+        : "Die anderen " + (gruppe.length - 1) + " Teile bleiben stehen.")
+    : "Kombination " + nr + " löschen?" +
+      (gruppe.length > 1
+        ? "\n\nEs fallen ALLE " + gruppe.length + " Teile weg (" +
+          [...new Set(gruppe.map(x => anbieterName(x.kz)))].join(", ") + ")."
+        : "\n\nAnbieter: " + anbieterName(s.kz) + ".");
+
+  frage += "\n\nDie Wetten werden wieder frei und beim nächsten Mischen neu verteilt.";
+
+  if (schonDrin.length) {
+    frage = "ACHTUNG: " + (schonDrin.length === 1 ? "Diese Kombination steht" : schonDrin.length + " Teile stehen") +
+      " schon im Verlauf - du hast sie also beim Anbieter gesetzt.\n\n" +
+      "Im Verlauf bleibt sie stehen, hier verschwindet sie. Danach weiß der " +
+      "Kombi-Bau nicht mehr, dass diese Wetten schon draußen sind, und kann " +
+      "sie ein ZWEITES MAL verbauen.\n\n" + frage;
+  }
+
+  if (!confirm(frage)) return;
+
+  const raus = new Set(weg.map(x => x.id));
+  z.scheine = z.scheine.filter(x => !raus.has(x.id));
   speichereZustand(z);
-  meldung("Schein aufgelöst. Die Wetten sind wieder frei und werden beim nächsten " +
-    "Anders mischen neu verteilt.", "gut");
+
+  // Fotos nur wegwerfen, wenn kein Verlaufseintrag mehr daran haengt -
+  // sonst steht der Eintrag ohne Bild da. Ohne dieses Aufraeumen fuellen
+  // die Bilder still den Speicher, bis das Speichern scheitert.
+  let fotosWeg = 0;
+  for (const x of weg) {
+    if (fotoNochGebraucht(x.id)) continue;
+    if (localStorage.getItem(fotoSchluessel(x.id))) fotosWeg++;
+    fotoLoeschen(x.id);
+  }
+
+  meldung((s.teil ? "Teil " + s.teil + " von Kombination " : "Kombination ") + nr +
+    " gelöscht" + (fotosWeg ? " (mit Foto)" : "") + ". Die Wetten sind wieder frei. " +
+    "<b>Die Nummern der folgenden Kombinationen rücken um eins nach vorne.</b>", "gut");
+
+  // Im Einzel-Modus ist damit die eine Kombination weg - gleich die
+  // naechste holen, sonst steht Karam vor einer leeren Seite.
+  if (typeof einzelnAktiv === "function" && einzelnAktiv() && s.einzeln) {
+    if (typeof einzelnNaechste === "function") { einzelnNaechste(); return; }
+  }
   zeichne_();
 }
 
@@ -1262,6 +1348,15 @@ function baueVerlaufsEintrag(scheinId) {
 function scheinMerken(scheinId) {
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
   if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
+  // Doppelt gespeichert heisst doppelt in der Buchhaltung. Karam nennt
+  // genau das als Grund fuer den Loeschknopf: "haben wir da doppelt
+  // reingemacht". Also lieber einmal fragen.
+  const drin = schonGesetzt(scheinId);
+  if (drin && !confirm("Diese Kombination steht schon im Verlauf" +
+      (drin.nummer ? " als Nr. " + drin.nummer : "") +
+      (drin.einsatz ? " mit " + Number(drin.einsatz).toFixed(2) + " Euro" : "") + ".\n\n" +
+      "Noch einmal speichern? Dann steht sie zweimal drin und zaehlt in der " +
+      "Buchhaltung doppelt.")) return;
   // Eingeloggt? Dann ist die Konto-Ordner-Frage PFLICHT (Karams Regel:
   // jede Kombination muss zugeordnet sein). Ohne Konto wie bisher lokal.
   if (typeof supaNutzer === "function" && window.supa) {
@@ -1356,9 +1451,12 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
       return;
     }
     ordnerWahlZu(scheinId);
-    meldung("Schein " + b.eintrag.nummer + " in dein Konto gespeichert und der Person zugeordnet: " +
+    meldung("Kombination " + b.eintrag.nummer + " in dein Konto gespeichert und der Person zugeordnet: " +
       '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");
     zeichneKonto();
+    // Frisch nachladen, sonst haelt der Kombi-Bau die Kombination
+    // weiter fuer ungesetzt - genau der Fehler, der Karam aufgefallen ist.
+    kontoScheineLaden();
   });
 }
 
@@ -1525,12 +1623,15 @@ function neuBauen() {
 function gesetzteScheine() {
   const z = liesZustand();
   if (!z || !z.scheine) return [];
-  const satz = aktiverSatzId();
-  const ids = new Set();
-  for (const e of liesVerlauf()) if (e.satz === satz && e.scheinId) ids.add(e.scheinId);
-  if (!ids.size) return [];
+  // BEIDE Ablagen (gesetzteEintraege), nicht nur die oertliche: wer
+  // angemeldet ist, speichert ausschliesslich ins Konto.
+  const staemme = new Set(gesetzteEintraege().map(e => stammId(e.scheinId)));
+  if (!staemme.size) return [];
+  // Ueber den Stamm vergleichen: ein gesetzter Teil (S7-3_t2) haelt die
+  // ganze Kombination fest, damit sie beim Neumischen nicht auseinander-
+  // geriessen wird.
   const nummern = new Set();
-  for (const s of z.scheine) if (ids.has(s.id)) nummern.add(s.nr);
+  for (const s of z.scheine) if (staemme.has(stammId(s.id))) nummern.add(s.nr);
   return z.scheine.filter(s => nummern.has(s.nr));
 }
 
@@ -1822,13 +1923,13 @@ function panelZahlen() {
   const z = liesZustand();
 
   // 1. Gebaut, aber noch nichts gesetzt: alles im Zustand, dessen Stamm
-  //    im Verlauf noch gar nicht vorkommt.
-  let v = [];
-  try { v = liesVerlauf() || []; } catch (e) { v = []; }
+  //    im Verlauf noch gar nicht vorkommt. "Verlauf" heisst BEIDE
+  //    Ablagen - Geraet und Konto (siehe gesetzteEintraege).
+  const v = gesetzteEintraege();
   const gesetztProStamm = {};
   for (const e of v) {
     const s = stammId(e.scheinId);
-    if (!gesetztProStamm[s]) gesetztProStamm[s] = { einsatz: 0, teile: [], zeit: e.zeit };
+    if (!gesetztProStamm[s]) gesetztProStamm[s] = { einsatz: 0, teile: [] };
     gesetztProStamm[s].einsatz += Number(e.einsatz) || 0;
     gesetztProStamm[s].teile.push(e);
   }
@@ -1920,4 +2021,79 @@ function panelRestMischen() {
     "Neu mischen?";
   if (!confirm(frage)) return;
   restNeuMischen();
+}
+// ============================================================
+// WAS STEHT SCHON IM VERLAUF? - beide Wege zusammen
+//
+// Es gibt zwei Ablagen, und bis heute hat der Kombi-Bau nur eine
+// gelesen (siehe oben im Kommentar zu diesem Patch):
+//   oertlich   localStorage "verlauf"  - wenn niemand angemeldet ist
+//   Konto      kt_scheine in der Datenbank - wenn Karam angemeldet ist
+// Karam ist angemeldet. Deshalb war fuer den Kombi-Bau immer alles
+// "noch nichts gesetzt", obwohl es gesetzt war.
+//
+// kontoScheine wird einmal beim Laden geholt und nach jedem Speichern
+// aufgefrischt. Faellt das Netz aus, bleibt die Liste leer - dann zeigt
+// das Panel weniger an, aber es erfindet nichts.
+// ============================================================
+let kontoScheine = [];
+let kontoGeladen = false;   // false = wir wissen es (noch) nicht
+let kontoLaeuft = false;
+
+async function kontoScheineLaden() {
+  if (kontoLaeuft) return;
+  if (!window.supa || typeof supaNutzer !== "function" ||
+      typeof supaScheineKurz !== "function") return;
+  kontoLaeuft = true;
+  try {
+    const u = await supaNutzer();
+    if (!u) { kontoScheine = []; kontoGeladen = false; return; }
+    // Der Kombi-Bau speichert immer in den EIGENEN Bereich (siehe
+    // scheinMerken: ordnerWahlZeigen(scheinId, u.id)). Also dort auch
+    // nachsehen - nicht in geteilten Bereichen.
+    const liste = await supaScheineKurz(u.id);
+    if (liste && liste._fehler) { kontoGeladen = false; return; }
+    kontoScheine = liste || [];
+    kontoGeladen = true;
+  } catch (e) {
+    kontoGeladen = false;
+  } finally {
+    kontoLaeuft = false;
+    if (typeof zeichnePanel === "function") zeichnePanel();
+    if (typeof zeichne_ === "function" && kontoGeladen) zeichne_();
+  }
+}
+
+// Alle Kombinationen, die fuer DIESEN Ordner schon gesetzt sind -
+// aus beiden Ablagen, in einer Form.
+function gesetzteEintraege() {
+  const satz = aktiverSatzId();
+  const raus = [];
+  let oertlich = [];
+  try { oertlich = liesVerlauf() || []; } catch (e) { oertlich = []; }
+  for (const e of oertlich) {
+    // Alte Eintraege ohne satz gehoerten zum damals einzigen Ordner:
+    // lieber mitzaehlen als eine gesetzte Kombination uebersehen.
+    if (e.satz && e.satz !== satz) continue;
+    raus.push({ scheinId: e.scheinId, einsatz: Number(e.einsatz) || 0,
+                anbieter: e.anbieter, nummer: e.nummer, woher: "geraet" });
+  }
+  for (const x of kontoScheine) {
+    const d = x.daten;
+    if (!d) continue;                       // unlesbar: siehe supaScheineKurz
+    if (d.satz && d.satz !== satz) continue;
+    raus.push({ scheinId: d.scheinId, einsatz: Number(d.einsatz) || 0,
+                anbieter: d.anbieter, nummer: x.nummer || d.nummer, woher: "konto" });
+  }
+  return raus;
+}
+
+// Steht GENAU DIESE Karte schon im Verlauf? EXAKTE Kennung, kein Stamm:
+// jeder Teil ist beim Anbieter eine eigene Wette und braucht seinen
+// eigenen Eintrag. Wer hier ueber den Stamm ginge, wuerde einen noch
+// nicht gesetzten zweiten Teil gruen als "erledigt" melden - und eine
+// falsche gruene Meldung sieht sich niemand nach.
+function schonGesetzt(scheinId, gesetzt) {
+  const liste = gesetzt || gesetzteEintraege();
+  return liste.find(e => e.scheinId === scheinId) || null;
 }
