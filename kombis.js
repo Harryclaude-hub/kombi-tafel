@@ -819,12 +819,8 @@ function scheinHtml(s, z) {
         '<img src="' + foto + '" alt="' + name + '">' +
         '<div class="mini">hochgeladen ' + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "") +
         ' &nbsp;<a href="' + foto + '" download="' + fotoDateiname(name) + '">unter diesem Namen herunterladen</a>' +
-        ' &nbsp;<button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button>' +
-        ' &nbsp;<button class="haupt" onclick="scheinFotoLesen(\'' + s.id + '\')">Zahlen aus dem Foto lesen</button></div>' +
-        '<div id="fotolese_' + s.id + '">' + (function () {
-          const a = (typeof fotoAnalyseLesen === "function") ? fotoAnalyseLesen(s.id) : null;
-          return a ? fotoAnalyseHtml(s.id, a) : "";
-        })() + "</div></div>";
+        ' &nbsp;<button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button></div>' +
+        "</div>";
     })() : "") +
     "</div>";
 }
@@ -1105,8 +1101,8 @@ function baueVerlaufsEintrag(scheinId) {
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   };
-  const analyse = (typeof fotoAnalyseLesen === "function") ? fotoAnalyseLesen(scheinId) : null;
-  if (analyse && analyse.sicher) eintrag.fotoAnalyse = analyse;
+  // Frueher hing hier die Foto-Auswertung mit dran. Das Foto wird jetzt
+  // nur noch mitgenommen, nicht mehr gelesen.
   return { s: s, eintrag: eintrag,
     foto: localStorage.getItem(fotoSchluessel(scheinId)),
     fotoName: localStorage.getItem(fotoSchluessel(scheinId) + "_name") };
@@ -1210,6 +1206,7 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
 }
 
 function zeichneVerlauf() {
+  verlaufZahlSetzen();
   const ziel = document.getElementById("verlauf");
   if (!ziel) return;
   const v = liesVerlauf();
@@ -1393,4 +1390,121 @@ function tippsHtml(z) {
       (t.grund ? ' <span class="mini">' + t.grund + "</span>" : "") + "</li>";
   }
   return h + "</ul></div>";
+}
+
+// Springt zum Verlauf und macht ihn kurz sichtbar. Reine Bedienung -
+// am Verlauf selbst aendert sich nichts.
+function zumVerlauf() {
+  const ziel = document.getElementById("verlaufkasten") || document.getElementById("verlauf");
+  if (!ziel) return;
+  ziel.scrollIntoView({ behavior: "smooth", block: "start" });
+  ziel.classList.add("hervor");
+  setTimeout(() => ziel.classList.remove("hervor"), 1600);
+}
+
+// Wie viele Scheine liegen schon im Verlauf? Fuer die Zahl am Knopf.
+function verlaufZahlSetzen() {
+  const knopf = document.getElementById("knopf_verlauf");
+  if (!knopf) return;
+  let n = 0;
+  try { n = (liesVerlauf() || []).length; } catch (e) { n = 0; }
+  knopf.innerHTML = "&#128220; Verlauf" + (n ? ' <span class="f-zahl">' + n + "</span>" : "");
+}
+// ============================================================
+// REST AUFFUELLEN: jede Kombination auf den Ziel-Einsatz bringen
+//
+// Karams Lage: eine Kombination bekommt bei Stake nur 200 Euro, weil er
+// dort schon gesetzt hat oder eine Einsatz-Grenze gilt. Die restlichen
+// 200 sollen dann bei DEMSELBEN Dreier bei einem anderen Anbieter
+// stehen, in seiner Reihenfolge: Stake, Interwetten, Bwin, Bet365.
+//
+// Geprueft wird vor jedem Teil, ob der neue Anbieter die drei Wetten
+// ueberhaupt fuehrt und ob jede Quote dort ihre Untergrenze aus der
+// Tabelle erreicht. Sonst kommt der naechste dran.
+//
+// Es ist ausdruecklich in Ordnung, wenn eine Kombination am Ende nicht
+// auf den vollen Betrag kommt - dann steht es hinterher da.
+// ============================================================
+
+// Fuehrt dieser Anbieter ALLE Wetten des Scheins ueber ihrer Untergrenze?
+function anbieterTraegt(wetten, kz) {
+  for (const eintrag of wetten) {
+    const w = wetteNachId(eintrag.id);
+    if (!w) return false;
+    const q = zielQuote(w, eintrag.optIdx, kz);
+    if (!(q.roh >= mindFuer(w, eintrag.optIdx) - 0.0001)) return false;
+  }
+  return true;
+}
+
+// Wie viel darf bei diesem Anbieter noch dazu? Karams Einsatz-Grenze
+// gilt je Anbieter ueber ALLE Kombinationen zusammen.
+function grenzeRest(z, kz) {
+  const grenzen = (z.einst && z.einst.limits) || null;
+  if (!grenzen || !isFinite(grenzen[kz])) return Infinity;
+  let schon = 0;
+  for (const s of z.scheine) if (s.kz === kz) schon += parseFloat(einsatzWert(s, z)) || 0;
+  return Math.max(0, rund2(grenzen[kz] - schon));
+}
+
+function alleAuffuellen() {
+  const z = liesZustand();
+  if (!z || !z.scheine.length) { meldung("Es gibt noch keine Scheine.", "warn"); return; }
+  const ziel = zielEinsatz();
+  const reihe = (z.einst && z.einst.anbieter && z.einst.anbieter.length)
+    ? z.einst.anbieter : KT_ANBIETER_RANG.slice();
+
+  const nummern = [...new Set(z.scheine.map(s => s.nr))];
+  let dazu = 0, voll = 0, offenGeblieben = [];
+
+  for (const nr of nummern) {
+    // Immer frisch rechnen: jeder neue Teil aendert die Summe.
+    let rest = rund2(ziel - gruppeGesetzt(z, nr));
+    if (rest <= 0.004) { voll++; continue; }
+    for (const kz of reihe) {
+      if (rest <= 0.004) break;
+      const teile = z.scheine.filter(x => x.nr === nr);
+      if (teile.some(x => x.kz === kz)) continue;        // dort steht dieser Dreier schon
+      const vorlage = teile[0];
+      if (!vorlage) break;
+      if (!anbieterTraegt(vorlage.wetten, kz)) continue; // fuehrt die Wetten nicht
+      const platz = grenzeRest(z, kz);
+      if (platz <= 0.004) continue;                      // Einsatz-Grenze schon voll
+      const betrag = rund2(Math.min(rest, platz));
+      if (betrag <= 0.004) continue;
+      z.scheine.splice(z.scheine.indexOf(vorlage) + teile.length, 0, {
+        id: vorlage.id + "_t" + (teile.length + 1), nr: nr, kz: kz,
+        art: (vorlage.art === "niedrig") ? "niedrig" : "normal",
+        teil: teile.length + 1, einsatz: betrag,
+        wetten: vorlage.wetten.map(w => ({ id: w.id, optIdx: w.optIdx })),
+        entfernt: []
+      });
+      dazu++;
+      rest = rund2(rest - betrag);
+    }
+    if (rest <= 0.004) voll++;
+    else offenGeblieben.push({ nr: nr, rest: rest });
+  }
+
+  if (!dazu) {
+    meldung("<b>Nichts aufzufüllen.</b> " + (offenGeblieben.length
+      ? offenGeblieben.length + " Kombination(en) kommen nicht auf " + ziel.toFixed(2) +
+        " &euro;, aber kein weiterer Anbieter führt die Wetten über ihrer Untergrenze " +
+        "oder hat noch Platz unter deiner Einsatz-Grenze."
+      : "Alle Kombinationen stehen schon auf " + ziel.toFixed(2) + " &euro;."),
+      offenGeblieben.length ? "warn" : "gut");
+    return;
+  }
+
+  speichereZustand(z);
+  let text = "<b>" + dazu + " Teil" + (dazu === 1 ? "" : "e") + " bei weiteren Anbietern angelegt.</b> " +
+    voll + " von " + nummern.length + " Kombinationen stehen jetzt auf " + ziel.toFixed(2) + " &euro;.";
+  if (offenGeblieben.length) {
+    const summe = offenGeblieben.reduce((p, x) => p + x.rest, 0);
+    text += " Bei " + offenGeblieben.length + " Kombination(en) bleiben zusammen " +
+      summe.toFixed(2) + " &euro; offen - dort führt kein weiterer Anbieter die Wetten " +
+      "über ihrer Untergrenze, oder deine Einsatz-Grenze ist erreicht.";
+  }
+  meldung(text, offenGeblieben.length ? "warn" : "gut");
+  zeichne_();
 }
