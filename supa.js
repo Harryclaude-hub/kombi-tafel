@@ -235,7 +235,11 @@ async function supaScheinAendern(id, felder) {
 }
 
 async function supaScheinLoeschen(id) {
-  return await supa.from("kt_scheine").delete().eq("id", id);
+  // select() macht die 0-Zeilen-Falle sichtbar (dieselbe Lektion wie bei
+  // supaScheinAendern): ohne select kommt weder ein Fehler noch eine
+  // Zeilenzahl zurueck, und ein an den Rechten gescheitertes Loeschen
+  // saehe genauso aus wie ein erfolgreiches.
+  return await supa.from("kt_scheine").delete().eq("id", id).select("id");
 }
 
 // ---------- Chat ----------

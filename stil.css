@@ -2655,3 +2655,93 @@ tr.unterquote td { background: #fdf3f3; }
   .ez-tab { font-size: 12px; }
   .ez-kopf button { min-height: 44px; }
 }
+/* ============================================================
+   KNOEPFE UND FOTOS (loeschbare Schicht, ganz am Ende)
+
+   Karam: die Knoepfe sollen schoener sein und man soll sofort
+   sehen, dass man sie druecken kann. Und "Foto hinzufuegen" sah
+   aus wie ein Link, nicht wie ein Knopf.
+
+   Nichts hier aendert eine Rechnung, eine Abfrage oder einen
+   Ablauf. Loescht man diesen Block, sieht die Seite aus wie
+   vorher und funktioniert unveraendert.
+   Die Bedeutungsfarben bleiben unangetastet: gruen heisst weiter
+   "erreicht", rot "zu niedrig", der rote Auflege-Knopf bleibt rot.
+   ============================================================ */
+
+button, .fotoknopf, label.fotoknopf {
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.25;
+  transition: background 0.12s, border-color 0.12s, transform 0.06s;
+}
+button { border-width: 1.5px; border-color: #b7c0d4; padding: 8px 15px; }
+button:hover { border-color: #1a2c50; background: #eef2fa; }
+/* Man muss sehen, dass der Druck angekommen ist. */
+button:active { transform: translateY(1px); }
+/* Wer mit der Tastatur arbeitet, muss sehen, wo er ist. */
+button:focus-visible, .fotoknopf:focus-within {
+  outline: 3px solid #7fb2ff; outline-offset: 2px;
+}
+
+/* Der wichtigste Knopf einer Zeile: dunkelblau statt schwarz, damit er
+   zur Seite passt und trotzdem heraussticht. */
+button.haupt {
+  background: #1a2c50; border-color: #1a2c50; color: #fff; font-weight: bold;
+}
+button.haupt:hover { background: #24406f; border-color: #24406f; }
+
+/* FOTO HINZUFUEGEN: war ein blau umrandeter Text und sah aus wie ein Link.
+   Jetzt ein richtiger Knopf mit Klammer-Zeichen davor. */
+label.fotoknopf, .fotoknopf {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1.5px solid #b7c0d4; background: #fff; color: #1a2c50;
+  padding: 8px 15px; font-size: 14px; cursor: pointer; margin-left: 8px;
+}
+label.fotoknopf:hover, .fotoknopf:hover { border-color: #1a2c50; background: #eef2fa; }
+
+/* Kleine Knoepfe in Tabellen bleiben klein, aber bekommen dieselbe Form. */
+button.merken, button.aufloesen, button.auge, .zeilenschalter .zl-knopf {
+  border-radius: 8px;
+}
+button.merken { border-color: #1a7a1a; color: #0d5a0d; }
+button.merken:hover { background: #eaf7ea; border-color: #0d5a0d; }
+
+/* Der Muell-Knopf: erkennbar gefaehrlich, aber nicht laut. */
+button.knopfweg {
+  border-color: #e0b4b4; color: #a00000; padding: 6px 11px; font-size: 15px;
+}
+button.knopfweg:hover { background: #fdf3f3; border-color: #a00000; }
+
+/* ---------- Fotos klein, beim Antippen gross ---------- */
+/* Sie nahmen die halbe Seite ein. Jetzt stehen sie klein rechts. */
+img.minifoto {
+  max-width: 74px; max-height: 74px; object-fit: cover;
+  border: 1px solid #c3c9d8; border-radius: 8px;
+  cursor: zoom-in; float: right; margin: 0 0 4px 8px;
+}
+.s-foto img {
+  max-width: 120px; max-height: 120px; object-fit: cover;
+  border-radius: 8px; cursor: zoom-in; float: right; margin: 0 0 6px 10px;
+}
+img.foto-gross {
+  max-width: 100%; max-height: none; object-fit: contain;
+  cursor: zoom-out; float: none; margin: 8px 0;
+}
+.s-foto { overflow: hidden; }
+
+@media (max-width: 700px) {
+  /* Am Handy grosszuegiger: 44 Pixel ist die Grenze, unter der man
+     danebentippt. */
+  button, label.fotoknopf, .fotoknopf { min-height: 44px; font-size: 15px; }
+  button.knopfweg { min-width: 44px; }
+  img.minifoto { max-width: 60px; max-height: 60px; }
+}
+
+/* Die kleinen Knoepfe in den Scheinen waren nur 21 Pixel hoch - zum
+   Treffen zu wenig. Sie bleiben klein, bekommen aber Luft. */
+button.merken, button.aufloesen, label.fotoknopf.klein,
+.s-fuss button, .s-fuss label.fotoknopf {
+  min-height: 30px; padding: 5px 12px; font-size: 12.5px;
+}

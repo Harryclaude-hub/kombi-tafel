@@ -1331,8 +1331,9 @@ function zeichneVerlauf() {
     const foto = x.scheinId ? localStorage.getItem(fotoSchluessel(x.scheinId)) : null;
     html += "<tr><td class='mini'>" + String(d.getDate()).padStart(2, "0") + "." +
       String(d.getMonth() + 1).padStart(2, "0") + ". " + String(d.getHours()).padStart(2, "0") +
-      ":" + String(d.getMinutes()).padStart(2, "0") + "</td><td>" + x.anbieter + "</td>" +
-      "<td class='mini'>" + x.wetten.map(t => t.spiel + " (" + t.linie + ")").join("<br>") +
+      ":" + String(d.getMinutes()).padStart(2, "0") + "</td><td>" + textSicherK2(x.anbieter) + "</td>" +
+      "<td class='mini'>" + x.wetten.map(t =>
+        textSicherK2(t.spiel) + " (" + textSicherK2(t.linie) + ")").join("<br>") +
       (foto ? '<div class="fotoname mini">' +
         (localStorage.getItem(fotoSchluessel(x.scheinId) + "_name") || "") + "</div>" +
         '<div><img src="' + foto + '" class="minifoto"></div>' : "") + "</td>" +
@@ -1343,8 +1344,9 @@ function zeichneVerlauf() {
         "<option" + (x.stand === o ? " selected" : "") + ">" + o + "</option>").join("") +
       "</select></td>" +
       "<td class='notizzelle'><textarea class='notizfeld' placeholder='Notiz...' " +
-      "onchange='notizSpeichern(" + i + ", this.value)'>" + (x.notiz || "") + "</textarea></td>" +
-      "<td><button onclick='verlaufLoeschen(" + i + ")'>weg</button></td></tr>";
+      "onchange='notizSpeichern(" + i + ", this.value)'>" + textSicherK2(x.notiz || "") + "</textarea></td>" +
+      "<td><button class='knopfweg' title='Diese Kombination aus dem Verlauf loeschen' " +
+        "onclick='verlaufLoeschen(" + i + ")'>&#128465;</button></td></tr>";
   });
   html += "</tbody></table>";
   const gew = v.filter(x => x.stand === "gewonnen"), ver = v.filter(x => x.stand === "verloren");
@@ -1428,8 +1430,33 @@ function standAendern(i, wert) {
   const v = liesVerlauf();
   if (v[i]) { v[i].stand = wert; speichereVerlauf(v); zeichneVerlauf(); zeichneKonto(); }
 }
+// MIT RUECKFRAGE: hier steht eine gesetzte Kombination mit echtem Geld.
+// Frueher loeschte der Knopf sofort, und rueckgaengig ging gar nichts.
 function verlaufLoeschen(i) {
-  const v = liesVerlauf(); v.splice(i, 1); speichereVerlauf(v); zeichneVerlauf(); zeichneKonto();
+  const v = liesVerlauf();
+  const x = v[i];
+  if (!x) return;
+  const wann = new Date(x.zeit);
+  const frage = "Diese Kombination aus dem Verlauf loeschen?\n\n" +
+    (x.anbieter || "") + ", " + Number(x.einsatz || 0).toFixed(2) + " Euro, Quote " +
+    Number(x.quote || 0).toFixed(2) + "\n" +
+    (Array.isArray(x.wetten) ? x.wetten.map(t => t.spiel).join("\n") : "") + "\n\n" +
+    "Gemerkt am " + wann.toLocaleString("de-AT") + ".\n" +
+    "Das laesst sich nicht rueckgaengig machen.";
+  if (!confirm(frage)) return;
+  v.splice(i, 1);
+  if (!speichereVerlauf(v)) return;
+  meldung("Kombination aus dem Verlauf geloescht. <b>Achtung:</b> in deinem Konto " +
+    "unter Mein Bereich steht sie weiter - dort musst du sie eigens loeschen.", "gut");
+  zeichneVerlauf();
+  zeichneKonto();
+}
+
+// Fremder Text nie als HTML. Spielnamen und Notizen kommen aus den
+// Foto-Importen und aus geteilten Bereichen.
+function textSicherK2(t) {
+  return String(t == null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
 
 // ---------- Knöpfe ----------

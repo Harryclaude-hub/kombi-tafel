@@ -118,3 +118,25 @@ function zeilenStart() {
 if (document.readyState === "loading")
   document.addEventListener("DOMContentLoaded", zeilenStart);
 else zeilenStart();
+
+// ============================================================
+// FOTOS KLEIN HALTEN
+//
+// Die Wettschein-Fotos nahmen die halbe Seite ein. Sie stehen jetzt
+// klein rechts; ein Antippen macht sie gross, ein zweites wieder klein.
+// Reine Anzeige: loescht man diese Datei, sind die Bilder wieder so
+// gross wie vorher, es geht nichts kaputt.
+// ============================================================
+function fotoGrossKlein(bild) {
+  if (!bild) return;
+  bild.classList.toggle('foto-gross');
+}
+
+// EIN Zuhoerer fuer die ganze Seite: die Bilder werden staendig neu
+// gezeichnet, einzelne Zuhoerer waeren nach jedem Zeichnen weg.
+document.addEventListener('click', function (e) {
+  const b = e.target;
+  if (!b || b.tagName !== 'IMG') return;
+  if (!b.classList.contains('minifoto') && !b.closest('.s-foto')) return;
+  fotoGrossKlein(b);
+});

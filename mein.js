@@ -983,7 +983,8 @@ function zeichneScheineDb(scheine) {
         : "<span class='mini'>" + textSicherM(s.notiz || "") + "</span>") + "</td>" +
       "<td>" + (aktiverBereich.rolle !== "ich"
         ? "<button onclick=\"tuKopieren('" + s.id + "')\">zu mir kopieren</button> " : "") +
-        (schreib ? "<button onclick=\"tuLoeschen('" + s.id + "')\">weg</button>" : "") + "</td></tr>";
+        (schreib ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
+          "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>" : "") + "</td></tr>";
   }
   el("scheine_db").innerHTML = html + "</tbody></table>";
 }
@@ -1003,8 +1004,30 @@ async function tuNotiz(id, wert) {
   if (r.error) meldungM("Notiz nicht gespeichert: " + r.error.message, "warn");
 }
 
+// MIT RUECKFRAGE und mit Pruefung, ob es wirklich geklappt hat.
+// Frueher wurde sofort geloescht und das Ergebnis weggeworfen: schlug es
+// fehl (Rechte, Netz), stand die Kombination nach dem naechsten Laden
+// einfach wieder da, ohne dass jemand wusste warum.
 async function tuLoeschen(id) {
-  await supaScheinLoeschen(id);
+  const s = (kasseScheine || []).find(x => x.id === id);
+  const d = (s && s.daten) || {};
+  const spiele = Array.isArray(d.wetten) ? d.wetten.map(t => t.spiel).join("\n") : "";
+  const frage = "Diese Kombination wirklich loeschen?\n\n" +
+    (d.anbieter || "?") + ", " + Number(d.einsatz || 0).toFixed(2) + " Euro, Quote " +
+    Number(d.quote || 0).toFixed(2) + "\n" + spiele + "\n\n" +
+    "Das laesst sich nicht rueckgaengig machen.";
+  if (!confirm(frage)) return;
+  const r = await supaScheinLoeschen(id);
+  if (r && r.error) {
+    meldungM("NICHT geloescht: " + textSicherM(String(r.error.message).slice(0, 140)), "warn");
+    return;
+  }
+  if (r && r.data && r.data.length === 0) {
+    meldungM("Nicht geloescht - dazu fehlt dir das Recht. In einem fremden Bereich " +
+      "darf nur der Besitzer loeschen.", "warn");
+    return;
+  }
+  meldungM("Kombination geloescht.", "gut");
   zeichneBereich();
 }
 
