@@ -514,9 +514,15 @@ async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, 
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
   if (!key) return { error: { message: OHNE_SCHLUESSEL } };
+  // Welche Felder zu welcher Art gehoeren, prueft auch die Datenbank.
+  // Hier steht dasselbe noch einmal, damit ein Tippfehler nicht erst
+  // dort auffaellt: "stand_weg" hat keinen Anbieter, "stand_anbieter"
+  // keinen Zahlungsweg.
+  const nurWeg = (art === "erhalten" || art === "ausgezahlt" || art === "stand_weg");
   return await supa.from("kt_person_zahlungen").insert({
     bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
-    weg: weg, art: art, anbieter: art === "erhalten" ? null : anbieter,
+    weg: art === "stand_anbieter" ? null : weg,
+    art: art, anbieter: nurWeg ? null : anbieter,
     betrag: betrag, notiz: await e2eZu(key, notiz || "") || ""
   });
 }

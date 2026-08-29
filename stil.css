@@ -2610,3 +2610,14 @@ html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody > tr > td:firs
      ganze Etikett zum Tippziel, damit man es sicher trifft. */
   .zeilenschalter .zl-nummern { min-height: 44px; padding: 0 8px; }
 }
+
+/* ---------- Stand von Hand eintragen (loeschbar) ---------- */
+.standfeld { display: inline-flex; gap: 4px; align-items: center; }
+.standfeld input { width: 92px; padding: 4px 6px; }
+.standfeld button { padding: 4px 9px; font-size: 12px; }
+/* Bedeutungsfarbe: ungeklaertes Geld ist ein Hinweis, kein Fehler. */
+.korrekturmarke { color: #b35a00; white-space: nowrap; }
+@media (max-width: 700px) {
+  .standfeld input { width: 84px; min-height: 40px; }
+  .standfeld button { min-height: 40px; }
+}

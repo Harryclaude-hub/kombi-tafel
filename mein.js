@@ -1084,11 +1084,21 @@ function personPruefen(ordnerId, scheine) {
   const buch = personBuchungen.filter(b => b.ordner === ordnerId);
   const meine = scheine.filter(s => s.ordner === ordnerId);
   const wege = {};
-  for (const [w] of KASSE_WEGE) wege[w] = { erhalten: 0, hin: 0, zurueck: 0, stand: 0 };
+  for (const [w] of KASSE_WEGE) wege[w] = { erhalten: 0, hin: 0, zurueck: 0, stand: 0, korrektur: 0 };
   const anbieter = {};
-  for (const [kz] of KASSE_ANBIETER) anbieter[kz] = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, guthaben: 0 };
+  for (const [kz] of KASSE_ANBIETER) anbieter[kz] = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, guthaben: 0, korrektur: 0 };
   for (const b of buch) {
     const betrag = Number(b.betrag) || 0;
+    // Die zwei Korrektur-Arten zuerst: "stand_anbieter" hat gar keinen
+    // Zahlungsweg und wuerde sonst gleich unten herausfliegen.
+    if (b.art === "stand_anbieter") {
+      if (anbieter[b.anbieter]) anbieter[b.anbieter].korrektur += betrag;
+      continue;
+    }
+    if (b.art === "stand_weg") {
+      if (wege[b.weg]) wege[b.weg].korrektur += betrag;
+      continue;
+    }
     if (!wege[b.weg]) continue;
     if (b.art === "erhalten") wege[b.weg].erhalten += betrag;
     else if (b.art === "ausgezahlt") wege[b.weg].raus = (wege[b.weg].raus || 0) + betrag;
@@ -1111,13 +1121,13 @@ function personPruefen(ordnerId, scheine) {
   const probleme = [];
   for (const [w, nameW] of KASSE_WEGE) {
     const x = wege[w];
-    x.stand = x.erhalten - x.hin + x.zurueck - (x.raus || 0);
+    x.stand = x.erhalten - x.hin + x.zurueck - (x.raus || 0) + (x.korrektur || 0);
     if (x.stand < -0.004) probleme.push(nameW + " ist im Minus (" + x.stand.toFixed(2) +
       " Euro): mehr weitergezahlt als erhalten. Buchung vergessen oder falsch eingetragen.");
   }
   for (const [kz, nameA] of KASSE_ANBIETER) {
     const a = anbieter[kz];
-    a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen;
+    a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen + (a.korrektur || 0);
     if (a.guthaben < -0.004) probleme.push("Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
       a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurückgeholt als eingezahlt und gewonnen. " +
       "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehört zu einer anderen Person.");
@@ -1128,10 +1138,17 @@ function personPruefen(ordnerId, scheine) {
   const aufWegen = Object.values(wege).reduce((p, x) => p + x.stand, 0);
   const beiAnbietern = Object.values(anbieter).reduce((p, x) => p + x.guthaben, 0);
   const imSpiel = Object.values(anbieter).reduce((p, x) => p + (x.imSpiel || 0), 0);
+  // Alle Korrekturen zusammen. Sie stecken oben schon in den Staenden -
+  // hier werden sie aus der Gewinnrechnung wieder herausgenommen, weil
+  // niemand weiss, woher das Geld kam. Genau so hat Karam es entschieden.
+  const korrekturGesamt =
+    Object.values(wege).reduce((p, x) => p + (x.korrektur || 0), 0) +
+    Object.values(anbieter).reduce((p, x) => p + (x.korrektur || 0), 0);
   return { wege: wege, anbieter: anbieter, probleme: probleme, buch: buch,
     eingesamt: eingesamt, erhaltengesamt: erhaltengesamt, ausgezahlt: ausgezahlt,
     aufWegen: aufWegen, beiAnbietern: beiAnbietern, imSpiel: imSpiel,
-    bilanz: (aufWegen + beiAnbietern + imSpiel + ausgezahlt) - erhaltengesamt };
+    korrekturGesamt: korrekturGesamt,
+    bilanz: (aufWegen + beiAnbietern + imSpiel + ausgezahlt) - erhaltengesamt - korrekturGesamt };
 }
 
 // Wann ist ein Schein "fertig"? Wenn das letzte Spiel darin sicher aus ist
@@ -1296,16 +1313,18 @@ function zeichnePersonenKasse(scheine) {
         ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
     }
     html += "</div><table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
-      "<th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th></tr></thead><tbody>";
+      "<th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th>" +
+      (schreib ? "<th>wirklich drauf</th>" : "") + "</tr></thead><tbody>";
     for (const [w, nameW] of KASSE_WEGE) {
       if (zg.wege[w] === false) continue;
       const x = p.wege[w];
-      html += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
+      html += "<tr><td>" + nameW + korrekturMarke(x.korrektur) + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
         "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
         "<td>" + (x.raus || 0).toFixed(2) + " &euro;</td>" +
-        "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td></tr>";
+        "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td>" +
+        (schreib ? "<td>" + standFeld(person.id, "weg", w, x.stand) + "</td>" : "") + "</tr>";
     }
-    html += "</tbody></table>";
+    html += "</tbody></table>" + standErklaerung(schreib);
   }
 
   // ---------- Wettanbieter ----------
@@ -1318,18 +1337,20 @@ function zeichnePersonenKasse(scheine) {
     }
     html += "</div><table><thead><tr><th>Anbieter</th><th>rein</th><th>raus</th>" +
       "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>gewonnen</th>" +
-      "<th>fertig</th><th>Ergebnis ab</th><th>liegt dort</th></tr></thead><tbody>";
+      "<th>fertig</th><th>Ergebnis ab</th><th>liegt dort</th>" +
+      (schreib ? "<th>wirklich drauf</th>" : "") + "</tr></thead><tbody>";
     for (const kz of ["iw", "bw", "b3", "st"]) {
       if (zg.anbieter[kz] === false) continue;
       const a = p.anbieter[kz];
-      html += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
+      html += "<tr><td>" + markeM(kz) + korrekturMarke(a.korrektur) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
         "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
         "<td>" + (a.imSpiel || 0).toFixed(2) + " &euro;</td>" +
         "<td>" + (a.moeglichOffen || 0).toFixed(2) + " &euro;</td>" +
         "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
         "<td>" + (a.wartet ? "<b class='rot'>" + a.wartet + "</b>" : "-") + "</td>" +
         "<td class='mini'>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td>" +
-        "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td></tr>";
+        "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td>" +
+        (schreib ? "<td>" + standFeld(person.id, "anbieter", kz, a.guthaben) + "</td>" : "") + "</tr>";
     }
     html += "</tbody></table>";
   }
@@ -2755,4 +2776,94 @@ function tagHalterHtml(zeilen) {
     'Gewinn oder Verlust bei dieser Person. Die Zahlen sind dieselben wie in der Personen-Kasse - ' +
     'sie kommen aus derselben Rechnung.</p>';
   return html + "</div>";
+}
+// ============================================================
+// STAND DIREKT EINTRAGEN
+//
+// Karam tippt hier, wie viel WIRKLICH auf dem Konto liegt. Gespeichert
+// wird die Differenz zum gerechneten Stand, nicht die absolute Zahl -
+// so wirken spaetere Ein- und Auszahlungen ganz normal weiter, und im
+// Verlauf sieht man noch, wann um wie viel korrigiert wurde.
+//
+// Die Differenz zaehlt NICHT als Gewinn (Karams Entscheidung): sie steht
+// als "ungeklaert" daneben und wird in personPruefen aus der Bilanz
+// wieder herausgerechnet.
+// ============================================================
+
+function standFeld(ordnerId, art, schluessel, jetzt) {
+  const id = "st_" + art + "_" + schluessel;
+  return '<span class="standfeld">' +
+    // BEWUSST type=text mit inputmode=decimal, nicht type=number:
+    // ein Zahlenfeld verwirft "250,50" je nach Spracheinstellung des
+    // Browsers still - das Feld ist dann leer und niemand weiss warum.
+    // Nachgemessen: im Test kam genau das heraus. So geht Komma UND Punkt.
+    '<input type="text" inputmode="decimal" id="' + id + '" placeholder="' +
+    Number(jetzt || 0).toFixed(2) + '" title="Wie viel liegt hier wirklich?">' +
+    '<button onclick="tuStandSetzen(&quot;' + ordnerId + '&quot;,&quot;' + art +
+    '&quot;,&quot;' + schluessel + '&quot;,' + Number(jetzt || 0) + ')">setzen</button></span>';
+}
+
+// Der Hinweis neben dem Namen, wenn schon einmal korrigiert wurde.
+function korrekturMarke(k) {
+  const n = Number(k || 0);
+  if (Math.abs(n) < 0.005) return "";
+  return " <span class='mini korrekturmarke' title='So viel wurde von Hand " +
+    "dazugesetzt oder abgezogen. Zaehlt NICHT als Gewinn.'>ungeklärt " +
+    (n >= 0 ? "+" : "") + n.toFixed(2) + " &euro;</span>";
+}
+
+function standErklaerung(schreib) {
+  if (!schreib) return "";
+  return '<p class="mini"><b>wirklich drauf:</b> trag hier ein, wie viel auf dem Konto ' +
+    'tatsächlich liegt. Das Programm merkt sich die Differenz zum gerechneten Stand. ' +
+    'Spätere Ein- und Auszahlungen rechnen ganz normal weiter, und du kannst die Zahl ' +
+    'jederzeit wieder ändern. <b>Die Differenz zählt nicht als Gewinn</b> - sie steht ' +
+    'als "ungeklärt" daneben, weil niemand weiß, woher das Geld kam.</p>';
+}
+
+async function tuStandSetzen(ordnerId, art, schluessel, jetzt) {
+  const feld = el("st_" + art + "_" + schluessel);
+  if (!feld) return;
+  const text = String(feld.value || "").trim().replace(",", ".");
+  if (!text) { meldungM("Trag zuerst ein, wie viel wirklich drauf liegt.", "warn"); return; }
+  const soll = parseFloat(text);
+  if (!isFinite(soll)) { meldungM("Das ist keine Zahl.", "warn"); return; }
+  const ist = Number(jetzt || 0);
+  const diff = Math.round((soll - ist) * 100) / 100;
+  if (Math.abs(diff) < 0.005) {
+    meldungM("Der Stand passt schon - es gibt nichts zu ändern.", "gut");
+    feld.value = "";
+    return;
+  }
+  const wohin = (art === "weg") ? wegName(schluessel) : anbieterNameM(schluessel);
+  // Rueckfrage: hier wird eine Geldzahl von Hand verbogen, das soll man
+  // nicht aus Versehen tun.
+  const frage = "Bei " + wohin + " stehen gerechnet " + ist.toFixed(2) + " Euro.\n" +
+    "Du sagst, es sind " + soll.toFixed(2) + " Euro.\n\n" +
+    (diff > 0 ? "Es kommen " + diff.toFixed(2) + " Euro dazu."
+              : "Es gehen " + Math.abs(diff).toFixed(2) + " Euro weg.") + "\n\n" +
+    "Das zählt NICHT als Gewinn - unterm Strich bleibt gleich.\n\nEintragen?";
+  if (!confirm(frage)) return;
+  const heute = new Date();
+  const datum = heute.getFullYear() + "-" + String(heute.getMonth() + 1).padStart(2, "0") +
+    "-" + String(heute.getDate()).padStart(2, "0");
+  const r = await supaPersonBuchen(aktiverBereich.id, ordnerId, datum,
+    art === "weg" ? schluessel : null,
+    art === "weg" ? "stand_weg" : "stand_anbieter",
+    art === "weg" ? null : schluessel,
+    diff, "Stand von Hand eingetragen: " + soll.toFixed(2) + " Euro");
+  if (r && r.error) {
+    meldungM("Nicht eingetragen: " + textSicherM(String(r.error.message).slice(0, 140)), "warn");
+    return;
+  }
+  meldungM("<b>" + textSicherM(wohin) + " steht jetzt auf " + soll.toFixed(2) + " &euro;.</b> " +
+    "Die " + (diff >= 0 ? "+" : "") + diff.toFixed(2) + " &euro; stehen als <b>ungeklärt</b> " +
+    "daneben und zählen nicht als Gewinn. Ändern kannst du die Zahl jederzeit wieder.", "gut");
+  zeichneBereich();
+}
+
+// Anbietername fuer die Rueckfrage. markeM liefert HTML, hier braucht es Text.
+function anbieterNameM(kz) {
+  const x = KASSE_ANBIETER.find(a => a[0] === kz);
+  return x ? x[1] : kz;
 }
