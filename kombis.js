@@ -731,7 +731,14 @@ function scheinHtml(s, z) {
         (v === "D" ? '<div class="duenn">Markt dort duenn, prüfen</div>' :
          (v === "N" ? '<div class="duenn">Einschätzung: evtl. nicht im Angebot, prüfen</div>' : "")) + "</td>" +
       "<td class='s-ziel'>" + q.roh.toFixed(2) + '<div class="mini">' + q.quelle + "</div></td>" +
-      "<td class='s-mind'>" + mind.toFixed(2) + "</td>" +
+      // Die Mindestquote gilt fuer die ECHTE Quote nach Gebuehr. Hier steht
+      // sie aber neben Zahlen, die man beim Anbieter ABLIEST. Bei Interwetten
+      // (Quote geteilt durch 1,05) sind das zwei verschiedene Zahlen: fuer
+      // real 1,80 muss auf dem Schirm 1,89 stehen. Frueher stand hier auch
+      // dort 1,80 - wer sich danach richtet, setzt in Wirklichkeit auf 1,71.
+      "<td class='s-mind'>" + (mind * GEBUEHREN_TEILER[s.kz]).toFixed(2) +
+        (GEBUEHREN_TEILER[s.kz] !== 1
+          ? '<div class="mini">= real ' + mind.toFixed(2) + "</div>" : "") + "</td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
         (eigen ? "value='" + eigen + "' " : "") +
         "onchange=\"quoteEintragen('" + s.id + "','" + w.id + "',this)\">" +
