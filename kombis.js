@@ -1542,7 +1542,10 @@ function verlaufZahlSetzen() {
   if (!knopf) return;
   let n = 0;
   try { n = (liesVerlauf() || []).length; } catch (e) { n = 0; }
-  knopf.innerHTML = "&#128220; Verlauf" + (n ? ' <span class="f-zahl">' + n + "</span>" : "");
+  // Die Beschriftung muss zu dem passen, was der Knopf tut: er fuehrt
+  // nach Mein Bereich, weil der Verlauf dort liegt und nicht hier.
+  knopf.innerHTML = "&#128220; Gesetzte ansehen" +
+    (n ? ' <span class="f-zahl">' + n + "</span>" : "");
 }
 // ============================================================
 // REST AUFFUELLEN: jede Kombination auf den Ziel-Einsatz bringen
