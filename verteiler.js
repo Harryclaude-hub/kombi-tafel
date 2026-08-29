@@ -344,12 +344,26 @@ function verteile(eingabe) {
       });
     }
 
-    // Reihenfolge der Zahlstellen: erst der bestbelegte Anbieter, Bet365
-    // immer zuletzt (R6), bei Gleichstand der Anbieter, fuer den der
-    // Dreier gebaut wurde, danach die hoehere Gesamtquote.
+    // Reihenfolge der Zahlstellen: KARAMS ANBIETER-REIHENFOLGE ZUERST
+    // (Stake, Interwetten, Bwin/Sportingbet, Bet365 zuletzt).
+    //
+    // Frueher stand x.rang (der Beweis fuer die Quote) vorn. Gemessen an
+    // 51 echten Wetten: sobald bei Interwetten Quoten eingetippt waren,
+    // gingen 100 Prozent dorthin und Stake bekam nichts - obwohl Stake
+    // die erste Wahl sein soll. Genau das war der Fehler.
+    //
+    // Nur der Notfall bleibt hinten: dort ist entweder bekannt, dass es
+    // das Spiel beim Anbieter NICHT gibt, oder der Preis ist reine
+    // Schaetzung. Auf so ein Konto zu setzen hilft niemandem.
+    // Eine bloss unbekannte Verfuegbarkeit ist KEIN Notfall - die darf
+    // Stake nicht nach hinten schieben.
     kandidaten.sort(function (x, y) {
-      if (x.rang !== y.rang) return x.rang - y.rang;
+      var xn = (x.rang === RANG_NOTFALL) ? 1 : 0;
+      var yn = (y.rang === RANG_NOTFALL) ? 1 : 0;
+      if (xn !== yn) return xn - yn;
       if (x.rangAnb !== y.rangAnb) return x.rangAnb - y.rangAnb;
+      // Erst innerhalb DESSELBEN Anbieters zaehlt, wie gut die Quote belegt ist.
+      if (x.rang !== y.rang) return x.rang - y.rang;
       if (x.eigen !== y.eigen) return x.eigen - y.eigen;
       if (y.quote !== x.quote) return y.quote - x.quote;
       return x.platz - y.platz;
@@ -1043,13 +1057,22 @@ function dreierAusVorrat(vorrat, v, kapa, gesehen, zaehlerDoppelt) {
      1. nach Belegstufe: belegt vor geschaetzt vor unsicher
      2. innerhalb derselben Stufe steht Bet365 immer hinten (R6)
      3. dann die hoehere Gesamtquote
-   Warum Bet365 nur INNERHALB derselben Stufe hinten steht: R6 sagt
-   "solange ein anderer Anbieter die drei Wetten FUEHRT". Ein Anbieter,
-   bei dem wir nur raten, fuehrt sie nicht nachweislich. Wuerde Bet365
-   auch hinter geratene Anbieter rutschen, wanderten 300 von 400 Euro auf
-   Maerkte, von denen niemand weiss, ob es sie gibt, und die einzige
-   bewiesene Adresse bekaeme den Rest. Das waere das Gegenteil von dem,
-   was Karam will.
+   REIHENFOLGE (Stand 29.08.2026, von Karam noch einmal bestaetigt):
+   Zuerst entscheidet SEINE Anbieter-Reihenfolge - Stake, Interwetten,
+   Bwin (= Sportingbet), Bet365 zuletzt. Erst danach zaehlt, wie gut die
+   Quote belegt ist.
+   Frueher war es umgekehrt. Gemessen an seinen 51 echten Wetten: kaum
+   waren bei Interwetten Quoten eingetippt, gingen 32 von 32
+   Kombinationen dorthin und Stake bekam nichts. Er tippt die Anbieter
+   aber der Reihe nach ab - der zuerst getippte gewann also immer.
+
+   Eine Ausnahme bleibt: Stufe "unsicher" (der Preis ist reine
+   Schaetzung, oder der Markt ist dort nachweislich nicht da) steht
+   weiter ganz hinten. Sonst wanderte Geld auf Maerkte, von denen
+   niemand weiss, ob es sie ueberhaupt gibt.
+   Eine bloss UNBEKANNTE Verfuegbarkeit ist kein solcher Fall - genau
+   dazu hat Karam gesagt: "wenn Du nicht lesen kannst, ob es das Spiel
+   dort gibt, dann passt das".
    Jeder Anbieter nimmt hoechstens seinen Vertrauens-Deckel. Reicht der
    erste nicht, kommt der naechste dazu, der DIESELBEN drei Wetten fuehrt.
    --------------------------------------------------------------------- */
@@ -1076,8 +1099,13 @@ function teileFuer(trip, v) {
   }
 
   kandidaten.sort(function (x, y) {
-    if (y.rang !== x.rang) return y.rang - x.rang;        // belegt zuerst
-    if (x.spaet !== y.spaet) return x.spaet - y.spaet;    // Karams Rangfolge
+    // "unsicher" heisst: Preis geraten oder Markt nachweislich nicht da.
+    // Das bleibt hinten, alles andere richtet sich nach Karams Reihenfolge.
+    var xu = (x.stufe === "unsicher") ? 1 : 0;
+    var yu = (y.stufe === "unsicher") ? 1 : 0;
+    if (xu !== yu) return xu - yu;
+    if (x.spaet !== y.spaet) return x.spaet - y.spaet;    // Karams Rangfolge ZUERST
+    if (y.rang !== x.rang) return y.rang - x.rang;        // dann die Belegung
     if (y.quote !== x.quote) return y.quote - x.quote;    // dann hoehere Quote
     return x.kz < y.kz ? -1 : (x.kz > y.kz ? 1 : 0);      // fester Tiebreak
   });

@@ -90,9 +90,18 @@ function nrNaechste() {
   return n;
 }
 
+// Karams Reihenfolge, an EINER Stelle. Stake zuerst, Bet365 zuletzt.
+// Bwin und Sportingbet sind derselbe Anbieter, deshalb steht dort nur bw.
+const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3"];
+
 function einstellungenLesen() {
   const anb = [];
   document.querySelectorAll(".anbwahl:checked").forEach(c => anb.push(c.value));
+  // NACH KARAMS REIHENFOLGE, nicht nach der Reihenfolge der Kaestchen.
+  // Vorher kam heraus: iw, bw, b3, st - Stake also zuletzt. Daran haengen
+  // der Niedrig-Schein, das Aufteilen auf einen weiteren Anbieter und der
+  // selbst gebaute Schein, die alle einfach den ersten der Liste nehmen.
+  anb.sort((a, b) => KT_ANBIETER_RANG.indexOf(a) - KT_ANBIETER_RANG.indexOf(b));
   const zielFeld = document.getElementById("ziel");
   // Karams Einsatz-Grenzen je Anbieter. Leeres Feld = keine Grenze.
   // Sie werden gemerkt, damit er sie nicht jedes Mal neu eintippt.
@@ -104,7 +113,7 @@ function einstellungenLesen() {
   try { localStorage.setItem("kt_grenzen", JSON.stringify(limits)); } catch (e) { }
   return {
     mind: parseFloat(document.getElementById("mind").value) || 1.5,
-    anbieter: anb.length ? anb : ["iw", "bw", "b3", "st"],
+    anbieter: anb.length ? anb : KT_ANBIETER_RANG.slice(),
     saat: parseInt(document.getElementById("mischzahl").value, 10) || 1,
     ziel: zielFeld ? (parseFloat(zielFeld.value) || 400) : 400,
     limits: Object.keys(limits).length ? limits : null
@@ -864,7 +873,7 @@ function scheinNeuMischen(scheinId) {
   }
   // Anbieter, die in dieser Gruppe schon dran waren, hinten anstellen
   const benutzt = gruppe.map(g => g.kz);
-  const erlaubt = (e.anbieter && e.anbieter.length) ? e.anbieter : ["iw", "bw", "b3", "st"];
+  const erlaubt = (e.anbieter && e.anbieter.length) ? e.anbieter : KT_ANBIETER_RANG.slice();
   const kz = erlaubt.find(x => !benutzt.includes(x)) || s.kz;
 
   const frei = satzWetten().filter(w => !istVorbei(anstossFeld(w)) && !gesperrt.has(spielKennung(w)));
@@ -906,7 +915,7 @@ function scheinTeilen(scheinId) {
   const nr = s.nr;
   const teile = z.scheine.filter(x => x.nr === nr);
   const benutzt = teile.map(x => x.kz);
-  const frei = (e.anbieter || ["iw", "bw", "b3", "st"]).find(kz => !benutzt.includes(kz));
+  const frei = (e.anbieter || KT_ANBIETER_RANG.slice()).find(kz => !benutzt.includes(kz));
   if (!frei) { meldung("Alle erlaubten Anbieter haben diesen Schein schon.", "warn"); return; }
   const rest = rund2(zielEinsatz() - gruppeGesetzt(z, nr));
   const kopie = {
@@ -962,7 +971,9 @@ function eigenbauAnlegen() {
   nrAufholen(z);
   const nr = nrNaechste();
   z.scheine.push({
-    id: "E" + Date.now(), nr: nr, kz: (z.einst && z.einst.anbieter && z.einst.anbieter[0]) || "bw",
+    // Der selbst gebaute Schein geht an den ersten erlaubten Anbieter -
+    // das ist jetzt Stake, frueher stand hier Bwin als Rueckfall.
+    id: "E" + Date.now(), nr: nr, kz: (z.einst && z.einst.anbieter && z.einst.anbieter[0]) || KT_ANBIETER_RANG[0],
     art: "eigen",
     wetten: gewaehlt.map(id => ({ id: id, optIdx: gewaehlteOption(wetteNachId(id)) })),
     entfernt: []
