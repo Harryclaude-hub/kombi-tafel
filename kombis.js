@@ -170,9 +170,13 @@ function baueAlles(nurRest) {
     const quoten = {}, belegt = {}, verf = {};
     for (const kz of e.anbieter) {
       const q = zielQuote(w, optIdx, kz);
-      quoten[kz] = (q.roh && q.roh > 1) ? q.roh : null;
+      // Ohne Quote geht beim Verteiler gar nichts - genau das wollen wir
+      // hier: was es dort nicht gibt, kann auch nicht gesetzt werden.
+      quoten[kz] = nichtDa(w.id, kz) ? null : ((q.roh && q.roh > 1) ? q.roh : null);
       belegt[kz] = q.fest === true || q.quelle === "Screenshot";
-      verf[kz] = v[kz] || "J";
+      // Was Karam selbst gesehen hat, schlaegt die Schaetzung aus der
+      // Tabelle. "N" heisst fuer den Verteiler: letzte Wahl.
+      verf[kz] = nichtDa(w.id, kz) ? "N" : (v[kz] || "J");
     }
     eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt,
       verf: verf });
@@ -347,6 +351,40 @@ function mische(liste, saat) {
   return liste;
 }
 
+// ---------- Was Karam selbst gesehen hat ----------
+//
+// "Dieser Anbieter hat diese Wette nicht" ist eine Beobachtung, keine
+// Schaetzung. Sie bleibt auf dem Geraet stehen und gilt fuer alles
+// Weitere: fuer den Wechsel des Anbieters, fuer das Nachruecken und
+// beim naechsten Bauen.
+const NICHT_DA_SCHLUESSEL = "kt_nicht_da";
+
+function nichtDaLesen() {
+  try { return JSON.parse(localStorage.getItem(NICHT_DA_SCHLUESSEL) || "{}") || {}; }
+  catch (e) { return {}; }
+}
+
+function nichtDa(wettId, kz) {
+  return nichtDaLesen()[wettId + "|" + kz] === true;
+}
+
+function nichtDaSetzen(wettId, kz, ja) {
+  const m = nichtDaLesen();
+  if (ja) m[wettId + "|" + kz] = true; else delete m[wettId + "|" + kz];
+  try { localStorage.setItem(NICHT_DA_SCHLUESSEL, JSON.stringify(m)); return true; }
+  catch (e) {
+    meldung("Der Speicher dieses Browsers ist voll - ich konnte mir nicht merken, " +
+      "dass der Anbieter diese Wette nicht hat.", "warn");
+    return false;
+  }
+}
+
+// Hat KEINER der erlaubten Anbieter diese Wette?
+function nirgendsDa(wettId, erlaubt) {
+  const liste = (erlaubt && erlaubt.length) ? erlaubt : KT_ANBIETER_RANG;
+  return liste.every(kz => nichtDa(wettId, kz));
+}
+
 // ---------- Wette rausnehmen und Ersatz nachruecken ----------
 
 // Die frueheren Helfer verbraucht() und verbrauchteKennungen() sind hier
@@ -422,6 +460,13 @@ function wetteRaus(scheinId, wettId, grund) {
   if (!sch) return;
   const pos = sch.wetten.findIndex(w => w.id === wettId);
   if (pos < 0) return;
+
+  // Karams Sonderweg: sagt er "der Anbieter hat sie nicht", dann fliegt
+  // nicht die Wette raus, sondern die ganze Kombination wandert weiter.
+  if (grund === "Anbieter hat die Wette nicht") {
+    if (anbieterWeiterwandern(z, sch, wettId)) return;
+    // Kein Anbieter mehr uebrig: dann doch heraus, unten weiter wie immer.
+  }
 
   sch.entfernt.push({ id: wettId, grund: grund, wann: new Date().toISOString() });
   sch.wetten.splice(pos, 1);
@@ -841,6 +886,12 @@ function zeichneReste(z) {
   html += liste(z.uebrig, "Uebrig geblieben", "Erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.");
   html += liste(z.uebrigNiedrig, "Uebrig, zu niedrige Quote", "Unter der Mindestquote und keine drei für einen eigenen Schein.");
   html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
+  // Karams eigene Beobachtung: hier stehen die Wetten, die es bei keinem
+  // seiner Anbieter gibt. Die kann niemand mehr setzen.
+  const nirgends = nirgendsDaListe(z);
+  html += liste(nirgends, "Kein Anbieter hat sie",
+    "Du hast bei allen vier gesagt, dass es die Wette dort nicht gibt. " +
+    "Sie kommt deshalb in keine Kombination mehr.");
   
   document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
 }
@@ -1509,4 +1560,79 @@ function alleAuffuellen() {
   }
   meldung(text, offenGeblieben.length ? "warn" : "gut");
   zeichne_();
+}
+// ============================================================
+// DIE KOMBINATION WANDERT ZUM NAECHSTEN ANBIETER
+//
+// Sucht in Karams Reihenfolge den naechsten Anbieter, der ALLE Wetten
+// dieses Scheins fuehrt (keine davon als "nicht da" gemerkt) und bei dem
+// jede echte Quote die Mindestquote erreicht.
+// Gibt true zurueck, wenn gewandert wurde - dann bleibt die Wette drin.
+// ============================================================
+function anbieterWeiterwandern(z, sch, wettId) {
+  const erlaubt = (z.einst && z.einst.anbieter && z.einst.anbieter.length)
+    ? z.einst.anbieter : KT_ANBIETER_RANG.slice();
+  const mind = mindWert(z);
+
+  // Zuerst festhalten, was er gesehen hat.
+  nichtDaSetzen(wettId, sch.kz, true);
+
+  const w = wetteNachId(wettId);
+  const name = w ? w.spiel : wettId;
+
+  for (const kz of erlaubt) {
+    if (kz === sch.kz) continue;
+    // Fuehrt er ALLE Wetten dieses Scheins - und ist keine davon als
+    // "nicht da" gemerkt?
+    let geht = true;
+    let grund = "";
+    for (const eintrag of sch.wetten) {
+      if (nichtDa(eintrag.id, kz)) {
+        geht = false;
+        const ww = wetteNachId(eintrag.id);
+        grund = (ww ? ww.spiel : eintrag.id) + " hat er auch nicht";
+        break;
+      }
+      const ww = wetteNachId(eintrag.id);
+      if (!ww) { geht = false; grund = "Wette unbekannt"; break; }
+      const q = zielQuote(ww, eintrag.optIdx, kz);
+      if (!ueberMind(q.echt, mind)) {
+        geht = false;
+        grund = ww.spiel + " nur " + rund2(q.echt).toFixed(2) + ", unter " + mind.toFixed(2);
+        break;
+      }
+    }
+    if (!geht) continue;
+
+    const alt = sch.kz;
+    sch.kz = kz;
+    speichereZustand(z);
+    meldung("<b>" + anbieterName(alt) + " hat " + name + " nicht.</b> " +
+      "Die ganze Kombination steht jetzt bei <b>" + anbieterName(kz) + "</b> - " +
+      "alle drei Wetten bleiben drin. Hat der sie auch nicht, sag es wieder, " +
+      "dann geht es zum naechsten.", "gut");
+    zeichne_();
+    return true;
+  }
+
+  // Keiner mehr uebrig. Die Wette selbst ist der Grund, wenn sie
+  // ueberall als "nicht da" steht.
+  if (nirgendsDa(wettId, erlaubt)) {
+    meldung("<b>Keiner deiner Anbieter hat " + name + ".</b> " +
+      "Die Wette verlaesst die Kombination und steht unten unter " +
+      "<b>Kein Anbieter hat sie</b>. Fuer den Schein wird Ersatz gesucht.", "warn");
+  } else {
+    meldung("<b>" + anbieterName(sch.kz) + " hat " + name + " nicht,</b> und kein anderer " +
+      "Anbieter fuehrt alle drei Wetten dieses Scheins ueber der Mindestquote. " +
+      "Die Wette wird deshalb aus dem Schein genommen und Ersatz gesucht.", "warn");
+  }
+  return false;
+}
+
+// Alle Wetten des offenen Ordners, die bei KEINEM erlaubten Anbieter zu
+// haben sind. Reine Anzeige.
+function nirgendsDaListe(z) {
+  const erlaubt = (z && z.einst && z.einst.anbieter && z.einst.anbieter.length)
+    ? z.einst.anbieter : KT_ANBIETER_RANG.slice();
+  return satzWetten().filter(w => nirgendsDa(w.id, erlaubt));
 }
