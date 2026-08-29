@@ -170,6 +170,48 @@ async function supaTeilen(gastId, rolle) {
   return r;
 }
 
+// ---------- Schluessel nachliefern ----------
+// Eine Freigabe OHNE Feld "schluessel" sieht fuer den Gast so aus:
+// er darf alles, sieht aber ueberall nur "[verschluesselt - Schluessel
+// fehlt]". Er kann sich nicht selbst helfen - den Bereichsschluessel hat
+// nur der Besitzer, und zwar nur in seinem Browser.
+// Bisher half genau eine Sache: der Besitzer drueckt von Hand noch einmal
+// auf Teilen. Das merkt sich niemand, und deshalb sass Karams Kollege
+// seit dem ersten Teilen vor lauter Schloessern.
+// Jetzt prueft der Besitzer bei jedem Laden selbst nach und liefert nach.
+// Gibt zurueck, wie viele Schluessel WIRKLICH geschrieben wurden.
+async function supaSchluesselNachliefern() {
+  const u = await supaNutzer();
+  if (!u || typeof kryptoMeinPriv !== "function") return { nachgeliefert: 0, offen: 0 };
+  const raw = localStorage.getItem("kt_e2e_bereich_" + u.id);
+  const priv = await kryptoMeinPriv();
+  // Ohne eigenen Schluessel auf diesem Geraet geht es nicht. Das ist kein
+  // Fehler: dann muss der Besitzer erst "Schluessel nachtragen" machen.
+  if (!raw || !priv) return { nachgeliefert: 0, offen: 0, ohneEigenen: true };
+
+  const offen = await supa.from("kt_freigaben").select("gast")
+    .eq("owner", u.id).is("schluessel", null);
+  if (offen.error || !offen.data || !offen.data.length) return { nachgeliefert: 0, offen: 0 };
+
+  let n = 0, ohnePub = 0;
+  for (const f of offen.data) {
+    const gp = await supa.from("kt_profiles").select("pubkey").eq("id", f.gast).maybeSingle();
+    // Der Gast war noch nie mit der verschluesselten Fassung angemeldet.
+    // Dann gibt es nichts, wofuer man verschluesseln koennte - beim
+    // naechsten Laden noch einmal.
+    if (!gp.data || !gp.data.pubkey) { ohnePub++; continue; }
+    const paar = await kryPaarSchluessel(priv, gp.data.pubkey);
+    const paket = await kryAes(paar, raw);
+    // .select() ist Pflicht: ohne das sieht ein an RLS gescheitertes
+    // Update genauso aus wie ein gelungenes, und beim naechsten Laden
+    // steht wieder null da, ohne dass jemand weiss warum.
+    const r = await supa.from("kt_freigaben").update({ schluessel: paket })
+      .eq("owner", u.id).eq("gast", f.gast).select();
+    if (!r.error && r.data && r.data.length) n++;
+  }
+  return { nachgeliefert: n, offen: ohnePub };
+}
+
 async function supaTeilenBeenden(gastId) {
   const u = await supaNutzer();
   return await supa.from("kt_freigaben").delete().eq("owner", u.id).eq("gast", gastId);

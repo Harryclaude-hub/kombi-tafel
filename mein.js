@@ -273,6 +273,17 @@ jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen
   zeichneMbNavi();
   benachKnopf();
   pruefeSchluessel();
+  // Fehlende Bereichsschluessel an meine Gaeste nachliefern. Laeuft NACH dem
+  // Aufbau der Seite, sonst gibt es kein Feld fuer die Meldung.
+  supaSchluesselNachliefern().then(s => {
+    if (s.nachgeliefert)
+      meldungM("&#128273; <b>" + s.nachgeliefert + " Freigabe(n) freigeschaltet.</b> Wer deinen Bereich " +
+        "sehen darf, kann jetzt wirklich alles lesen und mitarbeiten - vorher standen dort nur Schlösser.", "gut");
+    else if (s.offen)
+      meldungM("<b>" + s.offen + " Freigabe(n) warten noch.</b> Diese Leute waren noch nie mit der " +
+        "verschlüsselten Fassung angemeldet. Sobald sie sich einmal anmelden, wird der Schlüssel " +
+        "beim nächsten Laden automatisch nachgeliefert.", "warn");
+  });
   await zeichneTabs();
   await zeichneFreunde();
   await zeichneTeilen();
@@ -448,6 +459,20 @@ async function zeichneTabs() {
       (neu > 0 ? ' <span class="badge">' + neu + "</span>" : "");
     a.onclick = (ev) => { ev.preventDefault(); aktiverBereich = b; zeigeApp(); };
     box.appendChild(a);
+  }
+  // Fremder Bereich ohne Schluessel: der Gast sieht sonst nur Schloesser
+  // und weiss nicht warum. Er kann sich auch nicht selbst helfen - den
+  // Bereichsschluessel hat nur der Besitzer.
+  if (aktiverBereich && aktiverBereich.rolle !== "ich" &&
+      typeof kryptoBereich === "function" && !(await kryptoBereich(aktiverBereich.id))) {
+    const w = document.createElement("div");
+    w.className = "warnkern schluesselwarnung";
+    w.innerHTML = "&#128274; <b>Der Bereich von " + textSicherM(aktiverBereich.username) +
+      " ist für dich noch zugesperrt.</b> Du darfst hinein, aber der Schlüssel fehlt dir. " +
+      "Den kann nur " + textSicherM(aktiverBereich.username) + " selbst herausgeben: " +
+      "er muss sich einmal in Mein Bereich anmelden, dann geht das von allein. " +
+      "Danach hier einmal neu laden.";
+    box.parentNode.insertBefore(w, box.nextSibling);
   }
 }
 
