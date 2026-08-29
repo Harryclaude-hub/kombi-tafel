@@ -164,6 +164,9 @@ function ersatzRohquote(w) {
 // Ergebnis: null heisst "hier nicht verwendbar" (nur wegen R5 oder weil
 // es ueberhaupt keine Zahl gibt), sonst {echt, rang, ausEigen}.
 function stelleBauen(w, kz, mind, ersatz) {
+  // HARTE SPERRE: der Mensch hat gesehen, dass es die Wette dort nicht
+  // gibt. Das steht ueber jeder Schaetzung und ueber jeder Ersatzquote.
+  if (w.gesperrt && w.gesperrt[kz]) return null;
   var teiler = GEBUEHREN_TEILER[kz] || 1;
   var eigen = w.quoten ? w.quoten[kz] : null;
   var roh = null;
@@ -933,9 +936,10 @@ function bereiteVor(eingabe) {
       }
       gueteZeile.push(g);
 
-      // R5 ist die einzige harte Quotenregel: echte Quote nach Gebuehr
-      // muss die Mindestquote erreichen. Ohne jede Quote geht gar nichts.
-      if (roh !== null && echt >= mind - 1e-9) {
+      // HARTE SPERRE zuerst (siehe stelleBauen), dann R5: echte Quote
+      // nach Gebuehr muss die Mindestquote erreichen.
+      var gesperrtHier = !!(w.gesperrt && w.gesperrt[kzA]);
+      if (!gesperrtHier && roh !== null && echt >= mind - 1e-9) {
         maske |= (1 << a);
         if (g >= 3) knapp++;
         if (g >= GUETE_BELEGT) belegAnzahl++;

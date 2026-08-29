@@ -160,8 +160,10 @@ function baueAlles(nurRest) {
   // Je Wette: die gewaehlte Option, die ROHEN Quoten je Anbieter, ob die
   // Quote BELEGT ist (eigene Eingabe oder Screenshot = Beweis, dass der
   // Anbieter den Markt fuehrt) und die Markt-Schaetzung J/D/N.
+  // limits fehlte hier - die Einsatz-Grenzen kamen beim Bauen also gar
+  // nie an, obwohl der Verteiler sie auswertet (einst.limits).
   const eingabe = { wetten: [], einst: { mind: e.mind, ziel: e.ziel,
-    anbieter: e.anbieter, maxNutzung: 2, saat: e.saat } };
+    anbieter: e.anbieter, maxNutzung: 2, saat: e.saat, limits: e.limits } };
   const optVon = {};
   for (const w of offen) {
     const optIdx = gewaehlteOption(w);
@@ -170,16 +172,21 @@ function baueAlles(nurRest) {
     const quoten = {}, belegt = {}, verf = {};
     for (const kz of e.anbieter) {
       const q = zielQuote(w, optIdx, kz);
-      // Ohne Quote geht beim Verteiler gar nichts - genau das wollen wir
-      // hier: was es dort nicht gibt, kann auch nicht gesetzt werden.
-      quoten[kz] = nichtDa(w.id, kz) ? null : ((q.roh && q.roh > 1) ? q.roh : null);
+      // Die Quote bleibt stehen, gesperrt wird ueber das eigene Feld weiter
+      // unten. Frueher stand hier quoten[kz] = null mit der Begruendung,
+      // ohne Quote gehe nichts - das war falsch: der Verteiler setzt dann
+      // eine Ersatzquote ein und baut die Wette doch dort ein.
+      quoten[kz] = (q.roh && q.roh > 1) ? q.roh : null;
       belegt[kz] = q.fest === true || q.quelle === "Screenshot";
       // Was Karam selbst gesehen hat, schlaegt die Schaetzung aus der
       // Tabelle. "N" heisst fuer den Verteiler: letzte Wahl.
       verf[kz] = nichtDa(w.id, kz) ? "N" : (v[kz] || "J");
     }
+    // Die harte Sperre: hier steht, wo Karam die Wette nicht gefunden hat.
+    const gesperrt = {};
+    for (const kz of e.anbieter) if (nichtDa(w.id, kz)) gesperrt[kz] = true;
     eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt,
-      verf: verf });
+      verf: verf, gesperrt: gesperrt });
   }
 
   // ---- Verteilen: beide Verfahren rechnen, das bessere gewinnt ----
@@ -430,6 +437,10 @@ function findeErsatz(z, kz, scheinId, maxNutzung) {
     !drinHier.has(w.id) &&
     !rausHier.has(w.id) &&
     !spieleHier.has(spielKennung(w)) &&
+    // Was der Anbieter dieses Scheins nachweislich nicht hat, darf hier
+    // auch nicht nachruecken. Das fehlte, und die Erfolgsmeldung hat dann
+    // sogar behauptet, die Wette sei dort zu haben.
+    !nichtDa(w.id, kz) &&
     (nutzung[w.id] || 0) < grenze);
 
   const bewertet = [];
@@ -720,11 +731,13 @@ function zeichne_() {
   }
   if (archiviert) {
     speichereZustand(z);
-    const gesperrt = [];
-    for (const sc of z.scheine) for (const en of sc.entfernt) gesperrt.push(en.id);
+    // ACHTUNG, hier stand ein Fehler: findeErsatz bekam eine LISTE, wo es
+    // eine Schein-Kennung erwartet. Damit fand es nie einen Schein und gab
+    // still auf - das automatische Nachruecken nach dem Archivieren hat
+    // also seit dem Umbau gar nicht mehr funktioniert.
     for (const sch of z.scheine) {
       while (sch.wetten.length < 3) {
-        const suche = findeErsatz(z, sch.kz, gesperrt);
+        const suche = findeErsatz(z, sch.kz, sch.id, ERSATZ_NOTFALL_NUTZUNG);
         if (!suche.treffer) break;
         sch.wetten.push(suche.treffer);
         nachgerückt++;
@@ -793,7 +806,11 @@ function scheinHtml(s, z) {
       // Die Mindestquote, aber in der Waehrung der Spalte daneben: das ist
       // die Zahl, die beim Anbieter auf dem Schirm stehen muss. Bei
       // Interwetten sind das 1,89 fuer real 1,80.
-      "<td class='s-mind'>" + (mind * GEBUEHREN_TEILER[s.kz]).toFixed(2) +
+      // AUFRUNDEN, nicht kaufmaennisch: bei 1,85 und Teiler 1,05 waeren es
+      // 1,9425 - abgerundet auf 1,94 waere die echte Quote 1,8476 und damit
+      // UNTER der Mindestquote. Die angezeigte Pflichtquote muss immer
+      // reichen.
+      "<td class='s-mind'>" + (Math.ceil(mind * GEBUEHREN_TEILER[s.kz] * 100) / 100).toFixed(2) +
         (GEBUEHREN_TEILER[s.kz] !== 1
           ? '<div class="mini">= real ' + mind.toFixed(2) + "</div>" : "") + "</td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
@@ -889,9 +906,20 @@ function zeichneReste(z) {
   // Karams eigene Beobachtung: hier stehen die Wetten, die es bei keinem
   // seiner Anbieter gibt. Die kann niemand mehr setzen.
   const nirgends = nirgendsDaListe(z);
-  html += liste(nirgends, "Kein Anbieter hat sie",
-    "Du hast bei allen vier gesagt, dass es die Wette dort nicht gibt. " +
-    "Sie kommt deshalb in keine Kombination mehr.");
+  if (nirgends.length) {
+    // MIT WEG ZURUECK: ein Merker liess sich bisher nie wieder loeschen.
+    // Ein Vertippen haette die Wette fuer immer aus allen Kombinationen
+    // gehalten, ohne dass man etwas dagegen tun kann.
+    html += "<h3>Kein Anbieter hat sie (" + nirgends.length + ")</h3>" +
+      "<p class='mini'>Du hast bei allen vier gesagt, dass es die Wette dort nicht " +
+      "gibt. Sie kommt deshalb in keine Kombination mehr. War es ein Versehen, " +
+      "hol sie mit dem Knopf zurück.</p><ul>";
+    for (const w of nirgends) {
+      html += "<li>" + w.spiel + " <span class='mini'>(" + w.wette + ")</span> " +
+        '<button onclick="merkerLoeschen(&quot;' + w.id + '&quot;)">doch verfügbar</button></li>';
+    }
+    html += "</ul>";
+  }
   
   document.getElementById("reste").innerHTML = html || "<p class='mini'>Alles verbaut.</p>";
 }
@@ -1480,23 +1508,32 @@ function verlaufZahlSetzen() {
 // ============================================================
 
 // Fuehrt dieser Anbieter ALLE Wetten des Scheins ueber ihrer Untergrenze?
-function anbieterTraegt(wetten, kz) {
+// mind wird uebergeben, nicht je Wette neu aus dem Speicher gelesen.
+function anbieterTraegt(wetten, kz, mind) {
+  const grenze = isFinite(mind) ? mind : mindWert(liesZustand() || {});
   for (const eintrag of wetten) {
+    // Zuerst der Merker: was er dort nicht hat, traegt er nicht.
+    if (nichtDa(eintrag.id, kz)) return false;
     const w = wetteNachId(eintrag.id);
     if (!w) return false;
     const q = zielQuote(w, eintrag.optIdx, kz);
-    if (!ueberMind(q.echt, mindWert(liesZustand() || {}))) return false;
+    if (!ueberMind(q.echt, grenze)) return false;
   }
   return true;
 }
 
-// Wie viel darf bei diesem Anbieter noch dazu? Karams Einsatz-Grenze
-// gilt je Anbieter ueber ALLE Kombinationen zusammen.
-function grenzeRest(z, kz) {
+// Wie viel darf bei diesem Anbieter in DIESER Kombination noch dazu?
+// Die Grenze gilt JE KOMBINATION - so steht es in der Seite ("Wie viel
+// nimmt dieser Anbieter je Kombination hoechstens an?") und so rechnet
+// auch der Verteiler damit. Vorher wurde hier ueber ALLE Kombinationen
+// summiert; nach ein paar Scheinen war die Grenze scheinbar voll und es
+// wurde gar nichts mehr aufgefuellt.
+function grenzeRest(z, kz, nr) {
   const grenzen = (z.einst && z.einst.limits) || null;
   if (!grenzen || !isFinite(grenzen[kz])) return Infinity;
   let schon = 0;
-  for (const s of z.scheine) if (s.kz === kz) schon += parseFloat(einsatzWert(s, z)) || 0;
+  for (const s of z.scheine) if (s.nr === nr && s.kz === kz)
+    schon += parseFloat(einsatzWert(s, z)) || 0;
   return Math.max(0, rund2(grenzen[kz] - schon));
 }
 
@@ -1520,8 +1557,8 @@ function alleAuffuellen() {
       if (teile.some(x => x.kz === kz)) continue;        // dort steht dieser Dreier schon
       const vorlage = teile[0];
       if (!vorlage) break;
-      if (!anbieterTraegt(vorlage.wetten, kz)) continue; // fuehrt die Wetten nicht
-      const platz = grenzeRest(z, kz);
+      if (!anbieterTraegt(vorlage.wetten, kz, mindWert(z))) continue; // fuehrt die Wetten nicht
+      const platz = grenzeRest(z, kz, nr);
       if (platz <= 0.004) continue;                      // Einsatz-Grenze schon voll
       const betrag = rund2(Math.min(rest, platz));
       if (betrag <= 0.004) continue;
@@ -1635,4 +1672,19 @@ function nirgendsDaListe(z) {
   const erlaubt = (z && z.einst && z.einst.anbieter && z.einst.anbieter.length)
     ? z.einst.anbieter : KT_ANBIETER_RANG.slice();
   return satzWetten().filter(w => nirgendsDa(w.id, erlaubt));
+}
+
+// Loescht alle Merker zu EINER Wette - fuer den Fall, dass Karam sich
+// vertippt hat oder der Anbieter sie doch wieder anbietet.
+function merkerLoeschen(wettId) {
+  const m = nichtDaLesen();
+  let weg = 0;
+  for (const s of Object.keys(m)) if (s.indexOf(wettId + "|") === 0) { delete m[s]; weg++; }
+  if (!weg) return;
+  try { localStorage.setItem(NICHT_DA_SCHLUESSEL, JSON.stringify(m)); }
+  catch (e) { meldung("Speicher voll - konnte den Merker nicht löschen.", "warn"); return; }
+  const w = wetteNachId(wettId);
+  meldung("<b>" + (w ? w.spiel : wettId) + "</b> ist wieder frei. " +
+    "Beim nächsten <b>Scheine neu bauen</b> kann sie wieder in eine Kombination.", "gut");
+  zeichne_();
 }
