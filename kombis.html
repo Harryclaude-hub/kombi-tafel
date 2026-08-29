@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260829z">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260829z">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260829aa">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260829aa">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,7 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260829z">
+<link rel="stylesheet" href="stil.css?v=20260829aa">
 </head>
 <body data-seite="bau">
 
@@ -93,6 +93,7 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
     <button onclick="neuBauen()" class="haupt">Scheine neu bauen</button>
     <button onclick="neuMischen()">Anders mischen</button>
     <button onclick="restNeuMischen()" title="Die schon gesetzten Kombinationen bleiben, wie sie sind. Nur der Rest wird neu gemischt.">Rest neu mischen</button>
+    <button id="knopf_einzeln" onclick="einzelnUmschalten()" title="Eine Kombination nach der anderen, in der Reihenfolge deiner Anbieter. Was du ablehnst, kommt dort nicht wieder.">&#9654; Einer nach dem anderen</button>
     <button onclick="alleAuffuellen()" title="Jede Kombination, die noch nicht auf dem Ziel-Einsatz steht, wird beim nächsten Anbieter deiner Reihenfolge aufgefüllt - Stake, Interwetten, Bwin, Bet365.">&#128176; Rest auffüllen</button>
     <button id="knopf_verlauf" onclick="zumVerlauf()" title="Springt nach unten zu dem, was du schon gesetzt hast.">&#128220; Verlauf</button>
     <span class="mini">Achtung: neu bauen wirft deine Rausnahmen weg. Die eingetragenen
@@ -103,6 +104,8 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
 
 <div id="meldung" style="display:none"></div>
 <div id="uebersicht" class="stand"></div>
+
+<div id="einzeln"></div>
 
 <h2>Deine Scheine</h2>
 <p class="mini"><b>Anbieter wechseln:</b> oben in jedem Schein kannst du den Anbieter umstellen.
@@ -146,24 +149,25 @@ Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der Ap
 <!-- scheinlesen.js wird nicht mehr geladen: das Foto wird nur noch
      mitgenommen, nicht mehr ausgelesen. Die Datei bleibt im Ordner
      liegen, falls das je wieder gebraucht wird. -->
-<script src="krypto.js?v=20260829z"></script>
-<script src="medien.js?v=20260829z"></script>
-<script src="anruf-server.js?v=20260829z"></script>
-<script src="anruf.js?v=20260829z"></script>
-<script src="supa.js?v=20260829z"></script>
-<script src="benachrichtigung.js?v=20260829z"></script>
-<script src="satzdaten.js?v=20260829z"></script>
-<script src="profil.js?v=20260829z"></script>
-<script src="anhang.js?v=20260829z"></script>
-<script src="glocke.js?v=20260829z"></script>
-<script src="daten.js?v=20260829z"></script>
-<script src="roh.js?v=20260829z"></script>
-<script src="recherche.js?v=20260829z"></script>
-<script src="logik.js?v=20260829z"></script>
-<script src="verteiler.js?v=20260829z"></script>
-<script src="kombis.js?v=20260829z"></script>
-<script src="ausschnitt.js?v=20260829z"></script>
-<script src="handy.js?v=20260829z"></script>
-<script src="zeilen.js?v=20260829z"></script>
+<script src="krypto.js?v=20260829aa"></script>
+<script src="medien.js?v=20260829aa"></script>
+<script src="anruf-server.js?v=20260829aa"></script>
+<script src="anruf.js?v=20260829aa"></script>
+<script src="supa.js?v=20260829aa"></script>
+<script src="benachrichtigung.js?v=20260829aa"></script>
+<script src="satzdaten.js?v=20260829aa"></script>
+<script src="profil.js?v=20260829aa"></script>
+<script src="anhang.js?v=20260829aa"></script>
+<script src="glocke.js?v=20260829aa"></script>
+<script src="daten.js?v=20260829aa"></script>
+<script src="roh.js?v=20260829aa"></script>
+<script src="recherche.js?v=20260829aa"></script>
+<script src="logik.js?v=20260829aa"></script>
+<script src="verteiler.js?v=20260829aa"></script>
+<script src="einzeln.js?v=20260829aa"></script>
+<script src="kombis.js?v=20260829aa"></script>
+<script src="ausschnitt.js?v=20260829aa"></script>
+<script src="handy.js?v=20260829aa"></script>
+<script src="zeilen.js?v=20260829aa"></script>
 </body>
 </html>

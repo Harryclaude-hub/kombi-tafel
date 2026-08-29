@@ -2632,3 +2632,26 @@ html[data-zeilennr="ja"] body[data-seite="bau"] table.s-tab tbody > tr > td:firs
    Rest der Design-Schicht loescht, indem sie hier ganz unten steht. */
 .uebergruen { color: #1a7a1a; font-size: 10.5px; font-weight: bold; }
 tr.unterquote td { background: #fdf3f3; }
+/* ---------- Einer nach dem anderen (loeschbar) ---------- */
+#einzeln:empty { display: none; }
+#einzeln { margin: 10px 0 16px 0; }
+.ez-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.ez-schritt { background: #1a2c50; color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 13px; }
+.ez-reihe { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.ez-anb { border: 1px solid #c3c9d8; border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+/* Bedeutungsfarben: blau = hier sind wir gerade, grau durchgestrichen = durch. */
+.ez-anb.dran { border-color: #1a2c50; border-width: 2px; font-weight: bold; }
+.ez-anb.fertig { color: #8c93a8; text-decoration: line-through; }
+.ez-tab { width: 100%; font-size: 12.5px; }
+.ez-tab td, .ez-tab th { padding: 4px 7px; }
+.ez-tab tr.ez-drin { outline: 2px solid #1a2c50; }
+/* Der Stand je Anbieter, in Bedeutungsfarben. */
+.ez-offen { color: #1a7a1a; font-weight: bold; }
+.ez-gesetzt { color: #55627a; }
+.ez-keine { color: #a00000; }
+.ez-quote { color: #b35a00; }
+.ez-niedrig { color: #8c93a8; }
+@media (max-width: 700px) {
+  .ez-tab { font-size: 12px; }
+  .ez-kopf button { min-height: 44px; }
+}

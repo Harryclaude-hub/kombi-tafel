@@ -372,12 +372,23 @@ function nichtDaLesen() {
 }
 
 function nichtDa(wettId, kz) {
-  return nichtDaLesen()[wettId + "|" + kz] === true;
+  // Alles Wahre sperrt: alte Eintraege stehen auf true, neue auf
+  // "keine" oder "quote".
+  return !!nichtDaLesen()[wettId + "|" + kz];
 }
 
-function nichtDaSetzen(wettId, kz, ja) {
+// Warum gesperrt? "keine" = hat er nicht, "quote" = Quote passt dort
+// nicht, "" = gar nicht gesperrt.
+function nichtDaGrund(wettId, kz) {
+  const wert = nichtDaLesen()[wettId + "|" + kz];
+  if (!wert) return "";
+  return (wert === "quote") ? "quote" : "keine";
+}
+
+function nichtDaSetzen(wettId, kz, grund) {
   const m = nichtDaLesen();
-  if (ja) m[wettId + "|" + kz] = true; else delete m[wettId + "|" + kz];
+  if (grund) m[wettId + "|" + kz] = (grund === "quote") ? "quote" : "keine";
+  else delete m[wettId + "|" + kz];
   try { localStorage.setItem(NICHT_DA_SCHLUESSEL, JSON.stringify(m)); return true; }
   catch (e) {
     meldung("Der Speicher dieses Browsers ist voll - ich konnte mir nicht merken, " +
@@ -471,6 +482,15 @@ function wetteRaus(scheinId, wettId, grund) {
   if (!sch) return;
   const pos = sch.wetten.findIndex(w => w.id === wettId);
   if (pos < 0) return;
+
+  // Im Modus "Einer nach dem anderen" gilt etwas anderes: dort wird die
+  // Wette fuer DIESEN Anbieter abgelehnt und sofort getauscht, die zwei
+  // anderen bleiben stehen. Genau so arbeitet Karam am Schalter.
+  if (sch.einzeln && typeof einzelnAbgelehnt === "function") {
+    if (grund === "Anbieter hat die Wette nicht") { einzelnAbgelehnt(wettId, "keine"); return; }
+    if (grund === "Quote passt nicht mehr") { einzelnAbgelehnt(wettId, "quote"); return; }
+    if (typeof einzelnTauschen === "function") { einzelnTauschen(wettId); return; }
+  }
 
   // Karams Sonderweg: sagt er "der Anbieter hat sie nicht", dann fliegt
   // nicht die Wette raus, sondern die ganze Kombination wandert weiter.
@@ -778,6 +798,7 @@ function zeichne_() {
   zeichneReste(z);
   zeichneVerlauf();
   zeichneKonto();
+  if (typeof einzelnZeichnen === "function") einzelnZeichnen();
 }
 
 function scheinHtml(s, z) {
@@ -1215,6 +1236,11 @@ function scheinLokalMerken(scheinId, ohneKonto) {
     : "Schein " + b.s.nr + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
+  // Im Einzel-Modus ist die Kombination damit erledigt und wandert ans
+  // Ende: sie steht jetzt im Verlauf und wird nie wieder vorgeschlagen.
+  if (typeof einzelnAktiv === "function" && einzelnAktiv() && b.s && b.s.einzeln) {
+    einzelnNaechste();
+  }
 }
 
 // ---------- Konto-Ordner-Pflicht beim Speichern ----------

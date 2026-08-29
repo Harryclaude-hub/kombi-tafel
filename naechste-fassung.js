@@ -53,13 +53,28 @@ for (const f of fs.readdirSync(".").filter(x => x.endsWith(".html"))) {
 // nie festgeschrieben worden war. Unschaedlich, aber verwirrend - und beim
 // naechsten Mal koennte daraus echtes Durcheinander werden.
 let hoechste = "";
-for (const v of vergeben) if (v.slice(0, 8) === heute && v > hoechste) hoechste = v;
-let neu = null;
-for (const b of buchstaben) {
-  const k = heute + b;
-  if (!vergeben.has(k) && k > hoechste) { neu = k; break; }
+const heutige = [];
+for (const v of vergeben) if (v.slice(0, 8) === heute) heutige.push(v);
+// wird weiter unten mit spaeter() verglichen, deshalb erst sammeln
+// Nach z geht es mit aa, ab, ac weiter. An einem langen Arbeitstag sind
+// 26 Nummern schnell aufgebraucht - dann darf der Helfer nicht einfach
+// aufgeben, sonst muss man doch wieder von Hand raten.
+// Wichtig: "aa" ist als Text KLEINER als "z". Deshalb wird nicht mit >
+// verglichen, sondern nach Laenge und dann nach Text.
+function spaeter(a, b) {
+  const sa = a.slice(8), sb = b.slice(8);
+  if (sa.length !== sb.length) return sa.length > sb.length;
+  return sa > sb;
 }
-if (!neu) { console.error("Alle 26 Nummern von heute sind vergeben."); process.exit(1); }
+for (const v of heutige) if (!hoechste || spaeter(v, hoechste)) hoechste = v;
+const kandidaten = [];
+for (const b of buchstaben) kandidaten.push(heute + b);
+for (const b1 of buchstaben) for (const b2 of buchstaben) kandidaten.push(heute + b1 + b2);
+let neu = null;
+for (const k of kandidaten) {
+  if (!vergeben.has(k) && (!hoechste || spaeter(k, hoechste))) { neu = k; break; }
+}
+if (!neu) { console.error("Heute sind alle Nummern vergeben (bis zz)."); process.exit(1); }
 
 if (process.argv.indexOf("--setzen") < 0) {
   console.log("naechste freie Fassung: " + neu);
