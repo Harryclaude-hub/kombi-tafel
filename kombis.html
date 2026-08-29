@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260829ak">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260829ak">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260829al">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260829al">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,7 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260829ak">
+<link rel="stylesheet" href="stil.css?v=20260829al">
 </head>
 <body data-seite="bau">
 
@@ -51,13 +51,16 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
 <div class="filterbox">
 
 <div class="filterzeile">
-  <span class="f-label">Mindestquote</span>
+  <span class="f-label">Mindestquote<br><span class="mini">nur als Ersatz</span></span>
   <span class="f-knoepfe">
-    <input type="number" id="mind" value="1.80" step="0.05" min="1.01" class="einst">
+    <input type="number" id="mind" value="1.78" step="0.05" min="1.01" class="einst">
     <label style="margin-left:14px">Ziel-Einsatz je Kombi:
       <input type="number" id="ziel" value="400" min="1" step="50" style="width:70px"> &euro;</label>
-    <span class="mini">Gilt für jede einzelne Wette, und zwar die ECHTE Quote nach Gebühr.
-    Traegst du später eine kleinere ein, wird sie nicht übernommen.</span>
+    <span class="mini"><b>Du musst hier nichts einstellen.</b> Jede Wette bringt ihre eigene
+    Mindestquote aus dem Foto mit (die Spalte neben der Quote), und die gilt.
+    Dieses Feld greift nur, wenn im Foto für eine Zeile keine steht.
+    Geprüft wird immer die ECHTE Quote nach Gebühr. Traegst du später eine kleinere
+    ein, wird sie nicht übernommen.</span>
   </span>
 </div>
 <div class="filterzeile">
@@ -153,25 +156,25 @@ Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der Ap
 <!-- scheinlesen.js wird nicht mehr geladen: das Foto wird nur noch
      mitgenommen, nicht mehr ausgelesen. Die Datei bleibt im Ordner
      liegen, falls das je wieder gebraucht wird. -->
-<script src="krypto.js?v=20260829ak"></script>
-<script src="medien.js?v=20260829ak"></script>
-<script src="anruf-server.js?v=20260829ak"></script>
-<script src="anruf.js?v=20260829ak"></script>
-<script src="supa.js?v=20260829ak"></script>
-<script src="benachrichtigung.js?v=20260829ak"></script>
-<script src="satzdaten.js?v=20260829ak"></script>
-<script src="profil.js?v=20260829ak"></script>
-<script src="anhang.js?v=20260829ak"></script>
-<script src="glocke.js?v=20260829ak"></script>
-<script src="daten.js?v=20260829ak"></script>
-<script src="roh.js?v=20260829ak"></script>
-<script src="recherche.js?v=20260829ak"></script>
-<script src="logik.js?v=20260829ak"></script>
-<script src="verteiler.js?v=20260829ak"></script>
-<script src="einzeln.js?v=20260829ak"></script>
-<script src="kombis.js?v=20260829ak"></script>
-<script src="ausschnitt.js?v=20260829ak"></script>
-<script src="handy.js?v=20260829ak"></script>
+<script src="krypto.js?v=20260829al"></script>
+<script src="medien.js?v=20260829al"></script>
+<script src="anruf-server.js?v=20260829al"></script>
+<script src="anruf.js?v=20260829al"></script>
+<script src="supa.js?v=20260829al"></script>
+<script src="benachrichtigung.js?v=20260829al"></script>
+<script src="satzdaten.js?v=20260829al"></script>
+<script src="profil.js?v=20260829al"></script>
+<script src="anhang.js?v=20260829al"></script>
+<script src="glocke.js?v=20260829al"></script>
+<script src="daten.js?v=20260829al"></script>
+<script src="roh.js?v=20260829al"></script>
+<script src="recherche.js?v=20260829al"></script>
+<script src="logik.js?v=20260829al"></script>
+<script src="verteiler.js?v=20260829al"></script>
+<script src="einzeln.js?v=20260829al"></script>
+<script src="kombis.js?v=20260829al"></script>
+<script src="ausschnitt.js?v=20260829al"></script>
+<script src="handy.js?v=20260829al"></script>
 <script>
 // Einmal nachsehen, was schon gesetzt ist. Muss NACH kombis.js und
 // supa.js stehen, sonst gibt es die Funktionen noch nicht.
@@ -179,6 +182,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (typeof kontoScheineLaden === "function") kontoScheineLaden();
 });
 </script>
-<script src="zeilen.js?v=20260829ak"></script>
+<script src="zeilen.js?v=20260829al"></script>
 </body>
 </html>

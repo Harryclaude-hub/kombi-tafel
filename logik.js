@@ -333,6 +333,50 @@ function anbieterSuchLink(a, w) {
   return a.suche.replace("%s", encodeURIComponent(suchName(w)));
 }
 
+// ============================================================
+// MINDESTQUOTE JE WETTE (Karams Regel vom 29.08.2026)
+// Die Mindestquote steht IM FOTO, in der Spalte neben der Quote,
+// und gilt genau fuer diese eine Zeile. Karam stellt sie nicht
+// mehr von Hand ein. Steht im Foto keine - was fast nie vorkommt -
+// gilt der Wert aus dem Feld oben, und wenn auch der fehlt: 1.78.
+//
+// Sie steckt im dritten Platz einer Option: [Linie, Quote, Mindest].
+// Alte Wetten haben nur [Linie, Quote] - die laufen weiter, sie
+// bekommen dann den Ersatzwert. Deshalb kein Umbau der Datenbank.
+// ============================================================
+const MIND_STANDARD = 1.78;
+
+function mindFuer(w, optIdx, ersatz) {
+  const o = (w && Array.isArray(w.o)) ? w.o[optIdx || 0] : null;
+  const m = (o && o.length > 2) ? Number(o[2]) : NaN;
+  if (isFinite(m) && m > 0) return m;
+  const f = Number(ersatz);
+  return (isFinite(f) && f > 0) ? f : MIND_STANDARD;
+}
+
+// Aus "AWAY (-1.5, -1, -0.5)" und Option 2 wird "AWAY -1".
+// NUR fuer die Anzeige. Der Schluessel, unter dem Karams eigene
+// Quoten liegen, bleibt w.o[i][0] - der darf sich nie aendern,
+// sonst sind alle eingetragenen Quoten weg.
+function optionName(w, optIdx) {
+  const i = optIdx || 0;
+  const o = (w && Array.isArray(w.o)) ? w.o[i] : null;
+  const roh = o ? String(o[0]) : "";
+  const text = String((w && w.wette) || "");
+  const auf = text.indexOf("(");
+  const zu = text.lastIndexOf(")");
+  if (auf >= 0 && zu > auf) {
+    const teile = text.slice(auf + 1, zu).split(",").map(x => x.trim()).filter(Boolean);
+    // Nur umbenennen, wenn zu JEDER Linie auch eine Quote gehoert. Sonst
+    // wuerde eine Zeile eine Linie behaupten, fuer die es keine Zahl gibt.
+    if (teile.length > 1 && Array.isArray(w.o) && w.o.length === teile.length && teile[i]) {
+      const vorn = text.slice(0, auf).trim();
+      const hinten = text.slice(zu + 1).trim();
+      return (vorn + " " + teile[i] + (hinten ? " " + hinten : "")).replace(/\s+/g, " ").trim();
+    }
+  }
+  return roh || text;
+}
 function anbieterName(kz) { return ANBIETER.find(a => a.kz === kz).name; }
 
 // Bester aus den GETIPPTEN Quoten (echt gerechnet); null wenn nichts getippt

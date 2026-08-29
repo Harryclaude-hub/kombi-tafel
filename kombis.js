@@ -35,12 +35,14 @@ function zielQuote(w, optIdx, kz) {
   return { roh: ref, echt: ref / teiler, quelle: "Foto " + ref.toFixed(2), fest: false };
 }
 
-// Die Mindestquote gilt fuer ALLE Wetten gleich und steht im Feld oben.
-// Sie prueft immer die ECHTE Quote nach Gebuehr. Die Foto-Quote ist nur
-// eine Einschaetzung und entscheidet nichts.
+// ERSATZWERT, nicht mehr die Regel: seit dem 29.08.2026 bringt jede
+// Wette ihre eigene Mindestquote aus dem Foto mit (mindFuer in logik.js).
+// Das Feld oben greift nur noch, wenn im Foto nichts steht.
+// Geprueft wird immer die ECHTE Quote nach Gebuehr. Die Foto-Quote ist
+// nur eine Einschaetzung und entscheidet nichts.
 function mindWert(z) {
   const m = z && z.einst ? Number(z.einst.mind) : NaN;
-  return isFinite(m) && m > 0 ? m : 1.5;
+  return isFinite(m) && m > 0 ? m : MIND_STANDARD;
 }
 
 // Erreicht diese Quote die Mindestquote? Genau darauf zaehlt als erreicht.
@@ -195,8 +197,10 @@ function baueAlles(nurRest) {
     // Die harte Sperre: hier steht, wo Karam die Wette nicht gefunden hat.
     const gesperrt = {};
     for (const kz of e.anbieter) if (nichtDa(w.id, kz)) gesperrt[kz] = true;
+    // mind: die Mindestquote DIESER Wette aus dem Foto. Ohne die wuerde der
+    // Verteiler weiter mit einer einzigen Zahl fuer alle rechnen.
     eingabe.wetten.push({ id: w.id, spiel: spielKennung(w), quoten: quoten, belegt: belegt,
-      verf: verf, gesperrt: gesperrt });
+      verf: verf, gesperrt: gesperrt, mind: mindFuer(w, optIdx, e.mind) });
   }
 
   // ---- Verteilen: beide Verfahren rechnen, das bessere gewinnt ----
@@ -247,7 +251,7 @@ function baueAlles(nurRest) {
   for (const w of offen) {
     if (inKombi.has(w.id)) continue;
     const irgendwoUeber = e.anbieter.some(kz =>
-      ueberMind(zielQuote(w, optVon[w.id], kz).echt, e.mind));
+      ueberMind(zielQuote(w, optVon[w.id], kz).echt, mindFuer(w, optVon[w.id], e.mind)));
     (irgendwoUeber ? uebrig : zuNiedrig).push(w);
   }
   const topfN = mische(zuNiedrig.slice(), e.saat + 7);
@@ -329,9 +333,10 @@ function anbieterWechseln(scheinId, neuKz) {
     const v = verfuegbarkeit(w)[neuKz];
     // "N" ist nur eine Einschätzung, kein Ausschluss: Karam prüft selbst.
     const q = zielQuote(w, eintrag.optIdx, neuKz);
-    if (sch.art === "normal" && q.echt < z.einst.mind - 0.0001) {
+    const mindW = mindFuer(w, eintrag.optIdx, z.einst.mind);
+    if (sch.art === "normal" && q.echt < mindW - 0.0001) {
       probleme.push(w.spiel + ": dort nur " + rund2(q.echt).toFixed(2) +
-        ", unter deiner Mindestquote " + z.einst.mind.toFixed(2));
+        ", unter der Mindestquote " + mindW.toFixed(2) + " dieser Wette");
     }
   }
 
@@ -474,7 +479,7 @@ function findeErsatz(z, kz, scheinId, maxNutzung) {
   for (const w of frei) {
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (ueberMind(q.echt, e.mind))
+    if (ueberMind(q.echt, mindFuer(w, optIdx, e.mind)))
       bewertet.push({ w: w, optIdx: optIdx, echt: q.echt, schonBenutzt: nutzung[w.id] || 0 });
   }
   const info = { imOrdner: imOrdner.length, offen: offen.length, frei: frei.length,
@@ -582,11 +587,13 @@ function quoteEintragen(scheinId, wettId, feld) {
   if (!roh || roh <= 1) { feld.classList.add("fehler"); return; }
 
   const echt = roh / GEBUEHREN_TEILER[sch.kz];
-  if (sch.art === "normal" && echt < z.einst.mind - 0.0001) {
+  const mindW = mindFuer(w, eintrag.optIdx, z.einst.mind);
+  if (sch.art === "normal" && echt < mindW - 0.0001) {
     feld.classList.add("fehler");
     meldung("Nicht übernommen: " + roh.toFixed(2) + " bei " + anbieterName(sch.kz) +
-      " sind real nur " + rund2(echt).toFixed(2) + ", das liegt unter deiner Mindestquote " +
-      z.einst.mind.toFixed(2) + ". Entweder du nimmst die Wette raus, oder du senkst oben die Mindestquote.",
+      " sind real nur " + rund2(echt).toFixed(2) + ", das liegt unter der Mindestquote " +
+      mindW.toFixed(2) + " dieser Wette (aus dem Foto). Entweder du nimmst die Wette raus, " +
+      "oder du suchst eine andere Linie desselben Spiels.",
       "warn");
     return;
   }
@@ -799,7 +806,7 @@ function zeichne_() {
 
   const gruppenZahl = new Set(normal.map(s => s.nr)).size;
   document.getElementById("uebersicht").innerHTML =
-    "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (" + z.einst.mind.toFixed(2) + ")" +
+    "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (je Wette aus dem Foto, sonst " + z.einst.mind.toFixed(2) + ")" +
     ", dazu <b>" + niedrig.length + " Scheine mit zu niedrigen Quoten</b>. " +
     verbaut + " Plätze belegt bei " + z.gesamtOffen + " offenen Wetten (jede darf in " +
     "höchstens zwei Scheinen stecken), " + (z.uebrig.length + z.uebrigNiedrig.length) +
@@ -847,13 +854,16 @@ function scheinHtml(s, z, gesetzt) {
     if (!q.fest) alleFest = false;
     // Die Mindestquote gegen die ECHTE Quote nach Gebuehr.
     // Genau auf der Grenze gilt als erreicht - also gruen.
-    const unter = !ueberMind(q.echt, mind);
+    // Jede Zeile hat ihre EIGENE Mindestquote aus dem Foto. "mind" oben ist
+    // nur noch der Ersatzwert, falls im Foto keine steht.
+    const mindZ = mindFuer(w, eintrag.optIdx, mind);
+    const unter = !ueberMind(q.echt, mindZ);
     const opt = w.o[eintrag.optIdx][0];
     const eigen = liesEingabe(w.id, opt, s.kz);
     return "<tr" + (unter ? ' class="unterquote"' : "") + ">" +
       "<td class='s-zeit'>" + zeitText(anstossFeld(w)) + "</td>" +
       "<td class='s-spiel'>" + w.spiel + '<div class="mini">' + w.liga + "</div></td>" +
-      "<td class='s-wette'>" + w.wette.split("(")[0].trim() + " " + opt +
+      "<td class='s-wette'>" + optionName(w, eintrag.optIdx) +
         ' <span class="reiter-chip">' + w.s + "</span>" +
         (v === "D" ? '<div class="duenn">Markt dort duenn, prüfen</div>' :
          (v === "N" ? '<div class="duenn">Einschätzung: evtl. nicht im Angebot, prüfen</div>' : "")) + "</td>" +
@@ -865,9 +875,11 @@ function scheinHtml(s, z, gesetzt) {
       // 1,9425 - abgerundet auf 1,94 waere die echte Quote 1,8476 und damit
       // UNTER der Mindestquote. Die angezeigte Pflichtquote muss immer
       // reichen.
-      "<td class='s-mind'>" + (Math.ceil(mind * GEBUEHREN_TEILER[s.kz] * 100) / 100).toFixed(2) +
+      "<td class='s-mind'>" + (Math.ceil(mindZ * GEBUEHREN_TEILER[s.kz] * 100) / 100).toFixed(2) +
         (GEBUEHREN_TEILER[s.kz] !== 1
-          ? '<div class="mini">= real ' + mind.toFixed(2) + "</div>" : "") + "</td>" +
+          ? '<div class="mini">= real ' + mindZ.toFixed(2) + "</div>" : "") +
+        '<div class="mini">' + (w.o[eintrag.optIdx].length > 2
+          ? "aus dem Foto" : "kein Foto-Wert") + "</div></td>" +
       "<td class='s-eingabe'><input type='number' step='0.01' min='1' placeholder='Quote' " +
         (eigen ? "value='" + eigen + "' " : "") +
         "onchange=\"quoteEintragen('" + s.id + "','" + w.id + "',this)\">" +
@@ -1106,7 +1118,7 @@ function scheinNeuMischen(scheinId) {
     if (schonDrin.has(k)) continue;
     const optIdx = gewaehlteOption(w);
     const q = zielQuote(w, optIdx, kz);
-    if (ueberMind(q.echt, e.mind)) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
+    if (ueberMind(q.echt, mindFuer(w, optIdx, e.mind))) { passend.push({ id: w.id, optIdx: optIdx }); schonDrin.add(k); }
     if (passend.length === 3) break;
   }
   if (passend.length < 3) {
@@ -1164,11 +1176,14 @@ function zeichneEigenbau() {
   const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)));
   if (!offen.length) { box.innerHTML = '<p class="mini">Keine offenen Wetten im Ordner.</p>'; return; }
   let zeilen = "";
+  // Ersatzwert aus dem Feld oben; hier gibt es kein "e" wie beim Bauen.
+  const ersatzMind = mindWert(liesZustand() || {});
   for (const w of offen) {
     const optIdx = gewaehlteOption(w);
     zeilen += '<label class="eb-zeile"><input type="checkbox" class="eb-wahl" value="' + w.id + '"> ' +
-      "<b>" + w.spiel + "</b> <span class='mini'>" + w.wette + " (" + w.o[optIdx][0] + "), Foto-Quote " +
-      w.o[optIdx][1].toFixed(2) + ", " + zeitText(anstossFeld(w)) + "</span></label>";
+      "<b>" + w.spiel + "</b> <span class='mini'>" + optionName(w, optIdx) + ", Foto-Quote " +
+      w.o[optIdx][1].toFixed(2) + ", Mindestquote " + mindFuer(w, optIdx, ersatzMind).toFixed(2) +
+      ", " + zeitText(anstossFeld(w)) + "</span></label>";
   }
   box.innerHTML = '<div class="eigenbaukasten">' + zeilen +
     '<p><button class="haupt" onclick="eigenbauAnlegen()">&#129513; Eigenen Schein aus den angehakten Wetten anlegen</button></p></div>';
@@ -1326,8 +1341,8 @@ function baueVerlaufsEintrag(scheinId) {
     const w = wetteNachId(eintrag.id);
     const q = zielQuote(w, eintrag.optIdx, s.kz);
     gesamt *= q.echt;
-    return { id: w.id, spiel: w.spiel, wette: w.wette, linie: w.o[eintrag.optIdx][0],
-             quote: rund2(q.echt), quelle: q.quelle };
+    return { id: w.id, spiel: w.spiel, wette: w.wette, linie: optionName(w, eintrag.optIdx),
+             quote: rund2(q.echt), quelle: q.quelle, mind: mindFuer(w, eintrag.optIdx, null) };
   });
   // HIER entsteht die feste Nummer, und nur hier: eine Kombination, die
   // wirklich gesetzt wird, bekommt eine, die es nie wieder gibt. Blosses
@@ -1615,7 +1630,8 @@ function textSicherK2(t) {
 function neuBauen() {
   localStorage.removeItem(zustandSchluessel());
   baueAlles();
-  meldung("Neu gebaut mit Mindestquote " + einstellungenLesen().mind.toFixed(2) + ".", "gut");
+  meldung("Neu gebaut. Mindestquote je Wette aus dem Foto, Ersatzwert " +
+    einstellungenLesen().mind.toFixed(2) + ".", "gut");
   zeichne_();
 }
 

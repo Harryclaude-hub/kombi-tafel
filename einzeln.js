@@ -52,8 +52,10 @@ function einzelnStand(wettId, kz, mind) {
   if (grund) return "keine";
   const w = wetteNachId(wettId);
   if (!w) return "keine";
-  const q = zielQuote(w, gewaehlteOption(w), kz);
-  if (!ueberMind(q.echt, mind)) return "niedrig";
+  const optIdx = gewaehlteOption(w);
+  const q = zielQuote(w, optIdx, kz);
+  // Die Mindestquote DIESER Wette aus dem Foto. "mind" ist nur Ersatz.
+  if (!ueberMind(q.echt, mindFuer(w, optIdx, mind))) return "niedrig";
   return "offen";
 }
 

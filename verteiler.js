@@ -183,7 +183,10 @@ function stelleBauen(w, kz, mind, ersatz) {
   var echt = roh / teiler;
   // R5, harte Grenze: die ECHTE Quote nach Gebuehr muss die Mindestquote
   // erreichen. Genau auf der Grenze zaehlt als erreicht.
-  if (echt < mind - 1e-9) return null;
+  // Seit 29.08.2026: jede Wette bringt ihre eigene Mindestquote aus dem
+  // Foto mit (w.mind). Der uebergebene Wert ist nur noch der Ersatz.
+  var mindW = (typeof w.mind === "number" && w.mind > 0) ? w.mind : mind;
+  if (echt < mindW - 1e-9) return null;
 
   var v = (w.verf && w.verf[kz]) ? String(w.verf[kz]).toUpperCase() : "";
   var belegt = !!(w.belegt && w.belegt[kz]);
@@ -862,6 +865,7 @@ function bereiteVor(eingabe) {
 
   var anzahlA = anbieter.length;
   var v = {
+    mindJe: [],
     wetten: wetten,
     anbieter: anbieter,
     mind: mind,
@@ -909,6 +913,11 @@ function bereiteVor(eingabe) {
       if (typeof q === "number" && q > 0 && (ersatz === null || q < ersatz)) ersatz = q;
     }
 
+    // Die Mindestquote DIESER Wette aus dem Foto, sonst der Ersatzwert.
+    // Muss genauso wirken wie mindW in stelleBauen (Verfahren 1).
+    var mindW = (typeof w.mind === "number" && w.mind > 0) ? w.mind : mind;
+    v.mindJe.push(mindW);
+
     var echtZeile = [];
     var gueteZeile = [];
     var maske = 0;
@@ -939,7 +948,7 @@ function bereiteVor(eingabe) {
       // HARTE SPERRE zuerst (siehe stelleBauen), dann R5: echte Quote
       // nach Gebuehr muss die Mindestquote erreichen.
       var gesperrtHier = !!(w.gesperrt && w.gesperrt[kzA]);
-      if (!gesperrtHier && roh !== null && echt >= mind - 1e-9) {
+      if (!gesperrtHier && roh !== null && echt >= mindW - 1e-9) {
         maske |= (1 << a);
         if (g >= 3) knapp++;
         if (g >= GUETE_BELEGT) belegAnzahl++;
@@ -1457,7 +1466,7 @@ function baueTipps(v, loesung) {
     var teiler = GEBUEHREN_TEILER[kzB] || 1;
     // So viel muesste auf dem Schirm stehen, damit nach Gebuehr die
     // Mindestquote herauskommt.
-    var noetig = Math.ceil(v.mind * teiler * 100) / 100;
+    var noetig = Math.ceil((v.mindJe[i2] || v.mind) * teiler * 100) / 100;
     // Wie viel waere zu holen? Nur etwas, wenn zwei weitere Wetten mit
     // freier Kapazitaet und anderen Spielen bei diesem Anbieter warten.
     var partner = 0;
