@@ -1322,7 +1322,11 @@ function personGewinn(ordnerId, scheine) {
 // Stand, Foto - und wie viele Teile zusammen zum Ziel gehören.
 function kombiUebersichtHtml(ordnerId, scheine) {
   const meine = scheine.filter(s => s.ordner === ordnerId);
-  if (!meine.length) return '<p class="mini">Noch keine Kombinationen bei dieser Person.</p>';
+  if (!meine.length) return '<p class="mini">Noch keine Kombinationen bei dieser Person.</p>' +
+    (darfSchreiben() && typeof pkNeu === "function"
+      ? '<p><button onclick="pkNeu(\'' + ordnerId + '\')">&#10133; Kombination von Hand anlegen</button></p>'
+      : "") +
+    (typeof pkFormularHtml === "function" ? pkFormularHtml(ordnerId) : "");
   const einsatz = meine.reduce((p, s) => p + (s.daten.einsatz || 0), 0);
   const offen = meine.filter(s => s.stand === "offen").length;
   const gew = meine.filter(s => s.stand === "gewonnen").length;
@@ -1331,21 +1335,34 @@ function kombiUebersichtHtml(ordnerId, scheine) {
     '<p class="mini"><b>Gesamteinsatz ' + einsatz.toFixed(2) + " &euro;</b> - " + offen + " offen, " +
     '<span class="gruen">' + gew + " gewonnen</span>, <span class=\"rot\">" + ver + " verloren</span>. " +
     "Ein Schein hat drei Wetten; setzt du 400 &euro;, zählen die 400 &euro; für die ganze Kombination.</p>" +
+    (darfSchreiben() && typeof pkNeu === "function"
+      ? '<p><button onclick="pkNeu(\'' + ordnerId + '\')">&#10133; Kombination von Hand anlegen</button> ' +
+        '<span class="mini">für ältere Kombinationen, die nicht über den Kombi-Bau gelaufen sind</span></p>'
+      : "") +
     '<div class="tabellenrand"><table><thead><tr><th>Wann</th><th>Anbieter</th><th>Spiele</th>' +
-    "<th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th><th>Foto</th></tr></thead><tbody>";
+    "<th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th><th>Foto</th><th></th></tr></thead><tbody>";
   for (const s of meine) {
     const d = s.daten;
     h += "<tr" + (scheinWartet(s) ? " class='fertigzeile'" : "") + ">" +
-      "<td class='mini'>" + zeitM(s.created_at) + "</td>" +
+      "<td class='mini'>" + zeitM((d.handeingabe && d.zeit) ? d.zeit : s.created_at) +
+        (d.handeingabe ? '<div class="pkmarke">von Hand</div>' : "") + "</td>" +
       "<td>" + markeM(d.kz) + "</td>" +
-      "<td class='mini'>" + (d.wetten || []).map(t => textSicherM(t.spiel)).join("<br>") + "</td>" +
+      "<td class='mini'>" + (d.wetten || []).map(t => textSicherM(t.spiel) +
+        (t.linie ? " (" + textSicherM(t.linie) + ")" : "")).join("<br>") + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td>" +
       "<td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + s.stand + (scheinWartet(s) ? ' <span class="fertigbadge">Ergebnis?</span>' : "") + "</td>" +
-      "<td>" + (s.foto ? '<img src="' + s.foto + '" class="minifoto">' : '<span class="mini">-</span>') + "</td></tr>";
+      "<td>" + (s.foto ? '<img src="' + textSicherM(s.foto) + '" class="minifoto">' : '<span class="mini">-</span>') + "</td>" +
+      "<td>" + (darfSchreiben() && typeof pkBearbeiten === "function"
+        ? "<button title='Diese Kombination bearbeiten' " +
+          "onclick=\"pkBearbeiten('" + ordnerId + "', '" + s.id + "')\">&#9998;</button> " +
+          "<button class='knopfweg' title='Diese Kombination loeschen' " +
+          "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>"
+        : "") + "</td></tr>";
   }
-  return h + "</tbody></table></div>";
+  return h + "</tbody></table></div>" +
+    (typeof pkFormularHtml === "function" ? pkFormularHtml(ordnerId) : "");
 }
 
 function zeichnePersonenKasse(scheine) {

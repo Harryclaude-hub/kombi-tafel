@@ -2898,3 +2898,34 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
 .gs-tafel .gs-nr { font-weight: 700; white-space: nowrap; }
 .gs-tafel .gs-wetten { font-size: .9em; line-height: 1.35; }
 .gs-tafel tr.gs-unlesbar { opacity: .7; font-style: italic; }
+
+
+/* ==========================================================
+   Kombination von Hand anlegen / bearbeiten (personkombi.js)
+   Reine Optik. Diesen Block kann man ersatzlos loeschen, das
+   Formular funktioniert dann weiter, nur ungeordnet.
+   ========================================================== */
+.pkkasten { border: 2px solid #cfd8e3; border-radius: 10px; padding: 12px 14px;
+            margin: 12px 0; background: #fbfcfe; }
+.pkkasten h4 { margin: 0 0 6px; }
+.pkreihe { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 10px 0; }
+.pkreihe label { display: block; font-size: 0.9em; }
+.pktabelle td { padding: 3px 4px; }
+.pkfeld { width: 100%; box-sizing: border-box; }
+.pkkurz { max-width: 170px; }
+.pkmini { max-width: 90px; }
+.pkmarke { color: #7a6000; font-size: 0.8em; }
+/* Am Handy wird aus jeder Wett-Zeile eine eigene Karte. Als Tabelle waren
+   die Felder dort nur noch zwei Zeichen breit (gemessen bei 375 px). */
+@media (max-width: 700px) {
+  .pkreihe { flex-direction: column; align-items: stretch; }
+  .pkkurz, .pkmini { max-width: none; }
+  .pktabelle, .pktabelle tbody, .pktabelle tr, .pktabelle td { display: block; width: auto; }
+  .pktabelle thead { display: none; }
+  .pktabelle tr { border: 1px solid #dde3ec; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; }
+  .pktabelle td { padding: 3px 0; }
+  .pktabelle input { width: 100%; box-sizing: border-box; }
+  .pknr { font-weight: bold; color: #556; }
+  .pkkasten .tabellenrand { overflow: visible; }
+}
+.pknr { white-space: nowrap; }
