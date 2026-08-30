@@ -2866,3 +2866,30 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   border-radius: 10px; padding: 10px 13px; background: #fdf3f3;
   font-size: 13px; color: #7a0000;
 }
+/* ============================================================
+   DESIGN-SCHICHT: Die ganze Tabelle im Kombi-Bau (30.08.2026)
+   Nur Optik. Loeschbar, ohne dass etwas aufhoert zu arbeiten.
+   ============================================================ */
+.tb-leiste { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin: 8px 0 10px; }
+.tb-leiste select { padding: 4px 6px; }
+.tb-warnung { color: #b23; font-weight: 600; }
+.tb-tafel { width: 100%; border-collapse: collapse; }
+.tb-tafel th, .tb-tafel td { padding: 4px 7px; vertical-align: top; }
+.tb-tafel tbody tr { border-top: 1px solid rgba(128,128,128,.25); }
+/* Weitere Linie desselben Spiels: kein neuer Trennstrich, sie gehoert dazu */
+.tb-tafel tr.tb-weiter { border-top: 1px dotted rgba(128,128,128,.2); }
+.tb-tafel tr.tb-vorbei { opacity: .45; }
+.tb-wahl { width: 28px; }
+.tb-wahl input { transform: scale(1.25); cursor: pointer; }
+.tb-zeit { white-space: nowrap; }
+.tb-wette { font-weight: 600; }
+.tb-q { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tb-mind { font-weight: 700; }
+.tb-ersatz { opacity: .5; font-weight: 400; }
+.tb-gesetzt { text-align: right; font-variant-numeric: tabular-nums;
+  white-space: nowrap; font-weight: 600; }
+@media (max-width: 700px) {
+  .tb-tafel th, .tb-tafel td { padding: 3px 4px; font-size: .9em; }
+  .tb-tafel th:nth-child(3), .tb-tafel td:nth-child(3) { display: none; }  /* Liga */
+}

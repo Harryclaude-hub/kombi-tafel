@@ -1170,56 +1170,120 @@ function scheinTeilen(scheinId) {
 
 // ---------- Eigener Schein: Wetten aus dem offenen Ordner selbst mischen ----------
 
+// ---------- Die Tabelle: alles wie im Foto, zum Selberbauen ----------
+// Karams Wunsch (30.08.2026): keine fertig gestellten Scheine mehr raten
+// muessen, sondern die ganze Tabelle sehen - jede Wettmoeglichkeit als
+// eigene Zeile, daneben BEIDE Quoten, und ganz rechts, wie viel auf diese
+// Wette schon gesetzt wurde. Anhaken, Anbieter waehlen, Kombi bauen.
 function zeichneEigenbau() {
   const box = document.getElementById("eigenbau");
   if (!box) return;
-  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w)));
-  if (!offen.length) { box.innerHTML = '<p class="mini">Keine offenen Wetten im Ordner.</p>'; return; }
-  let zeilen = "";
-  // Ersatzwert aus dem Feld oben; hier gibt es kein "e" wie beim Bauen.
+  const alle = satzWetten();
+  if (!alle.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
   const ersatzMind = mindWert(liesZustand() || {});
-  for (const w of offen) {
-    const optIdx = gewaehlteOption(w);
-    zeilen += '<label class="eb-zeile"><input type="checkbox" class="eb-wahl" value="' + w.id + '"> ' +
-      "<b>" + w.spiel + "</b> <span class='mini'>" + optionName(w, optIdx) + ", Foto-Quote " +
-      w.o[optIdx][1].toFixed(2) + ", Mindestquote " + mindFuer(w, optIdx, ersatzMind).toFixed(2) +
-      ", " + zeitText(anstossFeld(w)) + "</span></label>";
+
+  // Wie viel steht schon auf welcher Wette? BEIDE Ablagen, nur dieser
+  // Ordner - liesVerlauf() allein waere bei angemeldetem Nutzer leer.
+  const proWette = {};
+  for (const e of gesetzteEintraege())
+    for (const t of (e.wetten || []))
+      proWette[t.id] = (proWette[t.id] || 0) + (Number(e.einsatz) || 0);
+
+  let zeilen = "", offen = 0;
+  for (const w of alle) {
+    const vorbei = istVorbei(anstossFeld(w));
+    const anzahl = Array.isArray(w.o) ? w.o.length : 0;
+    const gesetztH = proWette[w.id] || 0;
+    for (let i = 0; i < anzahl; i++) {
+      if (!vorbei) offen++;
+      zeilen += '<tr class="' + (vorbei ? "tb-vorbei" : "") + (i ? " tb-weiter" : "") + '">' +
+        '<td class="tb-wahl"><input type="checkbox" class="eb-wahl" value="' + w.id + "|" + i + '"' +
+          (vorbei ? " disabled" : "") + ' onchange="ebZaehlen()"></td>' +
+        '<td class="mini tb-zeit">' + (i ? "" : zeitText(anstossFeld(w))) + "</td>" +
+        '<td class="mini">' + (i ? "" : textSicher(w.liga)) + "</td>" +
+        "<td>" + (i ? "" : "<b>" + textSicher(w.spiel) + "</b>") + "</td>" +
+        '<td class="tb-wette">' + textSicher(optionName(w, i)) +
+          ' <span class="reiter-chip">' + textSicher(w.s) + "</span></td>" +
+        '<td class="tb-q">' + Number(w.o[i][1]).toFixed(2) + "</td>" +
+        '<td class="tb-q tb-mind">' + mindFuer(w, i, ersatzMind).toFixed(2) +
+          (w.o[i].length > 2 ? "" : '<span class="tb-ersatz">*</span>') + "</td>" +
+        '<td class="tb-gesetzt">' + (i === 0 && gesetztH ? gesetztH.toFixed(2) + " &euro;" : "") + "</td></tr>";
+    }
   }
-  box.innerHTML = '<div class="eigenbaukasten">' + zeilen +
-    '<p><button class="haupt" onclick="eigenbauAnlegen()">&#129513; Eigenen Schein aus den angehakten Wetten anlegen</button></p></div>';
+
+  const anb = KT_ANBIETER_RANG.map(kz =>
+    '<option value="' + kz + '">' + textSicher(anbieterName(kz)) + "</option>").join("");
+
+  box.innerHTML =
+    '<div class="tb-leiste">' +
+      '<label>Anbieter: <select id="eb_kz">' + anb + "</select></label> " +
+      '<button class="haupt" onclick="eigenbauAnlegen()">&#129513; Kombination aus der Auswahl bauen</button> ' +
+      '<span id="eb_zaehler" class="mini">nichts angehakt</span>' +
+    "</div>" +
+    '<div class="tabellenrand"><table class="tb-tafel"><thead><tr>' +
+      "<th></th><th>Anstoß</th><th>Liga</th><th>Spiel</th><th>Wette</th>" +
+      "<th>Quote</th><th>Mindest</th><th>gesetzt</th></tr></thead><tbody>" +
+      zeilen + "</tbody></table></div>" +
+    '<p class="mini">' + offen + " Wettmöglichkeiten offen. Jede Linie eines Spiels steht als " +
+      "eigene Zeile - du setzt nur eine davon. <b>Quote</b> ist die linke Spalte aus dem Foto, " +
+      "<b>Mindest</b> die rechte. Ein <b>*</b> heißt: für diese Zeile stand im Foto keine " +
+      "Mindestquote, es gilt der Ersatzwert " + ersatzMind.toFixed(2) + ". " +
+      "<b>gesetzt</b> ist die Summe, die auf diese Wette schon draußen ist.</p>";
+  ebZaehlen();
+}
+
+// Zeigt laufend, was angehakt ist - und warnt sofort bei zwei Zeilen
+// desselben Spiels, statt erst beim Bauen.
+function ebZaehlen() {
+  const feld = document.getElementById("eb_zaehler");
+  if (!feld) return;
+  const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
+  const spiele = new Set(), doppelt = new Set();
+  for (const v of wahl) {
+    const w = wetteNachId(v.split("|")[0]);
+    if (!w) continue;
+    const k = spielKennung(w);
+    if (spiele.has(k)) doppelt.add(w.spiel);
+    spiele.add(k);
+  }
+  feld.className = "mini" + (doppelt.size ? " tb-warnung" : "");
+  feld.innerHTML = wahl.length
+    ? wahl.length + " angehakt" +
+      (doppelt.size ? " - <b>" + textSicher([...doppelt].join(", ")) +
+        "</b> steckt zweimal drin (gleiches Spiel, geht nicht in EINEN Schein)" : "")
+    : "nichts angehakt";
 }
 
 function eigenbauAnlegen() {
-  const gewaehlt = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
-  if (gewaehlt.length < 2) { meldung("Bitte mindestens zwei Wetten anhaken.", "warn"); return; }
+  const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
+  if (wahl.length < 2) { meldung("Bitte mindestens zwei Zeilen anhaken.", "warn"); return; }
   const kennungen = new Set();
-  for (const id of gewaehlt) {
-    const w = wetteNachId(id);
+  const wetten = [];
+  for (const v of wahl) {
+    const teile = v.split("|");
+    const w = wetteNachId(teile[0]);
     if (!w) continue;
     const k = spielKennung(w);
     if (kennungen.has(k)) {
-      meldung("<b>" + w.spiel + "</b> ist zweimal angehakt (gleiches Spiel) - " +
+      meldung("<b>" + textSicher(w.spiel) + "</b> ist zweimal angehakt (gleiches Spiel) - " +
         "ein Spiel darf nur einmal in denselben Schein.", "warn");
       return;
     }
     kennungen.add(k);
+    wetten.push({ id: w.id, optIdx: parseInt(teile[1], 10) || 0 });
   }
+  const kzFeld = document.getElementById("eb_kz");
+  const kz = (kzFeld && kzFeld.value) || KT_ANBIETER_RANG[0];
   const z = liesZustand() || baueAlles();
-  // Auch der Eigenbau nimmt nur eine interne Nummer.
   const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
-  z.scheine.push({
-    // Der selbst gebaute Schein geht an den ersten erlaubten Anbieter -
-    // das ist jetzt Stake, frueher stand hier Bwin als Rueckfall.
-    id: "E" + Date.now(), nr: nr, kz: (z.einst && z.einst.anbieter && z.einst.anbieter[0]) || KT_ANBIETER_RANG[0],
-    art: "eigen",
-    wetten: gewaehlt.map(id => ({ id: id, optIdx: gewaehlteOption(wetteNachId(id)) })),
-    entfernt: []
-  });
+  z.scheine.push({ id: "E" + Date.now(), nr: nr, kz: kz, art: "eigen",
+    wetten: wetten, entfernt: [] });
   speichereZustand(z);
-  // anzeigeNr erst NACH dem Speichern: vorher steht der neue Schein
-  // noch nicht in der Liste, ueber die gezaehlt wird.
-  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> mit " + gewaehlt.length + " Wetten angelegt - " +
-    "oben bei den Scheinen: Anbieter wählen, Einsatz eintragen, fertig.", "gut");
+  // anzeigeNr erst NACH dem Speichern: vorher steht der neue Schein noch
+  // nicht in der Liste, ueber die gezaehlt wird.
+  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> mit " + wetten.length +
+    " Wetten bei " + textSicher(anbieterName(kz)) + " angelegt - oben bei den Scheinen: " +
+    "Einsatz eintragen, fertig.", "gut");
   zeichne_();
 }
 
