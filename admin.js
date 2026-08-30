@@ -1093,8 +1093,10 @@ function satzScannen(ordner) {
   box.dataset.offen = "1";
   // Der vollstaendige Auftrag. Er enthaelt ALLES, was Claude braucht, um
   // die Arbeit ohne Rueckfrage zu Ende zu bringen: wo die Fotos liegen,
-  // was gelesen werden soll, in welcher Form es in die Datenbank gehoert
-  // und was ausdruecklich NICHT eingetragen wird. Karam soll nichts mehr
+  // was gelesen werden soll und in welcher Form es in die Datenbank gehoert.
+  // BEIDE Quotenspalten gehoeren hinein - links die Quote, rechts die
+  // Mindestquote. Am 30.08.2026 fehlte die rechte Spalte, dadurch stand bei
+  // jeder Wette derselbe Ersatzwert 1,78. Karam soll nichts mehr
   // einfuegen muessen - die Zeilen landen direkt im Ordner, und der
   // Kombi-Bau rechnet danach von selbst weiter.
   const satz = [
@@ -1107,20 +1109,30 @@ function satzScannen(ordner) {
     "WAS ICH BRAUCHE:",
     "1. Lies JEDE Zeile von JEDEM Foto. Keine Zeile ueberspringen.",
     "2. Die Fotos ueberlappen sich oft - dieselbe Zeile darf nur EINMAL hinein.",
-    "3. Je Zeile: Melder, Anstoss, Liga, Spiel, Wette, Quote.",
-    "4. Stehen mehrere Quoten in einer Zeile (mit Schraegstrich getrennt), ist das EINE",
-    "   Wette mit mehreren Optionen - alle Werte mitnehmen.",
-    "5. Trag NUR die erste Quotenspalte ein, also die Rohquote. Die Interwetten-Spalte",
-    "   daneben NICHT eintragen: die rechnet das Programm selbst (geteilt durch 1,05).",
+    "3. Je Zeile: Melder, Anstoss, Liga, Spiel, Wette, Quote UND Mindestquote.",
+    "4. Rechts von der Wette stehen ZWEI Quotenbloecke. Links die Quoten, rechts die",
+    "   MINDESTQUOTEN. Beide gehoeren zur Zeile, beide werden gebraucht.",
+    "   Beispiel:   HOME (-0.5, 0)   2.57 / 1.90   2.45 / 1.81",
+    "     Linie -0.5:  Quote 2.57, Mindestquote 2.45",
+    "     Linie  0  :  Quote 1.90, Mindestquote 1.81",
+    "5. Die Mindestquote ist in fast jeder Zeile eine andere. Sie ist NICHT immer",
+    "   Quote geteilt durch 1,05 und kein fester Wert - lies sie wirklich vom Bild",
+    "   ab, rechne sie nicht aus. Kommt ueberall dieselbe Zahl heraus, ist es falsch.",
+    "6. Stehen mehrere Quoten in einer Zeile (mit Schraegstrich getrennt), ist das EINE",
+    "   Wette mit mehreren Optionen - alle Werte mitnehmen, links wie rechts,",
+    "   paarweise in derselben Reihenfolge.",
     "",
     "EINTRAGEN in die Tabelle kt_wetten mit satz = " + ordner + ", dazu pos, von,",
     "an_zeit im Format 2026-08-29T15:00, liga, spiel, wette, kat und s (die Wettart",
-    "nach artErkennen aus admin.js) und o als Liste [[Name, Quote], ...].",
+    "nach artErkennen aus admin.js) und o als Liste [[Name, Quote, Mindestquote], ...].",
+    "Der dritte Platz ist Pflicht. Fehlt er, nimmt das Programm den Ersatzwert 1,78,",
+    "und dann steht bei jeder Wette dieselbe Mindestquote.",
     "Danach die Fotos in kt_satz_uploads auf status eingelesen setzen und gelesen_am fuellen.",
     "",
     "WICHTIG: rate NICHTS. Ist eine Zeile abgeschnitten oder unleserlich, lass sie weg",
     "und sag mir am Ende genau, welche fehlt und warum. Lieber eine Zeile weniger als",
-    "eine falsche Quote - hier haengt echtes Geld dran.",
+    "eine falsche Quote - hier haengt echtes Geld dran. Das gilt fuer die Mindestquote",
+    "genauso: lieber ohne, als eine geratene.",
     "",
     "Sag mir zum Schluss, wie viele Zeilen jetzt im Ordner stehen."
   ].join("\n");
