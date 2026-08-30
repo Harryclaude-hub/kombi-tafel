@@ -2893,3 +2893,8 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   .tb-tafel th, .tb-tafel td { padding: 3px 4px; font-size: .9em; }
   .tb-tafel th:nth-child(3), .tb-tafel td:nth-child(3) { display: none; }  /* Liga */
 }
+
+/* Liste der gesetzten Kombinationen im Kombi-Bau (30.08.2026) */
+.gs-tafel .gs-nr { font-weight: 700; white-space: nowrap; }
+.gs-tafel .gs-wetten { font-size: .9em; line-height: 1.35; }
+.gs-tafel tr.gs-unlesbar { opacity: .7; font-style: italic; }

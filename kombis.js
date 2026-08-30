@@ -756,6 +756,7 @@ function meldung(text, art) {
 
 function zeichne_() {
   zeichneOrdnerLeiste();
+  zeichneGesetzte();
   zeichneEigenbau();
   // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
   if (!document.getElementById("scheine")) {
@@ -826,8 +827,8 @@ function zeichne_() {
 
   document.getElementById("scheine").innerHTML =
     (normal.length ? normal.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
-      '<div class="warnkern">Keine Scheine über der Mindestquote. Senk sie oben, oder trag ' +
-      'in der Kombi-Tafel echte Quoten ein.</div>');
+      '<div class="kern">Noch nichts gebaut. Hak dir unten in der Tabelle die Wetten an, ' +
+      'wähl den Anbieter und drück <b>Kombination aus der Auswahl bauen</b>.</div>');
 
   document.getElementById("niedrig").innerHTML =
     (niedrig.length ? niedrig.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
@@ -955,7 +956,6 @@ function scheinHtml(s, z, gesetzt) {
         'onclick="scheinMerken(\'' + s.id + '\')">' +
         (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
       '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Der Anbieter lässt nicht mehr zu? Gleiche Wetten zusätzlich bei einem weiteren Anbieter setzen.">&#10133; Rest bei weiterem Anbieter</button>' +
-      '<button onclick="scheinNeuMischen(\'' + s.id + '\')" title="Geht auch beim anderen Anbieter nicht mehr? Andere Wetten aus dem Ordner zu einer neuen Mischung, damit der Rest trotzdem gesetzt wird.">&#128256; Andere Mischung für den Rest</button>' +
       '<button class="knopfweg" title="Diese Kombination löschen" ' +
         'onclick="kombiLoeschen(\'' + s.id + '\')">&#128465; Löschen</button>' +
       '<label class="fotoknopf">&#128247; Foto vom Wettschein' +
@@ -1183,6 +1183,52 @@ function scheinTeilen(scheinId) {
 }
 
 // ---------- Eigener Schein: Wetten aus dem offenen Ordner selbst mischen ----------
+
+// ---------- Was wirklich gesetzt ist ----------
+// Karam am 30.08.2026: "Ich will nur die Liste von den Scheinen, die
+// gesetzt wurden, aber nix Leeres. Und dann seh ich auch, welche Personen."
+// Quelle ist gesetzteEintraege() - BEIDE Ablagen, nur der aktive Ordner.
+// liesVerlauf() allein waere bei angemeldetem Nutzer leer.
+function zeichneGesetzte() {
+  const box = document.getElementById("gesetzteliste");
+  if (!box) return;
+  const liste = gesetzteEintraege()
+    .slice()
+    .sort((a, b) => String(b.zeit || "").localeCompare(String(a.zeit || "")));
+  if (!liste.length) {
+    box.innerHTML = '<p class="mini">In diesem Ordner ist noch nichts gesetzt.</p>';
+    return;
+  }
+  let summe = 0, zeilen = "";
+  for (const e of liste) {
+    summe += Number(e.einsatz) || 0;
+    if (e.unlesbar) {
+      zeilen += '<tr class="gs-unlesbar"><td>' + (e.nummer || "?") + "</td>" +
+        '<td colspan="5">Kombination liegt im Konto, ist auf diesem Gerät aber ' +
+        "nicht lesbar (Schlüssel fehlt). Sie zählt trotzdem als gesetzt.</td></tr>";
+      continue;
+    }
+    const wetten = (e.wetten || []).map(w =>
+      textSicher(w.spiel || "") + (w.linie ? ' <span class="mini">' + textSicher(w.linie) + "</span>" : "")
+    ).join("<br>");
+    const person = personName(e.ordner);
+    zeilen += "<tr>" +
+      '<td class="gs-nr">' + (e.nummer || "-") + "</td>" +
+      "<td>" + textSicher(e.anbieter || anbieterName(e.kz) || "") + "</td>" +
+      '<td class="tb-q">' + (Number(e.einsatz) || 0).toFixed(2) + " &euro;</td>" +
+      '<td class="tb-q">' + (Number(e.quote) || 0).toFixed(2) + "</td>" +
+      '<td class="tb-q">' + ((Number(e.einsatz) || 0) * (Number(e.quote) || 0)).toFixed(2) + " &euro;</td>" +
+      "<td>" + (person ? textSicher(person) : '<span class="mini">keine Person</span>') + "</td>" +
+      '<td class="gs-wetten">' + wetten + "</td></tr>";
+  }
+  box.innerHTML =
+    '<div class="tabellenrand"><table class="tb-tafel gs-tafel"><thead><tr>' +
+      "<th>Nr.</th><th>Anbieter</th><th>Einsatz</th><th>Quote</th><th>möglich</th>" +
+      "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
+    "</tbody></table></div>" +
+    '<p class="mini"><b>' + liste.length + " gesetzt</b>, zusammen <b>" +
+      summe.toFixed(2) + " &euro;</b> in diesem Ordner.</p>";
+}
 
 // ---------- Die Tabelle: alles wie im Foto, zum Selberbauen ----------
 // Karams Wunsch (30.08.2026): keine fertig gestellten Scheine mehr raten
@@ -1473,6 +1519,9 @@ function scheinLokalMerken(scheinId, ohneKonto) {
     : "Schein " + b.eintrag.nummer + " gespeichert. Du findest ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "gut");
   zeichneVerlauf();
   zeichneKonto();
+  // Die Liste "Gesetzt" muss sofort nachziehen, sonst sieht Karam seinen
+  // gerade gespeicherten Schein erst nach dem naechsten Laden.
+  if (typeof zeichneGesetzte === "function") zeichneGesetzte();
   if (typeof zeichnePanel === "function") zeichnePanel();
   if (typeof einzelnKarteVergessen === "function") einzelnKarteVergessen();
   // Im Einzel-Modus ist die Kombination damit erledigt und wandert ans
