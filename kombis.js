@@ -17,6 +17,10 @@
 // ============================================================
 "use strict";
 
+// Stellt das Programm selbst Kombinationen? Seit 30.08.2026 nein - Karam
+// baut sie unten in der Tabelle von Hand. Siehe baueAlles().
+const KT_AUTOBAU = false;
+
 // Jeder Foto-Satz hat seinen eigenen Bau-Zustand: nie mischen!
 function zustandSchluessel() { return "scheinbau_" + aktiverSatzId(); }
 
@@ -221,7 +225,12 @@ function baueAlles(nurRest) {
   // Eine Marke fuer diesen Durchgang, damit die Kennungen der neuen
   // Scheine nicht auf die von gestern fallen (siehe oben bei bauMarke).
   const marke = bauMarke();
-  for (const k of aus.kombis || []) {
+  // Karam baut seit 30.08.2026 SELBST, unten in der Tabelle. Automatisch
+  // gestellte Kombinationen will er nicht mehr sehen: "Ich will nur noch,
+  // dass ich die erstelle." Der Verteiler rechnet weiter (er liefert die
+  // Uebersicht, welche Wette wo ueberhaupt geht), aber es entstehen keine
+  // Scheine mehr daraus. Auf true stellen holt den Automatikbau zurueck.
+  for (const k of (KT_AUTOBAU ? (aus.kombis || []) : [])) {
     const lfd = ++lfdIntern;
     const wetten = k.wetten.map(id => ({ id: id, optIdx: optVon[id] || 0 }));
     const teile = (k.teile && k.teile.length) ? k.teile
@@ -806,11 +815,14 @@ function zeichne_() {
 
   const gruppenZahl = new Set(normal.map(s => s.nr)).size;
   document.getElementById("uebersicht").innerHTML =
-    "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (je Wette aus dem Foto, sonst " + z.einst.mind.toFixed(2) + ")" +
-    ", dazu <b>" + niedrig.length + " Scheine mit zu niedrigen Quoten</b>. " +
-    verbaut + " Plätze belegt bei " + z.gesamtOffen + " offenen Wetten (jede darf in " +
-    "höchstens zwei Scheinen stecken), " + (z.uebrig.length + z.uebrigNiedrig.length) +
-    " blieben übrig." + tippsHtml(z);
+    (KT_AUTOBAU
+      ? "<b>" + gruppenZahl + " Kombinationen über der Mindestquote</b> (je Wette aus dem Foto, sonst " +
+        z.einst.mind.toFixed(2) + "), dazu <b>" + niedrig.length + " Scheine mit zu niedrigen Quoten</b>. " +
+        verbaut + " Plätze belegt bei " + z.gesamtOffen + " offenen Wetten (jede darf in " +
+        "höchstens zwei Scheinen stecken), " + (z.uebrig.length + z.uebrigNiedrig.length) + " blieben übrig."
+      : "<b>" + gruppenZahl + " selbst gebaute Kombination(en)</b>, " + verbaut +
+        " Plätze bei " + z.gesamtOffen + " offenen Wetten. Gebaut wird unten in der Tabelle.") +
+    tippsHtml(z);
 
   document.getElementById("scheine").innerHTML =
     (normal.length ? normal.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
@@ -978,8 +990,10 @@ function zeichneReste(z) {
     }
     return h + "</ul>";
   };
-  html += liste(z.uebrig, "Uebrig geblieben", "Erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.");
-  html += liste(z.uebrigNiedrig, "Uebrig, zu niedrige Quote", "Unter der Mindestquote und keine drei für einen eigenen Schein.");
+  if (KT_AUTOBAU) {
+    html += liste(z.uebrig, "Uebrig geblieben", "Erfuellen die Mindestquote, aber beim selben Anbieter waren keine drei mehr uebrig.");
+    html += liste(z.uebrigNiedrig, "Uebrig, zu niedrige Quote", "Unter der Mindestquote und keine drei für einen eigenen Schein.");
+  }
   html += liste(z.doppelt, "Doppel-Spiele", "Dieses Spiel steckt schon mit einer anderen Wette in einem Schein.");
   // Karams eigene Beobachtung: hier stehen die Wetten, die es bei keinem
   // seiner Anbieter gibt. Die kann niemand mehr setzen.
@@ -1691,11 +1705,23 @@ function textSicherK2(t) {
 
 // ---------- Knöpfe ----------
 
+// Ohne Automatikbau raeumt dieser Knopf nur noch auf: er wirft die selbst
+// gebauten Kombinationen weg und liest die Tabelle frisch. Deshalb fragt er
+// vorher nach - es sind Karams eigene Scheine, keine geratenen.
 function neuBauen() {
+  if (!KT_AUTOBAU) {
+    const z0 = liesZustand();
+    const eigene = (z0 && z0.scheine ? z0.scheine : []).filter(s => s.art === "eigen");
+    if (eigene.length && !confirm("Das wirft deine " + eigene.length +
+        " selbst gebaute(n) Kombination(en) weg und liest die Tabelle frisch ein. " +
+        "Schon gespeicherte Kombinationen im Verlauf bleiben. Wirklich?")) return;
+  }
   localStorage.removeItem(zustandSchluessel());
   baueAlles();
-  meldung("Neu gebaut. Mindestquote je Wette aus dem Foto, Ersatzwert " +
-    einstellungenLesen().mind.toFixed(2) + ".", "gut");
+  meldung(KT_AUTOBAU
+    ? "Neu gebaut. Mindestquote je Wette aus dem Foto, Ersatzwert " +
+      einstellungenLesen().mind.toFixed(2) + "."
+    : "Tabelle frisch eingelesen. Bau deine Kombinationen unten in der Tabelle.", "gut");
   zeichne_();
 }
 

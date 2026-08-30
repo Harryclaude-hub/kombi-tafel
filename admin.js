@@ -589,13 +589,17 @@ function satzFelderParsen(felder, erbe) {
   // Stehen mehrere Quoten in einer Zeile (z. B. 2,25 / 2,50), kommen ALLE mit -
   // ABER nicht die Interwetten-Spalte. Sie ist keine zweite Wettmoeglichkeit,
   // sondern dieselbe Quote nach Abzug der 5 Prozent (G geteilt durch 1,05).
-  const alle = ohneGebuehrenspalte(quoten.filter(q => q >= 1.01 && q <= 1000));
+  const geteilt = quotenTeilen(quoten.filter(q => q >= 1.01 && q <= 1000), wette);
+  const alle = geteilt.q;
   // Die fuehrende Quote muss aus der bereinigten Liste kommen. Vorher fuehrte
   // schlicht das letzte Zahlenfeld der Zeile - und das war meistens die
   // schon gekuerzte Interwetten-Zahl.
-  const fuehrend = alle.length ? alle[alle.length - 1] : quote;
+  // Die fuehrende Quote ist die ERSTE Linie, nicht die letzte Zahl der
+  // Zeile: rechts stehen jetzt die Mindestquoten.
+  const fuehrend = alle.length ? alle[0] : quote;
   return { von: von, an_zeit: an, liga: liga, spiel: spiel, wette: wette,
-    s: artErkennen(wette), quote: fuehrend, quoten: alle.length > 1 ? alle : null, geerbt: geerbt };
+    s: artErkennen(wette), quote: fuehrend, quoten: alle.length > 1 ? alle : null,
+    mind: geteilt.m, geerbt: geerbt };
 }
 
 // Wirft aus einer Quotenliste jede Zahl heraus, die eine andere Zahl
@@ -612,6 +616,43 @@ function satzFelderParsen(felder, erbe) {
 // BEHALTENEN Zahl. Dann bleibt [2.10, 1.90] stehen, und aus
 // [3.00, 2.86, 1.50, 1.43] (zwei Optionen mit je ihrer Abzugsspalte)
 // wird richtig [3.00, 1.50].
+// ---------- Die zwei Quotenspalten (gemessen am Foto vom 30.08.2026) ----------
+// Eine Zeile im Foto hat rechts ZWEI Quotenblöcke:
+//   OVER (2.25, 2.5)   1.94 / 2.20   1.85 / 2.10
+// Links die Quoten, rechts die Mindestquoten, paarweise in derselben
+// Reihenfolge: 2.25 gehoert 1.94 und 1.85, 2.5 gehoert 2.20 und 2.10.
+// Frueher hat ohneGebuehrenspalte() die rechte Zahl weggeworfen, weil sie
+// ungefaehr Quote/1,05 ist - deshalb kam nie eine Mindestquote an.
+
+// Wie viele Linien nennt der Wett-Text? "OVER (2.25, 2.5)" -> 2, sonst 1.
+function linienZahl(wette) {
+  const t = String(wette || "");
+  const auf = t.indexOf("("), zu = t.lastIndexOf(")");
+  if (auf < 0 || zu <= auf) return 1;
+  const teile = t.slice(auf + 1, zu).split(",").map(x => x.trim()).filter(Boolean);
+  return teile.length || 1;
+}
+
+// Zahlen einer Zeile in Quoten und Mindestquoten aufteilen.
+function quotenTeilen(liste, wette) {
+  const n = linienZahl(wette);
+  const l = (liste || []).slice();
+  if (l.length === 2 * n) return { q: l.slice(0, n), m: l.slice(n) };
+  if (l.length === n) return { q: l, m: [] };
+  // Zahl passt nicht zur Zahl der Linien: nichts erfinden. Lieber ohne
+  // Mindestquote - dann greift der Ersatzwert, statt dass eine falsche
+  // Grenze in die Rechnung kommt.
+  return { q: l.slice(0, Math.max(1, n)), m: [] };
+}
+
+// [Linie, Quote, Mindestquote] - der dritte Platz nur, wenn es ihn gibt.
+function optionenBauen(wette, q, m) {
+  return (q || []).map((wert, k) => {
+    const name = (k === 0) ? wette : "Option " + (k + 1);
+    return (m && m[k]) ? [name, wert, m[k]] : [name, wert];
+  });
+}
+
 function ohneGebuehrenspalte(liste) {
   if (!liste || liste.length < 2) return liste || [];
   const raus = [];
@@ -891,9 +932,8 @@ async function vsUebernehmen() {
   for (let i = 0; i < vorschauZeilen.length; i++) {
     const z = vorschauZeilen[i];
     if (daSchluessel.has(satzSchluessel(z))) { schonDa++; continue; }
-    const optionen = (z.quoten && z.quoten.length > 1)
-      ? z.quoten.map((q, k) => [k === 0 ? z.wette : "Option " + (k + 1), q])
-      : [[z.wette, z.quote]];
+    const optionen = optionenBauen(z.wette,
+      (z.quoten && z.quoten.length) ? z.quoten : [z.quote], z.mind);
     const r = await supaWetteAnlegen(vorschauDatum, { pos: daWetten.length + i + 1, von: z.von, an_zeit: z.an_zeit,
       liga: z.liga, spiel: z.spiel, wette: z.wette, kat: z.s, s: z.s,
       o: optionen });
@@ -1168,8 +1208,9 @@ async function scanPruefen(ordner) {
     const key = (spiel + "|" + wette + "|" + an).toLowerCase();
     if (bekannt.has(key)) { doppelt.push(nr); return; }
     bekannt.add(key);
+    const geteilt = quotenTeilen(quoten, wette);
     gut.push({ von: von || "?", an_zeit: an, liga: liga, spiel: spiel, wette: wette,
-      s: artErkennen(wette), quoten: quoten });
+      s: artErkennen(wette), quoten: geteilt.q, mind: geteilt.m });
   });
   scanGeprueft[ordner] = gut;
 
@@ -1191,7 +1232,9 @@ async function scanPruefen(ordner) {
     for (const z of gut.slice(0, 60))
       h += "<tr><td>" + sicherA(z.von) + "</td><td class='mini'>" + sicherA(z.an_zeit) +
         "</td><td>" + sicherA(z.liga) + "</td><td>" + sicherA(z.spiel) + "</td><td>" +
-        sicherA(z.wette) + "</td><td>" + z.s + "</td><td>" + z.quoten.join(" / ") + "</td></tr>";
+        sicherA(z.wette) + "</td><td>" + z.s + "</td><td>" + z.quoten.join(" / ") +
+        ((z.mind && z.mind.length) ? '<div class="mini">Mindest ' + z.mind.join(" / ") + "</div>" : "") +
+        "</td></tr>";
     h += "</tbody></table></div>";
     if (gut.length > 60) h += '<p class="mini">(nur die ersten 60 gezeigt, übernommen werden alle ' +
       gut.length + ")</p>";
@@ -1219,9 +1262,7 @@ async function scanUebernehmen(ordner) {
   const fehler = [];
   for (let i = 0; i < gut.length; i++) {
     const z = gut[i];
-    const o = z.quoten.length > 1
-      ? z.quoten.map((q, k) => [k === 0 ? z.wette : "Option " + (k + 1), q])
-      : [[z.wette, z.quoten[0]]];
+    const o = optionenBauen(z.wette, z.quoten, z.mind);
     const r = await supaWetteAnlegen(ordner, { pos: daWetten.length + i + 1, von: z.von,
       an_zeit: z.an_zeit, liga: z.liga, spiel: z.spiel, wette: z.wette,
       kat: z.s, s: z.s, o: o });

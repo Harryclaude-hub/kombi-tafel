@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260830a">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260830a">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260830b">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260830b">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,7 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260830a">
+<link rel="stylesheet" href="stil.css?v=20260830b">
 </head>
 <body data-seite="bau">
 
@@ -95,7 +95,7 @@ zwei Scheine aneinander und fallen gemeinsam.</li>
   <span class="f-label">Bauen</span>
   <span class="f-knoepfe">
     <input type="hidden" id="mischzahl" value="1">
-    <button onclick="neuBauen()" class="haupt">Scheine neu bauen</button>
+    <button onclick="neuBauen()">Tabelle frisch einlesen</button>
     <button onclick="neuMischen()">Anders mischen</button>
     <button onclick="restNeuMischen()" title="Die schon gesetzten Kombinationen bleiben, wie sie sind. Nur der Rest wird neu gemischt.">Rest neu mischen</button>
     <button id="knopf_einzeln" onclick="einzelnUmschalten()" title="Eine Kombination nach der anderen, in der Reihenfolge deiner Anbieter. Was du ablehnst, kommt dort nicht wieder.">&#9654; Einer nach dem anderen</button>
@@ -156,25 +156,25 @@ Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der Ap
 <!-- scheinlesen.js wird nicht mehr geladen: das Foto wird nur noch
      mitgenommen, nicht mehr ausgelesen. Die Datei bleibt im Ordner
      liegen, falls das je wieder gebraucht wird. -->
-<script src="krypto.js?v=20260830a"></script>
-<script src="medien.js?v=20260830a"></script>
-<script src="anruf-server.js?v=20260830a"></script>
-<script src="anruf.js?v=20260830a"></script>
-<script src="supa.js?v=20260830a"></script>
-<script src="benachrichtigung.js?v=20260830a"></script>
-<script src="satzdaten.js?v=20260830a"></script>
-<script src="profil.js?v=20260830a"></script>
-<script src="anhang.js?v=20260830a"></script>
-<script src="glocke.js?v=20260830a"></script>
-<script src="daten.js?v=20260830a"></script>
-<script src="roh.js?v=20260830a"></script>
-<script src="recherche.js?v=20260830a"></script>
-<script src="logik.js?v=20260830a"></script>
-<script src="verteiler.js?v=20260830a"></script>
-<script src="einzeln.js?v=20260830a"></script>
-<script src="kombis.js?v=20260830a"></script>
-<script src="ausschnitt.js?v=20260830a"></script>
-<script src="handy.js?v=20260830a"></script>
+<script src="krypto.js?v=20260830b"></script>
+<script src="medien.js?v=20260830b"></script>
+<script src="anruf-server.js?v=20260830b"></script>
+<script src="anruf.js?v=20260830b"></script>
+<script src="supa.js?v=20260830b"></script>
+<script src="benachrichtigung.js?v=20260830b"></script>
+<script src="satzdaten.js?v=20260830b"></script>
+<script src="profil.js?v=20260830b"></script>
+<script src="anhang.js?v=20260830b"></script>
+<script src="glocke.js?v=20260830b"></script>
+<script src="daten.js?v=20260830b"></script>
+<script src="roh.js?v=20260830b"></script>
+<script src="recherche.js?v=20260830b"></script>
+<script src="logik.js?v=20260830b"></script>
+<script src="verteiler.js?v=20260830b"></script>
+<script src="einzeln.js?v=20260830b"></script>
+<script src="kombis.js?v=20260830b"></script>
+<script src="ausschnitt.js?v=20260830b"></script>
+<script src="handy.js?v=20260830b"></script>
 <script>
 // Einmal nachsehen, was schon gesetzt ist. Muss NACH kombis.js und
 // supa.js stehen, sonst gibt es die Funktionen noch nicht.
@@ -182,6 +182,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (typeof kontoScheineLaden === "function") kontoScheineLaden();
 });
 </script>
-<script src="zeilen.js?v=20260830a"></script>
+<script src="zeilen.js?v=20260830b"></script>
 </body>
 </html>
