@@ -188,6 +188,7 @@ Ladereihenfolge.
 | `krypto.js` | Ende-zu-Ende: `e2eZu` / `e2eAuf` / `kryptoBereich` |
 | `anruf.js`, `anruf-server.js` | Anrufe (WebRTC). **Alle STUN/TURN-Adressen nur in `anruf-server.js`.** |
 | `daten.js` | Notrad: eingebaute `SAETZE`/`WETTEN`, falls die Datenbank nicht antwortet |
+| `personkombi.js` | Kombination bei einer Person **von Hand anlegen und bearbeiten**. Eigene Datei, `mein.js` hat nur vier `typeof`-abgesicherte Haken: faellt sie weg, sieht die Liste aus wie vorher. Baut den Datensatz in derselben Form wie `baueVerlaufsEintrag` (`kombis.js`) - wer eines aendert, schaut ins andere. Hand-Eintraege haben `daten.handeingabe = true` und eine Kennung mit `H` statt `S`. |
 | `satzdaten.js` | Hängt die Ordner/Wetten aus der Datenbank an `SAETZE`/`WETTEN` an |
 
 **Achtung bei `logik.js`:** sie wird von `index.html`, `kombis.html`,
