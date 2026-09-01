@@ -2891,7 +2891,10 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   white-space: nowrap; font-weight: 600; }
 @media (max-width: 700px) {
   .tb-tafel th, .tb-tafel td { padding: 3px 4px; font-size: .9em; }
-  .tb-tafel th:nth-child(3), .tb-tafel td:nth-child(3) { display: none; }  /* Liga */
+  /* Liga-Spalte am Handy weg. Seit 01.09. mit Zeichen-Spalte vorne ist das
+     Spalte 4, und NUR in der Bau-Tabelle: in der Gesetzt-Liste (gleiche
+     Klasse) waere Spalte 3 der Einsatz. */
+  #eigenbau .tb-tafel th:nth-child(4), #eigenbau .tb-tafel td:nth-child(4) { display: none; }
 }
 
 /* Liste der gesetzten Kombinationen im Kombi-Bau (30.08.2026) */
@@ -2929,3 +2932,20 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   .pkkasten .tabellenrand { overflow: visible; }
 }
 .pknr { white-space: nowrap; }
+
+/* ============================================================
+   DESIGN-SCHICHT: Anbieter-Zeichen und Kombi-Farben (01.09.2026)
+   Nur Optik. Die Farben selbst kommen inline aus kombiKarte() in
+   kombis.js, weil die Zebra-Regeln jede Klassenregel schlagen.
+   ============================================================ */
+.ab { display: inline-block; min-width: 20px; padding: 1px 5px; margin-right: 3px;
+  border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .2px;
+  line-height: 1.5; text-align: center; border: 1px solid #000; vertical-align: middle; }
+.ab-st { background: #1a2c38; color: #fff;    border-color: #0e1a22; }  /* Stake */
+.ab-iw { background: #0a7d3e; color: #fff;    border-color: #06612f; }  /* Interwetten */
+.ab-bw { background: #111;    color: #ffd400; border-color: #000; }     /* Bwin */
+.ab-b3 { background: #14805e; color: #ffe400; border-color: #0b5b42; }  /* Bet365 */
+.tb-marken { white-space: nowrap; width: 1%; }
+/* Eine gesetzte Zeile (hat Kombi-Farbe) bleibt lesbar, auch wenn das Spiel laeuft */
+.tb-tafel tr.tb-vorbei[style] { opacity: .85; }
+.gs-tafel .ab { margin-right: 5px; }

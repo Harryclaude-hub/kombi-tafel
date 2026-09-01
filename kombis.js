@@ -938,8 +938,7 @@ function scheinHtml(s, z, gesetzt) {
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
     (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
       ' Wetten, kein Dreier mehr</span>' : "") +
-    '<span class="s-quote">' + s.wetten.length + "er, Gesamtquote <b>" + rund2(gesamt).toFixed(2) + "</b>" +
-    (GEBUEHREN_TEILER[s.kz] !== 1 ? ' <span class="mini">(Schein zeigt ' + rund2(gesamtRoh).toFixed(2) + ")</span>" : "") +
+    '<span class="s-quote">' + s.wetten.length + "er, Gesamtquote laut Schein <b>" + rund2(gesamtRoh).toFixed(2) + "</b>" +
     (alleFest ? ' <span class="mini gruen">alle Quoten selbst geprüft</span>'
               : ' <span class="mini">teils noch Foto-Quoten</span>') +
     "</span></div>" +
@@ -949,9 +948,17 @@ function scheinHtml(s, z, gesetzt) {
     (s.entfernt.length ? '<div class="s-raus-liste">Rausgenommen: ' +
       s.entfernt.map(e => (wetteNachId(e.id) ? wetteNachId(e.id).spiel : e.id) +
         " (" + e.grund + ")").join(", ") + "</div>" : "") +
+    // Karam (01.09.2026): Einsatz UND moeglichen Gewinn eintragen, so wie
+    // der Anbieter ihn anzeigt. Aus beiden ergibt sich die ECHTE Gebuehr:
+    // Einsatz x Quote laut Schein minus das, was der Anbieter auszahlt.
+    // Die frueheren zwei geschaetzten Zahlen (netto / "Schein zeigt")
+    // lagen bei Interwetten oft daneben - jetzt zaehlt, was er sieht.
     "<div class='s-fuss'>Einsatz <input type='number' step='0.5' min='0' class='einsatz' " +
-      "id='e_" + s.id + "' value='" + einsatzWert(s, z) + "' oninput=\"einsatzGeaendert('" + s.id + "', this.value, " + gesamt + ")\"> &euro;" +
-      ' &nbsp;&rarr;&nbsp; moeglich <b id="g_' + s.id + '">' + rund2(einsatzWert(s, z) * gesamt).toFixed(2) + " &euro;</b>" +
+      "id='e_" + s.id + "' value='" + einsatzWert(s, z) + "' oninput=\"einsatzGeaendert('" + s.id + "', this.value, " + gesamt + ", " + gesamtRoh + ")\"> &euro;" +
+      ' &nbsp;&rarr;&nbsp; m&ouml;glich <input type="number" step="0.01" min="0" class="einsatz gewinn" id="g_' + s.id + '" ' +
+        'value="' + gewinnWert(s, z, gesamt) + '" title="Was der Anbieter als möglichen Gewinn anzeigt. Vorbelegt ist die Schätzung nach Gebühr - trag ein, was wirklich dasteht." ' +
+        'oninput="gewinnGeaendert(\x27' + s.id + '\x27, this.value, ' + gesamt + ', ' + gesamtRoh + ')"> &euro;' +
+      ' <span class="mini gebuehr" id="geb_' + s.id + '">' + gebuehrText(einsatzWert(s, z), gewinnWert(s, z, gesamt), gesamtRoh) + "</span>" +
       '<button class="merken' + (imVerlauf ? ' schonda' : '') + '" ' +
         'onclick="scheinMerken(\'' + s.id + '\')">' +
         (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
@@ -1091,7 +1098,7 @@ function aktualisiereZielzeilen() {
   }
 }
 
-function einsatzGeaendert(scheinId, wert, gesamt) {
+function einsatzGeaendert(scheinId, wert, gesamt, gesamtRoh) {
   const z = liesZustand();
   const s = z.scheine.find(x => x.id === scheinId);
   if (s) {
@@ -1099,8 +1106,41 @@ function einsatzGeaendert(scheinId, wert, gesamt) {
     s.einsatz = isNaN(w) ? 0 : w;
     speichereZustand(z);
   }
-  rechneGewinn(scheinId, gesamt);
+  rechneGewinn(scheinId, gesamt, gesamtRoh);
   aktualisiereZielzeilen();
+}
+
+// Der moegliche Gewinn, wie der Anbieter ihn zeigt. Leeres Feld = zurueck
+// zur Schaetzung. Gemerkt am Schein (s.gewinn), damit er beim Neuzeichnen
+// nicht verschwindet.
+function gewinnGeaendert(scheinId, wert, gesamt, gesamtRoh) {
+  const z = liesZustand();
+  const s = z.scheine.find(x => x.id === scheinId);
+  if (s) {
+    const w = parseFloat(wert);
+    if (isNaN(w) || wert === "") delete s.gewinn; else s.gewinn = w;
+    speichereZustand(z);
+  }
+  rechneGewinn(scheinId, gesamt, gesamtRoh);
+}
+
+// Vorbelegung: eigener Eintrag, sonst Einsatz x Quote nach Gebuehr.
+function gewinnWert(s, z, gesamt) {
+  if (s.gewinn !== undefined && s.gewinn !== null) return s.gewinn;
+  return rund2(einsatzWert(s, z) * gesamt).toFixed(2);
+}
+
+// Die Gebuehr ist keine Schaetzung mehr, sondern die Differenz zwischen
+// dem, was der Schein verspricht (Einsatz x Quote laut Schein), und dem,
+// was der Anbieter wirklich auszahlt.
+function gebuehrText(einsatz, gewinn, gesamtRoh) {
+  const e = parseFloat(einsatz) || 0, g = parseFloat(gewinn) || 0;
+  if (!e || !g) return "";
+  const brutto = rund2(e * gesamtRoh);
+  const geb = rund2(brutto - g);
+  if (Math.abs(geb) < 0.005) return "ohne Gebühr (Schein: " + brutto.toFixed(2) + " €)";
+  if (geb < 0) return "⚠ mehr als der Schein hergibt (" + brutto.toFixed(2) + " €) - Zahl prüfen";
+  return "davon Gebühr <b>" + geb.toFixed(2) + " €</b> (" + rund2(geb / brutto * 100).toFixed(1) + " %, Schein: " + brutto.toFixed(2) + " €)";
 }
 
 // Andere Mischung fuer den Rest: neue Wetten aus DEMSELBEN Ordner
@@ -1184,6 +1224,77 @@ function scheinTeilen(scheinId) {
 
 // ---------- Eigener Schein: Wetten aus dem offenen Ordner selbst mischen ----------
 
+// ---------- Farbe je Kombination, Anbieter-Zeichen je Zeile ----------
+// Karam (01.09.2026): jede gesetzte Kombination bekommt eine eigene helle
+// Hintergrundfarbe. Dieselbe Farbe tragen in der Tabelle die Zeilen ihrer
+// Wetten; steckt eine Wette in zwei Kombinationen, teilt sich die Zeile
+// halb/halb, bei drei gedrittelt. Davor stehen die Zeichen der Anbieter,
+// bei denen die Kombination gesetzt wurde (Teile bei weiteren Anbietern
+// zaehlen zur selben Kombination, also mehrere Zeichen).
+//
+// Farbe haengt am STAMM (stammId), nicht an der exakten Kennung: der Teil
+// "_t2" beim zweiten Anbieter ist dieselbe Kombination. Vergeben wird in
+// der Reihenfolge des Setzens, damit die Farbe beim Neuzeichnen bleibt.
+// Bewusst keine Rosa-, Gruen- oder Orangetoene: die bedeuten hier schon
+// "unter Mindestquote", "bester Wert" und "offen".
+const KOMBI_FARBEN = ["#dbe7ff", "#e9dcff", "#d6f0f5", "#f3e8d2", "#dfe3f7", "#f0d9ee", "#d9ecef", "#ece6d8"];
+
+function kombiKarte(liste) {
+  const eintraege = (liste || gesetzteEintraege()).slice()
+    .sort((a, b) => String(a.zeit || "").localeCompare(String(b.zeit || "")));
+  const farbe = {}, kzJe = {}, zeilen = {};
+  let n = 0;
+  for (const e of eintraege) {
+    const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
+    if (!(st in farbe)) { farbe[st] = KOMBI_FARBEN[n % KOMBI_FARBEN.length]; n++; kzJe[st] = []; }
+    if (e.kz && kzJe[st].indexOf(e.kz) < 0) kzJe[st].push(e.kz);
+    for (const t of (e.wetten || [])) {
+      if (!t || !t.id) continue;      // Handeingaben (personkombi.js) haben keine Wetten-Kennung
+      const k = t.id + "|" + (t.linie || "");
+      (zeilen[k] = zeilen[k] || []).push({ stamm: st, kz: e.kz, nummer: e.nummer });
+    }
+  }
+  return { farbe: farbe, kzJe: kzJe, zeilen: zeilen, anzahl: n };
+}
+
+// Welche gesetzten Kombinationen enthalten diese Tabellenzeile? Erst
+// zeilengenau (Kennung + Linie). Alte Eintraege ohne Linie, oder solche,
+// deren Linie zu keiner Zeile mehr passt (Wettentext nachtraeglich
+// geaendert), landen bei der ERSTEN Linie - lieber dort als nirgends.
+function zeilenTreffer(karte, w, i) {
+  const genau = karte.zeilen[w.id + "|" + optionName(w, i)] || [];
+  if (genau.length) return genau;
+  if (i !== 0) return [];
+  const alle = [];
+  const linien = (w.o || []).map((_, j) => optionName(w, j));
+  for (const k in karte.zeilen) {
+    if (k.indexOf(w.id + "|") !== 0) continue;
+    const linie = k.slice(w.id.length + 1);
+    if (!linie || linien.indexOf(linie) < 0) alle.push.apply(alle, karte.zeilen[k]);
+  }
+  return alle;
+}
+
+// Inline-Stil fuer die Zeile: eine Farbe, oder ein harter Farbverlauf in
+// gleich grosse Teile. Inline, weil die Zebra-Regeln (html[data-zeilen]
+// tbody tr:nth-child(even)) jede Klassenregel schlagen wuerden.
+function hintergrundFuer(karte, treffer) {
+  const staemme = [];
+  for (const t of treffer) if (staemme.indexOf(t.stamm) < 0) staemme.push(t.stamm);
+  if (!staemme.length) return "";
+  if (staemme.length === 1) return "background:" + karte.farbe[staemme[0]];
+  const teil = 100 / staemme.length;
+  const stops = staemme.map((s, k) => karte.farbe[s] + " " + (k * teil).toFixed(1) + "% " + ((k + 1) * teil).toFixed(1) + "%");
+  return "background:linear-gradient(90deg," + stops.join(",") + ")";
+}
+
+// Kleines Zeichen in der Hausfarbe des Anbieters (eigene Marke, kein
+// fremdes Logo - Logobilder muesste Karam erst liefern).
+function anbieterZeichen(kz) {
+  const kurz = { st: "S", iw: "IW", bw: "bw", b3: "365" };
+  return '<span class="ab ab-' + kz + '" title="' + textSicher(anbieterName(kz) || kz) + '">' + (kurz[kz] || kz) + "</span>";
+}
+
 // ---------- Was wirklich gesetzt ist ----------
 // Karam am 30.08.2026: "Ich will nur die Liste von den Scheinen, die
 // gesetzt wurden, aber nix Leeres. Und dann seh ich auch, welche Personen."
@@ -1199,9 +1310,12 @@ function zeichneGesetzte() {
     box.innerHTML = '<p class="mini">In diesem Ordner ist noch nichts gesetzt.</p>';
     return;
   }
+  const karte = kombiKarte(liste);
   let summe = 0, zeilen = "";
   for (const e of liste) {
     summe += Number(e.einsatz) || 0;
+    const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
+    const stil = karte.farbe[st] ? ' style="background:' + karte.farbe[st] + '"' : "";
     if (e.unlesbar) {
       zeilen += '<tr class="gs-unlesbar"><td>' + (e.nummer || "?") + "</td>" +
         '<td colspan="5">Kombination liegt im Konto, ist auf diesem Gerät aber ' +
@@ -1212,12 +1326,17 @@ function zeichneGesetzte() {
       textSicher(w.spiel || "") + (w.linie ? ' <span class="mini">' + textSicher(w.linie) + "</span>" : "")
     ).join("<br>");
     const person = personName(e.ordner);
-    zeilen += "<tr>" +
+    // Moeglicher Gewinn: was Karam an der Karte eingetragen hat (so wie der
+    // Anbieter ihn zeigt), sonst die Schaetzung Einsatz x Quote.
+    const moeg = (Number(e.moeglich) > 0) ? Number(e.moeglich)
+      : (Number(e.einsatz) || 0) * (Number(e.quote) || 0);
+    zeilen += "<tr" + stil + ">" +
       '<td class="gs-nr">' + (e.nummer || "-") + "</td>" +
-      "<td>" + textSicher(e.anbieter || anbieterName(e.kz) || "") + "</td>" +
+      "<td>" + (e.kz ? anbieterZeichen(e.kz) + " " : "") + textSicher(e.anbieter || anbieterName(e.kz) || "") + "</td>" +
       '<td class="tb-q">' + (Number(e.einsatz) || 0).toFixed(2) + " &euro;</td>" +
       '<td class="tb-q">' + (Number(e.quote) || 0).toFixed(2) + "</td>" +
-      '<td class="tb-q">' + ((Number(e.einsatz) || 0) * (Number(e.quote) || 0)).toFixed(2) + " &euro;</td>" +
+      '<td class="tb-q">' + moeg.toFixed(2) + " &euro;" +
+        (Number(e.gebuehr) > 0 ? '<div class="mini">Geb&uuml;hr ' + Number(e.gebuehr).toFixed(2) + " &euro;</div>" : "") + "</td>" +
       "<td>" + (person ? textSicher(person) : '<span class="mini">keine Person</span>') + "</td>" +
       '<td class="gs-wetten">' + wetten + "</td></tr>";
   }
@@ -1245,9 +1364,12 @@ function zeichneEigenbau() {
   // Wie viel steht schon auf welcher Wette? BEIDE Ablagen, nur dieser
   // Ordner - liesVerlauf() allein waere bei angemeldetem Nutzer leer.
   const proWette = {};
-  for (const e of gesetzteEintraege())
+  const gesetztListe = gesetzteEintraege();
+  for (const e of gesetztListe)
     for (const t of (e.wetten || []))
       proWette[t.id] = (proWette[t.id] || 0) + (Number(e.einsatz) || 0);
+  // Farbe je Kombination und Anbieter-Zeichen je Zeile (siehe kombiKarte)
+  const karte = kombiKarte(gesetztListe);
 
   let zeilen = "", offen = 0;
   for (const w of alle) {
@@ -1256,7 +1378,13 @@ function zeichneEigenbau() {
     const gesetztH = proWette[w.id] || 0;
     for (let i = 0; i < anzahl; i++) {
       if (!vorbei) offen++;
-      zeilen += '<tr class="' + (vorbei ? "tb-vorbei" : "") + (i ? " tb-weiter" : "") + '">' +
+      const treffer = zeilenTreffer(karte, w, i);
+      const kzs = [];
+      for (const t of treffer) if (t.kz && kzs.indexOf(t.kz) < 0) kzs.push(t.kz);
+      const stil = hintergrundFuer(karte, treffer);
+      zeilen += '<tr class="' + (vorbei ? "tb-vorbei" : "") + (i ? " tb-weiter" : "") + '"' +
+        (stil ? ' style="' + stil + '"' : "") + ">" +
+        '<td class="tb-marken">' + kzs.map(anbieterZeichen).join("") + "</td>" +
         '<td class="tb-wahl"><input type="checkbox" class="eb-wahl" value="' + w.id + "|" + i + '"' +
           (vorbei ? " disabled" : "") + ' onchange="ebZaehlen()"></td>' +
         '<td class="mini tb-zeit">' + (i ? "" : zeitText(anstossFeld(w))) + "</td>" +
@@ -1281,6 +1409,7 @@ function zeichneEigenbau() {
       '<span id="eb_zaehler" class="mini">nichts angehakt</span>' +
     "</div>" +
     '<div class="tabellenrand"><table class="tb-tafel"><thead><tr>' +
+      '<th class="tb-marken" title="Bei welchen Anbietern diese Wette schon gesetzt ist">wo</th>' +
       "<th></th><th>Anstoß</th><th>Liga</th><th>Spiel</th><th>Wette</th>" +
       "<th>Quote</th><th>Mindest</th><th>gesetzt</th></tr></thead><tbody>" +
       zeilen + "</tbody></table></div>" +
@@ -1288,7 +1417,9 @@ function zeichneEigenbau() {
       "eigene Zeile - du setzt nur eine davon. <b>Quote</b> ist die linke Spalte aus dem Foto, " +
       "<b>Mindest</b> die rechte. Ein <b>*</b> heißt: für diese Zeile stand im Foto keine " +
       "Mindestquote, es gilt der Ersatzwert " + ersatzMind.toFixed(2) + ". " +
-      "<b>gesetzt</b> ist die Summe, die auf diese Wette schon draußen ist.</p>";
+      "<b>gesetzt</b> ist die Summe, die auf diese Wette schon draußen ist. " +
+      "<b>wo</b> zeigt die Anbieter, bei denen die Wette in einer gesetzten Kombination steckt; " +
+      "die Hintergrundfarbe ist die Farbe dieser Kombination (siehe Gesetzt), bei mehreren geteilt.</p>";
   ebZaehlen();
 }
 
@@ -1427,9 +1558,16 @@ function kombiLoeschen(scheinId) {
   zeichne_();
 }
 
-function rechneGewinn(scheinId, gesamt) {
+function rechneGewinn(scheinId, gesamt, gesamtRoh) {
   const e = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
-  document.getElementById("g_" + scheinId).textContent = rund2(e * gesamt).toFixed(2) + " €";
+  const gFeld = document.getElementById("g_" + scheinId);
+  const z = liesZustand();
+  const s = z && z.scheine ? z.scheine.find(x => x.id === scheinId) : null;
+  const eigen = s && s.gewinn !== undefined && s.gewinn !== null;
+  if (gFeld && !eigen) gFeld.value = rund2(e * gesamt).toFixed(2);
+  const geb = document.getElementById("geb_" + scheinId);
+  if (geb) geb.innerHTML = gebuehrText(e, gFeld ? gFeld.value : 0,
+    (typeof gesamtRoh === "number" && gesamtRoh > 0) ? gesamtRoh : gesamt);
 }
 
 // ---------- Verlauf ----------
@@ -1460,11 +1598,11 @@ function baueVerlaufsEintrag(scheinId) {
   const s = z.scheine.find(x => x.id === scheinId);
   if (!s) return null;
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
-  let gesamt = 1;
+  let gesamt = 1, gesamtRoh = 1;
   const wetten = s.wetten.map(eintrag => {
     const w = wetteNachId(eintrag.id);
     const q = zielQuote(w, eintrag.optIdx, s.kz);
-    gesamt *= q.echt;
+    gesamt *= q.echt; gesamtRoh *= q.roh;
     return { id: w.id, spiel: w.spiel, wette: w.wette, linie: optionName(w, eintrag.optIdx),
              quote: rund2(q.echt), quelle: q.quelle, mind: mindFuer(w, eintrag.optIdx, null) };
   });
@@ -1477,6 +1615,15 @@ function baueVerlaufsEintrag(scheinId) {
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
   };
+  // Moeglicher Gewinn, wie der Anbieter ihn angezeigt hat (Feld an der
+  // Karte). Steht dort etwas, ist DAS der Wert - nicht die Schaetzung.
+  // Dazu Quote laut Schein, Brutto und die daraus folgende echte Gebuehr.
+  const gFeld = document.getElementById("g_" + scheinId);
+  const gewinn = gFeld ? parseFloat(gFeld.value) : NaN;
+  eintrag.quoteRoh = rund2(gesamtRoh);
+  eintrag.brutto = rund2(einsatz * gesamtRoh);
+  if (isFinite(gewinn) && gewinn > 0) eintrag.moeglich = rund2(gewinn);
+  eintrag.gebuehr = rund2(eintrag.brutto - eintrag.moeglich);
   // Frueher hing hier die Foto-Auswertung mit dran. Das Foto wird jetzt
   // nur noch mitgenommen, nicht mehr gelesen.
   return { s: s, eintrag: eintrag,
@@ -1522,6 +1669,9 @@ function scheinLokalMerken(scheinId, ohneKonto) {
   // Die Liste "Gesetzt" muss sofort nachziehen, sonst sieht Karam seinen
   // gerade gespeicherten Schein erst nach dem naechsten Laden.
   if (typeof zeichneGesetzte === "function") zeichneGesetzte();
+  // ... und die Tabelle gleich mit: dort haengen jetzt die Anbieter-Zeichen
+  // und die Kombi-Farben an den gesetzten Eintraegen.
+  if (typeof zeichneEigenbau === "function") zeichneEigenbau();
   if (typeof zeichnePanel === "function") zeichnePanel();
   if (typeof einzelnKarteVergessen === "function") einzelnKarteVergessen();
   // Im Einzel-Modus ist die Kombination damit erledigt und wandert ans
@@ -2290,6 +2440,7 @@ function gesetzteEintraege() {
     const eG = { scheinId: e.scheinId, einsatz: Number(e.einsatz) || 0,
                  anbieter: e.anbieter, nummer: e.nummer, kz: e.kz,
                  quote: Number(e.quote) || 0, wetten: e.wetten || [],
+                 moeglich: Number(e.moeglich) || 0, gebuehr: Number(e.gebuehr) || 0,
                  zeit: e.zeit, woher: "geraet" };
     // Ohne scheinId kein gemeinsamer Stamm - sonst faellt alles, was
     // keine hat, zu EINER Kombination zusammen und die Einsaetze werden
@@ -2317,6 +2468,7 @@ function gesetzteEintraege() {
     const eK = { scheinId: d.scheinId, einsatz: Number(d.einsatz) || 0,
                  anbieter: d.anbieter, nummer: x.nummer || d.nummer, kz: d.kz,
                  quote: Number(d.quote) || 0, wetten: d.wetten || [],
+                 moeglich: Number(d.moeglich) || 0, gebuehr: Number(d.gebuehr) || 0,
                  zeit: x.created_at, dbId: x.id,
                  ordner: x.ordner, woher: "konto" };
     // Uebernommene Alt-Scheine (tuImport) haben keine scheinId - jeder

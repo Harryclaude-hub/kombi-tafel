@@ -37,7 +37,7 @@ als annehmen.
 
 | | |
 |---|---|
-| **Live** | https://harryclaude-hub.github.io/kombi-tafel/ |
+| **Live** | https://harryclaude-hub.github.io/kombi-tafel/ (index.html ist seit 01.09. NUR eine Weiterleitung auf original.html - Datei nie loeschen, siehe Manifest/start_url) |
 | **Repo** | `harryclaude-hub/kombi-tafel` (öffentlich, GitHub Pages) |
 | **Lokal** | `C:\Users\Home\kombi-tafel` |
 | **Supabase** | Projekt `mqmevpyatjsambervgtu` (heißt aus historischen Gründen noch „immo-check"), RLS aktiv, Ende-zu-Ende verschlüsselt |

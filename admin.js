@@ -258,7 +258,7 @@ async function durchlaufWeiter() {
     satzAktivieren(vorschauDatum);
     meldungA("<b>&#9989; Durchlauf fertig: " + saubere.length + " Wetten eingelesen, " +
       "Ordner aktiv.</b> Alles steht bereit: " +
-      '<a href="index.html"><b>Kombi-Tafel</b></a> &nbsp; ' +
+      '<a href="original.html"><b>Original-Tabelle</b></a> &nbsp; ' +
       '<a href="kombis.html"><b>Kombi-Bau</b></a> (baut die Dreier von selbst) &nbsp; ' +
       '<a href="original.html"><b>Original-Tabelle</b></a>', "gut");
     return;
@@ -987,7 +987,7 @@ function satzSuche(wert) {
 function satzAktivieren(id) {
   localStorage.setItem("kt_satz", id);
   meldungA("<b>Ordner aktiviert.</b> Er ist ab sofort überall der offene Ordner: " +
-    '<a href="index.html"><b>zur Kombi-Tafel</b></a> &nbsp; ' +
+    '<a href="original.html"><b>zur Original-Tabelle</b></a> &nbsp; ' +
     '<a href="kombis.html"><b>zum Kombi-Bau</b></a> &nbsp; ' +
     '<a href="original.html"><b>zur Original-Tabelle</b></a>', "gut");
   adminSaetze();

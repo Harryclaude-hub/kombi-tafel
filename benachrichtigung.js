@@ -910,7 +910,10 @@ let _updateFassung = null;
 async function pruefeUpdate() {
   try {
     if (!APP_FASSUNG) return;
-    const html = await fetch("index.html?frisch=" + Date.now(), { cache: "no-store" }).then(r => r.text());
+    // original.html statt index.html: index.html ist seit 01.09.2026 nur noch
+    // eine Weiterleitung. Sie traegt zwar noch einen stil.css?v=-Verweis, aber
+    // die Fassung soll von einer echten Seite kommen.
+    const html = await fetch("original.html?frisch=" + Date.now(), { cache: "no-store" }).then(r => r.text());
     const m = html.match(/logik\.js\?v=([A-Za-z0-9._-]+)/) || html.match(/stil\.css\?v=([A-Za-z0-9._-]+)/);
     if (!m) return;
     if (m[1] !== APP_FASSUNG && m[1] !== _updateFassung) {

@@ -1,100 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
 <title>Kombi-Tafel</title>
-<link rel="icon" type="image/svg+xml" href="logo.svg">
-<link rel="manifest" href="manifest.webmanifest">
-<!-- DIESE ZEILE ist das Symbol auf dem iPhone-Home-Bildschirm.
-     Das alte logo-180.png war zu 100 % durchsichtig, also leer -
-     Apple legt so etwas auf Weiss, und genau der weisse Kasten
-     stand dann auf dem Home-Bildschirm. Das neue Bild ist deckend
-     und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
-     sich das Symbol nach der Adresse und wuerde sonst ewig das
-     leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260830f">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260830f">
-<!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
-     als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
-     und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
-     es bei Karam nie funktioniert hat. -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
-<meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260830f">
+<!-- Seit 01.09.2026 gibt es die Listenansicht ("Kombi-Tafel") nicht mehr:
+     Karam arbeitet mit der Original-Tabelle und dem Kombi-Bau.
+     Diese Datei bleibt trotzdem, weil GitHub Pages die Wurzel als index.html
+     ausliefert und installierte Apps (manifest start_url, iOS-Home-Symbol)
+     hier einsteigen. Sie leitet nur weiter - relativ, im selben Ordner,
+     damit der App-Modus erhalten bleibt.
+     Der stil.css-Verweis mit ?v= bleibt absichtlich: naechste-fassung.js
+     stempelt ihn, und der Update-Pruefer las die Fassung bisher von hier. -->
+<link rel="stylesheet" href="stil.css?v=20260901a">
+<meta http-equiv="refresh" content="0; url=original.html">
+<script>location.replace("original.html" + location.search + location.hash);</script>
 </head>
-<body data-seite="tafel">
-
-<h1>Kombi-Tafel</h1>
-<div class="navleiste"><img src="logo.svg" class="logo" alt="Kombi-Tafel"><a href="index.html" class="navknopf aktiv">Kombi-Tafel</a><a href="kombis.html" class="navknopf">Kombi-Bau</a><a href="schule.html" class="navknopf">Handbuch</a><a href="original.html" class="navknopf">Original-Tabelle</a><a href="hilfe.html" class="navknopf">Erklärungen</a><a href="mein.html" class="navknopf">Mein Bereich</a><a href="#" class="navknopf glocke" id="nav_freunde" title="Freunde">&#128101; Freunde</a><a href="mein.html" class="navknopf glocke" id="nav_nachrichten" title="Nachrichten">&#128172;<span class="badge" style="display:none"></span></a></div>
-<div class="unter">Die 73 Wetten aus den vier Fotos vom 24.08.2026. Sortiert nach Anstoss,
-gefiltert nach Kategorie und Anbieter. Eingetippte Quoten bleiben auf diesem Gerät gespeichert.</div>
-
-<div id="stand" class="stand"></div>
-
-<div id="ordnerleiste"></div>
-
-<div class="kern"><b>Kurz und knapp:</b> Live-Quoten in die vier Felder tippen, Interwetten rechnet die Seite selbst durch 1,05, gruen = bester echter Wert, und mit "Setzen bei" arbeitest du einen Anbieter nach dem anderen ab. Alle Anleitungen, Begriffe und Gebühren stehen unter <a href="hilfe.html"><b>Erklärungen</b></a>.</div>
-
-<div class="filterbox">
-<div id="filter"></div>
-<div id="reiterfilter"></div>
-<div id="rangfilter"></div>
-<div id="anbieterfilter"></div>
-<div id="zeitfilter"></div>
-</div>
-<div id="zaehler"></div>
-
-<table>
-<thead>
-<tr>
-<th>Anstoss<span class="hilf" onclick="alert(this.title)" title="Wann das Spiel beginnt. Zum Anpfiff verschwindet die Zeile automatisch aus der Ansicht. Der Knopf Vergangene einblenden holt sie zurueck.">?</span></th>
-<th>Gemeldet<span class="hilf" onclick="alert(this.title)" title="Wann der Tippgeber den Tipp in Saschas Tabelle eingetragen hat (zweite Zeitspalte der Fotos). Je aelter die Meldung, desto eher hat sich die Quote seitdem bewegt: dann besonders genau vergleichen.">?</span></th>
-<th>Liga<span class="hilf" onclick="alert(this.title)" title="Der Wettbewerb, daneben der Tippgeber-Knopf (klt gruen, kafa lila, david blau) wie im Original.">?</span></th>
-<th>Spiel<span class="hilf" onclick="alert(this.title)" title="Die zwei Teams. [doppelt] = dieses Spiel steht mehrfach in der Liste, nur EINE Wette davon in eine Kombi. Info + Links öffnet Erklärung, Anbieter-Links und Vergleichslink.">?</span></th>
-<th>Wette<span class="hilf" onclick="alert(this.title)" title="Worauf gesetzt wird. Bei Klammer-Wetten wählst du die Linie im Dropdown, sicherste zuerst. Mit der Maus auf die Wette zeigen gibt die Kurz-Erklärung, ausfuehrlich im Begriffe-Kasten oben.">?</span></th>
-<th>Foto-Quote<span class="hilf" onclick="alert(this.title)" title="Die Quote aus Saschas Foto-Tabelle (Spalte G), Stand 24.08.2026. Nur ein Anhaltspunkt, KEINE Live-Quote. Die echten Zahlen tippst du in die vier Anbieter-Felder.">?</span></th>
-<th><a href="https://www.interwetten.com/de/sportwetten" target="_blank" rel="noopener">Interwetten</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Interwetten hier eintippen, und zwar die ANGEZEIGTE Zahl. Das Programm teilt selbst durch 1,05 (5 Prozent Wettgebuehr) und zeigt real. In der Zelle: "Seite öffnen" springt zum Anbieter, "Name" kopiert den Teamnamen für die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
-<th><a href="https://sports.bwin.com/de/sports" target="_blank" rel="noopener">Bwin</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bwin hier eintippen. Kein Abzug, Bwin uebernimmt die Wettgebuehr seit Mai 2026 selbst. In der Zelle: "Seite öffnen" springt zum Anbieter, "Name" kopiert den Teamnamen für die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
-<th><a href="https://www.bet365.com/" target="_blank" rel="noopener">Bet365</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Bet365 hier eintippen. Kein Abzug. Für Ecken und asiatische Linien NICHT die .de-Seite verwenden. In der Zelle: "Seite öffnen" springt zum Anbieter, "Name" kopiert den Teamnamen für die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
-<th><a href="https://stake.com/de/sports" target="_blank" rel="noopener">Stake</a><span class="hilf" onclick="alert(this.title)" title="Live-Quote von Stake hier eintippen. Keine Wettgebuehr, aber nur Krypto und Netzwerkgebuehr bei jeder Auszahlung. In der Zelle: "Seite öffnen" springt zum Anbieter, "Name" kopiert den Teamnamen für die Suche, darunter steht wann du dort zuletzt nachgeschaut hast.">?</span></th>
-<th>Setzen bei<span class="hilf" onclick="alert(this.title)" title="Der Anbieter auf dem gewaehlten Rang aus der Filterzeile Anbieter-Rang. Mit getippten Quoten ist es der echte Bestwert, sonst die Start-Vorgabe. Darunter der Quoten-Vergleichslink für genau dieses Spiel.">?</span></th>
-<th>Reiter<span class="hilf" onclick="alert(this.title)" title="In welchem Reiter der App diese Wette steckt: SIEG, ASIA, TORE, ECKEN, BTTS, HZ-END, DNB oder TENNIS. Der Reiter-Kasten oben nennt für jeden die genauen Bezeichnungen bei allen vier Anbietern. Mit der Filterzeile Reiter in der App holst du dir alle Wetten eines Reiters auf einmal.">?</span></th>
-</tr>
-</thead>
-<tbody id="koerper"></tbody>
-</table>
-
-<div class="fuss">
-Tabellenquote (Spalte "Tab.") = Spalte G aus Saschas Tabelle. Interwetten-Eingaben werden durch 1,05
-geteilt (5 % Wettgebuehr AT, nur bei Gewinn faellig; Bwin uebernimmt seit Mai 2026 selbst, Bet365 und
-Stake ziehen nichts ab; Stake nimmt Krypto-Netzwerkgebuehr bei jeder Auszahlung). Die Vorgabe-Zuweisung
-und die Markt-Einschaetzungen (duenn / kein Markt) stammen aus der Recherche vom 24.08.2026 und sind
-Einschätzung, kein Beleg. Gruen = Zuweisung dieser Wette. Vergangene Spiele sind ausgeblendet, Schalter
-oben. Die durchgestrichene Foto-Zeile (Branstine vs Ngou) ist nicht enthalten. Alle Angaben ohne Gewaehr,
-Quoten ändern sich laufend.
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="krypto.js?v=20260830f"></script>
-<script src="medien.js?v=20260830f"></script>
-<script src="anruf-server.js?v=20260830f"></script>
-<script src="anruf.js?v=20260830f"></script>
-<script src="supa.js?v=20260830f"></script>
-<script src="benachrichtigung.js?v=20260830f"></script>
-<script src="satzdaten.js?v=20260830f"></script>
-<script src="profil.js?v=20260830f"></script>
-<script src="anhang.js?v=20260830f"></script>
-<script src="glocke.js?v=20260830f"></script>
-<script src="daten.js?v=20260830f"></script>
-<script src="roh.js?v=20260830f"></script>
-<script src="recherche.js?v=20260830f"></script>
-<script src="logik.js?v=20260830f"></script>
-<script src="handy.js?v=20260830f"></script>
-<script src="zeilen.js?v=20260830f"></script>
+<body data-seite="original">
+<p style="padding:20px">Weiter zur <a href="original.html">Original-Tabelle</a> &hellip;</p>
 </body>
 </html>
