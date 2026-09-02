@@ -2955,3 +2955,26 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
 .gs-gewonnen { color: #0a7d3e; }
 .gs-verloren { color: #a00000; }
 .gs-unklar, .gs-offen { color: #555; font-weight: 400; }
+
+/* ============================================================
+   DESIGN-SCHICHT: Anbieter-Kopf in Mein Bereich (02.09.2026)
+   Nur Optik, loeschbar. Hausfarben wie die .ab-Marken.
+   ============================================================ */
+.ak-leiste { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; }
+.ak-karte { display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 7px 12px; border: 2px solid #ccc; border-radius: 8px; background: #fff;
+  cursor: pointer; text-align: left; min-width: 130px; }
+.ak-karte .ak-name { font-weight: 800; letter-spacing: .2px; }
+.ak-karte .ak-zeile { font-size: .85em; }
+.ak-st { border-color: #1a2c38; } .ak-st .ak-name { color: #1a2c38; }
+.ak-iw { border-color: #0a7d3e; } .ak-iw .ak-name { color: #0a7d3e; }
+.ak-bw { border-color: #111; }    .ak-bw .ak-name { color: #111; }
+.ak-b3 { border-color: #14805e; } .ak-b3 .ak-name { color: #14805e; }
+.ak-aktiv { outline: 3px solid var(--kenn, #0e6273); outline-offset: 1px; background: var(--kennhell, #eef1f7); }
+.ak-detail { border: 1px solid #d8dee9; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: #fff; }
+.ak-summe td { border-top: 2px solid #999; }
+.pk-kombihinweis { margin: 6px 0; }
+@media (max-width: 700px) {
+  .ak-karte { min-width: 46%; }
+  .ak-detail { overflow-x: auto; }
+}

@@ -208,6 +208,7 @@ einem NEUEN Gerät zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine 
 Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können.</details>
 <div id="schluesselkasten"></div>
 <div id="bereichtabs" class="navleiste"></div>
+<div id="anbieterkopf"></div>
 <div id="mb_navi" class="mb-navi"></div>
 
 <div id="blk_tag" class="mb-block">
@@ -919,6 +920,7 @@ async function zeichneBereich() {
   // Liste. ergebnisseAuswerten schuetzt sich selbst gegen Schleifen.
   if (typeof ergebnisseZeichnen === "function") ergebnisseZeichnen();
   if (typeof ergebnisseAuswerten === "function") ergebnisseAuswerten();
+  zeichneAnbieterKopf();
   zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);
@@ -992,19 +994,29 @@ function zeichneScheineDb(scheine) {
   const doppZuviel = Object.keys(dopp).filter(id => dopp[id].spaeter).length;
   const filter = verlaufFilterLesen();
   const alleZahl = scheine.length;
+  // Anbieter-Kopf: ein Klick auf Stake/Interwetten/... filtert die Liste.
+  if (anbieterFilter !== "alle") scheine = scheine.filter(s => s.daten && s.daten.kz === anbieterFilter);
   if (filter !== "alle") scheine = scheine.filter(s => {
     const g = gruppen[stammIdM(s.daten && s.daten.scheinId)];
     return g && (filter === "voll" ? g.voll : !g.voll);
   });
   if (!scheine.length) {
     el("scheine_db").innerHTML = '<p class="mini">' +
-      (filter === "unter"
-        ? "Alles ist voll gesetzt - hier ist nichts offen."
-        : "Noch keine Kombination hat den vollen Einsatz erreicht.") +
+      (anbieterFilter !== "alle"
+        ? "Keine Kombination bei " + anbieterNameM(anbieterFilter) + " unter diesem Filter."
+        : (filter === "unter"
+          ? "Alles ist voll gesetzt - hier ist nichts offen."
+          : "Noch keine Kombination hat den vollen Einsatz erreicht.")) +
       ' (' + alleZahl + ' Einträge ausgeblendet)</p>';
     return;
   }
   const schreib = darfSchreiben();
+  // Das Stift-Formular (Foto, Quoten je Wette, Datum, Stand) erscheint
+  // ueber der Liste - die Personen-Kasse hat keine eigene Kombi-Liste
+  // mehr, also braucht das Bearbeiten hier einen Platz.
+  let pkForm = "";
+  if (typeof pkOffen !== "undefined" && pkOffen && pkOffen.scheinId &&
+      typeof pkFormularHtml === "function") pkForm = pkFormularHtml(pkOffen.ordnerId || "");
   let html = "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Person</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Möglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
@@ -1055,10 +1067,12 @@ function zeichneScheineDb(scheine) {
         : "<span class='mini'>" + textSicherM(s.notiz || "") + "</span>") + "</td>" +
       "<td>" + (aktiverBereich.rolle !== "ich"
         ? "<button onclick=\"tuKopieren('" + s.id + "')\">zu mir kopieren</button> " : "") +
+        (schreib ? "<button title='Bearbeiten: Foto, Quoten je Wette, Datum, Nummer' " +
+          "onclick=\"pkBearbeiten('" + (s.ordner || "") + "','" + s.id + "')\">&#9999;&#65039;</button> " : "") +
         (schreib ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
           "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>" : "") + "</td></tr>";
   }
-  el("scheine_db").innerHTML =
+  el("scheine_db").innerHTML = pkForm +
     (doppZuviel
       ? '<div class="warnkern"><b>&#9888; ' + doppZuviel + " Kombination" +
         (doppZuviel === 1 ? "" : "en") + " doppelt gespeichert.</b> " +
@@ -1477,7 +1491,17 @@ function zeichnePersonenKasse(scheine) {
   }
 
   // ---------- Kombinationen ----------
-  if (blockAn(zg, "kombis")) html += kombiUebersichtHtml(person.id, scheine);
+  // Die Liste selbst steht NUR noch unten unter "Kombinationen" - Karam
+  // sah jede Kombi doppelt (oben in der Kasse, unten in der Liste).
+  // Hier bleibt die Zahl und der Weg, Altbestand von Hand nachzutragen.
+  if (blockAn(zg, "kombis")) {
+    const meineK = scheine.filter(s => s.ordner === person.id);
+    html += '<div class="pk-kombihinweis mini">&#127919; ' + meineK.length +
+      ' Kombination(en) dieser Person - stehen unten unter <b>Kombinationen</b> (Person-Filter oben nutzen).' +
+      (schreib ? ' <button onclick="pkNeu(\'' + person.id + '\')">&#10133; Alte Kombination von Hand nachtragen</button>' : '') +
+      '</div>';
+    if (pkOffen && pkOffen.ordnerId === person.id && !pkOffen.scheinId) html += pkFormularHtml(person.id);
+  }
 
   // ---------- Neue Buchung ----------
   if (schreib) {
@@ -3203,4 +3227,126 @@ function doppelteM(scheine) {
     });
   }
   return raus;
+}
+// ============================================================
+// ANBIETER-KOPF (Karam, 02.09.2026): die vier Anbieter nebeneinander
+// ganz oben - je Anbieter der rechnerische Geldstand und was in den
+// offenen Kombinationen noch zu holen ist. Ein Klick filtert die EINE
+// Kombi-Liste unten und klappt die komplette Uebersicht auf
+// (eingezahlt, zurueckgeholt, gesetzt, gewonnen, je Person).
+// Die Zahlen sind gerechnet, aber uebersteuerbar: das Feld "wirklich
+// drauf" je Person steht direkt in der Uebersicht - eine Korrektur
+// wird als Buchung gespeichert und fliesst ab dann in alles ein.
+// ============================================================
+let anbieterFilter = "alle";
+
+function anbieterNameM(kz) {
+  const x = KASSE_ANBIETER.find(k => k[0] === kz);
+  return x ? x[1] : kz;
+}
+
+// Summen je Anbieter: ueber alle Personen (personPruefen) PLUS die
+// Scheine ohne Person - die haben keine Einzahlungen, aber Einsatz,
+// Gewinn und offene Moeglichkeiten, und fehlten sonst im Kopf.
+function anbieterSummen() {
+  const summe = {};
+  for (const [kz] of KASSE_ANBIETER)
+    summe[kz] = { einge: 0, geholt: 0, einsatz: 0, gewonnen: 0, guthaben: 0,
+                  imSpiel: 0, moeglichOffen: 0, wartet: 0, offen: 0, gew: 0, ver: 0,
+                  personen: [] };
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  for (const o of (ordnerListe || [])) {
+    const pr = personPruefen(o.id, scheine);
+    for (const [kz] of KASSE_ANBIETER) {
+      const a = pr.anbieter[kz];
+      if (!a) continue;
+      for (const f of ["einge", "geholt", "einsatz", "gewonnen", "guthaben", "imSpiel", "moeglichOffen", "wartet"])
+        summe[kz][f] += a[f] || 0;
+      if ((a.einge || a.einsatz || a.gewonnen || a.imSpiel || a.guthaben))
+        summe[kz].personen.push({ id: o.id, name: o.name || "?", a: a });
+    }
+  }
+  for (const s of scheine) {
+    const kz = s.daten && s.daten.kz;
+    if (!kz || !summe[kz]) continue;
+    if (s.stand === "offen") summe[kz].offen++;
+    else if (s.stand === "gewonnen") summe[kz].gew++;
+    else if (s.stand === "verloren") summe[kz].ver++;
+    if (!s.ordner && s.daten) {
+      // ohne Person: zaehlt im Kopf mit, sonst fehlt Geld in der Summe
+      summe[kz].einsatz += s.daten.einsatz || 0;
+      if (s.stand === "gewonnen") summe[kz].gewonnen += echtZurueckWert(s);
+      if (s.stand === "offen") {
+        summe[kz].imSpiel += s.daten.einsatz || 0;
+        summe[kz].moeglichOffen += s.daten.moeglich || 0;
+      }
+      summe[kz].guthaben += (s.stand === "gewonnen" ? echtZurueckWert(s) : 0) - (s.daten.einsatz || 0);
+    }
+  }
+  return summe;
+}
+
+function zeichneAnbieterKopf() {
+  const box = el("anbieterkopf");
+  if (!box) return;
+  if (!aktiverBereich) { box.innerHTML = ""; return; }
+  const summe = anbieterSummen();
+  let html = '<div class="ak-leiste">';
+  html += '<button class="ak-karte ak-alle' + (anbieterFilter === "alle" ? " ak-aktiv" : "") +
+    '" onclick="tuAnbieterFilter(\'alle\')"><span class="ak-name">Alle</span>' +
+    '<span class="ak-zeile mini">Filter aus</span></button>';
+  // Karams Reihenfolge (KT_ANBIETER_RANG steht in kombis.js, das diese
+  // Seite nicht laedt - deshalb hier dieselbe Folge ausgeschrieben).
+  for (const [kz, name] of ["st", "iw", "bw", "b3"].map(k => KASSE_ANBIETER.find(x => x[0] === k))) {
+    const a = summe[kz];
+    html += '<button class="ak-karte ak-' + kz + (anbieterFilter === kz ? " ak-aktiv" : "") +
+      '" onclick="tuAnbieterFilter(\'' + kz + '\')">' +
+      '<span class="ak-name">' + name + '</span>' +
+      '<span class="ak-zeile">drauf: <b>' + tagGeld(a.guthaben) + '</b></span>' +
+      '<span class="ak-zeile">noch m&ouml;glich: <b>' + tagGeld(a.moeglichOffen) + '</b></span>' +
+      '<span class="ak-zeile mini">' + a.offen + ' offen &middot; ' + a.gew + ' gew &middot; ' + a.ver + ' ver' +
+      (a.wartet ? ' &middot; ' + a.wartet + ' wartet' : '') + '</span></button>';
+  }
+  html += '</div>';
+  if (anbieterFilter !== "alle") html += anbieterDetailHtml(anbieterFilter, summe[anbieterFilter]);
+  box.innerHTML = html;
+}
+
+function anbieterDetailHtml(kz, a) {
+  const schreib = darfSchreiben();
+  let html = '<div class="ak-detail"><b>' + anbieterNameM(kz) + ' - komplette &Uuml;bersicht</b>' +
+    '<div class="tabellenrand"><table><thead><tr><th></th><th>eingezahlt</th><th>zur&uuml;ckgeholt</th>' +
+    '<th>gesetzt</th><th>gewonnen</th><th>im Spiel</th><th>noch m&ouml;glich</th><th>rechnerisch drauf</th>' +
+    (schreib ? '<th>wirklich drauf</th>' : '') + '</tr></thead><tbody>';
+  for (const p of a.personen) {
+    html += '<tr><td>' + textSicherM(p.name) + '</td><td>' + tagGeld(p.a.einge) + '</td>' +
+      '<td>' + tagGeld(p.a.geholt) + '</td><td>' + tagGeld(p.a.einsatz) + '</td>' +
+      '<td>' + tagGeld(p.a.gewonnen) + '</td><td>' + tagGeld(p.a.imSpiel || 0) + '</td>' +
+      '<td>' + tagGeld(p.a.moeglichOffen || 0) + '</td><td>' + tagGeld(p.a.guthaben) + '</td>' +
+      (schreib ? '<td>' + standFeld(p.id, "anbieter", kz, p.a.guthaben) + '</td>' : '') + '</tr>';
+  }
+  html += '<tr class="ak-summe"><td><b>Zusammen</b></td><td><b>' + tagGeld(a.einge) + '</b></td>' +
+    '<td><b>' + tagGeld(a.geholt) + '</b></td><td><b>' + tagGeld(a.einsatz) + '</b></td>' +
+    '<td><b>' + tagGeld(a.gewonnen) + '</b></td><td><b>' + tagGeld(a.imSpiel) + '</b></td>' +
+    '<td><b>' + tagGeld(a.moeglichOffen) + '</b></td><td><b>' + tagGeld(a.guthaben) + '</b></td>' +
+    (schreib ? '<td></td>' : '') + '</tr></tbody></table></div>' +
+    '<p class="mini"><b>rechnerisch drauf</b> = eingezahlt - zur&uuml;ckgeholt - gesetzt + gewonnen (+ Korrekturen). ' +
+    'Stimmt die Zahl nicht (Altbestand von vor dem Programm, R&uuml;cknahme, Programmfehler): bei <b>wirklich drauf</b> ' +
+    'den echten Stand eintragen - der Unterschied wird als Korrektur-Buchung gespeichert und gilt ab sofort &uuml;berall. ' +
+    'Alte Kombinationen tr&auml;gst du in der Personen-Kasse mit <b>von Hand nachtragen</b> ein; ' +
+    'gewonnen/verloren stellst du unten am Schein um.</p></div>';
+  return html;
+}
+
+function tuAnbieterFilter(kz) {
+  anbieterFilter = (anbieterFilter === kz) ? "alle" : kz;
+  zeichneAnbieterKopf();
+  // Nur die Liste neu, nicht der ganze Bereich: gleiche Filterkette wie
+  // in zeichneBereich (erst Person, dann drinnen Voll/Unter+Anbieter).
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const gefiltert = (ordnerFilter === "alle") ? scheine
+    : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
+    : scheine.filter(s => s.ordner === ordnerFilter);
+  zeichneKontoDb(gefiltert);
+  zeichneScheineDb(gefiltert);
 }

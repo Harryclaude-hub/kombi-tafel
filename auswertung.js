@@ -84,7 +84,8 @@ function awSeiteVonName(name, spiel) {
 
 function wetteLesen(text, spiel) {
   const roh = String(text || "").trim();
-  const t = roh.toLowerCase().replace(/\s+/g, " ").trim();
+  // Typographische Striche (aus Telegram/Web kopiert) sind Minusse.
+  const t = roh.toLowerCase().replace(/[−–—]/g, "-").replace(/\s+/g, " ").trim();
   const unklar = (grund) => ({ art: "unklar", grund: grund, text: roh });
   if (!t) return unklar("leerer Wett-Text");
 
@@ -127,6 +128,10 @@ function wetteLesen(text, spiel) {
   if (m) {
     const linie = awZahl(m[2]);
     if (linie === null) return unklar("Zahl nicht lesbar: " + roh);
+    // Diesen Markt gibt es nur mit ,5-Linien. Eine glatte oder Viertel-
+    // Linie hier waere ein Push/Halb-Fall ohne offizielle Regel - dann
+    // entscheidet ein Mensch (Pruefer-Fund vom 02.09.2026).
+    if (Math.round(linie * 2) % 2 !== 1) return unklar("Sieg+Tore nur mit ,5-Linie auswertbar: " + roh);
     return { art: "kombi-sieg-ueber", seite: m[1] === "home" ? "heim" : "gast", linie: linie };
   }
 
@@ -265,9 +270,11 @@ function awHandicap(margin, linie) {
 
 function wetteAuswerten(gelesen, ergebnis, spiel) {
   const g = gelesen && gelesen.art ? gelesen : wetteLesen(gelesen, spiel);
-  if (g.art === "unklar") return { ausgang: "unklar", grund: g.grund };
   const e = ergebnis || {};
+  // Absage ZUERST: sie voidet jede Wette des Spiels, auch eine, deren
+  // Text nicht lesbar ist (Pruefer-Fund vom 02.09.2026).
   if (e.stand === "abgesagt") return { ausgang: "abgesagt", grund: "Spiel abgesagt - Einsatz zurueck" };
+  if (g.art === "unklar") return { ausgang: "unklar", grund: g.grund };
   const fehlt = (was) => ({ ausgang: "offen", grund: was + " fehlt noch" });
 
   const heim = awZahl(e.heim), gast = awZahl(e.gast);
@@ -345,7 +352,11 @@ function wetteAuswerten(gelesen, ergebnis, spiel) {
 // q ist die ECHTE Quote der Wette (nach Gebuehr, aus dem Verlauf).
 
 function faktorFuer(ausgang, q) {
-  const quote = awZahl(q);
+  // Eine Quote unter 1 gibt es im Wettwesen nicht - das ist ein
+  // Tippfehler oder ein 0-Vorgabewert. Wie eine fehlende Quote
+  // behandeln, sonst wuerde eine gewonnene Kombi lautlos zu 0 verbucht.
+  let quote = awZahl(q);
+  if (quote !== null && quote < 1) quote = null;
   switch (ausgang) {
     case "gewonnen":      return quote === null ? null : quote;
     case "halbgewonnen":  return quote === null ? null : (quote + 1) / 2;
@@ -366,6 +377,10 @@ function faktorFuer(ausgang, q) {
 // Bereich. auszahlung ist einsatz x Produkt der Faktoren.
 
 function kombiAuswerten(wetten, einsatz, ergebnisJe) {
+  // Ohne Beine gibt es nichts zu entscheiden - ein leerer Schein darf
+  // nie automatisch als "gewonnen" (Einsatz zurueck) verbucht werden.
+  if (!wetten || !wetten.length)
+    return { stand: "unklar", auszahlung: null, faktor: null, beine: [] };
   const beine = [];
   let faktor = 1, offen = 0, unklar = 0, verloren = 0;
   for (const w of (wetten || [])) {
@@ -387,7 +402,12 @@ function kombiAuswerten(wetten, einsatz, ergebnisJe) {
   if (unklar) return { stand: "unklar", auszahlung: null, faktor: null, beine: beine };
   if (offen) return { stand: "offen", auszahlung: null, faktor: null, beine: beine };
   const rund = (x) => Math.round(x * 100) / 100;
-  const aus = rund((awZahl(einsatz) || 0) * faktor);
+  const es = awZahl(einsatz);
+  // Alle Beine entschieden, aber kein brauchbarer Einsatz: der Schein ist
+  // inhaltlich gewonnen, nur die Zahl fehlt - das entscheidet ein Mensch.
+  if (faktor > 0 && !(es > 0))
+    return { stand: "unklar", auszahlung: null, faktor: rund(faktor), beine: beine };
+  const aus = rund((es || 0) * faktor);
   return { stand: aus > 0 ? "gewonnen" : "verloren", auszahlung: aus, faktor: rund(faktor), beine: beine };
 }
 
