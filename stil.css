@@ -3115,3 +3115,30 @@ body[data-seite] > .navleiste a.glocke.aktiv {
   body[data-seite] > .navleiste a.navknopf { min-height: 44px; }
   body[data-seite] > .navleiste a.navknopf[href="mein.html"]:not(.glocke) { margin-right: 0; }
 }
+
+/* ============================================================
+   DESIGN-SCHICHT: Gewonnen/verloren an jeder Kombination
+   (02.09.2026, Karams Wunsch). Nur Optik, loeschbar - die Marke
+   selbst kommt aus standMarke() in mein.js und bleibt ohne diese
+   Schicht schlichter Text.
+   ============================================================ */
+.st-mark {
+  display: inline-block; margin-top: 4px; padding: 2px 9px;
+  border-radius: 999px; font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+}
+.st-mark.st-gewonnen { background: #d9efd9; color: #0a5a0a; border: 1px solid #9ccc9c; }
+.st-mark.st-verloren { background: #f7dcdc; color: #8a0f0f; border: 1px solid #dfa3a3; }
+.st-mark.st-offen    { background: #eef0f5; color: #556;    border: 1px solid #ccd2de; font-weight: 400; }
+
+/* Der Stand-Schalter selbst faerbt sich mit: gewonnen gruen, verloren rot. */
+#scheine_db td.standzelle.st-gewonnen select,
+#scheine_db td.standzelle.st-gewonnen {
+  color: #0a5a0a; font-weight: bold;
+}
+#scheine_db td.standzelle.st-gewonnen select { border-color: #1a7a1a; background: #eaf6ea; }
+#scheine_db td.standzelle.st-verloren select,
+#scheine_db td.standzelle.st-verloren {
+  color: #8a0f0f; font-weight: bold;
+}
+#scheine_db td.standzelle.st-verloren select { border-color: #a00000; background: #fbecec; }

@@ -9,6 +9,7 @@ let aktiverBereich = null;      // {id, username, rolle}  rolle: "ich" | "close"
 let meineBereiche = [];
 let chatTimer = null;
 let letzteChatId = 0;
+let ergSucheTimer = null;   // Selbstsuche fuer Ergebnisse (ergebnisse.js)
 
 function el(id) { return document.getElementById(id); }
 function rundM(x) { return Math.round(x * 100) / 100; }
@@ -197,8 +198,7 @@ async function zeigeApp() {
   if (!aktiverBereich) aktiverBereich = meineBereiche[0];
 
   el("inhalt").innerHTML = `
-<div class="kopfzeile"><span id="benach_platz"></span>
-  ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">&#9881;&#65039; Admin-Bereich</a>' : ""}</div>
+<div class="kopfzeile">${binAdmin ? '<a href="admin.html" class="navknopf adminknopf">&#9881;&#65039; Admin-Bereich</a>' : ""}</div>
 <div id="schluesselkasten"></div>
 <div id="bereichtabs" class="navleiste"></div>
 <div id="anbieterkopf"></div>
@@ -209,6 +209,10 @@ async function zeigeApp() {
 </div>
 
 <div id="blk_kombis" class="mb-block">
+<h2 id="scheine_titel">Kombinationen</h2>
+<div id="verlaufschalter" class="vf-schalter"></div>
+<div id="scheine_db"></div>
+<div id="ergebnisse"></div>
 <h2>&#128100; Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
 gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b> die
@@ -216,10 +220,6 @@ Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur,
 Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
-<div id="ergebnisse"></div>
-<h2 id="scheine_titel">Kombinationen</h2>
-<div id="verlaufschalter" class="vf-schalter"></div>
-<div id="scheine_db"></div>
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
 <div id="importkasten"></div>
@@ -284,7 +284,9 @@ jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen
   // auch nach einem Neuaufbau, z. B. beim Bereichswechsel aus dem Chat
   // heraus. Den Chat laedt gleich zeichneBereich - nicht doppelt laden.
   if (mbAnsicht) mbAnsichtOeffnen(mbAnsicht, true);
-  benachKnopf();
+  // Benachrichtigungs-Zeile gibt es hier nicht mehr (Karam, 02.09.):
+  // die Klingel oben in der Kopfleiste (wecker_knopf, benachrichtigung.js)
+  // zeigt den Zustand und oeffnet dasselbe Panel.
   pruefeSchluessel();
   // Fehlende Bereichsschluessel an meine Gaeste nachliefern. Laeuft NACH dem
   // Aufbau der Seite, sonst gibt es kein Feld fuer die Meldung.
@@ -991,8 +993,10 @@ function zeichneGesperrtWarnung(scheine) {
 }
 
 async function zeichneBereich() {
-  el("scheine_titel").textContent = (aktiverBereich.rolle === "ich")
-    ? "&#127919; Meine Kombinationen" : "&#127919; Kombinationen von " + aktiverBereich.username;
+  // innerHTML statt textContent: textContent zeigte die Zeichenfolge
+  // "&#127919;" woertlich an. Der Benutzername ist fremder Text -> textSicherM.
+  el("scheine_titel").innerHTML = (aktiverBereich.rolle === "ich")
+    ? "&#127919; Meine Kombinationen" : "&#127919; Kombinationen von " + textSicherM(aktiverBereich.username);
   const scheine = await supaScheineLaden(aktiverBereich.id);
   const ordnerNeu = await supaOrdnerLaden(aktiverBereich.id);
   // Ging EINES der Laden schief, wird gar nichts neu gezeichnet. Sonst
@@ -1034,6 +1038,15 @@ async function zeichneBereich() {
   if (mbAnsicht === "chat") await ladeChat(true);
   if (chatTimer) clearInterval(chatTimer);
   chatTimer = setInterval(chatTakt, 10000);
+  // Selbstsuche: Endstaende vorbeier Spiele automatisch holen und
+  // auswerten (ergebnisse.js). Ohne await - sie meldet sich selbst.
+  // Je Spiel fragt sie hoechstens alle 30 Minuten an, der Takt hier
+  // schaut nur alle 10 Minuten nach, ob ein Spiel fertig geworden ist.
+  if (typeof ergebnisseSelbstSuchen === "function") {
+    ergebnisseSelbstSuchen();
+    if (ergSucheTimer) clearInterval(ergSucheTimer);
+    ergSucheTimer = setInterval(ergebnisseSelbstSuchen, 10 * 60000);
+  }
 }
 
 function zeichneKontoDb(scheine) {
@@ -1132,7 +1145,7 @@ function zeichneScheineDb(scheine) {
     if (gr && !gr.voll) zklassen.push("unterziel");
     const dp = dopp[s.id];
     if (dp && dp.spaeter) zklassen.push("doppelzeile");
-    html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + "</td>" +
+    html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + standMarke(s) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
       // Spiel, Linie, Fotoname und das Foto selbst kommen von Menschen und
       // muessen als TEXT eingesetzt werden, nie als HTML (siehe textSicherM).
@@ -1152,7 +1165,7 @@ function zeichneScheineDb(scheine) {
         luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + echtZelle(s, schreib) + "</td>" +
-      "<td>" + (schreib
+      "<td class='standzelle st-" + s.stand + "'>" + (schreib
         ? "<select onchange=\"tuStand('" + s.id + "', this.value)\">" +
           ["offen", "gewonnen", "verloren"].map(o => "<option" + (s.stand === o ? " selected" : "") + ">" + o + "</option>").join("") + "</select>"
         : s.stand) +
@@ -1371,12 +1384,18 @@ function personPruefen(ordnerId, scheine) {
 // (Anstoss + 3 Stunden Spieldauer-Puffer). Ein fertiger OFFENER Schein
 // wartet auf Karams Bericht: gewonnen oder verloren.
 function scheinEnde(s) {
-  if (typeof WETTEN === "undefined" || typeof liesAnstoss !== "function") return null;
+  if (typeof liesAnstoss !== "function") return null;
   let ende = null;
   for (const t of (s.daten.wetten || [])) {
-    const w = WETTEN.find(x => x.id === t.id);
-    if (!w) return null;                        // Zeit unbekannt: nicht werten
-    const a = liesAnstoss(anstossFeld(w));
+    // Seit 20260902a traegt jedes Bein seine Anstosszeit selbst (an).
+    // Nur alte Eintraege ohne "an" muessen in der Tafel nachschlagen.
+    let an = t.an || "";
+    if (!an) {
+      const w = (typeof WETTEN !== "undefined") ? WETTEN.find(x => x.id === t.id) : null;
+      if (!w) return null;                      // Zeit unbekannt: nicht werten
+      an = anstossFeld(w);
+    }
+    const a = liesAnstoss(an);
     if (a.fehlt) return null;                   // Zeit unbekannt: nicht werten
     const e = new Date(a.zeit);
     if (isNaN(e.getTime())) return null;
@@ -1391,6 +1410,18 @@ function scheinWartet(s) {
   if (s.stand !== "offen") return false;
   const e = scheinEnde(s);
   return !!e && new Date() > e;
+}
+
+// Karam (02.09.): an JEDER Kombination soll direkt unter dem Anbieter
+// stehen, ob sie gewonnen oder verloren ist - und bei offenen, WANN das
+// Ergebnis kommt (letzter Anstoss + 3 h, dieselbe Rechnung wie scheinEnde).
+function standMarke(s) {
+  if (s.stand === "gewonnen") return '<div class="st-mark st-gewonnen">&#10004; gewonnen</div>';
+  if (s.stand === "verloren") return '<div class="st-mark st-verloren">&#10008; verloren</div>';
+  const e = scheinEnde(s);
+  if (!e) return '<div class="st-mark st-offen">offen</div>';
+  if (new Date() > e) return '<div class="st-mark st-offen">offen &middot; alle Spiele aus</div>';
+  return '<div class="st-mark st-offen">offen &middot; Ergebnis ~ ' + kasseZeit(e) + "</div>";
 }
 
 function kasseZeit(d) {

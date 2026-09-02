@@ -1237,7 +1237,21 @@ function scheinTeilen(scheinId) {
 // der Reihenfolge des Setzens, damit die Farbe beim Neuzeichnen bleibt.
 // Bewusst keine Rosa-, Gruen- oder Orangetoene: die bedeuten hier schon
 // "unter Mindestquote", "bester Wert" und "offen".
-const KOMBI_FARBEN = ["#dbe7ff", "#e9dcff", "#d6f0f5", "#f3e8d2", "#dfe3f7", "#f0d9ee", "#d9ecef", "#ece6d8"];
+//
+// Karam (02.09.): innerhalb EINES Ordners darf sich keine Farbe
+// wiederholen, kein Rhythmus. Frueher lief eine 8er-Palette im Kreis.
+// Jetzt: 9 erlaubte Farbtoene mal 3 Helligkeiten = 27 eigene Farben je
+// Ordner (mehr Staemme hat kein Ordner; erst die 28. bekaeme wieder die
+// erste). Der naechste Ordner faengt von selbst wieder vorn an, weil
+// kombiKarte immer nur die Eintraege des aktiven Ordners bekommt.
+const KOMBI_TOENE = [218, 187, 262, 42, 240, 300, 202, 35, 280];   // Grad: Blau, Tuerkis, Violett, Sand, Indigo, Mauve, Eisblau, Taupe, Lila
+const KOMBI_SATT = { 42: 45, 35: 25, 300: 30 };                    // Sand/Taupe/Mauve gedeckt, sonst 62
+const KOMBI_LICHT = [88, 81, 74];
+function kombiFarbe(n) {
+  const ton = KOMBI_TOENE[n % KOMBI_TOENE.length];
+  const licht = KOMBI_LICHT[Math.floor(n / KOMBI_TOENE.length) % KOMBI_LICHT.length];
+  return "hsl(" + ton + "," + (KOMBI_SATT[ton] || 62) + "%," + licht + "%)";
+}
 
 function kombiKarte(liste) {
   const eintraege = (liste || gesetzteEintraege()).slice()
@@ -1246,7 +1260,7 @@ function kombiKarte(liste) {
   let n = 0;
   for (const e of eintraege) {
     const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
-    if (!(st in farbe)) { farbe[st] = KOMBI_FARBEN[n % KOMBI_FARBEN.length]; n++; kzJe[st] = []; }
+    if (!(st in farbe)) { farbe[st] = kombiFarbe(n); n++; kzJe[st] = []; }
     if (e.kz && kzJe[st].indexOf(e.kz) < 0) kzJe[st].push(e.kz);
     for (const t of (e.wetten || [])) {
       if (!t || !t.id) continue;      // Handeingaben (personkombi.js) haben keine Wetten-Kennung

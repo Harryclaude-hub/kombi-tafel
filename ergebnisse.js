@@ -147,7 +147,10 @@ async function ergebnisseZeichnen() {
     for (const w of (s.daten.wetten || [])) {
       if (!w.spiel) continue;
       const k = ergSchluessel(s.daten.satz || "", w.spiel);
-      if (!spiele[k]) spiele[k] = { satz: s.daten.satz || "", spiel: w.spiel, texte: [], an: w.an_zeit || "" };
+      // Das Feld heisst in den Verlaufsdaten "an" (baueVerlaufsEintrag,
+      // kombis.js) - "an_zeit" nur zur Sicherheit fuer alte Eintraege.
+      if (!spiele[k]) spiele[k] = { satz: s.daten.satz || "", spiel: w.spiel, texte: [], an: w.an || w.an_zeit || "" };
+      if (!spiele[k].an) spiele[k].an = w.an || w.an_zeit || "";
       spiele[k].texte.push(w.linie || w.wette || "");
     }
   }
@@ -190,10 +193,11 @@ async function ergebnisseZeichnen() {
         (z ? '<div class="mini">' + sicher(z.quelle || "") + "</div>" : "") + "</td></tr>";
   }
   box.innerHTML = "<h2>&#9917; Ergebnisse eintragen</h2>" +
-    '<p class="mini">Alle Spiele deiner offenen Kombinationen. Endstand eintragen (bei Tennis: gewonnene ' +
-    "Sätze), speichern - gewonnen/verloren, Auszahlung und Kasse rechnet das Programm selbst. " +
-    "Jede Zeile fragt nur, was ihre Wetten wirklich brauchen. " + fertigZahl + " von " +
-    schluessel.length + " Spielen haben schon ein Ergebnis.</p>" +
+    '<p class="mini">Alle Spiele deiner offenen Kombinationen. Endstände holt sich das Programm ' +
+    "selbst, sobald ein Spiel vorbei ist (nur bei eindeutigem Treffer); du kannst jeden Wert " +
+    "ändern, deine Zahl gilt. Halbzeit, Karten und Ecken kann die Selbstsuche nicht - die " +
+    "trägst du ein. " + fertigZahl + " von " + schluessel.length + " Spielen haben schon ein Ergebnis." +
+    ergSucheLageText() + "</p>" +
     '<div class="tabellenrand"><table class="tb-tafel erg-tafel"><thead><tr>' +
     "<th>Spiel und Wetten</th><th>Ergebnis</th><th></th><th></th></tr></thead><tbody>" +
     zeilen + "</tbody></table></div>";
@@ -227,4 +231,145 @@ async function ergebnisSpeichernKlick(id, satz, spiel) {
   if (typeof meldungM === "function") meldungM("Ergebnis gespeichert. Werte jetzt aus...", "gut");
   await ergebnisseAuswerten();
   await ergebnisseZeichnen();
+}
+
+// ============================================================
+// SELBSTSUCHE: Endstaende automatisch holen (TheSportsDB,
+// oeffentlicher Test-Schluessel "123", CORS aus dem Browser ok -
+// gemessen am 02.09.). Karams Auftrag vom 02.09.: Kombinationen
+// sollen automatisch ausgewertet werden, er bessert nur aus.
+//
+// Die EISERNE REGEL gilt weiter - niemals raten:
+//  - gespeichert wird nur ein EINDEUTIGER Treffer: genau EIN
+//    Spiel der Antwort passt, das Datum liegt am Anstosstag
+//    (+/- 1 Tag wegen Zeitzonen), UND beide Teamnamen passen in
+//    DERSELBEN Reihenfolge (Heim = Heim). Nie ueber den Namen
+//    allein verknuepfen - Name + Datum sind zwei Eigenschaften.
+//  - ein vorhandenes Ergebnis (auch von Hand) wird NIE angefasst.
+//  - nur der Endstand: Halbzeit/Karten/Ecken bleiben leer, die
+//    Maschine wertet betroffene Wetten dann als "fehlt noch".
+//  - abgesagte/verschobene Spiele entscheidet die Automatik nicht
+//    (Absage = Einsatz zurueck = Geld) - das bleibt bei Karam.
+// Jeder Ausgang wird gezaehlt und in der Tafel angezeigt - kein
+// stiller Fehlschlag (drei Zustaende: gefunden / nichts / Fehler).
+// ============================================================
+
+const ERG_SUCHE_PAUSE_MIN = 30;   // je Spiel hoechstens alle 30 Minuten anfragen
+let _ergSucheLage = null;         // Ergebnis des letzten Laufs (fuer die Anzeige)
+let _ergSucheLaeuft = false;
+
+// Passt Karams Teamname zum API-Namen? Wortanfaenge wie awSeiteVonName
+// ("Leipzig" trifft "RB Leipzig"), Fuellwoerter zaehlen nicht.
+// WICHTIG (Geld!): "Celtic B U21" darf NIE auf "Celtic" passen - Jugend-,
+// B- und Frauen-Marker muessen auf BEIDEN Seiten gleich sein, sonst
+// waere es ein anderes Team desselben Vereins.
+function ergTeamPasst(karam, api) {
+  const putz = (t) => String(t || "").toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const kw = putz(karam).split(" "), aw = putz(api).split(" ");
+  const marker = { u16: 1, u17: 1, u18: 1, u19: 1, u20: 1, u21: 1, u23: 1, ii: 1, b: 1,
+    women: 1, w: 1, frauen: 1, fem: 1, feminino: 1, femenino: 1, reserve: 1, reserves: 1, youth: 1 };
+  const markerVon = (worte) => worte.filter(x => marker[x]).sort().join(",");
+  if (markerVon(kw) !== markerVon(aw)) return false;
+  const fueller = { fc: 1, cf: 1, fk: 1, sk: 1, sc: 1, ac: 1, afc: 1, cd: 1, club: 1, de: 1 };
+  const kern = (worte) => worte.filter(x => !fueller[x] && !marker[x] && x.length >= 3);
+  const kk = kern(kw), ak = kern(aw);
+  if (!kk.length || !ak.length) return false;
+  const enthaelt = (worte, teile) => teile.every(t => worte.some(w => w.indexOf(t) === 0));
+  // Der kuerzere Name muss komplett im laengeren stecken (als Wortanfaenge).
+  return enthaelt(aw, kk) || enthaelt(kw, ak);
+}
+
+async function ergebnisseSelbstSuchen() {
+  if (_ergSucheLaeuft) return;
+  if (!aktiverBereich || typeof darfSchreiben !== "function" || !darfSchreiben()) return;
+  if (typeof awSeiten !== "function" || typeof liesAnstoss !== "function") return;
+  const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const offene = liste.filter(s => s.stand === "offen" && s.daten && (s.daten.wetten || []).length);
+  if (!offene.length) { _ergSucheLage = null; return; }
+  _ergSucheLaeuft = true;
+  try {
+    const spiele = {};
+    for (const s of offene) for (const w of (s.daten.wetten || [])) {
+      if (!w.spiel) continue;
+      const k = ergSchluessel(s.daten.satz || "", w.spiel);
+      if (!spiele[k]) spiele[k] = { satz: s.daten.satz || "", spiel: w.spiel, an: w.an || w.an_zeit || "" };
+      if (!spiele[k].an) spiele[k].an = w.an || w.an_zeit || "";
+    }
+    const schluessel = Object.keys(spiele);
+    if (!schluessel.length) { _ergSucheLage = null; return; }
+    await ergebnisseLaden([...new Set(schluessel.map(k => spiele[k].satz).filter(Boolean))]);
+    const lage = { laeuft: 0, ohneZeit: 0, gesucht: 0, gefunden: 0, unsicher: 0, fehler: 0, wann: new Date() };
+    for (const k of schluessel) {
+      const sp = spiele[k];
+      if (_ergKarte[k]) continue;                              // Ergebnis da - nie anfassen
+      const a = liesAnstoss(sp.an);
+      if (a.fehlt || a.unklar || isNaN(a.zeit.getTime())) { lage.ohneZeit++; continue; }
+      const ende = new Date(a.zeit);
+      ende.setMinutes(ende.getMinutes() + 110);                // Spiel muss vorbei sein
+      if (new Date() < ende) { lage.laeuft++; continue; }
+      const merk = "kt_ergsuche_" + k;
+      const zuletzt = parseInt(localStorage.getItem(merk) || "0", 10);
+      if (Date.now() - zuletzt < ERG_SUCHE_PAUSE_MIN * 60000) continue;   // gerade erst gefragt
+      localStorage.setItem(merk, String(Date.now()));
+      const seiten = awSeiten(sp.spiel);
+      if (!seiten) { lage.unsicher++; continue; }
+      lage.gesucht++;
+      let antwort;
+      try {
+        const r = await fetch("https://www.thesportsdb.com/api/v1/json/123/searchevents.php?e=" +
+          encodeURIComponent(sp.spiel.replace(/\s+-\s+/, " vs ").replace(/\s+/g, "_")));
+        if (!r.ok) { lage.fehler++; continue; }
+        antwort = await r.json();
+      } catch (e) { lage.fehler++; continue; }
+      // +/- 30 Stunden um den Anstoss: dateEvent ist die Ortszeit des
+      // Stadions, Karams Zeit ist Oesterreich - ein Tag Unterschied kommt vor.
+      const treffer = (antwort && Array.isArray(antwort.event) ? antwort.event : []).filter(ev => {
+        if (!ev || !ev.dateEvent) return false;
+        const evTag = new Date(ev.dateEvent + "T12:00");
+        if (isNaN(evTag.getTime()) || Math.abs(evTag - a.zeit) > 30 * 3600000) return false;
+        if (ev.intHomeScore === null || ev.intHomeScore === undefined || ev.intHomeScore === "") return false;
+        if (ev.intAwayScore === null || ev.intAwayScore === undefined || ev.intAwayScore === "") return false;
+        if (/postpon|cancel|abandon|susp/i.test(String(ev.strStatus || "") + " " + String(ev.strPostponed || ""))) return false;
+        return true;
+      });
+      if (treffer.length !== 1) { lage.unsicher++; continue; }
+      const ev = treffer[0];
+      if (!ergTeamPasst(seiten.heim, ev.strHomeTeam) || !ergTeamPasst(seiten.gast, ev.strAwayTeam)) { lage.unsicher++; continue; }
+      const heim = parseInt(ev.intHomeScore, 10), gast = parseInt(ev.intAwayScore, 10);
+      if (!isFinite(heim) || !isFinite(gast) || heim < 0 || gast < 0) { lage.unsicher++; continue; }
+      const r2 = await supaErgebnisSpeichern({ satz: sp.satz, spiel: sp.spiel,
+        heim: heim, gast: gast, ht_heim: null, ht_gast: null, karten: null, ecken: null,
+        sonder: {}, stand: "fertig", quelle: "automatisch (TheSportsDB)" });
+      if (r2.error || !r2.data || !r2.data.length) { lage.fehler++; continue; }
+      lage.gefunden++;
+    }
+    _ergSucheLage = lage;
+    if (lage.gefunden) {
+      if (typeof meldungM === "function")
+        meldungM("&#128269; Selbstsuche: <b>" + lage.gefunden + " Endstand/-stände</b> automatisch " +
+          "eingetragen (Quelle steht an der Zeile, du kannst jeden Wert ändern). Werte jetzt aus...", "gut");
+      await ergebnisseAuswerten();
+      await ergebnisseZeichnen();
+    } else if (lage.gesucht) {
+      // Auch "nichts gefunden" ist ein Ergebnis - die Tafel zeigt es an.
+      await ergebnisseZeichnen();
+    }
+  } finally { _ergSucheLaeuft = false; }
+}
+
+// Eine Zeile fuer die Eingabetafel: was der letzte Suchlauf ergab.
+function ergSucheLageText() {
+  const l = _ergSucheLage;
+  if (!l) return "";
+  const teile = [];
+  if (l.gefunden) teile.push("<b>" + l.gefunden + " gefunden</b>");
+  if (l.gesucht && !l.gefunden) teile.push(l.gesucht + " gesucht, nichts Eindeutiges");
+  if (l.unsicher) teile.push(l.unsicher + " nicht eindeutig (von Hand)");
+  if (l.laeuft) teile.push(l.laeuft + " Spiel(e) noch nicht vorbei");
+  if (l.ohneZeit) teile.push(l.ohneZeit + " ohne Anstosszeit (von Hand)");
+  if (l.fehler) teile.push('<span class="rot">' + l.fehler + " Abfragefehler</span>");
+  if (!teile.length) return "";
+  return '<br>&#128269; Selbstsuche ' +
+    (typeof kasseZeit === "function" ? kasseZeit(l.wann) : "") + ": " + teile.join(" · ") + ".";
 }
