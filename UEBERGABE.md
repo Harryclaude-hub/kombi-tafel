@@ -575,11 +575,54 @@ Kombinationen, Personen-Buchhaltung und Nachrechnen** stehen. **Profil**
 **Bereichs-Chat** werden Knoepfe oben, die je eine EIGENE Ansicht oeffnen
 ("wie eine eigene Page"). Der Chat ist wie eine Gruppe und soll
 **optisch ueberarbeitet** werden ("fuehlt sich komisch an") - Design-
-Schicht ans Ende von stil.css, Funktion nicht anfassen. Es gibt schon eine
-Block-Navigation (mb_navi, mb-block, blockAn, mbAktiverBlock in mein.js) -
-erst die lesen, dann umbauen. Achtung: zeichneBereich haengt an
-mbAktiverBlock() === "tag" fuer die Tagesuebersicht, und ladeChat laeuft
-am Ende von zeichneBereich.
+Schicht ans Ende von stil.css, Funktion nicht anfassen. Blocksystem und Fallen stehen unten in der Karte - NICHT neu erheben,
+der Leser hat das am 02.09. schon getan.
+
+### Die Karte fuer den Umbau (vom Leser am 02.09. erhoben - stimmt fuer Fassung 20260902b)
+
+**Blocksystem (mein.js):** `MB_BLOECKE` Z. 403-412 (profil, tag, kombis,
+buch, freunde, chat, pruefen). `mbAktiverBlock()` Z. 413-416 liest
+localStorage `kt_mb_block`, Default "kombis", Unbekanntes faellt auf
+"kombis" zurueck. `mbBlockZeigen(kurz)` Z. 418-440: speichert den Block,
+baut Profil lazy (profilBlockHtml/profilBlockFuellen aus profil.js,
+dataset.gebaut), togglet Klasse "offen" (stil.css Z. 523-524: .mb-block
+display none / .offen block). Genau EIN Block sichtbar. Navi:
+`zeichneMbNavi` Z. 442-448, aufgerufen aus zeigeApp Z. 275.
+
+**Chat:** Template Z. 244-258 (#chatliste, .chateingabe mit #chat_text,
+.medienleiste). `ladeChat` Z. 2112-2130: je Nachricht div.chatzeile,
+eigene mit Klasse "vonmir"; scrollt ans Ende; markiert gelesen
+(kt_gelesen_<bereichId>); ruft zeichneTabs. Senden tuChatSenden Z. 2133.
+Polling: zeichneBereich Z. 936-938, alle 10 s.
+
+**Fallen, alle vom Leser belegt:**
+1. ladeChat laeuft per Timer IMMER und markiert alles als gelesen - der
+   Badge an den Bereichs-Tabs zeigt darum nie Neues. Beim Umbau: nur bei
+   offener Chat-Ansicht komplett laden/gelesen-markieren, dann lebt der
+   Badge endlich.
+2. scrollTop auf display:none wirkt nicht (scrollHeight 0) - beim Oeffnen
+   der Chat-Ansicht ans Ende scrollen.
+3. zeichneBereich Z. 934-935 haengt an mbAktiverBlock() === "tag";
+   Default "kombis" Z. 414 - beim Umbau mitziehen. Alte gespeicherte
+   kt_mb_block-Werte (chat/freunde/profil) fallen sauber zurueck, sobald
+   sie aus MB_BLOECKE fliegen.
+4. Die neuen eigenen Ansichten duerfen ihren Zustand NICHT in kt_mb_block
+   speichern, sonst startet die App beim naechsten Laden in der
+   Sonder-Ansicht.
+5. zeichneFreunde/zeichneTeilen/zeichneBuchhaltung laufen bei jedem
+   zeigeApp mit (eine Supabase-Zaehl-Query PRO Kontakt) - beim Umbau lazy
+   machen nach dem Profil-Muster Z. 422-427.
+6. dmTimer (Z. 539) endlos nach dem Oeffnen eines DM-Fensters -
+   clearInterval beim Schliessen der Freunde-Ansicht.
+7. zeichneTabs schreibt ohne Null-Pruefung in #bereichtabs - der
+   Container muss in JEDER Ansicht existieren (10-s-Timer!). Ebenso
+   muessen #meldung und #schluesselkasten ueberall sichtbar bleiben
+   (scrollIntoView in meldungM und schluesselPasswortKasten).
+8. .chatliste/.chatzeile/.chateingabe teilen sich Bereichs-Chat,
+   DM-Fenster (Z. 533-535) und Glockenpanel - neue Chat-Optik als
+   loeschbare Schicht ans Ende von stil.css, auf die Chat-Ansicht
+   gescopet, IDs und onclick nicht anfassen. Mobil-Sprechblasen heute
+   nur unter 700px (stil.css Z. 1534-1536).
 
 ### Weitere offene Punkte
 
