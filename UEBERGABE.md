@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **03.09.2026 frueh**, Fassung `20260902j` (Abschnitt 14 zuerst lesen!).
+Stand: **03.09.2026 frueh**, Fassung `20260902k` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -754,6 +754,27 @@ GESCHICHTE: Supabase prueft jetzt selbst, rund um die Uhr.
   bleiben die ALTEN Bau-Scheine im Zustand stehen - ein Pruefer, der
   danach z.scheine liest, sieht keine neuen. Und das sichtbare
   Ziel-Feld schlaegt localStorage.
+
+### Fassung 20260902k: Klingel = Verlauf zuerst, Alle-Geraete-Probe, Anruf klopft nach
+
+- Klingel-Klick zeigt ZUERST den Meldungs-Verlauf, die kompletten
+  Einstellungen stecken hinter dem Zahnrad (weckerEinstellungenUmschalten,
+  IDs/Handler unveraendert).
+- weckerProbeAlle: ECHTE Server-Probe an alle eigenen Geraete via
+  pushAnMich/ergebnis-push (derselbe Weg wie Gewonnen/Verloren), nennt
+  "hinausgeschickt an X von Y" und aufgeraeumte veraltete Adressen.
+  Der alte Panel-Text "Probe an dich selbst kann nicht ankommen" war
+  seit ergebnis-push falsch und ist korrigiert.
+- Zur Meldung "es kommt gar nix an": Karams iPhone (als App) und
+  Windows-Chrome SIND in kt_push_abos (28./29.08.); an sich selbst
+  konnte bis zum Server-Waechter technisch nie etwas gehen. Die Probe
+  klaert in Sekunden, ob die alten Geraete-Adressen noch leben -
+  wenn nicht: Geraet rauswerfen, Klingel dort neu einschalten.
+- Anruf: im 3-s-Klingel-Timer geht bei jedem dritten Tick (alle 9 s)
+  ein frischer Anruf-Push hinaus (tag "anruf" + renotify = klingelt
+  am Handy jedes Mal neu), bis angenommen oder Ende. push-senden
+  unveraendert. Anruf-Pfad im Sandkasten nicht ausfuehrbar - nur
+  Syntax geprueft, Zusatz haengt am lange laufenden Timer.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
