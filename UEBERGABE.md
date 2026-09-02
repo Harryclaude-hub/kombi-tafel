@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902c` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902d` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -567,16 +567,24 @@ Fassung **`20260902b`**, alles committet und live. Was seit dem 01.09. dazukam:
   die Hauptliste hat einen Stift (pkBearbeiten: Foto, Quoten je Wette,
   Datum, Nummer) - das pk-Formular haengt jetzt UEBER der Hauptliste.
 
-### Eigene Ansichten statt Bloecke (gebaut am 02.09., Fassung 20260902c)
+### Eigene Ansichten statt Bloecke (gebaut am 02.09., Fassung 20260902d)
 
 Karams Auftrag ist umgesetzt: Im eigenen Bereich stehen nur noch
 **Tagesuebersicht, Kombinationen, Personen-Buchhaltung und Nachrechnen**
 (MB_BLOECKE). **Profil** (Angemeldet-als, Abmelden, Schluessel-Erklaerung),
-**Freunde & Teilen** und der **Bereichs-Chat** haengen an drei Knoepfen
-oben (`.mb-kopfknoepfe`) und oeffnen je eine eigene Ansicht mit
-Zurueck-Knopf. Der Chat sieht jetzt aus wie eine Gruppe (Sprechblasen
-links/rechts auf jeder Bildschirmgroesse) - Design-Schicht ganz am Ende
-von stil.css, auf `#ans_chat` gescopet, loeschbar, Funktion unberuehrt.
+**Freunde & Teilen** und der **Bereichs-Chat** haengen an den
+**Kopfleisten-Knoepfen ganz oben** (nav_profil aus profil.js,
+nav_freunde und nav_nachrichten aus mein.html - glocke.js leitet die
+beiden auf Mein Bereich zu den Ansichten um, auf allen anderen Seiten
+oeffnen sie weiter Glocken-/Freundepanel). Eigene Extra-Knoepfe gibt es
+NICHT mehr - Karam wollte nichts doppelt (Fassung 20260902c hatte kurz
+drei eigene Knoepfe, die sind wieder raus). Jede Ansicht hat einen
+Zurueck-Knopf. Der Chat sieht aus wie eine Gruppe (Sprechblasen
+links/rechts auf jeder Bildschirmgroesse), und die Kopfleiste ist ein
+ruhiger Balken (Glocken-Gruppe rechts gebuendelt) - beides
+Design-Schichten ganz am Ende von stil.css, loeschbar, Funktion
+unberuehrt. Der Zaehler am Nachrichten-Knopf gehoert allein
+glockeZaehlen (glocke.js); ladeChat stoesst ihn nach dem Lesen an.
 
 So haengt es zusammen (mein.js):
 
