@@ -3146,6 +3146,14 @@ body[data-seite] > .navleiste a.glocke.aktiv {
   font-size: 16px; font-weight: 700; margin: 2px auto; }
 .gs-filterhinweis { color: #7a3d00; }
 
+/* Klingel-Panel (Karam, 03.09.): Verlauf zuerst, Einstellungen hinter
+   dem Zahnrad. Nur Optik, IDs/Handler unveraendert. */
+#weckerpanel .wk-verlauf { max-height: 42vh; overflow-y: auto; }
+#wk-einstellungen-knopf { width: 100%; min-height: 44px; border-radius: 8px; }
+#wk-einstellungen { border-top: 2px solid #e3e8f0; margin-top: 6px; }
+#wk-probe-alle b { color: #0a5a0a; }
+#wk-probe-alle b.rot { color: #a00000; }
+
 /* Bau-Tabelle: Linien desselben Spiels ruecken zusammen, zwischen den
    Einsaetzen eine dicke Trennkante und Luft (Karam, 03.09.). Nur
    Kanten und Abstaende - KEINE Hintergruende, die Kombi-Farben und

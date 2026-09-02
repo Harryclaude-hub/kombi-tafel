@@ -352,6 +352,13 @@ async function anrufStarten(partnerId, name, mitVideo) {
       return;
     }
     anrufSenden(partnerId, { typ: "klingeln", offer: offer, video: mitVideo });
+    // Karam (03.09.): auch die BENACHRICHTIGUNG klopft nach - alle 9
+    // Sekunden ein frischer Anruf-Push (der Service Worker zeigt ihn
+    // mit tag "anruf" + renotify jedes Mal neu, samt Vibration), bis
+    // angenommen wird oder der Anruf endet. Ohne await: das Klingeln
+    // im Signalweg darf nie auf den Push warten.
+    if (versuche % 3 === 0 && typeof pushSenden === "function")
+      pushSenden(partnerId, "anruf");
   }, 3000);
 }
 

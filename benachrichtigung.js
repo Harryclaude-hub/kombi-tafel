@@ -403,6 +403,7 @@ async function pushAnMich(titel, text, tag) {
     let d = {};
     try { d = await a.json(); } catch (e) { d = {}; }
     return { ok: a.status === 200, gesendet: d.gesendet || 0, geraete: d.geraete || 0,
+      aufgeraeumt: d.aufgeraeumt || 0,
       fehler: d.fehler || (a.status === 200 ? "" : "Status " + a.status) };
   } catch (e) {
     return { ok: false, fehler: String(e.message || e).slice(0, 120) };
@@ -635,11 +636,52 @@ function weckerPanelUmschalten() {
   if (document.getElementById("weckerpanel")) { weckerPanelZu(); return; }
   const p = document.createElement("div");
   p.id = "weckerpanel";
-  p.innerHTML = '<div class="gp-kopf">&#128276; Benachrichtigungen ' +
+  p.innerHTML = '<div class="gp-kopf">&#128276; Meldungen ' +
     '<button class="gp-zu" onclick="weckerPanelZu()">schliessen</button></div>' +
     '<div id="wk-inhalt"><p class="mini">Laedt...</p></div>';
   document.body.appendChild(p);
   weckerPanelZeichnen();
+}
+
+// Karam (03.09.): Klick auf die Klingel zeigt ZUERST den Verlauf der
+// Meldungen (gewonnen, verloren, Nachrichten, Anrufe - auch was kam,
+// waehrend die App zu war). Die ganzen Einstellungen stecken hinter
+// dem Zahnrad-Knopf. IDs und Handler bleiben dieselben.
+function weckerEinstellungenUmschalten() {
+  const e = document.getElementById("wk-einstellungen");
+  const k = document.getElementById("wk-einstellungen-knopf");
+  if (!e) return;
+  e.hidden = !e.hidden;
+  if (k) k.textContent = e.hidden ? "⚙️ Einstellungen anzeigen" : "⚙️ Einstellungen verbergen";
+}
+
+// Echte Server-Probe an ALLE eigenen Geraete (ergebnis-push, seit dem
+// 02.09.): exakt derselbe Weg wie die Gewonnen/Verloren-Meldungen des
+// Server-Waechters. Kommt DIESE Probe an, kommen auch die an.
+async function weckerProbeAlle() {
+  const ziel = document.getElementById("wk-probe-alle");
+  if (ziel) ziel.innerHTML = "Schicke an alle deine Geräte...";
+  if (typeof pushAnMich !== "function") {
+    if (ziel) ziel.textContent = "Baustein fehlt - bitte die Seite einmal frisch laden.";
+    return;
+  }
+  const r = await pushAnMich("Kombi-Tafel: Probemeldung",
+    "Wenn du das liest, kommen auch die Gewonnen/Verloren-Meldungen auf dieses Gerät an.", "kt-probe");
+  if (!ziel) return;
+  if (!r.ok) {
+    ziel.innerHTML = "<b class='rot'>Nicht hinausgegangen:</b> " +
+      String(r.fehler || "unbekannt").replace(/</g, "&lt;");
+    return;
+  }
+  ziel.innerHTML = "<b>Hinausgeschickt an " + r.gesendet + " von " + r.geraete + " Gerät(en).</b> " +
+    (r.aufgeraeumt ? "<b class='rot'>" + r.aufgeraeumt + " veraltete Geräte-Adresse(n) wurden dabei " +
+      "entfernt</b> - auf diesen Geräten die Klingel einmal neu einschalten. " : "") +
+    (r.gesendet === 0
+      ? "Kein Gerät war erreichbar - unten in den Einstellungen je Gerät neu einschalten."
+      : "Schau JETZT auf Handy und Laptop: die Meldung muss binnen Sekunden da sein. Kommt sie " +
+        "trotz \"hinausgeschickt\" nicht an, ist die Geräte-Adresse veraltet - in den Einstellungen " +
+        "das Gerät rauswerfen und die Klingel dort neu einschalten.");
+  weckerGeraeteZeichnen();
 }
 
 async function weckerPanelZeichnen() {
@@ -654,7 +696,24 @@ async function weckerPanelZeichnen() {
     : st === "anmelden" ? "&#128100; Erst anmelden"
     : st === "geht nicht" ? "&#128683; Geht hier nicht"
     : "&#9898; Aus";
-  let html = '<div class="wk-zeile"><b>&#128269; Was ist hier los?</b><br>' +
+  // ---- ZUERST der Verlauf (Karams Wunsch): was ist angekommen ----
+  let html = '<div class="wk-zeile"><b>Verlauf: was angekommen ist</b>' +
+    '<button class="wk-vlleeren" onclick="verlaufLeeren()">leeren</button>' +
+    '<div id="wk-verlauf" class="wk-verlauf">Laedt...</div></div>';
+
+  // ---- Die eine Probe, die zaehlt: echter Server-Push an ALLE Geraete ----
+  html += '<div class="wk-zeile"><b>&#128228; Kommt wirklich alles an?</b><br>' +
+    '<button class="haupt" onclick="weckerProbeAlle()">Probemeldung an ALLE meine Geräte</button>' +
+    '<p class="mini">Eine ECHTE Meldung vom Server - derselbe Weg wie Gewonnen/Verloren. ' +
+    "Sie geht an Handy UND Laptop, auch wenn die App dort zu ist.</p>" +
+    '<div id="wk-probe-alle" class="mini"></div></div>';
+
+  // ---- Alles Weitere hinter dem Zahnrad ----
+  html += '<div class="wk-zeile"><button id="wk-einstellungen-knopf" ' +
+    'onclick="weckerEinstellungenUmschalten()">&#9881;&#65039; Einstellungen anzeigen</button></div>';
+  html += '<div id="wk-einstellungen" hidden>';
+
+  html += '<div class="wk-zeile"><b>&#128269; Was ist hier los?</b><br>' +
     '<button class="haupt" onclick="weckerDiagnoseZeigen()">Dieses Gerät jetzt prüfen</button>' +
     '<p class="mini">Geht etwas nicht, sagt dir das Gerät hier selbst, woran es liegt - ' +
     "Punkt für Punkt, mit dem nächsten Schritt dazu.</p>" +
@@ -711,24 +770,23 @@ async function weckerPanelZeichnen() {
     "Gerät unten in der Liste steht - und spätestens, wenn dir jemand schreibt oder anruft.</p>" +
     '<div id="wk-probe" class="mini"></div></div>';
 
-  // Der ehrliche Teil: eine Probe an sich selbst KANN nicht ankommen.
-  html += '<div class="wk-zeile"><b>Kommt es auch von aussen an?</b>' +
-    '<p class="mini">Wichtig zu wissen: der Server schickt <b>nie</b> eine Meldung an dich ' +
-    "selbst zurueck. Eine Probe an dich allein kann also gar nicht ankommen - das ist kein " +
-    "Fehler. Diese Probe geht deshalb an einen Freund und liest vor, was der Server " +
-    "geantwortet hat.</p>" +
+  // Chat- und Anruf-Meldungen kommen von ANDEREN (push-senden schickt
+  // nie an dich selbst) - die Freund-Probe prueft genau diesen Weg.
+  // Fuer Meldungen an dich selbst (Gewonnen/Verloren, Probe oben)
+  // gibt es seit dem 02.09. den eigenen Weg ergebnis-push.
+  html += '<div class="wk-zeile"><b>Kommen Nachrichten von Freunden an?</b>' +
+    '<p class="mini">Diese Probe geht an einen Freund (derselbe Weg wie Chat und Anruf) ' +
+    "und liest vor, was der Server geantwortet hat.</p>" +
     '<button onclick="weckerProbeFreund()">&#128228; Probemeldung an einen Freund</button>' +
     '<div id="wk-probe2" class="mini"></div></div>';
-
-  html += '<div class="wk-zeile"><b>Verlauf: was angekommen ist</b>' +
-    '<button class="wk-vlleeren" onclick="verlaufLeeren()">leeren</button>' +
-    '<div id="wk-verlauf" class="wk-verlauf">Laedt...</div></div>';
 
   html += '<div class="wk-zeile"><b>Deine angemeldeten Geraete</b><div id="wk-geraete" class="mini">Laedt...</div></div>';
 
   html += '<div class="wk-zeile mini"><b>Was steht in so einer Meldung?</b><br>' +
-    "Nur wer dich anklopft und ob es ein Anruf oder eine Nachricht ist. Der Text selbst " +
-    "bleibt Ende-zu-Ende verschluesselt und verlaesst dein Geraet nie im Klartext.</div>";
+    "Bei Nachrichten und Anrufen: nur wer dich anklopft. Bei Ergebnissen: die Schein-Nummern, " +
+    "nie Beträge. Alles andere bleibt Ende-zu-Ende verschluesselt.</div>";
+
+  html += "</div>";   // Ende wk-einstellungen
 
   ziel.innerHTML = html;
   weckerGeraeteZeichnen();
