@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **03.09.2026 frueh**, Fassung `20260902k` (Abschnitt 14 zuerst lesen!).
+Stand: **03.09.2026 frueh**, Fassung `20260902l` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -775,6 +775,19 @@ GESCHICHTE: Supabase prueft jetzt selbst, rund um die Uhr.
   am Handy jedes Mal neu), bis angenommen oder Ende. push-senden
   unveraendert. Anruf-Pfad im Sandkasten nicht ausfuehrbar - nur
   Syntax geprueft, Zusatz haengt am lange laufenden Timer.
+
+### Fassung 20260902l: Berichte in der Buchhaltung
+
+Abschnitt "Berichte: filtern, ansehen, herunterladen" nach den grossen
+Karten. EIN Daten-Rechenweg (berichtDaten) fuer Bildschirm, PDF und
+Word: Filter Zeitraum (alles/Woche/Monat/letzter Monat/von-bis),
+Anbieter, Person (inkl. "ohne"), Foto-Ordner; Haken fuer Statistik/
+Kombinationen/Personen-Buchungen (kt_bericht_wahl). Gewinn-Formel =
+Konto-Tabelle (zurueck minus entschiedene Einsaetze, gegengerechnet
++180 = 780-600). berichtInnenHtml rendert mit INLINE-Farben (Word
+kennt kein Stylesheet); tuBerichtPdf = Druckfenster-Muster des
+Kassen-PDFs, tuBerichtWord = .doc per Blob (Word liest HTML). Warnt
+sichtbar bei gewonnenen Kombinationen ohne Betrag.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
