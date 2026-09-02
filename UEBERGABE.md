@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902f` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902g` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -390,12 +390,14 @@ dass jemand weiß warum.
 
 ## 9. Was offen ist
 
-1. **`push-senden` lässt sich nicht neu veröffentlichen.** Das MCP macht
-   aus dem `files`-Feld eine Zeichenkette, es gibt keine Supabase-CLI und
-   keinen `SUPABASE_ACCESS_TOKEN`. Solange das so ist, bleibt die Funktion
-   wie sie ist.
+1. **ERLEDIGT-Vermerk (02.09. spät): der MCP-Deploy von Edge-Funktionen
+   FUNKTIONIERT inzwischen.** Bewiesen mit `ergebnis-push` (Quellcode
+   kommt byte-gleich zurück, Probeaufruf antwortet aus dem eigenen Code).
+   `push-senden` ließe sich also jetzt neu veröffentlichen - sie läuft
+   aber und wird nur angefasst, wenn es einen Grund gibt (Regel:
+   Laufendes nie umbauen; erst daneben bauen, testen, dann umstellen).
 2. **Prüfbericht Punkt 13**: Benutzername → E-Mail ist für jeden lesbar.
-   Braucht eine Edge Function — hängt an Punkt 1.
+   Braucht eine Edge Function — geht jetzt (siehe Punkt 1).
 3. **TURN-Server für Anrufe über Mobilfunk.** Über WLAN läuft es. Für
    Mobilfunk bräuchte es Zugangsdaten von metered.ca — die muss Karam
    holen. `openrelay.metered.ca` ist **tot** (gemessen); ein toter Eintrag
@@ -675,6 +677,23 @@ der Kopfleiste (wecker_knopf) ist die eine Stelle dafuer.
   Ziel-Ordner.
 - **Mein Bereich**: im Kombi-Block Reihenfolge Personen -> Konto ->
   Kombinationen -> Ergebnis-Eingabetafel.
+
+### Fassung 20260902g: Ergebnis-Push an die eigenen Geraete
+
+Neue Edge Function **`ergebnis-push`** (Version 1, per MCP deployed -
+der Deploy funktioniert wieder, siehe Abschnitt 9 Punkt 1): schickt
+Titel/Text/Tag als Web-Push NUR an die eigenen Geraete des
+Angemeldeten. `push-senden` blieb unberuehrt (verweigert
+Absender=Empfaenger, ist im Betrieb). Client: `pushAnMich()` in
+benachrichtigung.js; `ergebnisMelden` (ergebnisse.js) baut je
+Kombination "Gewonnen: Nr. 41 (Sascha) bei Stake: +780.00 € - Stand
+Sascha bei Stake: 680.50 €" (Stand aus personPruefen, dieselbe
+Rechnung wie der Anbieter-Kopf), zeigt oertlich UND pusht mit
+gleichem tag (keine Doppel-Meldung). Wecker-Schalter Gewinne/Verluste
+gelten (gemessen). GRENZE, ehrlich: Selbstsuche + Auswertung laufen
+nur, solange Mein Bereich auf irgendeinem Geraet offen ist - einen
+Server-Scan bei komplett geschlossener App gibt es nicht. Baubar
+waere er jetzt (pg_cron/Edge Function), braucht Karams Auftrag.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
