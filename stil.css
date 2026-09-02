@@ -522,6 +522,15 @@ details.anmk summary.anmk-marke { color: #b35a00; font-weight: bold; }
 .mb-navi button.aktiv { background: #1a2c50; color: #fff; font-weight: bold; }
 .mb-block { display: none; }
 .mb-block.offen { display: block; }
+/* Eigene Ansichten (Profil, Freunde & Teilen, Chat) seit 02.09.2026:
+   ist eine offen (body.mb-sonder), verschwindet der normale Bereich
+   darunter. #schluesselkasten, #meldung und #bereichtabs bleiben in
+   JEDER Ansicht da (Falle 7 der Umbau-Karte). */
+.mb-ansicht { display: none; }
+body.mb-sonder .mb-ansicht.offen { display: block; }
+body.mb-sonder .mb-block,
+body.mb-sonder #mb_navi,
+body.mb-sonder #anbieterkopf { display: none; }
 .e2ehinweis { margin: 6px 0; }
 .e2ehinweis summary { cursor: pointer; }
 .navknopf.adminknopf, a.adminknopf { background: #7a0000; color: #fff; border-color: #7a0000; }
@@ -2977,4 +2986,73 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
 @media (max-width: 700px) {
   .ak-karte { min-width: 46%; }
   .ak-detail { overflow-x: auto; }
+}
+
+/* ============================================================
+   DESIGN-SCHICHT: Eigene Ansichten + Chat wie eine Gruppe
+   (02.09.2026). Komplett loeschbar: ohne diese Schicht sind die
+   Knoepfe schlicht und der Chat sieht aus wie vorher - alles
+   funktioniert genauso. Keine Animationen: die Seite bleibt
+   oft stundenlang offen (Stufe 1).
+   ============================================================ */
+
+/* -- Die drei Knoepfe oben -- */
+.mb-kopfknoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mb-kopfknoepfe > button { font-size: 15px; padding: 9px 16px;
+  border: 2px solid #1a2c50; background: #f2f5fb; border-radius: 9px; }
+.mb-kopfknoepfe > button.aktiv { background: #1a2c50; color: #fff; font-weight: bold; }
+.mb-kopfknoepfe .badge { margin-left: 4px; }
+
+/* -- Kopf jeder eigenen Ansicht: Zurueck + Titel -- */
+.ansicht-kopf { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.ansicht-kopf h2 { margin: 0; }
+.zurueckknopf { font-size: 15px; padding: 8px 16px; white-space: nowrap; }
+
+/* -- Chat wie eine Gruppe: Sprechblasen auf JEDER Bildschirmgroesse.
+      Nur auf die Chat-Ansicht gescopet: .chatliste/.chatzeile teilen
+      sich sonst DM-Fenster und Glockenpanel (Falle 8). -- */
+#ans_chat .chatliste {
+  max-height: none;
+  height: min(62vh, 640px);
+  background: #edf0f6;
+  border: 1px solid #d5dae4;
+  border-radius: 12px;
+  padding: 12px 12px 8px;
+}
+#ans_chat .chatzeile {
+  max-width: 76%;
+  width: fit-content;
+  margin: 8px auto 8px 0;
+  padding: 7px 12px 6px;
+  background: #fff;
+  border: 1px solid #dfe3ec;
+  border-left: 1px solid #dfe3ec;
+  border-radius: 14px 14px 14px 4px;
+  box-shadow: 0 1px 2px rgba(20, 30, 60, 0.08);
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+#ans_chat .chatzeile.vonmir {
+  margin: 8px 0 8px auto;
+  background: #ddf0dd;
+  border-color: #c2ddc2;
+  border-radius: 14px 14px 4px 14px;
+}
+#ans_chat .chatzeile > b { font-size: 12.5px; color: #33508a; }
+#ans_chat .chatzeile.vonmir > b { color: #1a6a1a; }
+#ans_chat .chatzeile .mini { font-size: 11px; color: #778; }
+#ans_chat .chateingabe { margin-top: 10px; gap: 8px; }
+#ans_chat .chateingabe input { border-radius: 999px; padding: 10px 16px;
+  border: 2px solid #c8cfdd; background: #fff; }
+#ans_chat .chateingabe input:focus { border-color: #1a2c50; }
+#ans_chat .chateingabe button { border-radius: 999px; padding: 10px 20px; }
+#ans_chat .medienleiste { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+#ans_chat .medienleiste button, #ans_chat .medienleiste .fotoknopf {
+  margin-right: 0; border-radius: 999px; }
+
+@media (max-width: 700px) {
+  .mb-kopfknoepfe > button { flex: 1 1 auto; }
+  #ans_chat .chatliste { height: calc(100vh - 340px); min-height: 240px; }
+  #ans_chat .chatzeile { max-width: 88%; }
 }

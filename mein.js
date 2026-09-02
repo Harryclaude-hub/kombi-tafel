@@ -197,15 +197,12 @@ async function zeigeApp() {
   if (!aktiverBereich) aktiverBereich = meineBereiche[0];
 
   el("inhalt").innerHTML = `
-<div class="kopfzeile">Angemeldet als <b>${ich.username}</b>
-  <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button>
+<div class="kopfzeile mb-kopfknoepfe">
+  <button id="mba_profil" onclick="mbAnsichtOeffnen('profil')">&#128100; Mein Profil</button>
+  <button id="mba_freunde" onclick="mbAnsichtOeffnen('freunde')">&#128101; Freunde &amp; Teilen</button>
+  <button id="mba_chat" onclick="mbAnsichtOeffnen('chat')">&#128172; Chat <span class="badge" id="mba_chat_badge" style="display:none"></span></button>
   <span id="benach_platz"></span>
   ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">&#9881;&#65039; Admin-Bereich</a>' : ""}</div>
-<details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschlüsselt - was heisst das?</summary>
-Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschlüsselt in der
-Datenbank - lesbar allein für dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
-einem NEUEN Gerät zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
-Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können.</details>
 <div id="schluesselkasten"></div>
 <div id="bereichtabs" class="navleiste"></div>
 <div id="anbieterkopf"></div>
@@ -236,15 +233,31 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="buchhaltung"></div>
 </div>
 
-<div id="blk_freunde" class="mb-block">
+<div id="ans_profil" class="mb-ansicht">
+<div class="ansicht-kopf"><button class="zurueckknopf" onclick="mbAnsichtZu()">&#8592; Zurück</button>
+<h2>&#128100; Mein Profil</h2></div>
+<div class="kern">Angemeldet als <b>${ich.username}</b>
+  <button onclick="supaAbmelden().then(()=>location.reload())">Abmelden</button></div>
+<details class="mini e2ehinweis"><summary>&#128274; Ende-zu-Ende verschlüsselt - was heisst das?</summary>
+Nachrichten, Scheine, Personen-Namen, Notizen und Anmerkungen liegen nur verschlüsselt in der
+Datenbank - lesbar allein für dich und die, denen du teilst. Wichtig: setzt du dein Passwort auf
+einem NEUEN Gerät zurueck, sind alte Nachrichten dort nicht mehr lesbar. Reine Zahlenspalten der
+Buchhaltung (Beträge, Daten) bleiben Zahlen, damit die Tabellen rechnen können.</details>
+<div id="blk_profil"></div>
+</div>
+
+<div id="ans_freunde" class="mb-ansicht">
+<div class="ansicht-kopf"><button class="zurueckknopf" onclick="mbAnsichtZu()">&#8592; Zurück</button>
+<h2>&#128101; Freunde &amp; Teilen</h2></div>
 <div id="freunde"></div>
 <div id="teilen"></div>
 </div>
 
-<div id="blk_chat" class="mb-block">
-<h2>&#128172; Chat dieses Bereichs</h2>
+<div id="ans_chat" class="mb-ansicht">
+<div class="ansicht-kopf"><button class="zurueckknopf" onclick="mbAnsichtZu()">&#8592; Zurück</button>
+<h2>&#128172; Chat dieses Bereichs</h2></div>
 <p class="mini">Alle, die diesen Bereich sehen können, können hier schreiben. So benachrichtigt
-ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p>
+ihr euch gegenseitig; die Zahl am Chat-Knopf oben zeigt neue Nachrichten.</p>
 <div id="chatliste" class="chatliste"></div>
 <div class="chateingabe"><input id="chat_text" placeholder="Nachricht..."
   onkeydown="if(event.key==='Enter')tuChatSenden()">
@@ -256,8 +269,6 @@ ihr euch gegenseitig; die Zahl am Bereichs-Knopf oben zeigt neue Nachrichten.</p
   <span id="bc-vorschau"></span>
 </div>
 </div>
-
-<div id="blk_profil" class="mb-block"></div>
 
 <div id="blk_pruefen" class="mb-block">
 <h2>&#128269; Nachrechnen</h2>
@@ -273,6 +284,10 @@ jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen
 </div>`;
 
   zeichneMbNavi();
+  // Stand eine eigene Ansicht offen (Profil/Freunde/Chat), bleibt sie es
+  // auch nach einem Neuaufbau, z. B. beim Bereichswechsel aus dem Chat
+  // heraus. Den Chat laedt gleich zeichneBereich - nicht doppelt laden.
+  if (mbAnsicht) mbAnsichtOeffnen(mbAnsicht, true);
   benachKnopf();
   pruefeSchluessel();
   // Fehlende Bereichsschluessel an meine Gaeste nachliefern. Laeuft NACH dem
@@ -287,11 +302,11 @@ jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen
         "beim nächsten Laden automatisch nachgeliefert.", "warn");
   });
   await zeichneTabs();
-  await zeichneFreunde();
-  await zeichneTeilen();
+  // Freunde, Teilen und Buchhaltung werden erst gezeichnet, wenn ihre
+  // Ansicht bzw. ihr Block wirklich aufgeht (Falle 5 der Umbau-Karte:
+  // zeichneFreunde macht eine Zaehl-Abfrage PRO Kontakt).
   zeichneImport();
   await zeichneBereich();
-  await zeichneBuchhaltung();
 }
 
 // ---------- Schlüssel auf diesem Gerät ----------
@@ -401,14 +416,15 @@ async function tuPushEinschalten() {
 // vom 26.08.). Der zuletzt offene Block wird gemerkt.
 
 const MB_BLOECKE = [
-  ["profil", "&#128100; Mein Profil"],
   ["tag", "&#128197; Tagesübersicht"],
   ["kombis", "&#127919; Kombinationen und Personen"],
   ["buch", "&#128210; Buchhaltung"],
-  ["freunde", "&#128101; Freunde und Teilen"],
-  ["chat", "&#128172; Chat"],
   ["pruefen", "&#128269; Nachrechnen"]
 ];
+
+// Profil, Freunde & Teilen und Chat sind seit dem 02.09. KEINE Bloecke
+// mehr, sondern eigene Ansichten hinter den Knoepfen oben.
+const MB_ANSICHTEN = ["profil", "freunde", "chat"];
 
 function mbAktiverBlock() {
   const b = localStorage.getItem("kt_mb_block") || "kombis";
@@ -416,19 +432,16 @@ function mbAktiverBlock() {
 }
 
 function mbBlockZeigen(kurz) {
+  // Alte Aufrufer (z. B. der Profil-Knopf in der Navileiste) kennen die
+  // frueheren Blocknamen noch - sie landen in der jeweiligen Ansicht.
+  if (MB_ANSICHTEN.includes(kurz)) { mbAnsichtOeffnen(kurz); return; }
   localStorage.setItem("kt_mb_block", kurz);
-  // Der Profil-Block wird erst beim Aufmachen gebaut und gefuellt -
-  // so kostet er nichts, solange ihn niemand ansieht.
-  if (kurz === "profil") {
-    const b = el("blk_profil");
-    if (b && typeof profilBlockHtml === "function") {
-      if (!b.dataset.gebaut) { b.innerHTML = profilBlockHtml(); b.dataset.gebaut = "1"; }
-      if (typeof profilBlockFuellen === "function") profilBlockFuellen();
-    }
-  }
   // Die Tagesuebersicht wird erst beim Aufmachen gerechnet - sie geht
   // ueber alle Personen und soll nicht bei jedem Zeichnen mitlaufen.
   if (kurz === "tag" && typeof zeichneTagesuebersicht === "function") zeichneTagesuebersicht();
+  // Die Buchhaltung genauso (Falle 5): sie laedt ihre Buchungen selbst
+  // und wird nach dem Datenladen von zeichneBereich nochmal aufgefrischt.
+  if (kurz === "buch" && typeof zeichneBuchhaltung === "function") zeichneBuchhaltung();
   for (const [k] of MB_BLOECKE) {
     const blk = el("blk_" + k);
     if (blk) blk.classList.toggle("offen", k === kurz);
@@ -447,21 +460,77 @@ function zeichneMbNavi() {
   mbBlockZeigen(mbAktiverBlock());
 }
 
+// ---------- Die eigenen Ansichten: Profil, Freunde & Teilen, Chat ----------
+// Karams Wunsch vom 02.09.: das sind eigene Seiten hinter den Knoepfen oben,
+// nicht mehr Teil der Block-Leiste. Welche offen ist, steht NUR hier im
+// Speicher - nie in localStorage, sonst startet die App beim naechsten
+// Laden in der Sonder-Ansicht statt im Alltag (Falle 4 der Umbau-Karte).
+
+let mbAnsicht = null;   // null | "profil" | "freunde" | "chat"
+
+function mbAnsichtOeffnen(name, nurZeigen) {
+  // Beim Wechsel weg von Freunden das DM-Polling stoppen (Falle 6).
+  if (mbAnsicht === "freunde" && name !== "freunde" && dmTimer) {
+    clearInterval(dmTimer); dmTimer = null;
+  }
+  mbAnsicht = name;
+  document.body.classList.add("mb-sonder");
+  for (const n of MB_ANSICHTEN) {
+    const a = el("ans_" + n);
+    if (a) a.classList.toggle("offen", n === name);
+    const k = el("mba_" + n);
+    if (k) k.classList.toggle("aktiv", n === name);
+  }
+  window.scrollTo(0, 0);
+  if (name === "profil") {
+    // Erst beim Aufmachen bauen und fuellen - kostet sonst nichts.
+    const b = el("blk_profil");
+    if (b && typeof profilBlockHtml === "function") {
+      if (!b.dataset.gebaut) { b.innerHTML = profilBlockHtml(); b.dataset.gebaut = "1"; }
+      if (typeof profilBlockFuellen === "function") profilBlockFuellen();
+    }
+  }
+  if (name === "freunde") { zeichneFreunde(); zeichneTeilen(); }
+  // Chat erst laden, wenn er wirklich sichtbar ist: ladeChat markiert als
+  // gelesen und scrollt ans Ende - beides braucht die OFFENE Ansicht
+  // (Fallen 1 und 2). nurZeigen kommt vom Neuaufbau in zeigeApp, dort
+  // laedt gleich danach zeichneBereich den Chat selbst.
+  if (name === "chat" && !nurZeigen) ladeChat(true);
+}
+
+function mbAnsichtZu() {
+  // Freunde-Ansicht zu = DM-Polling aus (Falle 6). Der Timer wuerde sonst
+  // unsichtbar weiterladen und alles als gelesen markieren.
+  if (dmTimer) { clearInterval(dmTimer); dmTimer = null; }
+  mbAnsicht = null;
+  document.body.classList.remove("mb-sonder");
+  for (const n of MB_ANSICHTEN) {
+    const a = el("ans_" + n);
+    if (a) a.classList.remove("offen");
+    const k = el("mba_" + n);
+    if (k) k.classList.remove("aktiv");
+  }
+}
+
 async function zeichneTabs() {
   const box = el("bereichtabs");
+  if (!box) return;
   box.innerHTML = "";
   for (const b of meineBereiche) {
     const a = document.createElement("a");
     a.href = "#";
+    a.dataset.bereich = b.id;
     a.className = "navknopf" + (b.id === aktiverBereich.id ? " aktiv" : "");
-    const neu = await neueNachrichten(b.id);
+    // Der Zaehler steckt in einem festen Platzhalter; die Zahl selbst
+    // schreibt NUR bereichBadges hinein - eine Stelle, kein Drift.
     a.innerHTML = (b.rolle === "ich" ? "Mein Bereich" : "Bereich von " + b.username) +
       (b.rolle === "friend" ? ' <span class="mini">(nur lesen)</span>' : "") +
       (b.rolle === "close" ? ' <span class="mini">(mitarbeiten)</span>' : "") +
-      (neu > 0 ? ' <span class="badge">' + neu + "</span>" : "");
+      ' <span class="badge" style="display:none"></span>';
     a.onclick = (ev) => { ev.preventDefault(); aktiverBereich = b; zeigeApp(); };
     box.appendChild(a);
   }
+  await bereichBadges();
   // Fremder Bereich ohne Schluessel: der Gast sieht sonst nur Schloesser
   // und weiss nicht warum. Er kann sich auch nicht selbst helfen - den
   // Bereichsschluessel hat nur der Besitzer.
@@ -483,6 +552,32 @@ async function neueNachrichten(bereichId) {
   const r = await supa.from("kt_nachrichten").select("id", { count: "exact", head: true })
     .eq("bereich", bereichId).gt("id", gelesen);
   return r.count || 0;
+}
+
+// Frischt NUR die Zaehler auf: an den Bereichs-Tabs und am Chat-Knopf oben.
+// Bewusst OHNE die Tabs neu zu bauen - der 10-Sekunden-Takt darf keine halb
+// angeklickten Knoepfe wegreissen und keine Warnkaesten verdoppeln.
+async function bereichBadges() {
+  const box = el("bereichtabs");
+  if (!box) return;
+  let gesamt = 0;
+  for (const b of meineBereiche) {
+    const neu = await neueNachrichten(b.id);
+    gesamt += neu;
+    const badge = box.querySelector('a[data-bereich="' + b.id + '"] .badge');
+    if (badge) { badge.textContent = neu; badge.style.display = neu > 0 ? "" : "none"; }
+  }
+  const cb = el("mba_chat_badge");
+  if (cb) { cb.textContent = gesamt; cb.style.display = gesamt > 0 ? "" : "none"; }
+}
+
+// Der 10-Sekunden-Takt. Frueher lief ladeChat IMMER mit und markierte alles
+// sofort als gelesen - der Zaehler konnte deshalb nie etwas zeigen
+// (Falle 1). Jetzt: Nachrichten nur bei offener Chat-Ansicht nachladen,
+// sonst nur die Zaehler auffrischen.
+async function chatTakt() {
+  if (mbAnsicht === "chat") await ladeChat(false);
+  else await bereichBadges();
 }
 
 // ---------- Freunde und Direktnachrichten ----------
@@ -933,9 +1028,14 @@ async function zeichneBereich() {
   // Steht die Tagesuebersicht gerade offen, muss sie die neuen Zahlen sehen.
   if (mbAktiverBlock() === "tag" && typeof zeichneTagesuebersicht === "function")
     zeichneTagesuebersicht();
-  await ladeChat(true);
+  // Die Buchhaltung ebenso - sie rechnet mit den offenen Scheinen
+  // (bbScheinLage liest kasseScheine, das gerade neu gefuellt wurde).
+  if (mbAktiverBlock() === "buch") zeichneBuchhaltung();
+  // Chat NUR laden, wenn seine Ansicht offen ist (Falle 1): ladeChat
+  // markiert alles als gelesen, und das darf nicht unsichtbar passieren.
+  if (mbAnsicht === "chat") await ladeChat(true);
   if (chatTimer) clearInterval(chatTimer);
-  chatTimer = setInterval(() => ladeChat(false), 10000);
+  chatTimer = setInterval(chatTakt, 10000);
 }
 
 function zeichneKontoDb(scheine) {
@@ -2110,6 +2210,11 @@ async function tuBalanceWeg(datum) {
 // ---------- Chat ----------
 
 async function ladeChat(komplett) {
+  // Waechter (Falle 1): nur bei offener Chat-Ansicht. Sonst wuerde alles
+  // ungesehen als gelesen markiert, und die Zaehler waeren wieder tot.
+  // Ausserdem wirkt scrollTop auf display:none nicht (Falle 2) - so wird
+  // immer erst sichtbar gemacht, dann geladen und gescrollt.
+  if (mbAnsicht !== "chat" || !el("chatliste")) return;
   if (komplett) { letzteChatId = 0; el("chatliste").innerHTML = ""; }
   const neue = await supaNachrichtenLaden(aktiverBereich.id, letzteChatId || null);
   if (!neue.length) return;
@@ -2127,7 +2232,9 @@ async function ladeChat(komplett) {
   }
   box.scrollTop = box.scrollHeight;
   localStorage.setItem("kt_gelesen_" + aktiverBereich.id, String(letzteChatId));
-  zeichneTabs();
+  // Nur die Zaehler auffrischen - die Tabs neu zu bauen hat frueher bei
+  // fehlendem Bereichsschluessel den Warnkasten verdoppelt.
+  bereichBadges();
 }
 
 async function tuChatSenden() {
