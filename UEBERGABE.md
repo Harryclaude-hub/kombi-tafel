@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902i` (Abschnitt 14 zuerst lesen!).
+Stand: **03.09.2026 frueh**, Fassung `20260902j` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -730,6 +730,30 @@ GESCHICHTE: Supabase prueft jetzt selbst, rund um die Uhr.
   Waechter - wer auswertung.js aendert, deployt ergebnis-scan neu.
   ergTeamPasst existiert wortgleich in ergebnisse.js UND index.ts der
   Funktion. Verweise stehen in allen Dateien.
+
+### Fassung 20260902j (03.09. frueh): Misch-Ziel + Konto-Haertung
+
+- **Misch-Ziel**: Feld "jeder Einsatz insgesamt [N] mal" neben dem
+  Misch-Knopf (mischZielLesen: sichtbares Feld schlaegt kt_misch_ziel,
+  Standard 2). Der Automat zaehlt Nutzungen je Anbieter aus den
+  GESETZTEN Kombinationen; am Ziel = raus aus dem Topf, darunter =
+  mehrfach hinein bis zum Ziel; Paar-Sperre/Dreier-Gurt/Anbieter-Treue
+  unveraendert. Zielverfehlungen werden NAMENTLICH gemeldet.
+  Gemessen: Ziel 2 dann 3 ueber dieselben 12 Einsaetze, 0 Verstoesse.
+- **gesetzt-Spalte im Eigenbau ist LINIEN-genau** (proLinie): die Summe
+  steht an der Zeile der wirklich gesetzten Linie; Altbestand ohne
+  Linie zaehlt zur ersten Zeile. Gruppen-Optik: 3px-Kante je Spiel,
+  gestrichelte Kante zwischen Linien desselben Spiels (Redesign-Layer).
+- **Stiller-0-Schutz** in personPruefen: gewonnen ohne Betrag (kein
+  echt_zurueck, kein moeglich) landet als Problem-Meldung in der
+  Personen-Kasse statt stumm mit 0 gutgeschrieben zu werden. Die
+  Plus-Minus-Kette der Konten wurde auf zweitem Weg gegengerechnet
+  (einge - geholt - einsatz + gewonnen + korrektur), Gewinne fliessen
+  mit Server-Waechter + echt_zurueck-Nachtrag vollautomatisch.
+- Merke fuer Messungen: bricht mischOhnePaare ab ("nichts veraendert"),
+  bleiben die ALTEN Bau-Scheine im Zustand stehen - ein Pruefer, der
+  danach z.scheine liest, sieht keine neuen. Und das sichtbare
+  Ziel-Feld schlaegt localStorage.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
