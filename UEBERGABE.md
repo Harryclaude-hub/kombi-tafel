@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **29.08.2026**, Fassung `20260829am`.
+Stand: **29.08.2026**, Fassung `20260902b` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -528,3 +528,66 @@ Beispiele und was wirklich dahintersteckte:
 
 Und wenn etwas nicht geht: **sagen, dass es nicht geht**, und warum. Er
 trifft die Entscheidung, nicht wir.
+
+---
+
+## 14. Stand 02.09.2026 - fuer den naechsten Chat
+
+Fassung **`20260902b`**, alles committet und live. Was seit dem 01.09. dazukam:
+
+### Automatische Auswertung (der grosse Block)
+
+- **`auswertung.js`**: reine Rechenmaschine. `wetteLesen(text, spiel)` liest
+  Karams Wett-Vokabular, `kombiAuswerten(wetten, einsatz, ergebnisJe)`
+  entscheidet die ganze Kombination (ein verlorenes Bein = alles verloren;
+  Viertellinien zahlen halb; Push/Absage = Einsatz zurueck).
+  **Eiserne Regel: was nicht sicher lesbar ist, wird "unklar" und wird NIE
+  automatisch verbucht.** Von 4 unabhaengigen Pruefern mit 371 Faellen
+  attackiert: 0 Rechenfehler. Laeuft auch unter Node (`require`).
+- **`kt_ergebnisse`** (Datenbank, UNverschluesselt - Spielstaende sind
+  oeffentlich): PK (satz, spiel); heim/gast, ht_heim/ht_gast, karten,
+  ecken, sonder (jsonb, z. B. "asse fritz"), stand fertig/abgesagt, von.
+  RLS: lesen alle Angemeldeten, schreiben mit von = auth.uid().
+- **`ergebnisse.js`**: Eingabetafel in Mein Bereich (je Spiel NUR die
+  Felder, die seine Wetten brauchen), rechnet alle offenen Scheine durch,
+  schreibt stand + echt_zurueck (nie eine vorhandene Zahl ueberschreiben),
+  meldet nach den zwei neuen Wecker-Schaltern **Gewinne / Verluste**.
+- Kombi-Bau, Gesetzt-Liste: zeigt Ausgaenge je Bein - NUR Anzeige,
+  verbucht wird ausschliesslich in Mein Bereich.
+
+### Mein Bereich
+
+- **Anbieter-Kopf** (`#anbieterkopf`, zeichneAnbieterKopf in mein.js):
+  vier Karten Stake/Interwetten/Bwin/Bet365 mit "drauf", "noch moeglich",
+  Zaehlern. Klick = Filter der Kombi-Liste (anbieterFilter) + komplette
+  Uebersicht je Person mit dem "wirklich drauf"-Feld (Korrektur wird als
+  stand_anbieter-Buchung gespeichert - so uebersteuert Karam jede Zahl,
+  auch Altbestand).
+- **EINE Kombi-Liste**: die Personen-Kasse zeigt keine eigene Liste mehr;
+  die Hauptliste hat einen Stift (pkBearbeiten: Foto, Quoten je Wette,
+  Datum, Nummer) - das pk-Formular haengt jetzt UEBER der Hauptliste.
+
+### Die NAECHSTE Aufgabe (beauftragt, noch NICHT gebaut)
+
+Karam am 02.09.: Im eigenen Bereich sollen nur noch **Tagesuebersicht,
+Kombinationen, Personen-Buchhaltung und Nachrechnen** stehen. **Profil**
+(Angemeldet-als, Abmelden, Schluessel), **Freunde & Teilen** und der
+**Bereichs-Chat** werden Knoepfe oben, die je eine EIGENE Ansicht oeffnen
+("wie eine eigene Page"). Der Chat ist wie eine Gruppe und soll
+**optisch ueberarbeitet** werden ("fuehlt sich komisch an") - Design-
+Schicht ans Ende von stil.css, Funktion nicht anfassen. Es gibt schon eine
+Block-Navigation (mb_navi, mb-block, blockAn, mbAktiverBlock in mein.js) -
+erst die lesen, dann umbauen. Achtung: zeichneBereich haengt an
+mbAktiverBlock() === "tag" fuer die Tagesuebersicht, und ladeChat laeuft
+am Ende von zeichneBereich.
+
+### Weitere offene Punkte
+
+1. **Ergebnis-Selbstsuche**: TheSportsDB ist aus dem Browser erreichbar
+   (CORS ok, gemessen; Schluessel "123", searchevents.php). Nur bei
+   EINDEUTIGEM Namens+Datums-Treffer speichern, quelle kennzeichnen.
+   Verlaufseintraege tragen seit 20260902a die Anstosszeit je Bein (an).
+2. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
+   fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
+   -> unklar; Handicaps ab 4 -> unklar.
+3. Punkte aus Abschnitt 9 (push-senden, TURN, neuBauen-Fotos) unveraendert.
