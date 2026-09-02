@@ -663,6 +663,12 @@ async function weckerPanelZeichnen() {
       '<label class="wk-schalter"><input type="checkbox"' + (w.anrufe ? " checked" : "") +
       ' onchange="weckerWunschSetzen(\'anrufe\', this.checked)"> ' +
       "&#128222; <b>Anrufe</b> - klingelt, bleibt stehen, mit Annehmen und Ablehnen</label>" +
+      '<label class="wk-schalter"><input type="checkbox"' + (w.gewinne ? " checked" : "") +
+      ' onchange="weckerWunschSetzen(\'gewinne\', this.checked)"> ' +
+      "&#127942; <b>Gewinne</b> - wenn eine Kombination gewonnen hat</label>" +
+      '<label class="wk-schalter"><input type="checkbox"' + (w.verluste ? " checked" : "") +
+      ' onchange="weckerWunschSetzen(\'verluste\', this.checked)"> ' +
+      "&#10060; <b>Verluste</b> - wenn eine Kombination verloren hat</label>" +
       '<p class="mini">Beides getrennt schaltbar. Schaltest du Anrufe aus, klingelt es hier nicht ' +
       "mehr - auf deinen anderen Geräten schon.</p></div>";
   }
@@ -974,8 +980,9 @@ const WK_WUNSCH_SCHLUESSEL = "kt_meldewunsch";
 function weckerWunschLesen() {
   try {
     const w = JSON.parse(localStorage.getItem(WK_WUNSCH_SCHLUESSEL) || "{}");
-    return { nachrichten: w.nachrichten !== false, anrufe: w.anrufe !== false };
-  } catch (e) { return { nachrichten: true, anrufe: true }; }
+    return { nachrichten: w.nachrichten !== false, anrufe: w.anrufe !== false,
+             gewinne: w.gewinne !== false, verluste: w.verluste !== false };
+  } catch (e) { return { nachrichten: true, anrufe: true, gewinne: true, verluste: true }; }
 }
 
 async function weckerWunschSetzen(was, an) {

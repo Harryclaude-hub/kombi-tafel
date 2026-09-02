@@ -323,6 +323,26 @@ async function supaScheinDatenSchreiben(id, key, daten) {
     .eq("id", id).select("id");
 }
 
+// ---------- Ergebnisse (kt_ergebnisse) ----------
+// Spielstaende sind oeffentliche Tatsachen und liegen UNverschluesselt.
+// Jeder Angemeldete darf lesen; wer schreibt, steht mit von=auth.uid()
+// in der Zeile (RLS erzwingt das).
+async function supaErgebnisseLaden(saetze) {
+  if (!saetze || !saetze.length) return [];
+  const r = await supa.from("kt_ergebnisse").select("*").in("satz", saetze);
+  return r.data || [];
+}
+
+async function supaErgebnisSpeichern(felder) {
+  const u = await supaNutzer();
+  if (!u) return { error: { message: "nicht angemeldet" } };
+  felder.von = u.id;
+  felder.updated_at = new Date().toISOString();
+  // .select() ist Pflicht: ein an RLS gescheitertes Upsert saehe sonst
+  // genauso aus wie ein gelungenes.
+  return await supa.from("kt_ergebnisse").upsert(felder).select();
+}
+
 async function supaScheinAendern(id, felder) {
   // select() macht die 0-Zeilen-Falle sichtbar (RLS-Lektion, siehe unten)
   return await supa.from("kt_scheine").update(felder).eq("id", id).select("id");

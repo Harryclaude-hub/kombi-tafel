@@ -222,6 +222,7 @@ Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur,
 Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenkasse"></div>
+<div id="ergebnisse"></div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="verlaufschalter" class="vf-schalter"></div>
 <div id="scheine_db"></div>
@@ -913,6 +914,11 @@ async function zeichneBereich() {
   anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
   zeichneLadefehlerWeg();
   kasseScheine = scheine;
+  // Ergebnisse: Eingabetafel zeichnen und alles Offene durchrechnen.
+  // NACH dem Fuellen von kasseScheine, sonst rechnet es auf der alten
+  // Liste. ergebnisseAuswerten schuetzt sich selbst gegen Schleifen.
+  if (typeof ergebnisseZeichnen === "function") ergebnisseZeichnen();
+  if (typeof ergebnisseAuswerten === "function") ergebnisseAuswerten();
   zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
   zeichnePersonenKasse(scheine);

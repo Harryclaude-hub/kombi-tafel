@@ -2949,3 +2949,9 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
 /* Eine gesetzte Zeile (hat Kombi-Farbe) bleibt lesbar, auch wenn das Spiel laeuft */
 .tb-tafel tr.tb-vorbei[style] { opacity: .85; }
 .gs-tafel .ab { margin-right: 5px; }
+
+/* Ausgaenge in der Gesetzt-Liste (01.09.2026, nur Anzeige) */
+.gs-ausgang { font-size: .85em; margin-top: 2px; font-weight: 700; }
+.gs-gewonnen { color: #0a7d3e; }
+.gs-verloren { color: #a00000; }
+.gs-unklar, .gs-offen { color: #555; font-weight: 400; }

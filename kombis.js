@@ -1330,7 +1330,7 @@ function zeichneGesetzte() {
     // Anbieter ihn zeigt), sonst die Schaetzung Einsatz x Quote.
     const moeg = (Number(e.moeglich) > 0) ? Number(e.moeglich)
       : (Number(e.einsatz) || 0) * (Number(e.quote) || 0);
-    zeilen += "<tr" + stil + ">" +
+    zeilen += "<tr" + stil + " data-erg='" + liste.indexOf(e) + "'>" +
       '<td class="gs-nr">' + (e.nummer || "-") + "</td>" +
       "<td>" + (e.kz ? anbieterZeichen(e.kz) + " " : "") + textSicher(e.anbieter || anbieterName(e.kz) || "") + "</td>" +
       '<td class="tb-q">' + (Number(e.einsatz) || 0).toFixed(2) + " &euro;</td>" +
@@ -1346,7 +1346,9 @@ function zeichneGesetzte() {
       "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
     "</tbody></table></div>" +
     '<p class="mini"><b>' + liste.length + " gesetzt</b>, zusammen <b>" +
-      summe.toFixed(2) + " &euro;</b> in diesem Ordner.</p>";
+      summe.toFixed(2) + " &euro;</b> in diesem Ordner. " +
+      '<span id="gs_stand_summe"></span></p>';
+  zeichneGesetzteAusgaenge(liste);
 }
 
 // ---------- Die Tabelle: alles wie im Foto, zum Selberbauen ----------
@@ -1604,6 +1606,7 @@ function baueVerlaufsEintrag(scheinId) {
     const q = zielQuote(w, eintrag.optIdx, s.kz);
     gesamt *= q.echt; gesamtRoh *= q.roh;
     return { id: w.id, spiel: w.spiel, wette: w.wette, linie: optionName(w, eintrag.optIdx),
+             an: anstossFeld(w),
              quote: rund2(q.echt), quelle: q.quelle, mind: mindFuer(w, eintrag.optIdx, null) };
   });
   // HIER entsteht die feste Nummer, und nur hier: eine Kombination, die
@@ -2725,4 +2728,49 @@ async function verlaufEintragLoeschen(dbId, zeit) {
         Number(e.einsatz).toFixed(2) +
         ' Euro höher - nachsehen in <a href="mein.html"><b>Mein Bereich</b></a>.'
       : ""), "gut");
+}
+// ---------- Ausgaenge in der Gesetzt-Liste ----------
+// Liest die Ergebnisse des offenen Ordners (kt_ergebnisse) und schreibt
+// je gesetzter Kombination hinter die Wetten, wie sie stehen:
+// je Bein ein Zeichen, dazu der Stand der ganzen Kombination.
+// NUR ANZEIGE. Verbucht wird ausschliesslich in Mein Bereich
+// (ergebnisse.js) - zwei Schreiber fuer denselben Stand waeren die
+// naechste Zwei-Ablagen-Falle.
+async function zeichneGesetzteAusgaenge(liste) {
+  try {
+    if (typeof supaErgebnisseLaden !== "function" || typeof kombiAuswerten !== "function") return;
+    if (!liste || !liste.length) return;
+    const satz = aktiverSatzId();
+    const ergListe = await supaErgebnisseLaden([satz]);
+    if (!ergListe.length) return;
+    const karte = {};
+    for (const z of ergListe) karte[z.spiel] = { heim: z.heim, gast: z.gast,
+      htHeim: z.ht_heim, htGast: z.ht_gast, karten: z.karten, ecken: z.ecken,
+      sonder: z.sonder || {}, stand: z.stand };
+    const zeichen = { gewonnen: "&#10004;", halbgewonnen: "&#10004;&#189;",
+      push: "&#8617;", abgesagt: "&#8617;", halbverloren: "&#10008;&#189;",
+      verloren: "&#10008;", offen: "&#183;", unklar: "?" };
+    let gew = 0, ver = 0;
+    for (let i = 0; i < liste.length; i++) {
+      const zeile = document.querySelector('#gesetzteliste tr[data-erg="' + i + '"]');
+      const e = liste[i];
+      if (!zeile || !e.wetten || !e.wetten.length) continue;
+      const a = kombiAuswerten(e.wetten, e.einsatz, (w) => karte[w.spiel] || null);
+      if (a.stand === "gewonnen") gew++; else if (a.stand === "verloren") ver++;
+      const zelle = zeile.querySelector(".gs-wetten");
+      if (zelle && !zelle.querySelector(".gs-ausgang")) {
+        const info = a.beine.map(b => zeichen[b.ausgang] || "?").join(" ");
+        const d = document.createElement("div");
+        d.className = "gs-ausgang gs-" + a.stand;
+        d.innerHTML = info + " &nbsp;" + (a.stand === "gewonnen"
+          ? "gewonnen, " + (a.auszahlung || 0).toFixed(2) + " &euro;"
+          : (a.stand === "verloren" ? "verloren"
+          : (a.stand === "unklar" ? "unklar - in Mein Bereich entscheiden" : "laeuft noch")));
+        zelle.appendChild(d);
+      }
+    }
+    const summe = document.getElementById("gs_stand_summe");
+    if (summe && (gew || ver)) summe.innerHTML =
+      "Nach Ergebnissen: <b>" + gew + " gewonnen</b>, <b>" + ver + " verloren</b>.";
+  } catch (e) { /* Anzeige-Beigabe: stoert nie die Liste selbst */ }
 }
