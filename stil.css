@@ -2996,13 +2996,6 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
    oft stundenlang offen (Stufe 1).
    ============================================================ */
 
-/* -- Die drei Knoepfe oben -- */
-.mb-kopfknoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.mb-kopfknoepfe > button { font-size: 15px; padding: 9px 16px;
-  border: 2px solid #1a2c50; background: #f2f5fb; border-radius: 9px; }
-.mb-kopfknoepfe > button.aktiv { background: #1a2c50; color: #fff; font-weight: bold; }
-.mb-kopfknoepfe .badge { margin-left: 4px; }
-
 /* -- Kopf jeder eigenen Ansicht: Zurueck + Titel -- */
 .ansicht-kopf { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .ansicht-kopf h2 { margin: 0; }
@@ -3052,7 +3045,73 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   margin-right: 0; border-radius: 999px; }
 
 @media (max-width: 700px) {
-  .mb-kopfknoepfe > button { flex: 1 1 auto; }
   #ans_chat .chatliste { height: calc(100vh - 340px); min-height: 240px; }
   #ans_chat .chatzeile { max-width: 88%; }
+}
+
+/* ============================================================
+   DESIGN-SCHICHT: Die Kopfleiste als ruhige Leiste (02.09.2026)
+   Karams Wunsch: die Knoepfe sollen in einen Header passen und
+   nicht so herausstechen. Nur Optik, komplett loeschbar - ohne
+   diese Schicht sind es wieder die eckigen Einzel-Knoepfe.
+   Die Signalknoepfe (Admin rot, App laden gruen, Update rot)
+   behalten ihre Farben, hier wird nur Form und Lage vereinheitlicht.
+   ============================================================ */
+
+/* Die Leiste selbst: ein flacher Balken in der Kennfarbe der Seite. */
+body[data-seite] > .navleiste {
+  align-items: center;
+  background-color: color-mix(in srgb, var(--kennhell, #eef1f7) 60%, #fff);
+  border: 1px solid color-mix(in srgb, var(--kenn, #1a2c50) 16%, #fff);
+  border-radius: 11px;
+  padding: 6px 10px;
+}
+
+/* Alle Knoepfe gleich hoch und leichter: duenner Rand, ohne eigene
+   weisse Flaeche - sie liegen IM Balken statt darauf. */
+body[data-seite] > .navleiste a.navknopf {
+  min-height: 38px;
+  padding: 5px 14px;
+  border-width: 1px;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 14px;
+}
+body[data-seite] > .navleiste a.navknopf:hover {
+  background-color: color-mix(in srgb, var(--kennhell, #eef1f7) 70%, #fff);
+}
+/* Aktiv bleibt gefuellt (Regel der Kenn-Schicht), nur nicht mehr fett
+   umrandet. Signalknoepfe kriegen ihre Flaeche zurueck: */
+body[data-seite] > .navleiste a.navknopf.adminknopf { background: #7a0000; }
+body[data-seite] > .navleiste a.navknopf.installknopf { background: #1a7a1a; }
+body[data-seite] > .navleiste a.navknopf.updateknopf { background: #a00000; }
+
+/* Die Glocken-Gruppe (Profil, Freunde, Nachrichten, Wecker) rueckt als
+   EIN Block nach rechts. Bisher hatte JEDER dieser Knoepfe
+   margin-left:auto - die freie Breite wurde dazwischen verteilt, und
+   genau diese Luecken sahen "herausgerissen" aus. */
+body[data-seite] > .navleiste a.navknopf[href="mein.html"]:not(.glocke) { margin-right: auto; }
+body[data-seite] > .navleiste a.glocke { margin-left: 0; }
+/* Die Glocken-Knoepfe als runde, stillere Zeichen. */
+body[data-seite] > .navleiste a.glocke {
+  border-radius: 999px;
+  padding: 5px 13px;
+  border-color: color-mix(in srgb, #1a7a1a 55%, #fff);
+}
+/* Ist eine der eigenen Ansichten offen, fuellt sich ihr Knopf gruen -
+   die Glocken-Ausnahme der Kenn-Schicht laesst ihn sonst leer. */
+body[data-seite] > .navleiste a.glocke.aktiv {
+  background: #1a7a1a; color: #fff; border-color: #1a7a1a;
+}
+
+/* Am Handy ist die Leiste eine klebende Schiebe-Zeile ueber die volle
+   Breite (Handy-Schicht) - dort keine runden Ecken und kein Rahmen,
+   sonst steht ein schwebender Kasten am oberen Rand. */
+@media (max-width: 700px) {
+  body[data-seite] > .navleiste {
+    border-radius: 0;
+    border-left: none; border-right: none; border-top: none;
+  }
+  body[data-seite] > .navleiste a.navknopf { min-height: 44px; }
+  body[data-seite] > .navleiste a.navknopf[href="mein.html"]:not(.glocke) { margin-right: 0; }
 }

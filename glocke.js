@@ -25,9 +25,26 @@ async function glockeStart() {
     }
     const knopf = document.getElementById("nav_nachrichten");
     if (!knopf) return;
-    knopf.addEventListener("click", (ev) => { ev.preventDefault(); glockeUmschalten(); });
+    // In Mein Bereich (angemeldet, App aufgebaut) oeffnen die beiden
+    // Knoepfe die eigenen Ansichten - Karam will nichts doppelt. Auf
+    // allen anderen Seiten bleiben die kleinen Fenster wie bisher.
+    // Gleiche Pruefung wie beim Profil-Knopf in profil.js: erst wenn
+    // die Ansicht wirklich im DOM steht, wird umgeleitet.
+    knopf.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      if (typeof mbAnsichtOeffnen === "function" && document.getElementById("ans_chat")) {
+        mbAnsichtOeffnen("chat"); return;
+      }
+      glockeUmschalten();
+    });
     const fk = document.getElementById("nav_freunde");
-    if (fk) fk.addEventListener("click", (ev) => { ev.preventDefault(); freundePanelUmschalten(); });
+    if (fk) fk.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      if (typeof mbAnsichtOeffnen === "function" && document.getElementById("ans_freunde")) {
+        mbAnsichtOeffnen("freunde"); return;
+      }
+      freundePanelUmschalten();
+    });
     if (typeof anrufBereit === "function") anrufBereit();
     await glockeZaehlen();
     setInterval(glockeZaehlen, 30000);

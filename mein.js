@@ -197,11 +197,7 @@ async function zeigeApp() {
   if (!aktiverBereich) aktiverBereich = meineBereiche[0];
 
   el("inhalt").innerHTML = `
-<div class="kopfzeile mb-kopfknoepfe">
-  <button id="mba_profil" onclick="mbAnsichtOeffnen('profil')">&#128100; Mein Profil</button>
-  <button id="mba_freunde" onclick="mbAnsichtOeffnen('freunde')">&#128101; Freunde &amp; Teilen</button>
-  <button id="mba_chat" onclick="mbAnsichtOeffnen('chat')">&#128172; Chat <span class="badge" id="mba_chat_badge" style="display:none"></span></button>
-  <span id="benach_platz"></span>
+<div class="kopfzeile"><span id="benach_platz"></span>
   ${binAdmin ? ' <a href="admin.html" class="navknopf adminknopf">&#9881;&#65039; Admin-Bereich</a>' : ""}</div>
 <div id="schluesselkasten"></div>
 <div id="bereichtabs" class="navleiste"></div>
@@ -468,6 +464,11 @@ function zeichneMbNavi() {
 
 let mbAnsicht = null;   // null | "profil" | "freunde" | "chat"
 
+// Die Ansichten haengen an den Kopfleisten-Knoepfen ganz oben (Karams
+// Wunsch: nichts doppelt). Der Profil-Knopf kommt aus profil.js, die
+// beiden anderen stehen in mein.html; glocke.js leitet sie hierher um.
+const MB_ANSICHT_KNOPF = { profil: "nav_profil", freunde: "nav_freunde", chat: "nav_nachrichten" };
+
 function mbAnsichtOeffnen(name, nurZeigen) {
   // Beim Wechsel weg von Freunden das DM-Polling stoppen (Falle 6).
   if (mbAnsicht === "freunde" && name !== "freunde" && dmTimer) {
@@ -478,7 +479,7 @@ function mbAnsichtOeffnen(name, nurZeigen) {
   for (const n of MB_ANSICHTEN) {
     const a = el("ans_" + n);
     if (a) a.classList.toggle("offen", n === name);
-    const k = el("mba_" + n);
+    const k = el(MB_ANSICHT_KNOPF[n]);
     if (k) k.classList.toggle("aktiv", n === name);
   }
   window.scrollTo(0, 0);
@@ -507,7 +508,7 @@ function mbAnsichtZu() {
   for (const n of MB_ANSICHTEN) {
     const a = el("ans_" + n);
     if (a) a.classList.remove("offen");
-    const k = el("mba_" + n);
+    const k = el(MB_ANSICHT_KNOPF[n]);
     if (k) k.classList.remove("aktiv");
   }
 }
@@ -554,21 +555,18 @@ async function neueNachrichten(bereichId) {
   return r.count || 0;
 }
 
-// Frischt NUR die Zaehler auf: an den Bereichs-Tabs und am Chat-Knopf oben.
-// Bewusst OHNE die Tabs neu zu bauen - der 10-Sekunden-Takt darf keine halb
-// angeklickten Knoepfe wegreissen und keine Warnkaesten verdoppeln.
+// Frischt NUR die Zaehler an den Bereichs-Tabs auf. Bewusst OHNE die Tabs
+// neu zu bauen - der 10-Sekunden-Takt darf keine halb angeklickten Knoepfe
+// wegreissen und keine Warnkaesten verdoppeln. Der Zaehler am 💬-Knopf
+// in der Kopfleiste gehoert allein glockeZaehlen (glocke.js) - EINE Stelle.
 async function bereichBadges() {
   const box = el("bereichtabs");
   if (!box) return;
-  let gesamt = 0;
   for (const b of meineBereiche) {
     const neu = await neueNachrichten(b.id);
-    gesamt += neu;
     const badge = box.querySelector('a[data-bereich="' + b.id + '"] .badge');
     if (badge) { badge.textContent = neu; badge.style.display = neu > 0 ? "" : "none"; }
   }
-  const cb = el("mba_chat_badge");
-  if (cb) { cb.textContent = gesamt; cb.style.display = gesamt > 0 ? "" : "none"; }
 }
 
 // Der 10-Sekunden-Takt. Frueher lief ladeChat IMMER mit und markierte alles
@@ -2235,6 +2233,9 @@ async function ladeChat(komplett) {
   // Nur die Zaehler auffrischen - die Tabs neu zu bauen hat frueher bei
   // fehlendem Bereichsschluessel den Warnkasten verdoppelt.
   bereichBadges();
+  // Der 💬-Knopf oben zaehlt ueber glocke.js (30-Sekunden-Takt). Nach dem
+  // Lesen soll er nicht eine halbe Minute lang Altes zeigen.
+  if (typeof glockeZaehlen === "function") glockeZaehlen();
 }
 
 async function tuChatSenden() {
