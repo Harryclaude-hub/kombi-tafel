@@ -263,7 +263,8 @@ function einzelnZeichnen() {
   if (dran) {
     const nr = reihe.indexOf(dran) + 1;
     html += ' <span class="ez-schritt">Durchgang ' + nr + " von " + reihe.length +
-      ": <b>" + anbieterName(dran) + "</b></span>";
+      ": " + (typeof anbieterZeichen === "function" ? anbieterZeichen(dran) + " " : "") +
+      "<b>" + anbieterName(dran) + "</b></span>";
     const frei = einzelnFrei(dran, mind);
     html += ' <span class="mini">' + frei.length + " Wetten dort noch offen</span>";
   } else {
@@ -278,6 +279,7 @@ function einzelnZeichnen() {
     const frei = einzelnFrei(kz, mind);
     const fertig = !einzelnGenug(frei);
     html += '<span class="ez-anb' + (kz === dran ? " dran" : (fertig ? " fertig" : "")) + '">' +
+      (typeof anbieterZeichen === "function" ? anbieterZeichen(kz) + " " : "") +
       anbieterName(kz) + " <span class='mini'>" + frei.length + " offen" +
       (fertig ? ", durch" : "") + "</span></span>";
   }
@@ -286,7 +288,8 @@ function einzelnZeichnen() {
   // Alle Wetten mit ihrem Stand je Anbieter
   const alle = satzWetten().filter(w => !istVorbei(anstossFeld(w)));
   html += '<table class="ez-tab"><thead><tr><th>Spiel</th><th>Wette</th>' +
-    reihe.map(kz => "<th>" + anbieterName(kz) + "</th>").join("") +
+    reihe.map(kz => "<th>" + (typeof anbieterZeichen === "function"
+      ? anbieterZeichen(kz) : anbieterName(kz)) + "</th>").join("") +
     "</tr></thead><tbody>";
   for (const w of alle) {
     const imSchein = sch && sch.wetten.some(x => x.id === w.id);

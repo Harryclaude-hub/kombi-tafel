@@ -3155,3 +3155,275 @@ body[data-seite] > .navleiste a.glocke.aktiv {
   color: #8a0f0f; font-weight: bold;
 }
 #scheine_db td.standzelle.st-verloren select { border-color: #a00000; background: #fbecec; }
+
+/* ============================================================
+   REDESIGN-SCHICHT 02.09.2026 - Karams Rundumschlag
+   ("das ganze Programm schoener, mehr Platz zum Eintragen,
+   klare Grenzen, Anbieter immer mit Zeichen und Farbe").
+   Komplett loeschbar. Komplett in @media screen: der Druckpfad
+   bleibt unberuehrt (Muster der Wohlfuehl-Schicht).
+   Leitplanken aus der Pruefung vom 02.09.:
+   - KEINE Hintergruende/Farben im tbody (Zebra- und Kombi-
+     Farben sind Bedeutung, Inline-Stile schlagen ohnehin alles)
+   - keine z-index an fixen Kaesten, keine Kopfleisten-Margins,
+   - h-Farben nur ueber var(--kenn, ...), kein !important ausser
+     drei dokumentierten Gegen-Inline-Breiten.
+   ============================================================ */
+@media screen {
+
+/* ---- 1. Lesbarkeit: die Kleinstschriften anheben ---- */
+.mini { font-size: 11px; }
+#eigenbau > p.mini, #gesetzteliste .mini, .fuss { font-size: 12.5px; line-height: 1.5; }
+table.s-tab th { font-size: 11.5px; letter-spacing: 0.02em; }
+td.s-raus select { font-size: 12px; }
+.stand { font-size: 12.5px; }
+
+/* ---- 2. Eintragen mit Platz und klaren Grenzen ---- */
+/* Formular "Neue Buchung" in der Personen-Kasse: geordnete Reihe. */
+.kassenformular { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+/* Buchhaltungs-Eingaben: die Inline-Breiten (width:110px/90px/130px im
+   HTML-String) schlagen jede Schicht - hier die dokumentierte Ausnahme
+   mit !important, drei Felder, sonst nichts. */
+.buch-eingabe #bu_person, .buch-eingabe #bu_betrag, .buch-eingabe #ba_betrag {
+  width: auto !important; flex: 1 1 120px;
+}
+#freunde input, #teilen input, #teilen select { min-height: 44px; font-size: 16px; }
+.tag-wahl { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.tag-wahl button, #tag_datum { min-height: 44px; }
+.tag-teil { margin-top: 18px; }
+/* Der GERECHNETE Stand (Platzhalter) unterscheidet sich jetzt sichtbar
+   von einer echten Eingabe. */
+.standfeld input::placeholder { opacity: 0.45; font-style: italic; }
+
+/* ---- 3. Abschnitte mit Kante: Orientierung im langen Block ---- */
+#blk_kombis > h2 { margin-top: 30px; padding-top: 16px; border-top: 2px solid #e3e8f0; }
+#anbieterkopf .ak-leiste::before {
+  content: "Anbieter - antippen filtert die Liste:";
+  flex-basis: 100%; font-size: 12px; color: #55627a;
+}
+.pn-ak::before {
+  content: "Gesetzt je Anbieter - antippen filtert Gesetzt-Liste und Kombis:";
+  flex-basis: 100%; font-size: 12px; color: #55627a;
+}
+.ordnerfilter::before {
+  content: "Person waehlen:";
+  display: block; font-size: 12px; color: #55627a; margin-bottom: 4px;
+}
+#ordnerbox { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- 4. Tabellen ruhiger (ohne tbody-Farben) ---- */
+#konto_db td:nth-child(n+2), #konto_db th:nth-child(n+2) {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+#scheine_db td { vertical-align: top; }
+body[data-seite="original"] td.q { font-variant-numeric: tabular-nums; }
+/* Die Mindestquoten-Spalte (rechte Quotenspalte, Karams Leseregel) wird
+   unverwechselbar: fett und mit markiertem Kopf - keine tbody-Farbe. */
+body[data-seite="original"] td:nth-child(8) { font-weight: bold; }
+body[data-seite="original"] th:nth-child(8) { background: #f3e8d2; }
+/* Zeilen mit Hinweis (title) bekommen ein sichtbares Zeichen; der volle
+   Text bleibt Desktop-Hover - mehr geht ohne JS nicht. */
+body[data-seite="original"] tr[title] > td:first-child::after {
+  content: " \24D8"; color: #1a5e97;
+}
+
+/* ---- 5. Kombi-Bau: Schein-Karten und Bau-Tabelle ---- */
+.s-kopf { gap: 4px 10px; align-items: center; }
+.s-fuss { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.s-fuss .knopfweg { margin-left: auto; }
+#eigenbau .tabellenrand { max-height: 72vh; overflow: auto; }
+#eigenbau .tb-tafel thead th { position: sticky; top: 0; background: #fff; z-index: 2; }
+#eigenbau .tb-leiste { position: sticky; top: 0; z-index: 5; background: #fff;
+  padding: 6px 0; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06); }
+/* "Tabelle frisch einlesen" wirft selbst Gebautes weg - das sieht man
+   dem Knopf jetzt an. Faellt der Selektor ins Leere, fehlt nur Farbe. */
+.filterzeile button[onclick^="neuBauen"] {
+  border-color: #a00000; color: #a00000; background: #fdf6f6;
+}
+
+/* ---- 6. Anbieter IMMER mit Zeichen und Hausfarbe ---- */
+/* Das kleine Zeichen (S, IW, bw, 365) vor jedem Namens-Schild - dieselbe
+   Optik wie die .ab-Marken im Kombi-Bau. */
+.marke::before {
+  display: inline-block; min-width: 18px; margin-right: 5px; padding: 0 3px;
+  border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0.2px;
+  text-align: center; background: rgba(255, 255, 255, 0.92); vertical-align: 1px;
+}
+.marke.m-st::before { content: "S"; color: #1a2c38; }
+.marke.m-iw::before { content: "IW"; color: #0a7d3e; }
+.marke.m-bw::before { content: "bw"; color: #111; }
+.marke.m-b3::before { content: "365"; color: #14805e; }
+/* Die Anbieter-Karten (Mein Bereich + Kombi-Bau) tragen das Zeichen im Namen. */
+.ak-karte .ak-name::before {
+  display: inline-block; min-width: 20px; margin-right: 6px; padding: 1px 5px;
+  border-radius: 4px; font-size: 10.5px; font-weight: 700; text-align: center;
+  border: 1px solid #000; color: #fff; vertical-align: 1px;
+}
+.ak-st .ak-name::before { content: "S"; background: #1a2c38; border-color: #0e1a22; }
+.ak-iw .ak-name::before { content: "IW"; background: #0a7d3e; border-color: #06612f; }
+.ak-bw .ak-name::before { content: "bw"; background: #111; color: #ffd400; }
+.ak-b3 .ak-name::before { content: "365"; background: #14805e; color: #ffe400; }
+/* Der Schein-Kopf "hier suchen" faerbt sich je Anbieter (die Klasse
+   m-<kz> haengt seit heute am Namen; :has wie im Bestand nur als Zier). */
+.s-wo:has(.s-wo-name.m-st) { background: #1a2c38; }
+.s-wo:has(.s-wo-name.m-iw) { background: #0a7d3e; }
+.s-wo:has(.s-wo-name.m-bw) { background: #111; }
+.s-wo:has(.s-wo-name.m-bw) .s-wo-name { color: #ffd400; }
+.s-wo:has(.s-wo-name.m-b3) { background: #14805e; }
+.s-wo:has(.s-wo-name.m-b3) .s-wo-name { color: #ffe400; }
+/* Alt-Drift behoben (Befund der Pruefung): button.haupt bekommt wieder
+   die Kennfarbe der Seite statt der Festfarbe aus der Knoepfe-Schicht. */
+button.haupt { background: var(--kenn, #1a2c50); border-color: var(--kenn, #1a2c50); }
+button.haupt:hover { background: color-mix(in srgb, var(--kenn, #1a2c50) 85%, #000); }
+
+/* ---- 7. Original-Tabelle: Ordnerkopf und Listen ---- */
+.ordnerkopf {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.ordnerliste { max-height: 40vh; overflow-y: auto; padding-right: 4px;
+  -webkit-overflow-scrolling: touch; }
+
+/* ---- 8. Die eigenen Ansichten: Profil, Freunde, Chat ---- */
+#ans_profil { max-width: 660px; margin: 0 auto; }
+#ans_profil .ansicht-kopf { margin-left: 0; }
+#ans_profil .kern { border-color: #c3cad8; background: #fafbfe; border-radius: 10px; }
+#ans_profil .kern b { color: inherit; }
+#ans_profil .kern button { margin-left: 10px; }
+#ans_profil .e2ehinweis { margin: 12px 0 18px; }
+.profilkasten .pf-feld:last-of-type { border-top: 1px solid #dfe3ec;
+  padding-top: 14px; margin-top: 18px; }
+/* Die Farb- und Schriftwahl zeigt jetzt VOR dem Klick, was sie tut -
+   exakt dieselben Werte wie .profilname.pf-* (Z. ~1885), keine zweite
+   Farbwahrheit. Wer dort aendert, zieht hier nach. */
+.pf-wahl.pf-c-blau { color: #17457e; }
+.pf-wahl.pf-c-gruen { color: #14663a; }
+.pf-wahl.pf-c-rot { color: #a4111f; }
+.pf-wahl.pf-c-lila { color: #6a2a86; }
+.pf-wahl.pf-c-orange { color: #8a4a00; }
+.pf-wahl.pf-c-tuerkis { color: #0d5f66; }
+.pf-wahl.pf-c-schwarz { color: #1a1a1a; }
+.pf-wahl.pf-c-pink { color: #99205e; }
+.pf-wahl.pf-f-rund { font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; }
+.pf-wahl.pf-f-schreib { font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", cursive; }
+.pf-wahl.pf-f-fett { font-family: "Arial Black", "Helvetica Neue", Impact, sans-serif; font-weight: 900; }
+.pf-wahl.pf-f-schmal { font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+.pf-wahl.pf-f-breit { font-family: Georgia, "Times New Roman", serif; letter-spacing: 0.4px; }
+/* Freunde & Teilen als ruhige Karten. */
+#ans_freunde details { border: 1px solid #d5dae4; border-radius: 12px; }
+#ans_freunde details > summary { background: transparent; border-left: none;
+  font-weight: 700; font-size: 16px; }
+#ans_freunde .freundknopf { min-height: 44px; padding: 8px 16px; font-size: 15px;
+  border-radius: 999px; }
+#ans_freunde .freundknopf .badge { margin-left: 6px; }
+#teilen td { vertical-align: middle; }
+/* Das DM-Fenster bekommt dieselben Sprechblasen wie der Bereichs-Chat -
+   strikt auf #dmfenster gescopet (Falle 8: Klassen teilen sich sonst
+   das Glockenpanel). */
+#dmfenster h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#dmfenster h3 button { font-size: 13px; color: #a4111f; border-color: #a4111f; background: #fff; }
+#dmfenster .chatliste { max-height: none; height: min(48vh, 480px); background: #edf0f6;
+  border: 1px solid #d5dae4; border-radius: 12px; padding: 12px 12px 8px; }
+#dmfenster .chatzeile { max-width: 76%; width: fit-content; margin: 8px auto 8px 0;
+  padding: 7px 12px 6px; background: #fff; border: 1px solid #dfe3ec;
+  border-left: 1px solid #dfe3ec; border-radius: 14px 14px 14px 4px;
+  box-shadow: 0 1px 2px rgba(20, 30, 60, 0.08); font-size: 15px; line-height: 1.35;
+  overflow-wrap: anywhere; }
+#dmfenster .chatzeile.vonmir { margin: 8px 0 8px auto; background: #ddf0dd;
+  border-color: #c2ddc2; border-radius: 14px 14px 4px 14px; }
+#dmfenster .chateingabe input { border-radius: 999px; padding: 10px 16px;
+  border: 2px solid #c8cfdd; background: #fff; }
+#dmfenster .chateingabe button { border-radius: 999px; padding: 10px 20px; }
+
+/* ---- 9. Buchhaltung: die Geld-Geschichte ---- */
+.bb-kindsatz { font-size: 16px; line-height: 1.55; padding: 12px 16px; margin-bottom: 12px;
+  background: #fafbfe; border: 1px solid #d5dae4; border-left: 5px solid var(--kenn, #1a2c50);
+  border-radius: 10px; }
+.bb-grossreihe .bb-kachel.bb-gross { flex: 1 1 200px; }
+.bb-kachel.bb-gross .bb-kachelwert { font-size: 26px; }
+.bb-kachel.bb-gross.bb-plus .bb-kachelwert { color: #0a5a0a; }
+.bb-kachel.bb-gross.bb-minus .bb-kachelwert { color: #a00000; }
+.bb-kassenbuch table td { padding: 4px 8px; }
+.bb-kassenbuch .tb-q { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- 10. KLAPPEN: Handbuch und Erklaerungen in Kapiteln ---- */
+.kl-leiste { border: 1px solid #d5dae4; border-radius: 12px; padding: 12px 14px;
+  margin: 12px 0 16px; background: #fafbfe; }
+.kl-titel { font-size: 12.5px; color: #55627a; margin-bottom: 8px; }
+.kl-reihe { display: flex; flex-wrap: wrap; gap: 7px; }
+.kl-knopf { font-size: 14px; padding: 8px 14px; border: 1px solid var(--kenn, #1a2c50);
+  color: var(--kenn, #1a2c50); background: #fff; border-radius: 999px; min-height: 40px; }
+.kl-knopf:hover { background: var(--kennhell, #eef1f7); }
+.kl-extras { margin-top: 8px; display: flex; gap: 7px; }
+.kl-extra { font-size: 12px; padding: 5px 12px; border-radius: 999px; }
+.kl-abschnitt { border: 1px solid #e3e8f0; border-radius: 12px; padding: 2px 16px 10px;
+  margin: 10px 0; background: #fff; }
+.kl-abschnitt.zu { padding-bottom: 2px; }
+.kl-abschnitt.zu > :not(h2) { display: none; }
+h2.kl-kopf { cursor: pointer; border-bottom: none; user-select: none; }
+h2.kl-kopf::after { content: " \25B4"; color: #8b95a8; font-size: 14px; }
+.kl-abschnitt.zu > h2.kl-kopf::after { content: " \25BE aufklappen"; font-size: 12px; }
+
+/* ---- 11. Handy: Platz zum Tippen, nichts schiebt die Seite quer ---- */
+@media (max-width: 700px) {
+  /* Tippziele wiederholen (Leitplanke: spaetere button-Regeln koennten
+     die 44px der Handy-Schicht schlagen - hier gelten sie weiter). */
+  button { min-height: 44px; }
+  #scheine_db input.einsatz, #personenkasse input.einsatz {
+    width: 110px; min-height: 44px; font-size: 16px;
+  }
+  .kassenformular input, .kassenformular select { flex: 1 1 100%; min-height: 44px; font-size: 16px; }
+  #freunde input { width: 100%; }
+  #teilen .inhalt { overflow-x: auto; }
+  #teilen table { min-width: 420px; }
+  #teilen select, #teilen td button { min-height: 44px; }
+  /* Schein-Karten scrollen INNEN, nicht die ganze Seite. */
+  #scheine .schein, #niedrig .schein, #einzeln .schein {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  td.s-eingabe input { width: 84px; }
+  .s-kopf .s-quote { flex-basis: 100%; margin-left: 0; }
+  /* Personen-Kasse: nur die Tabellen scrollen quer. */
+  #personenkasse .kassenkasten table { display: block; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; }
+  /* Panel als 2er-Raster statt Einerspalte. */
+  .pn-kachel { flex: 1 1 calc(50% - 5px); }
+  .pn-ak .ak-karte { flex: 1 1 calc(50% - 4px); }
+  /* Bau-Tabelle: greifbare Haekchen, klebende Bauen-Leiste unter der
+     klebenden Kopfleiste. */
+  #eigenbau .tb-wahl { width: 38px; }
+  #eigenbau .tb-wahl input { width: 26px; height: 26px; }
+  #eigenbau .tb-tafel td { padding-top: 6px; padding-bottom: 6px; }
+  #eigenbau .tb-leiste { top: 54px; }
+  /* Gesetzt-Liste: kuerzerer Scrollweg. */
+  .gs-tafel { font-size: 0.9em; }
+  .gs-tafel td, .gs-tafel th { padding: 3px 5px; }
+  .gs-tafel .gs-wetten { min-width: 170px; }
+  /* Original-Tabelle: Kopfzeile bleibt beim Scrollen sichtbar. */
+  body[data-seite="original"] > table { max-height: 78vh; overflow: auto; }
+  body[data-seite="original"] thead th { z-index: 5; }
+  body[data-seite="original"] td { padding: 5px 8px; line-height: 1.4; }
+  .von { font-size: 12px; display: inline-block; padding: 1px 6px; border-radius: 4px; }
+  /* Ordner-Suche kaempft gegen eine Inline-Breite (180px) - dokumentierte
+     Ausnahme mit !important, nur Optik, oninput bleibt. */
+  #ordner_suche { width: 100% !important; margin-top: 6px; }
+  /* Kopfstapel straffen, damit die Tabelle frueher beginnt. */
+  .ordnerkarte { margin: 6px 0 8px; }
+  .ordnerknoepfe { padding: 5px 8px; }
+  .ordnerkopf { padding: 6px 10px; }
+  #rohzaehler::before { margin: 4px 0; padding: 6px 10px; }
+  .unter { margin-bottom: 4px; }
+  /* Chat-Ansicht: mehr Hoehe fuer die Nachrichten. */
+  #ans_chat > p.mini { display: none; }
+  #ans_chat .chatliste { height: calc(100vh - 300px); }
+  #ans_chat .medienleiste button, #ans_chat .medienleiste .fotoknopf {
+    padding: 6px 12px; font-size: 13px; }
+  #dmfenster .chatzeile { max-width: 88%; }
+  /* Buchhaltungs-Karten: zwei nebeneinander. */
+  .bb-grossreihe .bb-kachel.bb-gross { flex: 1 1 calc(50% - 6px); }
+  /* Klapp-Knoepfe brauchen den Daumen. */
+  .kl-knopf { flex: 1 1 calc(50% - 4px); min-height: 46px; }
+}
+
+}
+/* ---- ENDE REDESIGN-SCHICHT 02.09.2026 ---- */

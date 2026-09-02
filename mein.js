@@ -2041,8 +2041,24 @@ async function zeichneBuchhaltung() {
       : " In offenen Kombinationen liegt gerade nichts.";
   }
 
+  // ---- 0. Die Geld-Geschichte in einem Satz (Karam, 02.09.: so einfach,
+  // dass ein Kind es versteht). NUR schon berechnete Werte, nichts Neues.
+  const rein = einz + start;
+  let kindSatz;
+  if (letzteBalance === null) {
+    kindSatz = "Ihr habt bisher <b>" + bbGeld(rein) + "</b> hineingesteckt und <b>" + bbGeld(ausz) +
+      "</b> wieder herausgeholt. Wie viel gerade auf den Wett-Konten liegt, weiß das Programm erst, " +
+      "wenn unten in Liste 2 die heutige Gesamtbalance steht.";
+  } else {
+    kindSatz = "Ihr habt <b>" + bbGeld(rein) + "</b> hineingesteckt (Einzahlungen + Startkapital) und <b>" +
+      bbGeld(ausz) + "</b> wieder herausgeholt. Auf den Wett-Konten liegen gerade <b>" + bbGeld(letzteBalance) +
+      "</b>. Unterm Strich " + (gewinn >= 0 ? "habt ihr <b>" + bbGeld(gewinn) + " Gewinn</b> gemacht."
+        : "fehlen <b>" + bbGeld(Math.abs(gewinn)) + "</b>.");
+  }
+
   let html = '<details open class="bb-bericht"><summary>&#128202; Buchhaltung: der Bericht (anklicken)</summary>' +
     '<div class="inhalt">' +
+    '<div class="bb-kindsatz">' + kindSatz + "</div>" +
     '<div class="bb-urteil ' + urteilKlasse + '">' +
     '<div class="bb-urteilzahl">' + urteilZahl + "</div>" +
     '<div class="bb-urteiltext">' + urteilText + "</div></div>";
@@ -2066,16 +2082,22 @@ async function zeichneBuchhaltung() {
       klemmt.map(k => "<li>" + k + "</li>").join("") + "</ul></div>";
   }
 
-  // ---- 3. Die wichtigsten Zahlen als Kacheln ----
-  html += '<div class="bb-kacheln">' +
-    bbKachel("Gesamtbalance", (letzteBalance === null) ? "noch keine" : bbGeld(letzteBalance),
-      (balanceDatum ? "Stand vom " + balanceDatum : "trag sie unten in Liste 2 ein"), "") +
-    bbKachel("Ausgezahlt", bbGeld(ausz), "Geld, das du herausgeholt hast", "") +
-    bbKachel("Eingezahlt", bbGeld(einz), "Geld, das du hineingesteckt hast", "") +
-    bbKachel("Startkapital", bbGeld(start), "womit du angefangen hast", "") +
+  // ---- 3. Die wichtigsten Zahlen: vier grosse Karten, darunter die
+  // kleine Reihe. Dieselben Werte wie immer, nur klarer sortiert.
+  html += '<div class="bb-kacheln bb-grossreihe">' +
+    bbKachel("Euer Gewinn", (gewinn === null) ? "noch offen" : bbGeldVz(gewinn),
+      "Konten + Herausgeholtes minus alles Hineingesteckte",
+      "bb-gross " + ((gewinn === null) ? "bb-offen" : (gewinn >= 0 ? "bb-plus" : "bb-minus"))) +
+    bbKachel("Auf den Konten", (letzteBalance === null) ? "noch keine" : bbGeld(letzteBalance),
+      (balanceDatum ? "Gesamtbalance, Stand vom " + balanceDatum : "trag sie unten in Liste 2 ein"), "bb-gross") +
     bbKachel("Im Spiel", bbGeld(lage.imSpiel),
-      lage.anzahl + (lage.anzahl === 1 ? " offene Kombination" : " offene Kombinationen"), "bb-warten") +
-    bbKachel("Möglich daraus", bbGeld(lage.moeglich), "wenn alle offenen aufgehen", "bb-warten") +
+      lage.anzahl + (lage.anzahl === 1 ? " offene Kombination" : " offene Kombinationen"), "bb-gross bb-warten") +
+    bbKachel("Kann daraus werden", bbGeld(lage.moeglich), "wenn alle offenen aufgehen", "bb-gross bb-warten") +
+    "</div>" +
+    '<div class="bb-kacheln">' +
+    bbKachel("Eingezahlt", bbGeld(einz), "Geld, das ihr hineingesteckt habt", "") +
+    bbKachel("Ausgezahlt", bbGeld(ausz), "Geld, das ihr herausgeholt habt", "") +
+    bbKachel("Startkapital", bbGeld(start), "womit ihr angefangen habt", "") +
     "</div>";
 
   // ---- 4. Bei wem liegt das offene Geld ----
@@ -2088,6 +2110,40 @@ async function zeichneBuchhaltung() {
         '<span class="bb-wemmini">' + p.n + (p.n === 1 ? " Kombination" : " Kombinationen") + "</span></li>";
     }
     html += "</ul></div>";
+  }
+
+  // ---- 4b. Kassenbuch: die letzten Bewegungen (Karam, 02.09.) ----
+  // Damit JEDER im Bereich nachpruefen kann, was eingetragen wurde:
+  // die Bereichs-Buchungen (Liste 1) und die Personen-Buchungen in
+  // EINER Liste, neueste zuerst. Reine Anzeige aus schon geladenen
+  // Daten - hier wird nichts gerechnet und nichts veraendert.
+  const kbArt = { einzahlung: "Einzahlung", auszahlung: "Auszahlung", startkapital: "Startkapital",
+    erhalten: "von Person erhalten", ausgezahlt: "an Person ausgezahlt",
+    hin: "Geld zum Anbieter", zurueck: "Geld zurückgeholt", raus: "entnommen",
+    stand_weg: "Stand-Korrektur (Weg)", stand_anbieter: "Stand-Korrektur (Anbieter)" };
+  const kb = [];
+  for (const b of buchungen) kb.push({ datum: b.datum,
+    was: (kbArt[b.art] || b.art) + (b.konto ? " · " + b.konto : ""),
+    wer: b.person || "", betrag: parseFloat(b.betrag) || 0 });
+  for (const b of (Array.isArray(personBuchungen) ? personBuchungen : [])) kb.push({ datum: b.datum,
+    was: (kbArt[b.art] || b.art) + (b.anbieter ? " · " + (anbieterNameM(b.anbieter) || b.anbieter) : "") +
+      (b.weg ? " · " + b.weg : ""),
+    wer: (b.ordner && ordnerNameM(b.ordner)) || "", betrag: parseFloat(b.betrag) || 0 });
+  kb.sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
+  if (kb.length) {
+    html += '<details class="bb-teil bb-kassenbuch"><summary>Kassenbuch: die letzten Bewegungen (' +
+      kb.length + ") - zum Nachpr&uuml;fen f&uuml;r alle im Bereich</summary>" +
+      '<p class="mini">Jede Zeile ist ein Eintrag, den jemand im Bereich gemacht hat: ' +
+      "Bereichs-Buchungen aus Liste 1 und alle Personen-Buchungen zusammen, die neuesten zuerst.</p>" +
+      '<div class="tabellenrand"><table><thead><tr><th>Datum</th><th>Was</th><th>Person</th><th>Betrag</th></tr></thead><tbody>';
+    for (const z of kb.slice(0, 30)) {
+      html += "<tr><td class='mini'>" + textSicherM(z.datum) + "</td><td>" + textSicherM(z.was) + "</td>" +
+        "<td>" + (z.wer ? textSicherM(z.wer) : "<span class='mini'>-</span>") + "</td>" +
+        "<td class='tb-q'>" + z.betrag.toFixed(2) + " &euro;</td></tr>";
+    }
+    if (kb.length > 30) html += "<tr><td colspan='4' class='mini'>und " + (kb.length - 30) +
+      " &auml;ltere - alle stehen weiter unten in den Listen und bei den Personen.</td></tr>";
+    html += "</tbody></table></div></details>";
   }
 
   // ---- 5. Der Rechenweg zum Mitrechnen ----
@@ -3017,7 +3073,7 @@ function tagAnbieterHtml(zeilen) {
   for (const [kz, name] of KASSE_ANBIETER) {
     const a = summe[kz];
     for (const f in g) g[f] += a[f] || 0;
-    html += "<tr><td><b>" + name + "</b>" +
+    html += "<tr><td>" + markeM(kz) +
       (a.wartet ? " <span class='mini fertigmark'>" + a.wartet + " fertig, Ergebnis fehlt</span>" : "") +
       "</td><td>" + tagGeld(a.einge) + "</td><td>" + tagGeld(a.geholt) + "</td>" +
       "<td>" + tagGeld(a.einsatz) + "</td><td>" + tagGeld(a.gewonnen) + "</td>" +
@@ -3453,7 +3509,7 @@ function zeichneAnbieterKopf() {
 
 function anbieterDetailHtml(kz, a) {
   const schreib = darfSchreiben();
-  let html = '<div class="ak-detail"><b>' + anbieterNameM(kz) + ' - komplette &Uuml;bersicht</b>' +
+  let html = '<div class="ak-detail">' + markeM(kz) + ' <b>komplette &Uuml;bersicht</b>' +
     '<div class="tabellenrand"><table><thead><tr><th></th><th>eingezahlt</th><th>zur&uuml;ckgeholt</th>' +
     '<th>gesetzt</th><th>gewonnen</th><th>im Spiel</th><th>noch m&ouml;glich</th><th>rechnerisch drauf</th>' +
     (schreib ? '<th>wirklich drauf</th>' : '') + '</tr></thead><tbody>';

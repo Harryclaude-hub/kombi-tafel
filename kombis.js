@@ -929,7 +929,10 @@ function scheinHtml(s, z, gesetzt) {
   return '<div class="schein"><div class="' + kopfKlasse + '">' +
     // Zuerst und am groessten: WO soll er suchen. marke() schreibt den
     // Namen schon selbst - ihn hier noch einmal zu setzen ergab "StakeStake".
-    '<span class="s-wo"><span class="s-wo-name">' + anbieterName(s.kz) +
+    // Die Anbieter-Klasse m-<kz> am Namen: damit faerbt die Design-Schicht
+    // den Kasten je Anbieter, und die :has-Farbband-Regeln in stil.css
+    // (Z. ~1111), die genau diese Klasse erwarten, leben wieder.
+    '<span class="s-wo"><span class="s-wo-name m-' + s.kz + '">' + anbieterName(s.kz) +
     '</span><span class="s-wo-mini">hier suchen</span></span>' +
     "Kombination " + anzeigeNr(z, s.nr) +
     (imVerlauf
@@ -1482,6 +1485,25 @@ function ebZaehlen() {
     : "nichts angehakt";
 }
 
+// Karams Logik-Wunsch (02.09. spaet): eine Kombination, die GENAU SO
+// schon gesetzt ist (gleicher Anbieter, gleiche Wetten samt Linie),
+// darf nicht unbemerkt noch einmal entstehen. Rueckfrage statt Verbot -
+// BEWUSST doppelt setzen bleibt erlaubt (Teile derselben Kombination
+// beim selben Anbieter nachlegen ist ein echter Fall).
+function schonGesetztGleich(kz, wetten) {
+  const soll = (wetten || []).map(x => {
+    const w = wetteNachId(x.id);
+    return String(x.id) + ":" + (w ? optionName(w, x.optIdx) : "");
+  }).sort().join("|");
+  if (!soll) return null;
+  for (const e of gesetzteEintraege()) {
+    if (e.unlesbar || e.kz !== kz) continue;
+    const ist = (e.wetten || []).map(t => String(t.id) + ":" + String(t.linie || "")).sort().join("|");
+    if (ist && ist === soll) return e;
+  }
+  return null;
+}
+
 function eigenbauAnlegen() {
   const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
   if (wahl.length < 2) { meldung("Bitte mindestens zwei Zeilen anhaken.", "warn"); return; }
@@ -1502,6 +1524,11 @@ function eigenbauAnlegen() {
   }
   const kzFeld = document.getElementById("eb_kz");
   const kz = (kzFeld && kzFeld.value) || KT_ANBIETER_RANG[0];
+  // Schon genau so gesetzt? Dann erst fragen (mit Nummer), nie stumm doppeln.
+  const gleich = schonGesetztGleich(kz, wetten);
+  if (gleich && !confirm("ACHTUNG: Genau diese Kombination (gleiche Wetten und Linien) ist bei " +
+    anbieterName(kz) + " schon GESETZT" + (gleich.nummer ? " - als Nr. " + gleich.nummer : "") +
+    ".\n\nWirklich noch einmal anlegen?")) return;
   const z = liesZustand() || baueAlles();
   const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
   z.scheine.push({ id: "E" + Date.now(), nr: nr, kz: kz, art: "eigen",
@@ -2529,6 +2556,16 @@ function mischOhnePaare() {
   // (Teile derselben Kombination liegen bei zweien - sonst kaeme
   // dieselbe Dreiergruppe woanders wieder heraus).
   const paare = new Set(verboten);
+  // Sicherheitsgurt (Karam, 02.09. spaet): kein neuer Dreier darf einer
+  // schon GESETZTEN Kombination gleichen. Die Paar-Sperre verhindert das
+  // rechnerisch schon (jedes Paar eines gesetzten Dreiers ist gesperrt) -
+  // hier steht die Regel trotzdem ausdruecklich, damit sie auch haelt,
+  // falls die Paar-Logik je umgebaut wird.
+  const dreierGesetzt = new Set();
+  for (const g of gesetzt) {
+    const ids = [...new Set((g.wetten || []).map(t => t && t.id).filter(Boolean))].sort();
+    if (ids.length) dreierGesetzt.add(String(g.kz) + "|" + ids.join("~"));
+  }
   const neu = [];
   for (const kz of kzListe) {
     const info = [...topfJeKz[kz].entries()].map(([id, w]) =>
@@ -2551,6 +2588,7 @@ function mischOhnePaare() {
             if (c.spiel === a.spiel || c.spiel === b.spiel) continue;
             if (p2.has(paarSchluessel(a.id, c.id))) continue;
             if (p2.has(paarSchluessel(b.id, c.id))) continue;
+            if (dreierGesetzt.has(kz + "|" + [a.id, b.id, c.id].sort().join("~"))) continue;
             fund = { i: i, j: j };
             break suche;
           }
