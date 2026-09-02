@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **29.08.2026**, Fassung `20260902b` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902c` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -567,62 +567,44 @@ Fassung **`20260902b`**, alles committet und live. Was seit dem 01.09. dazukam:
   die Hauptliste hat einen Stift (pkBearbeiten: Foto, Quoten je Wette,
   Datum, Nummer) - das pk-Formular haengt jetzt UEBER der Hauptliste.
 
-### Die NAECHSTE Aufgabe (beauftragt, noch NICHT gebaut)
+### Eigene Ansichten statt Bloecke (gebaut am 02.09., Fassung 20260902c)
 
-Karam am 02.09.: Im eigenen Bereich sollen nur noch **Tagesuebersicht,
-Kombinationen, Personen-Buchhaltung und Nachrechnen** stehen. **Profil**
-(Angemeldet-als, Abmelden, Schluessel), **Freunde & Teilen** und der
-**Bereichs-Chat** werden Knoepfe oben, die je eine EIGENE Ansicht oeffnen
-("wie eine eigene Page"). Der Chat ist wie eine Gruppe und soll
-**optisch ueberarbeitet** werden ("fuehlt sich komisch an") - Design-
-Schicht ans Ende von stil.css, Funktion nicht anfassen. Blocksystem und Fallen stehen unten in der Karte - NICHT neu erheben,
-der Leser hat das am 02.09. schon getan.
+Karams Auftrag ist umgesetzt: Im eigenen Bereich stehen nur noch
+**Tagesuebersicht, Kombinationen, Personen-Buchhaltung und Nachrechnen**
+(MB_BLOECKE). **Profil** (Angemeldet-als, Abmelden, Schluessel-Erklaerung),
+**Freunde & Teilen** und der **Bereichs-Chat** haengen an drei Knoepfen
+oben (`.mb-kopfknoepfe`) und oeffnen je eine eigene Ansicht mit
+Zurueck-Knopf. Der Chat sieht jetzt aus wie eine Gruppe (Sprechblasen
+links/rechts auf jeder Bildschirmgroesse) - Design-Schicht ganz am Ende
+von stil.css, auf `#ans_chat` gescopet, loeschbar, Funktion unberuehrt.
 
-### Die Karte fuer den Umbau (vom Leser am 02.09. erhoben - stimmt fuer Fassung 20260902b)
+So haengt es zusammen (mein.js):
 
-**Blocksystem (mein.js):** `MB_BLOECKE` Z. 403-412 (profil, tag, kombis,
-buch, freunde, chat, pruefen). `mbAktiverBlock()` Z. 413-416 liest
-localStorage `kt_mb_block`, Default "kombis", Unbekanntes faellt auf
-"kombis" zurueck. `mbBlockZeigen(kurz)` Z. 418-440: speichert den Block,
-baut Profil lazy (profilBlockHtml/profilBlockFuellen aus profil.js,
-dataset.gebaut), togglet Klasse "offen" (stil.css Z. 523-524: .mb-block
-display none / .offen block). Genau EIN Block sichtbar. Navi:
-`zeichneMbNavi` Z. 442-448, aufgerufen aus zeigeApp Z. 275.
+- `MB_ANSICHTEN` = profil/freunde/chat. `mbAnsichtOeffnen(name)` /
+  `mbAnsichtZu()`; der Zustand steht NUR in der Variable `mbAnsicht`,
+  nie in localStorage. `body.mb-sonder` blendet Navi, Anbieter-Kopf und
+  Bloecke aus (stil.css bei den .mb-block-Regeln); #schluesselkasten,
+  #meldung und #bereichtabs bleiben in jeder Ansicht da.
+- `mbBlockZeigen` leitet die alten Namen (profil/freunde/chat) auf die
+  Ansichten um - der Profil-Knopf in der Navileiste (profil.js) blieb
+  deshalb unangetastet.
+- `ladeChat` hat einen Waechter: laeuft NUR bei offener Chat-Ansicht.
+  Der 10-Sekunden-Takt heisst jetzt `chatTakt`: Chat offen = nachladen,
+  sonst nur `bereichBadges()`. Die schreibt die Zaehler in feste
+  Platzhalter an den Tabs und am Chat-Knopf, statt die Tabs neu zu
+  bauen (das Neubauen hat frueher bei fehlendem Bereichsschluessel den
+  Warnkasten verdoppelt). Ergebnis: der Badge zeigt endlich Neues.
+- Freunde/Teilen zeichnen erst beim Oeffnen der Ansicht, die
+  Buchhaltung erst beim Oeffnen ihres Blocks (und wird von
+  zeichneBereich nachgezogen, weil bbScheinLage kasseScheine liest).
+- dmTimer wird bei Zurueck UND beim Wechsel auf eine andere Ansicht
+  gestoppt; beim Wiederoeffnen der Freunde-Ansicht baut zeichneFreunde
+  das DM-Fenster samt Timer neu auf (dmPartner bleibt gesetzt).
 
-**Chat:** Template Z. 244-258 (#chatliste, .chateingabe mit #chat_text,
-.medienleiste). `ladeChat` Z. 2112-2130: je Nachricht div.chatzeile,
-eigene mit Klasse "vonmir"; scrollt ans Ende; markiert gelesen
-(kt_gelesen_<bereichId>); ruft zeichneTabs. Senden tuChatSenden Z. 2133.
-Polling: zeichneBereich Z. 936-938, alle 10 s.
-
-**Fallen, alle vom Leser belegt:**
-1. ladeChat laeuft per Timer IMMER und markiert alles als gelesen - der
-   Badge an den Bereichs-Tabs zeigt darum nie Neues. Beim Umbau: nur bei
-   offener Chat-Ansicht komplett laden/gelesen-markieren, dann lebt der
-   Badge endlich.
-2. scrollTop auf display:none wirkt nicht (scrollHeight 0) - beim Oeffnen
-   der Chat-Ansicht ans Ende scrollen.
-3. zeichneBereich Z. 934-935 haengt an mbAktiverBlock() === "tag";
-   Default "kombis" Z. 414 - beim Umbau mitziehen. Alte gespeicherte
-   kt_mb_block-Werte (chat/freunde/profil) fallen sauber zurueck, sobald
-   sie aus MB_BLOECKE fliegen.
-4. Die neuen eigenen Ansichten duerfen ihren Zustand NICHT in kt_mb_block
-   speichern, sonst startet die App beim naechsten Laden in der
-   Sonder-Ansicht.
-5. zeichneFreunde/zeichneTeilen/zeichneBuchhaltung laufen bei jedem
-   zeigeApp mit (eine Supabase-Zaehl-Query PRO Kontakt) - beim Umbau lazy
-   machen nach dem Profil-Muster Z. 422-427.
-6. dmTimer (Z. 539) endlos nach dem Oeffnen eines DM-Fensters -
-   clearInterval beim Schliessen der Freunde-Ansicht.
-7. zeichneTabs schreibt ohne Null-Pruefung in #bereichtabs - der
-   Container muss in JEDER Ansicht existieren (10-s-Timer!). Ebenso
-   muessen #meldung und #schluesselkasten ueberall sichtbar bleiben
-   (scrollIntoView in meldungM und schluesselPasswortKasten).
-8. .chatliste/.chatzeile/.chateingabe teilen sich Bereichs-Chat,
-   DM-Fenster (Z. 533-535) und Glockenpanel - neue Chat-Optik als
-   loeschbare Schicht ans Ende von stil.css, auf die Chat-Ansicht
-   gescopet, IDs und onclick nicht anfassen. Mobil-Sprechblasen heute
-   nur unter 700px (stil.css Z. 1534-1536).
+Die acht Fallen der Leser-Karte sind alle beruecksichtigt und im
+Browser gemessen (Commit ed9007c beschreibt jede Messung). Die alte
+Karte mit Zeilennummern gilt fuer Fassung 20260902b und ist Geschichte -
+Zeilennummern von damals NICHT mehr verwenden.
 
 ### Weitere offene Punkte
 
