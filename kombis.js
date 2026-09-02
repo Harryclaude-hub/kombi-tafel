@@ -2507,16 +2507,28 @@ function paarSchluessel(a, b) {
   return x < y ? x + "~" + y : y + "~" + x;
 }
 
-// Alle Wetten-Paare aus den GESETZTEN Kombinationen dieses Ordners -
+// Der Sperr-Schluessel eines Beins: das SPIEL, nicht die Wetten-Kennung.
+// Karams Fund vom 03.09.: bei hohem Ziel kamen zwei SPIELE ueber
+// verschiedene Linien wieder zusammen - ein [doppelt]-Spiel hat mehrere
+// Wetten-Kennungen, die alte Kennungs-Sperre sah das nicht. Ohne
+// lesbaren Spieltext (Uralt-Eintraege) faellt der Schluessel auf die
+// Kennung zurueck - sperrt dann wenigstens kennungsgenau.
+function mischSpielSchluessel(spiel, id) {
+  const t = String(spiel || "").toLowerCase().replace(/\s+/g, " ").trim();
+  return t || (id ? "id:" + String(id) : "");
+}
+
+// Alle SPIEL-Paare aus den GESETZTEN Kombinationen dieses Ordners -
 // beide Ablagen (gesetzteEintraege), Teile derselben Kombination zaehlen
-// mit. Handeingaben ohne Wetten-Kennung koennen nichts sperren.
+// mit. Handeingaben ohne Spiel und Kennung koennen nichts sperren.
 function gesetztePaare() {
   const verboten = new Set();
   for (const e of gesetzteEintraege()) {
-    const ids = [...new Set((e.wetten || []).map(w => w && w.id).filter(Boolean))];
-    for (let i = 0; i < ids.length; i++)
-      for (let j = i + 1; j < ids.length; j++)
-        verboten.add(paarSchluessel(ids[i], ids[j]));
+    const spiele = [...new Set((e.wetten || [])
+      .map(t => t && mischSpielSchluessel(t.spiel, t.id)).filter(Boolean))];
+    for (let i = 0; i < spiele.length; i++)
+      for (let j = i + 1; j < spiele.length; j++)
+        verboten.add(paarSchluessel(spiele[i], spiele[j]));
   }
   return verboten;
 }
@@ -2565,6 +2577,19 @@ function mischOhnePaare() {
     return;
   }
 
+  // DAS HOECHSTLIMIT (Karam, 03.09.: "das muss anerkannt werden").
+  // Reine Mathematik: ein Spiel hat im Topf (S-1) moegliche Partner-
+  // Spiele; jede Verwendung verbraucht 2 davon, und kein Spiel-Paar
+  // darf sich je wiederholen. Also geht jedes Spiel hoechstens
+  // floor((S-1)/2)-mal. Bei 12 Einsaetzen: (12-1)/2 = 5.
+  // Liegt Karams Ziel darueber, wird HART gedeckelt und angesagt.
+  const maxJeKz = {};
+  for (const kz of kzListe) {
+    const spiele = new Set([...topfJeKz[kz].values()]
+      .map(x => mischSpielSchluessel(x.w.spiel, null)).filter(Boolean));
+    maxJeKz[kz] = Math.max(1, Math.floor((spiele.size - 1) / 2));
+  }
+
   // Gesetzte Scheine bleiben, ungesetzte werden ersetzt.
   const behaltenIds = new Set(gesetzteScheine().map(s => s.id));
   const behalten = (z.scheine || []).filter(s => behaltenIds.has(s.id));
@@ -2572,16 +2597,24 @@ function mischOhnePaare() {
   const wegEigene = weg.filter(s => s.art === "eigen").length;
   const verboten = gesetztePaare();
   const toepfe = kzListe.map(kz => {
-    const offenN = [...topfJeKz[kz].values()].filter(x => x.nutzung < ziel).length;
-    return anbieterName(kz) + " " + topfJeKz[kz].size + " Einsätze (" + offenN + " unter dem Ziel)";
-  }).join(", ");
-  if (!confirm("Kombis neu mischen - je Anbieter, ohne Paar-Wiederholung:\n\n" +
-    "- Ziel: jeder Einsatz soll insgesamt " + ziel + "-mal gespielt sein\n" +
-    "- Töpfe: " + toepfe + "\n" +
+    const zielKz = Math.min(ziel, maxJeKz[kz]);
+    const offenN = [...topfJeKz[kz].values()].filter(x => x.nutzung < zielKz).length;
+    return anbieterName(kz) + ": " + topfJeKz[kz].size + " Einsätze, Höchstlimit " + maxJeKz[kz] +
+      "-mal (" + offenN + " unter dem Ziel)";
+  }).join("\n  ");
+  const gedeckelt = kzListe.filter(kz => ziel > maxJeKz[kz]);
+  if (!confirm("Kombis neu mischen - je Anbieter, KEIN Spiel-Paar je zweimal:\n\n" +
+    "- Dein Ziel: jeder Einsatz insgesamt " + ziel + "-mal\n" +
+    (gedeckelt.length
+      ? "- ACHTUNG: das liegt über dem mathematischen Höchstlimit bei " +
+        gedeckelt.map(kz => anbieterName(kz) + " (max " + maxJeKz[kz] + ")").join(", ") +
+        " - dort wird mit dem Höchstlimit gerechnet.\n"
+      : "") +
+    "- Töpfe (NUR aus gesetzten Kombinationen):\n  " + toepfe + "\n" +
     "- " + behalten.length + " gesetzte(r) Schein(e) bleiben unberührt\n" +
     "- " + weg.length + " ungesetzte Kombination(en) im Bau werden ersetzt" +
     (wegEigene ? " (davon " + wegEigene + " selbst gebaut!)" : "") + "\n" +
-    "- " + verboten.size + " Wetten-Paare aus gesetzten Kombinationen sind gesperrt\n" +
+    "- " + verboten.size + " Spiel-Paare aus gesetzten Kombinationen sind gesperrt\n" +
     "- die Anbieter mischen sich nicht: jeder Einsatz bleibt bei seinem Anbieter\n\n" +
     "Mischen?")) return;
 
@@ -2595,21 +2628,26 @@ function mischOhnePaare() {
   // rechnerisch schon (jedes Paar eines gesetzten Dreiers ist gesperrt) -
   // hier steht die Regel trotzdem ausdruecklich, damit sie auch haelt,
   // falls die Paar-Logik je umgebaut wird.
+  // Dreier-Gurt jetzt ebenfalls auf SPIEL-Ebene.
   const dreierGesetzt = new Set();
   for (const g of gesetzt) {
-    const ids = [...new Set((g.wetten || []).map(t => t && t.id).filter(Boolean))].sort();
-    if (ids.length) dreierGesetzt.add(String(g.kz) + "|" + ids.join("~"));
+    const sp = [...new Set((g.wetten || [])
+      .map(t => t && mischSpielSchluessel(t.spiel, t.id)).filter(Boolean))].sort();
+    if (sp.length) dreierGesetzt.add(String(g.kz) + "|" + sp.join("~"));
   }
   const neu = [];
   const zielVerfehlt = [];   // Rest-Topf: wer sein Ziel nicht erreicht, wird GENANNT
   for (const kz of kzListe) {
+    const zielKz = Math.min(ziel, maxJeKz[kz]);   // das anerkannte Hoechstlimit
     const info = [...topfJeKz[kz].entries()].map(([id, x]) =>
       ({ id: id, optIdx: gewaehlteOption(x.w), spiel: spielKennung(x.w),
-         spielName: x.w.spiel, rest: Math.max(0, ziel - x.nutzung) }));
+         sKey: mischSpielSchluessel(x.w.spiel, id),
+         spielName: x.w.spiel, rest: Math.max(0, zielKz - x.nutzung) }));
     if (!info.some(x => x.rest > 0)) continue;
     let beste = null, bestePaare = null, besteRest = null;
     for (let v = 0; v < 40; v++) {
-      // Jeder Einsatz darf so oft hinein, wie ihm zum Ziel fehlt.
+      // Jeder Einsatz darf so oft hinein, wie ihm zum (gedeckelten)
+      // Ziel fehlt.
       const arbeit = new Map(info.map(x => [x.id, x.rest]));
       const p2 = new Set(paare);
       const gruppen = [];
@@ -2625,14 +2663,18 @@ function mischOhnePaare() {
         for (let a = 0; a < frei.length; a++) {
           for (let i = a + 1; i < frei.length; i++) {
             const A = frei[a], B = frei[i];
-            if (B.spiel === A.spiel) continue;
-            if (p2.has(paarSchluessel(A.id, B.id))) continue;
+            // Verschiedene SPIELE (beide Lesarten: Tafel-Kennung mit
+            // doppel-Verknuepfung UND Spieltext) ...
+            if (B.spiel === A.spiel || B.sKey === A.sKey) continue;
+            // ... und dieses SPIEL-Paar war noch NIE zusammen gesetzt.
+            if (p2.has(paarSchluessel(A.sKey, B.sKey))) continue;
             for (let j = i + 1; j < frei.length; j++) {
               const C = frei[j];
               if (C.spiel === A.spiel || C.spiel === B.spiel) continue;
-              if (p2.has(paarSchluessel(A.id, C.id))) continue;
-              if (p2.has(paarSchluessel(B.id, C.id))) continue;
-              if (dreierGesetzt.has(kz + "|" + [A.id, B.id, C.id].sort().join("~"))) continue;
+              if (C.sKey === A.sKey || C.sKey === B.sKey) continue;
+              if (p2.has(paarSchluessel(A.sKey, C.sKey))) continue;
+              if (p2.has(paarSchluessel(B.sKey, C.sKey))) continue;
+              if (dreierGesetzt.has(kz + "|" + [A.sKey, B.sKey, C.sKey].sort().join("~"))) continue;
               fund = [A, B, C];
               break suche;
             }
@@ -2640,9 +2682,9 @@ function mischOhnePaare() {
         }
         if (!fund) break;
         for (const x of fund) arbeit.set(x.id, arbeit.get(x.id) - 1);
-        p2.add(paarSchluessel(fund[0].id, fund[1].id));
-        p2.add(paarSchluessel(fund[0].id, fund[2].id));
-        p2.add(paarSchluessel(fund[1].id, fund[2].id));
+        p2.add(paarSchluessel(fund[0].sKey, fund[1].sKey));
+        p2.add(paarSchluessel(fund[0].sKey, fund[2].sKey));
+        p2.add(paarSchluessel(fund[1].sKey, fund[2].sKey));
         gruppen.push(fund);
       }
       if (!beste || gruppen.length > beste.length) { beste = gruppen; bestePaare = p2; besteRest = arbeit; }
@@ -2651,15 +2693,17 @@ function mischOhnePaare() {
     if (bestePaare) for (const pk of bestePaare) paare.add(pk);
     if (besteRest) for (const x of info) {
       const r = besteRest.get(x.id);
-      if (r > 0) zielVerfehlt.push(anbieterName(kz) + ": " + x.spielName + " (fehlt noch " + r + "x)");
+      if (r > 0) zielVerfehlt.push(anbieterName(kz) + ": " + x.spielName + " (fehlt noch " + r + "x zum Limit " + zielKz + ")");
     }
   }
 
   if (!neu.length) {
-    meldung("<b>Keine neue Kombination möglich:</b> jedes erlaubte Paar dieser Einsätze war schon " +
-      "einmal zusammen in einer gesetzten Kombination, oder alle haben ihr Ziel von " + ziel +
-      "-mal erreicht. Es wurde nichts verändert." +
-      (zielVerfehlt.length ? "<br><b>Unter dem Ziel bleiben:</b> " +
+    const limitText = kzListe.map(kz => anbieterName(kz) + " max " +
+      Math.min(ziel, maxJeKz[kz]) + "-mal").join(", ");
+    meldung("<b>Keine neue Kombination möglich:</b> jedes erlaubte Spiel-Paar dieser Einsätze war " +
+      "schon einmal zusammen in einer gesetzten Kombination, oder alle haben ihr Limit erreicht (" +
+      textSicher(limitText) + "). Es wurde nichts verändert." +
+      (zielVerfehlt.length ? "<br><b>Unter dem Limit bleiben:</b> " +
         textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
         (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") : ""), "warn");
     return;
@@ -2678,16 +2722,17 @@ function mischOhnePaare() {
   z.gebautAm = new Date().toISOString();
   speichereZustand(z);
   const jeKzText = kzListe.map(kz =>
-    anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length).join(", ");
-  meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + jeKzText + ") - " +
-    "Ziel: jeder Einsatz insgesamt " + ziel + "-mal, jeder bleibt bei seinem Anbieter, " +
-    "keine zwei Wetten, die schon einmal zusammen gesetzt waren, stecken wieder in einer. " +
+    anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length +
+    (ziel > maxJeKz[kz] ? " (Ziel " + ziel + " auf Höchstlimit " + maxJeKz[kz] + " gedeckelt)" : "")).join(", ");
+  meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + textSicher(jeKzText) + ") - " +
+    "NUR aus gesetzten Einsätzen, jeder bleibt bei seinem Anbieter, und KEIN Spiel-Paar, das " +
+    "schon einmal zusammen gesetzt war, steckt wieder in einer. " +
     behalten.length + " gesetzte(r) Schein(e) unberührt." +
     (zielVerfehlt.length
-      ? "<br><b>&#9888; Unter dem Ziel bleiben:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
+      ? "<br><b>&#9888; Unter dem Limit bleiben:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
         (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") +
-        " - für sie gibt es kein erlaubtes Paar mehr."
-      : " Alle Einsätze erreichen ihr Ziel."), "gut");
+        " - für sie gibt es kein erlaubtes Spiel-Paar mehr."
+      : " Alle Einsätze erreichen ihr Limit."), "gut");
   zeichne_();
 }
 // ============================================================

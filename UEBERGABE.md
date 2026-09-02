@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **03.09.2026 frueh**, Fassung `20260902l` (Abschnitt 14 zuerst lesen!).
+Stand: **03.09.2026 frueh**, Fassung `20260902m` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -788,6 +788,37 @@ Konto-Tabelle (zurueck minus entschiedene Einsaetze, gegengerechnet
 kennt kein Stylesheet); tuBerichtPdf = Druckfenster-Muster des
 Kassen-PDFs, tuBerichtWord = .doc per Blob (Word liest HTML). Warnt
 sichtbar bei gewonnenen Kombinationen ohne Betrag.
+
+### Fassung 20260902m: Misch-Automat auf SPIEL-Ebene + hartes Hoechstlimit
+
+Karams Fund (03.09.): bei Ziel 9/10 kamen zwei SPIELE zweimal
+miteinander. Ursache: die Paar-Sperre lief auf Wetten-Kennungen, und
+ein [doppelt]-Spiel hat MEHRERE Kennungen (over- und under-Linie) -
+dieselben Spiele kamen ueber andere Linien wieder zusammen.
+
+- **mischSpielSchluessel(spiel, id)** (kombis.js): der Sperr-Schluessel
+  ist jetzt der normalisierte SPIELTEXT (klein, Leerraum gebuendelt);
+  ohne lesbaren Text Rueckfall auf "id:"+Kennung. gesetztePaare, die
+  Paar-Checks im Misch-Loop UND der Dreier-Gurt laufen alle auf dieser
+  Ebene; zusaetzlich prueft der Loop die In-Kombi-Verschiedenheit auch
+  ueber den Spiel-Schluessel.
+- **Hartes Hoechstlimit, ANGESAGT** (Karam: "das muss anerkannt
+  werden"): je Anbieter maxJeKz = max(1, floor((SpieleImTopf-1)/2)) -
+  reine Mathematik (jede Verwendung eines Spiels verbraucht 2 seiner
+  S-1 moeglichen Partner). Liegt das Ziel darueber, rechnet der Automat
+  mit dem Limit und SAGT es: ACHTUNG-Zeile in der Rueckfrage ("max X"),
+  Toepfe-Zeilen mit "Hoechstlimit X-mal", Erfolgsmeldung "(Ziel N auf
+  Hoechstlimit X gedeckelt)", Verfehlt-Liste "fehlt noch Nx zum
+  Limit X".
+- Gemessen (Fund-Szenario nachgestellt: 12 Einsaetze bei Stake, davon
+  tw1+tw13 = DASSELBE Spiel ueber zwei Linien -> 11 Spiele, dazu tw12
+  im Ordner aber NIE gesetzt, Ziel 9): Rueckfrage nennt Hoechstlimit 5
+  und ACHTUNG; 13 Kombis in Runde 1, danach ehrliche "Keine neue
+  Kombination moeglich"-Meldung; ueber ALLES (4 Gesetzte + 13 Neue)
+  KEIN Spiel-Paar doppelt, kein Spiel doppelt IN einer Kombi, kein
+  Spiel oefter als 5x, und tw12 (ungesetzt) tauchte NIRGENDS auf.
+- In der Verfehlt-Liste kann dasselbe Spiel zweimal stehen (je Linie
+  ein Einsatz) - das ist ehrlich gemeint: zwei Einsaetze, ein Spiel.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
