@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902d` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902e` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -614,13 +614,42 @@ Browser gemessen (Commit ed9007c beschreibt jede Messung). Die alte
 Karte mit Zeilennummern gilt fuer Fassung 20260902b und ist Geschichte -
 Zeilennummern von damals NICHT mehr verwenden.
 
-### Weitere offene Punkte
+### Ergebnis-Selbstsuche (GEBAUT am 02.09. abends, Fassung 20260902e)
 
-1. **Ergebnis-Selbstsuche**: TheSportsDB ist aus dem Browser erreichbar
-   (CORS ok, gemessen; Schluessel "123", searchevents.php). Nur bei
-   EINDEUTIGEM Namens+Datums-Treffer speichern, quelle kennzeichnen.
-   Verlaufseintraege tragen seit 20260902a die Anstosszeit je Bein (an).
-2. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
+`ergebnisseSelbstSuchen()` in ergebnisse.js, angestossen von
+zeichneBereich (sofort + alle 10 Minuten). TheSportsDB searchevents,
+Schluessel "123". Gespeichert wird NUR ein eindeutiger Treffer: genau
+EIN Spiel, Datum +/-30 h um den Anstoss (Ortszeit des Stadions!),
+beide Teamnamen in DERSELBEN Reihenfolge (ergTeamPasst; Jugend-/B-/
+Frauen-Marker muessen beidseits gleich sein - "Celtic B U21" trifft
+nie "Celtic"). Vorhandene Ergebnisse werden NIE ueberschrieben, nur
+der Endstand kommt automatisch (HT/Karten/Ecken bleiben "fehlt noch"),
+Absagen entscheidet die Automatik nicht. Drossel: je Spiel eine
+Anfrage alle 30 Minuten (localStorage kt_ergsuche_*). Jeder Lauf
+zeigt seine Bilanz in der Eingabetafel (ergSucheLageText) - kein
+stiller Fehlschlag. Nach einem Fund laeuft ergebnisseAuswerten samt
+Wecker-Meldung; Karam bessert in der Eingabetafel aus, seine Zahl gilt.
+ACHTUNG Feldname: die Anstosszeit je Bein heisst in den Verlaufsdaten
+**`an`** (baueVerlaufsEintrag) - ergebnisse.js las frueher `an_zeit`
+und bekam nie eine Zeit (behoben, beide Schreibweisen werden gelesen).
+
+Ausserdem seit 20260902e: an jeder Kombination steht unter dem
+Anbieter gruen/rot/offen samt "Ergebnis ~ Zeit" (standMarke, mein.js;
+scheinEnde liest jetzt bevorzugt das an-Feld des Beins);
+die Stand-Spalte faerbt sich mit; im Kombi-Block stehen die
+Kombinationen ganz oben, direkt darunter die Ergebnis-Eingabetafel,
+dann Personen, dann Konto; die Kombi-Farben
+wiederholen sich innerhalb eines Ordners nicht mehr (kombiFarbe in
+kombis.js: 9 Toene x 3 Helligkeiten = 27, Ordnerwechsel beginnt vorn);
+die Benachrichtigungs-Zeile in Mein Bereich ist raus, die Klingel in
+der Kopfleiste (wecker_knopf) ist die eine Stelle dafuer.
+
+### Weitere offene Punkte
+1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
    -> unklar; Handicaps ab 4 -> unklar.
-3. Punkte aus Abschnitt 9 (push-senden, TURN, neuBauen-Fotos) unveraendert.
+2. Punkte aus Abschnitt 9 (push-senden, TURN, neuBauen-Fotos) unveraendert.
+3. Karam traegt heute (02.09.) noch alle aktuellen Staende ein und
+   liefert die Zahlen zu Einzahlungen und Wettgewinn fuer die
+   Buchhaltung - danach stehen buchhaltungs- und eintragsspezifische
+   Aufgaben an (seine Worte, noch nicht naeher beschrieben).
