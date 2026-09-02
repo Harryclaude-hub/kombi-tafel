@@ -488,6 +488,8 @@ let vorschauDatum = null;
 let vorschauUploads = [];
 let vsTrotzdem = false;
 let vorschauBox = null;
+let vsSaetzeListe = [];   // vorhandene Ordner fuer die Ziel-Auswahl (Fotos nachschieben)
+let vsZielWahl = null;    // gewaehltes Ziel ("" = neuer Ordner), ueberlebt das Neuzeichnen
 
 const S_WAHL = ["SIEG", "ASIA", "TORE", "ECKEN", "BTTS", "HZ-END", "DNB", "DC", "TENNIS"];
 
@@ -763,6 +765,10 @@ async function satzEinlesen(datum) {
   vorschauDatum = datum;
   vorschauUploads = uploads;
   vsTrotzdem = false;
+  vsZielWahl = null;
+  // Vorhandene Ordner fuer die Ziel-Auswahl: Karam kann neue Fotos in
+  // einen BESTEHENDEN Ordner nachschieben (02.09.).
+  try { vsSaetzeListe = await supaSaetzeLaden(); } catch (e) { vsSaetzeListe = []; }
   const gesehen = new Set();
   vorschauZeilen = [];
   let nr = 0;
@@ -885,8 +891,23 @@ function vorschauZeigen() {
 }
 
 function vorschauFussHtml() {
-  return '<p><button onclick="vsNeueZeile()">Zeile hinzufügen</button> ' +
-    '<button class="haupt" onclick="vsUebernehmen()">Satz übernehmen: Ordner anlegen und überall anzeigen</button> ' +
+  // Ziel-Auswahl: neuer Ordner (Standard) oder ein bestehender - so
+  // lassen sich neue Fotos in einen Ordner nachschieben. Doppelte
+  // Zeilen legt vsUebernehmen ohnehin nicht an (satzSchluessel).
+  // Die Wahl wird gemerkt (vsZielWahl), weil jede Zeilen-Aenderung die
+  // Vorschau neu zeichnet - sonst spraenge das Ziel still zurueck.
+  const gewaehlt = (vsZielWahl !== null) ? vsZielWahl
+    : (vsSaetzeListe.some(s => s.id === vorschauDatum) ? vorschauDatum : "");
+  let ziel = '<label>In welchen Ordner? <select id="vs_ziel" onchange="vsZielWahl=this.value">' +
+    '<option value=""' + (gewaehlt === "" ? " selected" : "") + ">neuer Ordner: Fotos vom " +
+    sicherA(vorschauDatum) + "</option>";
+  for (const s of vsSaetzeListe) {
+    ziel += '<option value="' + sicherA(s.id) + '"' + (s.id === gewaehlt ? " selected" : "") + ">" +
+      sicherA(s.titel || s.id) + " (" + sicherA(s.id) + ")</option>";
+  }
+  ziel += "</select></label> ";
+  return "<p>" + ziel + '<button onclick="vsNeueZeile()">Zeile hinzufügen</button> ' +
+    '<button class="haupt" onclick="vsUebernehmen()">Übernehmen: in den gewählten Ordner</button> ' +
     '<button onclick="elA(\'" + (vorschauBox || "vorschau_" + vorschauDatum) + "\').innerHTML=\'\'">abbrechen</button></p>';
 }
 
@@ -921,12 +942,19 @@ async function vsUebernehmen() {
     return;
   }
   vsTrotzdem = false;
-  const d = vorschauDatum.split("-");
-  const titel = "Fotos vom " + d[2] + "." + d[1] + "." + d[0];
-  const s = await supaSatzAnlegen(vorschauDatum, titel);
-  if (s.error) { meldungA("Satz nicht angelegt: " + sicherA(s.error.message), "warn"); return; }
-  // Was schon im Ordner steht, wird NICHT doppelt angelegt (Fotos nachschieben!)
-  const daWetten = (await supaWettenLaden()).filter(w => w.satz === vorschauDatum);
+  // Ziel: der gewaehlte bestehende Ordner, sonst neuer Ordner vom Foto-Datum.
+  const zielFeld = elA("vs_ziel");
+  const ziel = (zielFeld && zielFeld.value) ? zielFeld.value : vorschauDatum;
+  if (ziel === vorschauDatum && !vsSaetzeListe.some(s => s.id === ziel)) {
+    // Nur einen NEUEN Ordner anlegen - ein bestehender wuerde durch das
+    // Upsert sonst umbenannt (titel) und umgeschrieben (erstellt_von).
+    const d = vorschauDatum.split("-");
+    const titel = "Fotos vom " + d[2] + "." + d[1] + "." + d[0];
+    const s = await supaSatzAnlegen(vorschauDatum, titel);
+    if (s.error) { meldungA("Satz nicht angelegt: " + sicherA(s.error.message), "warn"); return; }
+  }
+  // Was schon im Ziel-Ordner steht, wird NICHT doppelt angelegt (Fotos nachschieben!)
+  const daWetten = (await supaWettenLaden()).filter(w => w.satz === ziel);
   const daSchluessel = new Set(daWetten.map(satzSchluessel));
   let ok = 0, schonDa = 0, fehler = 0, ersterFehler = "";
   for (let i = 0; i < vorschauZeilen.length; i++) {
@@ -934,7 +962,7 @@ async function vsUebernehmen() {
     if (daSchluessel.has(satzSchluessel(z))) { schonDa++; continue; }
     const optionen = optionenBauen(z.wette,
       (z.quoten && z.quoten.length) ? z.quoten : [z.quote], z.mind);
-    const r = await supaWetteAnlegen(vorschauDatum, { pos: daWetten.length + i + 1, von: z.von, an_zeit: z.an_zeit,
+    const r = await supaWetteAnlegen(ziel, { pos: daWetten.length + i + 1, von: z.von, an_zeit: z.an_zeit,
       liga: z.liga, spiel: z.spiel, wette: z.wette, kat: z.s, s: z.s,
       o: optionen });
     if (!r.error) ok++;
@@ -955,7 +983,7 @@ async function vsUebernehmen() {
       "Die " + ok + " gespeicherten Zeilen stehen schon im Ordner und werden beim naechsten " +
       "Versuch nicht doppelt angelegt.", "warn");
   } else {
-    meldungA("<b>Satz vom " + sicherA(vorschauDatum) + ": " + ok + " Wetten übernommen" +
+    meldungA("<b>Ordner " + sicherA(ziel) + ": " + ok + " Wetten übernommen" +
       (schonDa ? ", " + schonDa + " waren schon im Ordner (nicht doppelt angelegt)" : "") + ".</b> " +
       "Der Ordner steht ab sofort auf der Kombi-Tafel, im Kombi-Bau und in der Original-Tabelle - " +
       "über die Ordner-Leiste wählbar. Nachbearbeiten geht unten bei Sätze bearbeiten.", "gut");
@@ -1118,6 +1146,9 @@ function satzScannen(ordner) {
     "5. Die Mindestquote ist in fast jeder Zeile eine andere. Sie ist NICHT immer",
     "   Quote geteilt durch 1,05 und kein fester Wert - lies sie wirklich vom Bild",
     "   ab, rechne sie nicht aus. Kommt ueberall dieselbe Zahl heraus, ist es falsch.",
+    "   Steht in einer Zeile WIRKLICH keine Mindestquote, lass den dritten Platz weg -",
+    "   das Programm nimmt dann von selbst 5 Prozent unter der Quote (5-Prozent-Regel).",
+    "   NIE eine Mindestquote erfinden oder ausrechnen.",
     "6. Stehen mehrere Quoten in einer Zeile (mit Schraegstrich getrennt), ist das EINE",
     "   Wette mit mehreren Optionen - alle Werte mitnehmen, links wie rechts,",
     "   paarweise in derselben Reihenfolge.",
@@ -1125,9 +1156,14 @@ function satzScannen(ordner) {
     "EINTRAGEN in die Tabelle kt_wetten mit satz = " + ordner + ", dazu pos, von,",
     "an_zeit im Format 2026-08-29T15:00, liga, spiel, wette, kat und s (die Wettart",
     "nach artErkennen aus admin.js) und o als Liste [[Name, Quote, Mindestquote], ...].",
-    "Der dritte Platz ist Pflicht. Fehlt er, nimmt das Programm den Ersatzwert 1,78,",
-    "und dann steht bei jeder Wette dieselbe Mindestquote.",
+    "Der dritte Platz kommt hinein, wenn er auf dem Foto steht; fehlt er dort,",
+    "bleibt er weg (5-Prozent-Regel, siehe Punkt 5).",
     "Danach die Fotos in kt_satz_uploads auf status eingelesen setzen und gelesen_am fuellen.",
+    "",
+    "ARBEITE SPARSAM: kein Erkunden des Repos, keine Zwischenberichte, keine Rueckfragen.",
+    "Jedes Foto genau EINMAL ansehen, Zeilen sammeln, die Inserts gebuendelt schreiben",
+    "(eine Abfrage fuer viele Zeilen), kurze Schlussmeldung. Mehr braucht es nicht -",
+    "die Zeilen erscheinen danach von selbst in der Original-Tabelle und im Kombi-Bau.",
     "",
     "WICHTIG: rate NICHTS. Ist eine Zeile abgeschnitten oder unleserlich, lass sie weg",
     "und sag mir am Ende genau, welche fehlt und warum. Lieber eine Zeile weniger als",

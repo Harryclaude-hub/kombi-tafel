@@ -337,12 +337,14 @@ function anbieterSuchLink(a, w) {
 // MINDESTQUOTE JE WETTE (Karams Regel vom 29.08.2026)
 // Die Mindestquote steht IM FOTO, in der Spalte neben der Quote,
 // und gilt genau fuer diese eine Zeile. Karam stellt sie nicht
-// mehr von Hand ein. Steht im Foto keine - was fast nie vorkommt -
-// gilt der Wert aus dem Feld oben, und wenn auch der fehlt: 1.78.
+// mehr von Hand ein. Steht im Foto keine, gilt seit dem 02.09.
+// Karams 5-Prozent-Regel: Mindestquote = Foto-Quote minus 5 Prozent.
+// Das Feld oben und der Festwert 1.78 greifen nur noch, wenn auch
+// keine Quote lesbar ist.
 //
 // Sie steckt im dritten Platz einer Option: [Linie, Quote, Mindest].
 // Alte Wetten haben nur [Linie, Quote] - die laufen weiter, sie
-// bekommen dann den Ersatzwert. Deshalb kein Umbau der Datenbank.
+// bekommen dann die 5-Prozent-Regel. Deshalb kein Umbau der Datenbank.
 // ============================================================
 const MIND_STANDARD = 1.78;
 
@@ -350,6 +352,10 @@ function mindFuer(w, optIdx, ersatz) {
   const o = (w && Array.isArray(w.o)) ? w.o[optIdx || 0] : null;
   const m = (o && o.length > 2) ? Number(o[2]) : NaN;
   if (isFinite(m) && m > 0) return m;
+  // Karam (02.09.): keine Mindestquote angegeben -> 5 Prozent unter der
+  // Foto-Quote DIESER Linie.
+  const q = o ? Number(o[1]) : NaN;
+  if (isFinite(q) && q > 1) return rund2(q * 0.95);
   const f = Number(ersatz);
   return (isFinite(f) && f > 0) ? f : MIND_STANDARD;
 }

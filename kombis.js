@@ -807,8 +807,12 @@ function zeichne_() {
   document.getElementById("mind").value = z.einst.mind;
   document.querySelectorAll(".anbwahl").forEach(c => { c.checked = z.einst.anbieter.includes(c.value); });
 
-  const normal = z.scheine.filter(s => s.art === "normal" || s.art === "eigen" || s.art === "variante");
-  const niedrig = z.scheine.filter(s => s.art === "niedrig");
+  // Anbieter-Filter (Karten oben im Panel): NUR die Anzeige wird
+  // gefiltert - Zustand, Zaehler und Panel rechnen weiter mit allem.
+  const sichtbar = s => !bauAnbieterFilter || s.kz === bauAnbieterFilter;
+  const normal = z.scheine.filter(s =>
+    (s.art === "normal" || s.art === "eigen" || s.art === "variante") && sichtbar(s));
+  const niedrig = z.scheine.filter(s => s.art === "niedrig" && sichtbar(s));
   const verbaut = z.scheine.reduce((p, s) => p + s.wetten.length, 0);
 
   // Einmal fuer alle Karten (siehe Kommentar unten bei scheinHtml).
@@ -823,12 +827,18 @@ function zeichne_() {
         "höchstens zwei Scheinen stecken), " + (z.uebrig.length + z.uebrigNiedrig.length) + " blieben übrig."
       : "<b>" + gruppenZahl + " selbst gebaute Kombination(en)</b>, " + verbaut +
         " Plätze bei " + z.gesamtOffen + " offenen Wetten. Gebaut wird unten in der Tabelle.") +
+    (bauAnbieterFilter ? ' <span class="gs-filterhinweis">&#128269; Filter: nur <b>' +
+      textSicherK2(anbieterName(bauAnbieterFilter)) +
+      "</b> - Karte oben nochmal antippen zeigt wieder alles.</span>" : "") +
     tippsHtml(z);
 
   document.getElementById("scheine").innerHTML =
     (normal.length ? normal.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
-      '<div class="kern">Noch nichts gebaut. Hak dir unten in der Tabelle die Wetten an, ' +
-      'wähl den Anbieter und drück <b>Kombination aus der Auswahl bauen</b>.</div>');
+      (bauAnbieterFilter
+        ? '<div class="kern">Keine Kombination bei ' + textSicherK2(anbieterName(bauAnbieterFilter)) +
+          " im Bau. Die Karte oben nochmal antippen zeigt wieder alle.</div>"
+        : '<div class="kern">Noch nichts gebaut. Hak dir unten in der Tabelle die Wetten an, ' +
+          'wähl den Anbieter und drück <b>Kombination aus der Auswahl bauen</b>.</div>'));
 
   document.getElementById("niedrig").innerHTML =
     (niedrig.length ? niedrig.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
@@ -1317,14 +1327,23 @@ function anbieterZeichen(kz) {
 function zeichneGesetzte() {
   const box = document.getElementById("gesetzteliste");
   if (!box) return;
-  const liste = gesetzteEintraege()
+  const alle = gesetzteEintraege()
     .slice()
     .sort((a, b) => String(b.zeit || "").localeCompare(String(a.zeit || "")));
+  // Anbieter-Filter von den Karten oben: nur die Anzeige. Unlesbare
+  // Eintraege bleiben IMMER sichtbar - sie duerfen nie verschwinden.
+  const liste = (typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
+    ? alle.filter(e => e.unlesbar || e.kz === bauAnbieterFilter) : alle;
   if (!liste.length) {
-    box.innerHTML = '<p class="mini">In diesem Ordner ist noch nichts gesetzt.</p>';
+    box.innerHTML = '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
+      ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist in diesem Ordner nichts gesetzt (" +
+        alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt alle)."
+      : "In diesem Ordner ist noch nichts gesetzt.") + "</p>";
     return;
   }
-  const karte = kombiKarte(liste);
+  // Farben IMMER ueber die ungefilterte Liste vergeben - sonst wechselt
+  // jede Kombination beim Filtern ihre Farbe (Vergabe nach Reihenfolge).
+  const karte = kombiKarte(alle);
   let summe = 0, zeilen = "";
   for (const e of liste) {
     summe += Number(e.einsatz) || 0;
@@ -1360,7 +1379,9 @@ function zeichneGesetzte() {
       "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
     "</tbody></table></div>" +
     '<p class="mini"><b>' + liste.length + " gesetzt</b>, zusammen <b>" +
-      summe.toFixed(2) + " &euro;</b> in diesem Ordner. " +
+      summe.toFixed(2) + " &euro;</b> in diesem Ordner" +
+      (liste.length !== alle.length ? " (gefiltert: " + (alle.length - liste.length) +
+        " bei anderen Anbietern ausgeblendet)" : "") + ". " +
       '<span id="gs_stand_summe"></span></p>';
   zeichneGesetzteAusgaenge(liste);
 }
@@ -2332,6 +2353,35 @@ function zeichnePanel() {
         '<div class="pn-mini">zählt in der Buchhaltung doppelt - antippen und wegräumen</div></div>'
       : "");
 
+  // Karams Anbieter-Blick (02.09.): ganz oben nebeneinander Stake,
+  // Interwetten, Bwin, Bet365 - wie viele gesetzte Kombinationen dieses
+  // Ordners bei wem liegen. Klick = Filter fuer die Gesetzt-Liste UND
+  // die Kombis in Arbeit. Daneben der Misch-Knopf (mischOhnePaare).
+  const jeKz = {};
+  for (const g of gesetzteEintraege()) {
+    if (g.unlesbar || !g.kz) continue;
+    if (!jeKz[g.kz]) jeKz[g.kz] = { staemme: new Set(), einsatz: 0 };
+    jeKz[g.kz].staemme.add(g.stamm);
+    jeKz[g.kz].einsatz += Number(g.einsatz) || 0;
+  }
+  let ak = '<div class="ak-leiste pn-ak">';
+  for (const kz of KT_ANBIETER_RANG) {
+    const d = jeKz[kz];
+    const n = d ? d.staemme.size : 0;
+    ak += '<button class="ak-karte ak-' + kz + " pn-ak-karte" +
+      (bauAnbieterFilter === kz ? " ak-aktiv" : "") +
+      '" onclick="bauAnbieterFiltern(\'' + kz + '\')" title="Nur ' +
+      textSicherK2(anbieterName(kz)) + ' zeigen - nochmal antippen hebt den Filter auf">' +
+      '<span class="ak-name">' + textSicherK2(anbieterName(kz)) + "</span>" +
+      '<span class="ak-zeile"><b>' + n + "</b> Kombination" + (n === 1 ? "" : "en") + "</span>" +
+      '<span class="ak-zeile">' + (d ? d.einsatz : 0).toFixed(2) + " &euro; gesetzt</span></button>";
+  }
+  ak += '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Je Anbieter: die dort ' +
+    'gesetzten Einsätze neu mischen; keine zwei Wetten, die schon zusammen gesetzt waren, ' +
+    'kommen wieder zusammen">' +
+    "&#127922; Kombis neu mischen<br><span class='mini'>je Anbieter, keine Paare doppelt</span></button></div>";
+  kasten.insertAdjacentHTML("afterbegin", ak);
+
   // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
   if (p.unter.anzahl) {
     let h = '<div class="pn-luecken"><b>Wo noch etwas fehlt:</b><ul>';
@@ -2380,6 +2430,172 @@ function panelRestMischen() {
     "Neu mischen?";
   if (!confirm(frage)) return;
   restNeuMischen();
+}
+
+// ============================================================
+// KOMBIS NEU MISCHEN - JE ANBIETER, OHNE PAAR-WIEDERHOLUNG
+// (Karams Auftrag, 02.09., praezisiert am Abend)
+//
+// Der Gedanke: was bei einem Anbieter gesetzt wurde, GILT bei
+// diesem Anbieter - die Anbieter mischen sich nicht mehr. Der
+// Knopf nimmt je Anbieter die Einsaetze (Wetten) aus den dort
+// GESETZTEN Kombinationen dieses Ordners und wuerfelt daraus neue
+// 3er-Kombinationen beim SELBEN Anbieter. Einzige harte Regel:
+// keine zwei Wetten, die schon einmal zusammen in einer gesetzten
+// Kombination waren, kommen je wieder zusammen in eine. So lassen
+// sich dieselben Einsaetze viel oefter spielen (aus 4 Kombis mit
+// 12 Einsaetzen werden ueber mehrere Runden bis zu 22 neue).
+//
+// Jeder Druck baut EINE Runde: jeder Einsatz hoechstens einmal je
+// Anbieter. Nochmal druecken = naechste Runde, neue Paarungen.
+// Gesetzte Scheine bleiben unberuehrt; ungesetzte werden ersetzt.
+// Jedes Spiel weiter nur einmal je Kombination.
+// ============================================================
+
+// Der Anbieter-Filter fuer den Kombi-Bau (Karam, 02.09.): Klick auf eine
+// der vier Karten oben zeigt in der Gesetzt-Liste und bei den Kombis in
+// Arbeit nur diesen Anbieter. Bewusst NUR im Speicher, nicht in
+// localStorage - beim naechsten Laden ist wieder alles zu sehen.
+let bauAnbieterFilter = "";
+
+function bauAnbieterFiltern(kz) {
+  bauAnbieterFilter = (bauAnbieterFilter === kz) ? "" : kz;
+  zeichne_();
+}
+
+function paarSchluessel(a, b) {
+  const x = String(a), y = String(b);
+  return x < y ? x + "~" + y : y + "~" + x;
+}
+
+// Alle Wetten-Paare aus den GESETZTEN Kombinationen dieses Ordners -
+// beide Ablagen (gesetzteEintraege), Teile derselben Kombination zaehlen
+// mit. Handeingaben ohne Wetten-Kennung koennen nichts sperren.
+function gesetztePaare() {
+  const verboten = new Set();
+  for (const e of gesetzteEintraege()) {
+    const ids = [...new Set((e.wetten || []).map(w => w && w.id).filter(Boolean))];
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++)
+        verboten.add(paarSchluessel(ids[i], ids[j]));
+  }
+  return verboten;
+}
+
+function mischOhnePaare() {
+  const e = einstellungenLesen();
+  const z = liesZustand() || baueAlles();
+  const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
+
+  // Topf je Anbieter: die Einsaetze aus den dort gesetzten Kombinationen.
+  // Nur Wetten, die noch laufen und deren Kennung in der Tafel steht.
+  const topfJeKz = {};
+  for (const g of gesetzt) {
+    if (!g.kz) continue;
+    for (const t of (g.wetten || [])) {
+      if (!t || !t.id) continue;
+      const w = wetteNachId(t.id);
+      if (!w || istVorbei(anstossFeld(w))) continue;
+      if (nichtDa(t.id, g.kz)) continue;
+      (topfJeKz[g.kz] = topfJeKz[g.kz] || new Map()).set(String(t.id), w);
+    }
+  }
+  const kzListe = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
+  if (!kzListe.length) {
+    meldung("<b>Zum Mischen braucht es gesetzte Kombinationen:</b> der Knopf nimmt je Anbieter " +
+      "die Einsätze aus deinen GESETZTEN Kombinationen dieses Ordners und mischt daraus neue - " +
+      "beim selben Anbieter. Es ist noch nichts (Laufendes) gesetzt, also gibt es nichts zu mischen.", "warn");
+    return;
+  }
+
+  // Gesetzte Scheine bleiben, ungesetzte werden ersetzt.
+  const behaltenIds = new Set(gesetzteScheine().map(s => s.id));
+  const behalten = (z.scheine || []).filter(s => behaltenIds.has(s.id));
+  const weg = (z.scheine || []).filter(s => !behaltenIds.has(s.id));
+  const wegEigene = weg.filter(s => s.art === "eigen").length;
+  const verboten = gesetztePaare();
+  const toepfe = kzListe.map(kz => anbieterName(kz) + " " + topfJeKz[kz].size + " Einsätze").join(", ");
+  if (!confirm("Kombis neu mischen - je Anbieter, ohne Paar-Wiederholung:\n\n" +
+    "- Töpfe: " + toepfe + "\n" +
+    "- " + behalten.length + " gesetzte(r) Schein(e) bleiben unberührt\n" +
+    "- " + weg.length + " ungesetzte Kombination(en) im Bau werden ersetzt" +
+    (wegEigene ? " (davon " + wegEigene + " selbst gebaut!)" : "") + "\n" +
+    "- " + verboten.size + " Wetten-Paare aus gesetzten Kombinationen sind gesperrt\n" +
+    "- die Anbieter mischen sich nicht: jeder Einsatz bleibt bei seinem Anbieter\n\n" +
+    "Mischen?")) return;
+
+  // Je Anbieter mehrere Mischungen probieren, die mit den meisten
+  // Kombinationen gewinnt. Die Paar-Sperre gilt ueber ALLE Anbieter
+  // (Teile derselben Kombination liegen bei zweien - sonst kaeme
+  // dieselbe Dreiergruppe woanders wieder heraus).
+  const paare = new Set(verboten);
+  const neu = [];
+  for (const kz of kzListe) {
+    const info = [...topfJeKz[kz].entries()].map(([id, w]) =>
+      ({ id: id, optIdx: gewaehlteOption(w), spiel: spielKennung(w) }));
+    let beste = null, bestePaare = null;
+    for (let v = 0; v < 40; v++) {
+      const frei = mische(info.slice(), e.saat * 131 + v * 17 + 3);
+      const p2 = new Set(paare);
+      const gruppen = [];
+      while (frei.length >= 3) {
+        const a = frei.shift();
+        let fund = null;
+        suche:
+        for (let i = 0; i < frei.length; i++) {
+          const b = frei[i];
+          if (b.spiel === a.spiel) continue;
+          if (p2.has(paarSchluessel(a.id, b.id))) continue;
+          for (let j = i + 1; j < frei.length; j++) {
+            const c = frei[j];
+            if (c.spiel === a.spiel || c.spiel === b.spiel) continue;
+            if (p2.has(paarSchluessel(a.id, c.id))) continue;
+            if (p2.has(paarSchluessel(b.id, c.id))) continue;
+            fund = { i: i, j: j };
+            break suche;
+          }
+        }
+        if (!fund) continue;   // a findet keine erlaubten Partner - naechste Runde wieder
+        const b = frei[fund.i], c = frei[fund.j];
+        frei.splice(fund.j, 1);
+        frei.splice(fund.i, 1);
+        p2.add(paarSchluessel(a.id, b.id));
+        p2.add(paarSchluessel(a.id, c.id));
+        p2.add(paarSchluessel(b.id, c.id));
+        gruppen.push([a, b, c]);
+      }
+      if (!beste || gruppen.length > beste.length) { beste = gruppen; bestePaare = p2; }
+    }
+    for (const g of (beste || [])) neu.push({ kz: kz, teile: g });
+    if (bestePaare) for (const pk of bestePaare) paare.add(pk);
+  }
+
+  if (!neu.length) {
+    meldung("<b>Keine neue Kombination möglich:</b> jedes Paar aus diesen Einsätzen war schon " +
+      "einmal zusammen in einer gesetzten Kombination. Diese Einsätze sind ausgemischt - " +
+      "es wurde nichts verändert.", "warn");
+    return;
+  }
+
+  // In Scheine uebersetzen - art "normal", wie frueher der Automatikbau.
+  const marke = bauMarke();
+  let lfd = 0;
+  for (const s of behalten) if ((s.nr || 0) > lfd) lfd = s.nr;
+  const scheine = behalten.slice();
+  for (const g of neu) {
+    scheine.push(macheSchein(marke, ++lfd, g.kz,
+      g.teile.map(x => ({ id: x.id, optIdx: x.optIdx })), "normal"));
+  }
+  z.scheine = scheine;
+  z.gebautAm = new Date().toISOString();
+  speichereZustand(z);
+  const jeKzText = kzListe.map(kz =>
+    anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length).join(", ");
+  meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + jeKzText + ") - " +
+    "jeder Einsatz bleibt bei seinem Anbieter, und keine zwei Wetten, die schon einmal " +
+    "zusammen gesetzt waren, stecken wieder in einer. " + behalten.length +
+    " gesetzte(r) Schein(e) unberührt. Nochmal drücken baut die nächste Runde.", "gut");
+  zeichne_();
 }
 // ============================================================
 // WAS STEHT SCHON IM VERLAUF? - beide Wege zusammen

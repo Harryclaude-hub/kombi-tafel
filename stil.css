@@ -3131,6 +3131,19 @@ body[data-seite] > .navleiste a.glocke.aktiv {
 .st-mark.st-verloren { background: #f7dcdc; color: #8a0f0f; border: 1px solid #dfa3a3; }
 .st-mark.st-offen    { background: #eef0f5; color: #556;    border: 1px solid #ccd2de; font-weight: 400; }
 
+/* ============================================================
+   DESIGN-SCHICHT: Anbieter-Blick + Misch-Knopf im Kombi-Bau
+   (02.09.2026). Nur Optik, loeschbar - die Kacheln nutzen die
+   ak-Klassen der Anbieter-Karten aus Mein Bereich.
+   ============================================================ */
+.pn-ak { align-items: stretch; margin: 0 0 10px; }
+.pn-misch { border-radius: 8px; padding: 8px 18px; line-height: 1.25; text-align: center; }
+.pn-misch .mini { color: #d9e2f5; font-size: 11.5px; }
+.gs-filterhinweis { color: #7a3d00; }
+@media (max-width: 700px) {
+  .pn-misch { flex: 1 1 100%; }
+}
+
 /* Der Stand-Schalter selbst faerbt sich mit: gewonnen gruen, verloren rot. */
 #scheine_db td.standzelle.st-gewonnen select,
 #scheine_db td.standzelle.st-gewonnen {

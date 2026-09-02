@@ -209,10 +209,6 @@ async function zeigeApp() {
 </div>
 
 <div id="blk_kombis" class="mb-block">
-<h2 id="scheine_titel">Kombinationen</h2>
-<div id="verlaufschalter" class="vf-schalter"></div>
-<div id="scheine_db"></div>
-<div id="ergebnisse"></div>
 <h2>&#128100; Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
 gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b> die
@@ -223,6 +219,10 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
 <div id="importkasten"></div>
+<h2 id="scheine_titel">Kombinationen</h2>
+<div id="verlaufschalter" class="vf-schalter"></div>
+<div id="scheine_db"></div>
+<div id="ergebnisse"></div>
 </div>
 
 <div id="blk_buch" class="mb-block">
