@@ -60,6 +60,36 @@ async function ergebnisseAuswerten() {
   if (_ergLaeuft) return;
   if (!aktiverBereich || typeof darfSchreiben !== "function" || !darfSchreiben()) return;
   const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  // Nachtrag 1: aeltere Scheine ohne "beine" bekommen sie einmalig -
+  // sonst sieht der Server-Waechter (ergebnis-scan) sie nie.
+  if (typeof beineAus === "function") {
+    for (const s of liste) {
+      if (s.stand !== "offen" || s.beine || !s.daten || !(s.daten.wetten || []).length) continue;
+      const b = beineAus(s.daten);
+      if (!b) continue;
+      const r = await supaScheinAendern(s.id, { beine: b });
+      if (!r.error && r.data && r.data.length) s.beine = b;
+    }
+  }
+  // Nachtrag 2: hat der SERVER einen Schein auf "gewonnen" gestellt,
+  // fehlt noch die Auszahlung (der Server kennt Einsatz und Quote nicht,
+  // beide sind verschluesselt). Hier rechnet der Client sie nach -
+  // dieselbe Vorrang-Regel wie unten: Karams "moeglich" schlaegt die
+  // Maschine, eine schon eingetragene Zahl wird NIE ueberschrieben.
+  const ohneZahl = liste.filter(s => s.stand === "gewonnen" &&
+    (s.echt_zurueck === null || s.echt_zurueck === undefined) &&
+    s.daten && (s.daten.wetten || []).length);
+  if (ohneZahl.length) {
+    await ergebnisseLaden([...new Set(ohneZahl.map(s => s.daten.satz).filter(Boolean))]);
+    for (const s of ohneZahl) {
+      const a = scheinDurchrechnen(s);
+      if (a.stand !== "gewonnen") continue;   // Maschine unsicher -> Mensch
+      const glatt = a.beine.every(b => b.ausgang === "gewonnen");
+      const wert = (glatt && Number(s.daten.moeglich) > 0) ? Number(s.daten.moeglich) : a.auszahlung;
+      const r = await supaScheinAendern(s.id, { echt_zurueck: wert });
+      if (!r.error && r.data && r.data.length) s.echt_zurueck = wert;
+    }
+  }
   const offene = liste.filter(s => s.stand === "offen" && s.daten && (s.daten.wetten || []).length);
   if (!offene.length) return;
   _ergLaeuft = true;
@@ -301,6 +331,9 @@ let _ergSucheLaeuft = false;
 // WICHTIG (Geld!): "Celtic B U21" darf NIE auf "Celtic" passen - Jugend-,
 // B- und Frauen-Marker muessen auf BEIDEN Seiten gleich sein, sonst
 // waere es ein anderes Team desselben Vereins.
+// ACHTUNG DRIFT (seit 02.09.): eine WORTGLEICHE Kopie dieser Funktion
+// steht im Server-Waechter (Edge Function "ergebnis-scan", index.ts).
+// Wer hier aendert, aendert dort mit und deployt neu.
 function ergTeamPasst(karam, api) {
   const putz = (t) => String(t || "").toLowerCase().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();

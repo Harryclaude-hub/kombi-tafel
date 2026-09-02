@@ -279,6 +279,21 @@ async function supaScheineKurz(bereichId) {
   return mitFehler(liste, r);
 }
 
+// Die Beine eines Scheins fuer den Server-Waechter (ergebnis-scan):
+// NUR satz + je Bein spiel/linie/anstoss, UNverschluesselt in der neuen
+// Spalte "beine" - mehr braucht der Server nicht, um verloren/gewonnen
+// zu erkennen. Einsaetze, Quoten, Personen, Fotos bleiben Ende-zu-Ende
+// in "daten" (Karams Auftrag vom 02.09.: der Server soll selbst
+// nachschauen, sobald ein Spiel endet).
+function beineAus(daten) {
+  try {
+    const w = (daten && daten.wetten) || [];
+    if (!w.length) return null;
+    return { satz: daten.satz || "",
+      wetten: w.map(x => ({ spiel: x.spiel || "", linie: x.linie || x.wette || "", an: x.an || "" })) };
+  } catch (e) { return null; }
+}
+
 // nummer ist Karams feste Scheinnummer. Die Spalte gab es schon, wurde
 // aber nie gefuellt - deshalb stand im Chat-Anhang immer "K-?".
 async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, nummer) {
@@ -293,7 +308,8 @@ async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, num
     nummer: (typeof nummer === "number" && isFinite(nummer)) ? nummer : null,
     stand: daten.stand || "offen",
     notiz: await e2eZu(key, daten.notiz || "") || "",
-    ordner: ordnerId || null
+    ordner: ordnerId || null,
+    beine: beineAus(daten)
   });
 }
 
@@ -318,8 +334,10 @@ async function supaScheinHolen(id) {
 // Schreibt den verschluesselten Block zurueck. NUR ueber diesen Weg,
 // damit niemand aus Versehen Klartext in die Datenbank legt.
 async function supaScheinDatenSchreiben(id, key, daten) {
+  // beine immer mitziehen: wer daten neu schreibt (Stift-Formular,
+  // Handeingabe), haelt damit auch den Server-Waechter aktuell.
   return await supa.from("kt_scheine")
-    .update({ daten: { e2e: await e2eZu(key, JSON.stringify(daten)) } })
+    .update({ daten: { e2e: await e2eZu(key, JSON.stringify(daten)) }, beine: beineAus(daten) })
     .eq("id", id).select("id");
 }
 

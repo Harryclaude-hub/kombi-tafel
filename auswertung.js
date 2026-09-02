@@ -6,6 +6,12 @@
 // REINE RECHENSCHICHT. Kein DOM, keine Datenbank, kein Netz.
 // Dieselbe Datei laeuft im Browser UND unter Node (fuer die Tests).
 //
+// ACHTUNG DRIFT (seit 02.09.): eine 1:1-Kopie dieser Datei laeuft als
+// auswertung.mjs im Server-Waechter (Supabase Edge Function
+// "ergebnis-scan"). WER HIER AENDERT, MUSS ergebnis-scan NEU DEPLOYEN
+// (die .mjs wird aus dieser Datei erzeugt: Inhalt + export-Zeile).
+// Anleitung steht in UEBERGABE.md Abschnitt 14.
+//
 // Die eiserne Regel (Karam, 01.09.2026): lieber "unklar" sagen und
 // EINMAL nachfragen, als still raten. Ein falsch abgerechneter
 // Schein verfaelscht die Kasse zwischen Freunden. Alles, was diese
