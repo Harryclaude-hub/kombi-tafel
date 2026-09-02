@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902g` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902i` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -690,10 +690,46 @@ Kombination "Gewonnen: Nr. 41 (Sascha) bei Stake: +780.00 € - Stand
 Sascha bei Stake: 680.50 €" (Stand aus personPruefen, dieselbe
 Rechnung wie der Anbieter-Kopf), zeigt oertlich UND pusht mit
 gleichem tag (keine Doppel-Meldung). Wecker-Schalter Gewinne/Verluste
-gelten (gemessen). GRENZE, ehrlich: Selbstsuche + Auswertung laufen
-nur, solange Mein Bereich auf irgendeinem Geraet offen ist - einen
-Server-Scan bei komplett geschlossener App gibt es nicht. Baubar
-waere er jetzt (pg_cron/Edge Function), braucht Karams Auftrag.
+gelten (gemessen).
+
+### Fassung 20260902i: DER SERVER-WAECHTER (Karams "sehr wichtig")
+
+Der fruehere Grenz-Hinweis ("laeuft nur bei offenem Geraet") ist
+GESCHICHTE: Supabase prueft jetzt selbst, rund um die Uhr.
+
+- **Spalte `kt_scheine.beine`** (Migration scheine_beine_fuer_serverscan):
+  je Schein UNverschluesselt NUR `{satz, wetten:[{spiel, linie, an}]}`.
+  BEWUSSTE ABWAEGUNG: ohne diese Offenlegung kann kein Server pruefen.
+  Einsaetze, Quoten, moeglich, Personen, Fotos, Notizen bleiben
+  Ende-zu-Ende in `daten` (gemessen: beineAus traegt keine Geldzahl).
+  supa.js `beineAus()` ist die EINE Stelle; supaScheinAnlegen und
+  supaScheinDatenSchreiben ziehen beine immer mit;
+  ergebnisseAuswerten traegt sie alten offenen Scheinen einmalig nach.
+- **Edge Function `ergebnis-scan`** (Version 2): liest offene Scheine
+  mit beine, sucht Endstaende vorbei gelaufener Spiele (TheSportsDB,
+  dieselben eisernen Regeln, Quelle "automatisch (Server)", nie
+  ueberschreiben), entscheidet ueber `scheinEntscheiden` (EIN Weg fuer
+  Echtlauf und Probe): ein verlorenes Bein = sofort verloren (geht
+  ohne Quote/Einsatz), alle Beine gut = gewonnen; Stand-Wechsel nur
+  solange stand='offen'. Push an die Geraete des Bereichs-Besitzers,
+  OHNE Betraege (verschluesselt). Drossel: ein Echtlauf je 4 Minuten.
+  Probe-Betrieb: POST {probe:{scheine,ergebnisse}} rechnet nur.
+  Am Server gemessen: 6 Faelle alle richtig (verloren trotz offenem
+  Bein, gewonnen, offen, Absage=zurueck, unklar bleibt offen,
+  halbverloren=gewonnen).
+- **Uhr**: pg_cron + pg_net, Job "ergebnis-scan" alle 10 Minuten mit
+  dem OEFFENTLICHEN anon-Schluessel. Gemessen: Marke
+  ergebnis_scan_zuletzt in kt_geheim springt zur vollen 10-Minuten-
+  Marke von selbst.
+- **Der Client rechnet die Betraege nach**: fuer server-entschiedene
+  Gewinne fuellt ergebnisseAuswerten echt_zurueck beim naechsten
+  Oeffnen (Karams moeglich-Wert schlaegt die Maschine; vorhandene
+  Zahlen werden NIE ueberschrieben; gemessen: 200 aus 100 x 2,0).
+- **DRIFT-REGELN (Geld!)**: auswertung.js laeuft als beim Deploy
+  erzeugte 1:1-Kopie (auswertung.mjs = Datei + export-Zeile) im
+  Waechter - wer auswertung.js aendert, deployt ergebnis-scan neu.
+  ergTeamPasst existiert wortgleich in ergebnisse.js UND index.ts der
+  Funktion. Verweise stehen in allen Dateien.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
