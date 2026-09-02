@@ -3369,6 +3369,17 @@ button.haupt:hover { background: color-mix(in srgb, var(--kenn, #1a2c50) 85%, #0
 .bb-kachel.bb-gross.bb-minus .bb-kachelwert { color: #a00000; }
 .bb-kassenbuch table td { padding: 4px 8px; }
 .bb-kassenbuch .tb-q { text-align: right; font-variant-numeric: tabular-nums; }
+/* Berichte in der Buchhaltung (03.09.): Filterzeile + Vorschau. */
+.bb-berichte .bb-filterzeile { display: flex; flex-wrap: wrap; gap: 8px 12px;
+  align-items: center; margin: 8px 0; }
+.bb-berichte .bb-filterzeile select, .bb-berichte .bb-filterzeile input[type="date"] {
+  min-height: 40px; }
+.bb-berichtschau { border: 1px solid #d5dae4; border-radius: 10px; padding: 12px 14px;
+  background: #fff; overflow-x: auto; }
+@media (max-width: 700px) {
+  .bb-berichte .bb-filterzeile label { flex: 1 1 100%; }
+  .bb-berichte .bb-filterzeile select { width: 100%; }
+}
 
 /* ---- 10. KLAPPEN: Handbuch und Erklaerungen in Kapiteln ---- */
 .kl-leiste { border: 1px solid #d5dae4; border-radius: 12px; padding: 12px 14px;

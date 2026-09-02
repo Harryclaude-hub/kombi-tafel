@@ -2013,6 +2013,270 @@ function bbPersonenOffen() {
 let bbArtFilter = "alle";
 function tuBuchArtFilter(wert) { bbArtFilter = wert; zeichneBuchhaltung(); }
 
+// ============================================================
+// BERICHTE (Karam, 03.09.): in der Buchhaltung filtern (Zeitraum,
+// Anbieter, Person, Foto-Ordner), ansehen und als PDF oder Word
+// herunterladen - "alles, was letzten Monat auf Stake gesetzt
+// wurde", "alles von dieser Person", "alles aus diesem Ordner".
+// REINE ANZEIGE: ein einziger Daten-Rechenweg (berichtDaten) speist
+// Bildschirm, PDF und Word; die Gewinn-Formel ist DIESELBE wie in
+// der Konto-Tabelle (zurueck minus entschiedene Einsaetze).
+// ============================================================
+
+let berichtWahl = null;
+function berichtWahlLesen() {
+  if (berichtWahl) return berichtWahl;
+  try { berichtWahl = JSON.parse(localStorage.getItem("kt_bericht_wahl") || "null"); } catch (e) { }
+  if (!berichtWahl) berichtWahl = { zeit: "monat", von: "", bis: "", kz: "alle",
+    person: "alle", satz: "alle", statistik: true, kombis: true, buchungen: false };
+  return berichtWahl;
+}
+function tuBerichtWahl(feld, wert) {
+  const w = berichtWahlLesen();
+  w[feld] = (feld === "statistik" || feld === "kombis" || feld === "buchungen") ? !!wert : wert;
+  try { localStorage.setItem("kt_bericht_wahl", JSON.stringify(w)); } catch (e) { }
+  zeichneBuchhaltung();
+}
+
+// Der gewaehlte Zeitraum als [von, bis) - bis exklusiv.
+function berichtZeitraum() {
+  const w = berichtWahlLesen();
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const tag = 86400000;
+  if (w.zeit === "woche") {
+    const von = new Date(heute.getTime() - ((heute.getDay() + 6) % 7) * tag);   // Montag
+    return { von: von, bis: null, name: "diese Woche (ab " + kasseZeit(von).slice(0, 6) + ")" };
+  }
+  if (w.zeit === "monat") {
+    const von = new Date(heute.getFullYear(), heute.getMonth(), 1);
+    return { von: von, bis: null, name: "dieser Monat" };
+  }
+  if (w.zeit === "letzter") {
+    const von = new Date(heute.getFullYear(), heute.getMonth() - 1, 1);
+    const bis = new Date(heute.getFullYear(), heute.getMonth(), 1);
+    return { von: von, bis: bis, name: "letzter Monat" };
+  }
+  if (w.zeit === "eigen") {
+    const von = w.von ? new Date(w.von + "T00:00") : null;
+    const bis = w.bis ? new Date(new Date(w.bis + "T00:00").getTime() + tag) : null;
+    return { von: von, bis: bis, name: (w.von || "Anfang") + " bis " + (w.bis || "heute") };
+  }
+  return { von: null, bis: null, name: "alles" };
+}
+
+// EIN Rechenweg fuer Anzeige, PDF und Word.
+function berichtDaten() {
+  const w = berichtWahlLesen();
+  const z = berichtZeitraum();
+  const imZeitraum = (d) => {
+    if (!d || isNaN(d.getTime())) return false;
+    if (z.von && d < z.von) return false;
+    if (z.bis && d >= z.bis) return false;
+    return true;
+  };
+  const alle = Array.isArray(kasseScheine) ? kasseScheine.filter(s => s.daten) : [];
+  const scheine = alle.filter(s => {
+    if (!imZeitraum(new Date(s.created_at))) return false;
+    if (w.kz !== "alle" && s.daten.kz !== w.kz) return false;
+    if (w.person !== "alle") {
+      if (w.person === "ohne" ? !!s.ordner : s.ordner !== w.person) return false;
+    }
+    if (w.satz !== "alle" && (s.daten.satz || "") !== w.satz) return false;
+    return true;
+  });
+  // Dieselbe Formel wie zeichneKontoDb: Saldo = zurueck - (Einsatz - im Spiel).
+  const stat = { n: scheine.length, einsatz: 0, imSpiel: 0, zurueck: 0,
+    offen: 0, gew: 0, ver: 0, ohneBetrag: 0 };
+  for (const s of scheine) {
+    stat.einsatz += s.daten.einsatz || 0;
+    if (s.stand === "offen") { stat.offen++; stat.imSpiel += s.daten.einsatz || 0; }
+    else if (s.stand === "gewonnen") {
+      stat.gew++; stat.zurueck += echtZurueckWert(s);
+      if (echtZurueckWert(s) <= 0) stat.ohneBetrag++;
+    } else stat.ver++;
+  }
+  stat.gewinn = rundM(stat.zurueck - (stat.einsatz - stat.imSpiel));
+  // Buchungen: Personen-Buchungen (kennen Person + Anbieter) ...
+  const pb = (Array.isArray(personBuchungen) ? personBuchungen : []).filter(b => {
+    if (!imZeitraum(new Date(b.datum + "T12:00"))) return false;
+    if (w.person !== "alle" && w.person !== "ohne" && b.ordner !== w.person) return false;
+    if (w.kz !== "alle" && b.anbieter && b.anbieter !== w.kz) return false;
+    return true;
+  });
+  const pbSumme = (art) => rundM(pb.filter(b => b.art === art).reduce((p, b) => p + (Number(b.betrag) || 0), 0));
+  const erhalten = pbSumme("erhalten"), anAnbieter = pbSumme("zum_anbieter"), anPersonen = pbSumme("ausgezahlt");
+  return { wahl: w, zeitraum: z, scheine: scheine, stat: stat, pb: pb,
+    erhalten: erhalten, anAnbieter: anAnbieter, anPersonen: anPersonen };
+}
+
+// Das Berichts-HTML: bewusst mit Inline-Farben, damit Bildschirm, PDF
+// und Word EXAKT dasselbe zeigen (Word kennt unser Stylesheet nicht).
+function berichtInnenHtml() {
+  const d = berichtDaten();
+  const w = d.wahl;
+  const kzName = w.kz === "alle" ? "alle Anbieter" : anbieterNameM(w.kz);
+  const personName_ = w.person === "alle" ? "alle Personen"
+    : (w.person === "ohne" ? "ohne Person" : (ordnerNameM(w.person) || "?"));
+  const satzName = w.satz === "alle" ? "alle Ordner"
+    : ((typeof SAETZE !== "undefined" && (SAETZE.find(x => x.id === w.satz) || {}).titel) || w.satz);
+  const farbe = { st: "#1a2c38", iw: "#0a7d3e", bw: "#111", b3: "#14805e" };
+  const marke = (kz) => '<span style="display:inline-block;padding:1px 7px;border-radius:4px;' +
+    'color:#fff;font-weight:bold;font-size:11px;background:' + (farbe[kz] || "#555") + '">' +
+    textSicherM(anbieterNameM(kz) || kz || "?") + "</span>";
+  const geld = (x) => Number(x || 0).toFixed(2) + " &euro;";
+  const kachel = (titel, wert, farbe2) =>
+    '<td style="border:1px solid #ccd2de;border-radius:8px;padding:10px 14px;text-align:center">' +
+    '<div style="font-size:11px;color:#556">' + titel + "</div>" +
+    '<div style="font-size:20px;font-weight:bold;color:' + (farbe2 || "#1a2c50") + '">' + wert + "</div></td>";
+
+  let h = '<div style="font-family:Arial,sans-serif">' +
+    '<h2 style="margin:0 0 2px">&#128209; Bericht: ' + textSicherM(kzName) + " &middot; " +
+    textSicherM(personName_) + " &middot; " + textSicherM(satzName) + "</h2>" +
+    '<div style="font-size:12px;color:#556;margin-bottom:10px">Zeitraum: ' + textSicherM(d.zeitraum.name) +
+    " &middot; erstellt am " + kasseZeit(new Date()) + " &middot; " + d.stat.n + " Kombination(en)</div>";
+
+  if (w.statistik) {
+    h += '<table style="border-collapse:separate;border-spacing:6px;width:100%"><tr>' +
+      kachel("Gesetzt gesamt", geld(d.stat.einsatz)) +
+      kachel("Noch im Spiel (" + d.stat.offen + " offen)", geld(d.stat.imSpiel), "#7a3d00") +
+      kachel("Zur&uuml;ckbekommen (" + d.stat.gew + " gewonnen)", geld(d.stat.zurueck), "#0a5a0a") +
+      kachel("Wettgewinn (entschiedene)", (d.stat.gewinn >= 0 ? "+" : "") + geld(d.stat.gewinn),
+        d.stat.gewinn >= 0 ? "#0a5a0a" : "#a00000") +
+      "</tr><tr>" +
+      kachel("Verloren", d.stat.ver + " Kombination(en)", "#a00000") +
+      kachel("Von Personen erhalten", geld(d.erhalten)) +
+      kachel("Zu Anbietern gezahlt", geld(d.anAnbieter)) +
+      kachel("An Personen ausgezahlt", geld(d.anPersonen)) +
+      "</tr></table>" +
+      '<div style="font-size:11px;color:#556;margin:2px 0 10px">Wettgewinn = Zur&uuml;ckbekommen minus ' +
+      "Eins&auml;tze der schon entschiedenen Kombinationen (dieselbe Rechnung wie die Konto-Tabelle). " +
+      "Erhalten/gezahlt kommt aus den Personen-Buchungen im Zeitraum." +
+      (d.stat.ohneBetrag ? ' <b style="color:#a00000">' + d.stat.ohneBetrag +
+        " gewonnene Kombination(en) ohne Betrag - Gewinn unvollst&auml;ndig!</b>" : "") + "</div>";
+  }
+
+  if (w.kombis && d.scheine.length) {
+    h += '<h3 style="margin:12px 0 4px">Kombinationen (' + d.scheine.length + ")</h3>" +
+      '<table style="border-collapse:collapse;width:100%">' +
+      '<tr style="background:#eef1f7">' +
+      ["Datum", "Nr.", "Anbieter", "Person", "Wetten", "Quote", "Einsatz", "Stand", "Zur&uuml;ck"].map(x =>
+        '<th style="border:1px solid #ccd2de;padding:4px 7px;font-size:12px;text-align:left">' + x + "</th>").join("") + "</tr>";
+    for (const s of d.scheine) {
+      const standFarbe = s.stand === "gewonnen" ? "#0a5a0a" : (s.stand === "verloren" ? "#a00000" : "#556");
+      h += "<tr>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' + zeitM(s.created_at) + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px"><b>' + (s.nummer || "-") + "</b></td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px">' + marke(s.daten.kz) + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' +
+          (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?") : "-") + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:11px">' +
+          (s.daten.wetten || []).map(t => textSicherM(t.spiel) + " <i>(" + textSicherM(t.linie || "") + ")</i>").join("<br>") + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' + (s.daten.quote || 0).toFixed(2) + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' + geld(s.daten.einsatz) + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px;font-weight:bold;color:' + standFarbe + '">' + s.stand + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' +
+          (s.stand === "gewonnen" ? geld(echtZurueckWert(s)) : "-") + "</td></tr>";
+    }
+    h += "</table>";
+  } else if (w.kombis) {
+    h += '<p style="font-size:12px;color:#556">Keine Kombination passt auf diese Auswahl.</p>';
+  }
+
+  if (w.buchungen && d.pb.length) {
+    const kbArt2 = { erhalten: "von Person erhalten", ausgezahlt: "an Person ausgezahlt",
+      zum_anbieter: "Geld zum Anbieter", stand_weg: "Stand-Korrektur (Weg)",
+      stand_anbieter: "Stand-Korrektur (Anbieter)" };
+    h += '<h3 style="margin:12px 0 4px">Personen-Buchungen (' + d.pb.length + ")</h3>" +
+      '<table style="border-collapse:collapse;width:100%"><tr style="background:#eef1f7">' +
+      ["Datum", "Was", "Person", "Betrag"].map(x =>
+        '<th style="border:1px solid #ccd2de;padding:4px 7px;font-size:12px;text-align:left">' + x + "</th>").join("") + "</tr>";
+    for (const b of d.pb.slice().reverse()) {
+      h += "<tr>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' + textSicherM(b.datum) + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' +
+          textSicherM(kbArt2[b.art] || b.art) + (b.anbieter ? " &middot; " + textSicherM(anbieterNameM(b.anbieter) || b.anbieter) : "") +
+          (b.weg ? " &middot; " + textSicherM(b.weg) : "") + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' +
+          ((b.ordner && ordnerNameM(b.ordner)) ? textSicherM(ordnerNameM(b.ordner)) : "-") + "</td>" +
+        '<td style="border:1px solid #dde3ee;padding:4px 7px;font-size:12px">' + geld(b.betrag) + "</td></tr>";
+    }
+    h += "</table>";
+  }
+  return h + "</div>";
+}
+
+// Die Filterzeile plus Anzeige - eingebaut in die Buchhaltung.
+function zeichneBerichtHtml() {
+  const w = berichtWahlLesen();
+  const kzOpt = [["alle", "alle Anbieter"]].concat(KASSE_ANBIETER)
+    .map(([k, n]) => '<option value="' + k + '"' + (w.kz === k ? " selected" : "") + ">" + n + "</option>").join("");
+  const persOpt = ['<option value="alle"' + (w.person === "alle" ? " selected" : "") + ">alle Personen</option>",
+    '<option value="ohne"' + (w.person === "ohne" ? " selected" : "") + ">ohne Person</option>"]
+    .concat((ordnerListe || []).map(o => '<option value="' + o.id + '"' + (w.person === o.id ? " selected" : "") + ">" +
+      textSicherM(o.name) + "</option>")).join("");
+  const saetze = [...new Set((Array.isArray(kasseScheine) ? kasseScheine : [])
+    .filter(s => s.daten && s.daten.satz).map(s => s.daten.satz))].sort().reverse();
+  const satzOpt = ['<option value="alle"' + (w.satz === "alle" ? " selected" : "") + ">alle Ordner</option>"]
+    .concat(saetze.map(sz => {
+      const titel = (typeof SAETZE !== "undefined" && (SAETZE.find(x => x.id === sz) || {}).titel) || sz;
+      return '<option value="' + textSicherM(sz) + '"' + (w.satz === sz ? " selected" : "") + ">" + textSicherM(titel) + "</option>";
+    })).join("");
+  const zeitOpt = [["alles", "alles"], ["woche", "diese Woche"], ["monat", "dieser Monat"],
+    ["letzter", "letzter Monat"], ["eigen", "von-bis"]]
+    .map(([k, n]) => '<option value="' + k + '"' + (w.zeit === k ? " selected" : "") + ">" + n + "</option>").join("");
+  return '<details open class="bb-teil bb-berichte"><summary>&#128209; Berichte: filtern, ansehen, herunterladen</summary>' +
+    '<div class="bb-filterzeile">' +
+    '<label>Zeitraum <select onchange="tuBerichtWahl(\'zeit\', this.value)">' + zeitOpt + "</select></label>" +
+    (w.zeit === "eigen"
+      ? ' <input type="date" value="' + textSicherM(w.von) + '" onchange="tuBerichtWahl(\'von\', this.value)">' +
+        ' bis <input type="date" value="' + textSicherM(w.bis) + '" onchange="tuBerichtWahl(\'bis\', this.value)">'
+      : "") +
+    ' <label>Anbieter <select onchange="tuBerichtWahl(\'kz\', this.value)">' + kzOpt + "</select></label>" +
+    ' <label>Person <select onchange="tuBerichtWahl(\'person\', this.value)">' + persOpt + "</select></label>" +
+    ' <label>Ordner <select onchange="tuBerichtWahl(\'satz\', this.value)">' + satzOpt + "</select></label>" +
+    "</div>" +
+    '<div class="bb-filterzeile mini">' +
+    '<label><input type="checkbox"' + (w.statistik ? " checked" : "") +
+      ' onchange="tuBerichtWahl(\'statistik\', this.checked)"> Statistik</label> ' +
+    '<label><input type="checkbox"' + (w.kombis ? " checked" : "") +
+      ' onchange="tuBerichtWahl(\'kombis\', this.checked)"> Kombinationen</label> ' +
+    '<label><input type="checkbox"' + (w.buchungen ? " checked" : "") +
+      ' onchange="tuBerichtWahl(\'buchungen\', this.checked)"> Personen-Buchungen</label> ' +
+    '<button class="haupt" onclick="tuBerichtPdf()">&#128424; Als PDF speichern</button> ' +
+    '<button onclick="tuBerichtWord()">&#11015; Als Word-Datei</button>' +
+    "</div>" +
+    '<div class="bb-berichtschau">' + berichtInnenHtml() + "</div></details>";
+}
+
+// PDF: dasselbe erprobte Muster wie das Kassen-PDF (Fenster + drucken;
+// im Druckdialog "Als PDF speichern" waehlen).
+function tuBerichtPdf() {
+  const f = window.open("", "_blank");
+  if (!f) { meldungM("Das PDF-Fenster wurde vom Browser geblockt - bitte Pop-ups erlauben.", "warn"); return; }
+  f.document.write("<html><head><title>Kombi-Tafel Bericht</title></head>" +
+    '<body style="background:#fff;margin:24px">' + berichtInnenHtml() + "</body></html>");
+  f.document.close();
+  setTimeout(() => { f.print(); }, 400);
+}
+
+// Word: eine .doc-Datei ist fuer Word auch als HTML lesbar - die
+// Inline-Farben aus berichtInnenHtml kommen dort 1:1 an.
+function tuBerichtWord() {
+  try {
+    const html = "<html><head><meta charset='utf-8'></head><body>" + berichtInnenHtml() + "</body></html>";
+    const blob = new Blob(["﻿", html], { type: "application/msword" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "kombi-tafel-bericht-" + new Date().toISOString().slice(0, 10) + ".doc";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    meldungM("Word-Datei erstellt - sie liegt in deinen Downloads.", "gut");
+  } catch (e) {
+    meldungM("Word-Datei nicht erstellt: " + String(e.message || e).slice(0, 80), "warn");
+  }
+}
+
 async function zeichneBuchhaltung() {
   const box = el("buchhaltung");
   if (!box) return;
@@ -2108,6 +2372,9 @@ async function zeichneBuchhaltung() {
     bbKachel("Ausgezahlt", bbGeld(ausz), "Geld, das ihr herausgeholt habt", "") +
     bbKachel("Startkapital", bbGeld(start), "womit ihr angefangen habt", "") +
     "</div>";
+
+  // ---- 3b. Berichte: filtern, ansehen, herunterladen (Karam 03.09.) ----
+  html += zeichneBerichtHtml();
 
   // ---- 4. Bei wem liegt das offene Geld ----
   if (lage.anzahl) {
