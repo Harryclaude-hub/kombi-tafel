@@ -99,6 +99,32 @@ async function ergebnisseAuswerten() {
 
 // ---------- Melden: Kasten + Benachrichtigung nach Schaltern ----------
 
+// Eine Zeile je Kombination: Nummer, Person, Anbieter, Betrag - und der
+// NEUE rechnerische Stand dieser Person bei diesem Anbieter (Karams
+// Wunsch vom 02.09.). Der Stand kommt aus personPruefen (mein.js),
+// derselben Rechnung wie im Anbieter-Kopf - eine Stelle, kein Drift.
+// Er stimmt hier schon, weil ergebnisseAuswerten stand/echt_zurueck
+// vor dem Melden in kasseScheine eingetragen hat.
+function ergebnisZeile(x) {
+  const s = x.s, d = s.daten || {};
+  const person = (s.ordner && typeof ordnerNameM === "function") ? (ordnerNameM(s.ordner) || "") : "";
+  const kzName = (typeof anbieterNameM === "function") ? anbieterNameM(d.kz) : (d.kz || "?");
+  let zeile = "Nr. " + (s.nummer || "?") + (person ? " (" + person + ")" : "") + " bei " + kzName;
+  if (x.a.stand === "gewonnen")
+    zeile += ": +" + (Number(s.echt_zurueck) || x.a.auszahlung || 0).toFixed(2) + " €";
+  else
+    zeile += ": -" + (Number(d.einsatz) || 0).toFixed(2) + " €";
+  try {
+    if (s.ordner && typeof personPruefen === "function") {
+      const pr = personPruefen(s.ordner, Array.isArray(kasseScheine) ? kasseScheine : []);
+      const a = pr && pr.anbieter && pr.anbieter[d.kz];
+      if (a && isFinite(a.guthaben))
+        zeile += " · Stand " + (person || "Person") + " bei " + kzName + ": " + Number(a.guthaben).toFixed(2) + " €";
+    }
+  } catch (e) { /* der Stand ist Beigabe - die Meldung geht auch ohne */ }
+  return zeile;
+}
+
 function ergebnisMelden(umgestellt) {
   const gew = umgestellt.filter(x => x.a.stand === "gewonnen");
   const ver = umgestellt.filter(x => x.a.stand === "verloren");
@@ -114,18 +140,30 @@ function ergebnisMelden(umgestellt) {
   const w = (typeof weckerWunschLesen === "function") ? weckerWunschLesen() : {};
   const melden = [];
   if (gew.length && w.gewinne !== false)
-    melden.push("Gewonnen: " + gew.map(x => "Nr. " + (x.s.nummer || "?") + " (" + (x.a.auszahlung || 0).toFixed(2) + " €)").join(", "));
+    for (const x of gew) melden.push("✅ Gewonnen: " + ergebnisZeile(x));
   if (ver.length && w.verluste !== false)
-    melden.push("Verloren: " + ver.map(x => "Nr. " + (x.s.nummer || "?")).join(", "));
+    for (const x of ver) melden.push("❌ Verloren: " + ergebnisZeile(x));
   if (!melden.length) return;
+  const titel = "Kombi-Tafel: " +
+    (gew.length && w.gewinne !== false ? gew.length + " gewonnen" : "") +
+    (gew.length && ver.length && w.gewinne !== false && w.verluste !== false ? ", " : "") +
+    (ver.length && w.verluste !== false ? ver.length + " verloren" : "");
+  // 1. Sofort auf DIESEM Geraet zeigen (geht auch ohne Server).
   try {
     if ("Notification" in window && Notification.permission === "granted" &&
         navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then(reg =>
-        reg.showNotification("Kombi-Tafel", { body: melden.join("\n"), tag: "kt-ergebnis",
+        reg.showNotification(titel, { body: melden.join("\n"), tag: "kt-ergebnis",
           icon: "logo-192.png", data: { url: "mein.html", art: "ergebnis" } }));
     }
   } catch (e) { /* Benachrichtigung ist Beigabe, nie Pflicht */ }
+  // 2. Als echter Push an ALLE eigenen Geraete (ergebnis-push): so
+  // klopft der offene Laptop dem Handy an, auch wenn die App dort zu
+  // ist. Gleicher tag wie oben - das offene Geraet bekommt dadurch
+  // keine zweite Meldung, die Push ersetzt die oertliche.
+  try {
+    if (typeof pushAnMich === "function") pushAnMich(titel, melden.join("\n"), "kt-ergebnis");
+  } catch (e) { /* dito */ }
 }
 
 // ---------- Die Eingabetafel ----------

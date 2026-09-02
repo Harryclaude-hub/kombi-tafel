@@ -378,6 +378,37 @@ function pushStatusText(st) {
 
 // ---------- Push an einen Empfaenger schicken ----------
 
+// ---------- Push an MICH selbst: Ergebnis-Meldungen ----------
+// push-senden verweigert Absender = Empfaenger (richtig so, sie ist
+// fuer Anrufe und Nachrichten an ANDERE). Fuer "deine Kombination hat
+// gewonnen/verloren" gibt es deshalb die eigene Server-Funktion
+// ergebnis-push (02.09.): sie schickt NUR an die eigenen Geraete -
+// so klopft der Laptop dem Handy an, auch wenn die App dort zu ist.
+const PUSH_MICH_URL = "https://mqmevpyatjsambervgtu.supabase.co/functions/v1/ergebnis-push";
+
+async function pushAnMich(titel, text, tag) {
+  try {
+    if (!window.supa) return { ok: false, fehler: "keine Datenbank" };
+    const s = await supaSitzung();
+    if (!s) return { ok: false, fehler: "nicht angemeldet" };
+    const a = await fetch(PUSH_MICH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + s.access_token,
+        "apikey": SUPA_KEY
+      },
+      body: JSON.stringify({ titel: titel, text: text, tag: tag || "kt-ergebnis" })
+    });
+    let d = {};
+    try { d = await a.json(); } catch (e) { d = {}; }
+    return { ok: a.status === 200, gesendet: d.gesendet || 0, geraete: d.geraete || 0,
+      fehler: d.fehler || (a.status === 200 ? "" : "Status " + a.status) };
+  } catch (e) {
+    return { ok: false, fehler: String(e.message || e).slice(0, 120) };
+  }
+}
+
 // Gibt IMMER ein Ergebnis zurueck (und wirft nie):
 //   { ok:true, gesendet, geraete, verteilt }  oder  { ok:false, fehler }
 async function pushSenden(anId, art, mehr) {
