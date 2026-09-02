@@ -1334,11 +1334,21 @@ function personPruefen(ordnerId, scheine) {
     else if (b.art === "zum_anbieter") { wege[b.weg].hin += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].einge += betrag; }
     else { wege[b.weg].zurueck += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].geholt += betrag; }
   }
+  const probleme = [];
   for (const s of meine) {
     const a = anbieter[s.daten.kz];
     if (!a) continue;
     a.einsatz += s.daten.einsatz || 0;
-    if (s.stand === "gewonnen") a.gewonnen += echtZurueckWert(s);
+    if (s.stand === "gewonnen") {
+      a.gewonnen += echtZurueckWert(s);
+      // Stiller-0-Schutz (Karam, 03.09.): gewonnen, aber weder "wirklich
+      // bekommen" noch ein Moeglich-Wert - dann wuerde der Person NICHTS
+      // gutgeschrieben, ohne dass es jemand sieht. Das MUSS dastehen.
+      if (echtZurueckWert(s) <= 0)
+        probleme.push("Kombination Nr. " + (s.nummer || "?") + " ist GEWONNEN, aber es steht kein " +
+          "Betrag dran (weder \"wirklich bekommen\" noch ein Möglich-Wert). Der Gewinn fehlt im " +
+          "Konto, bis du ihn bei der Kombination einträgst.");
+    }
     if (s.stand === "offen") {
       a.imSpiel = (a.imSpiel || 0) + (s.daten.einsatz || 0);
       a.moeglichOffen = (a.moeglichOffen || 0) + (s.daten.moeglich || 0);
@@ -1347,7 +1357,6 @@ function personPruefen(ordnerId, scheine) {
       if (e && (!a.endeMax || e > a.endeMax)) a.endeMax = e;
     }
   }
-  const probleme = [];
   for (const [w, nameW] of KASSE_WEGE) {
     const x = wege[w];
     x.stand = x.erhalten - x.hin + x.zurueck - (x.raus || 0) + (x.korrektur || 0);

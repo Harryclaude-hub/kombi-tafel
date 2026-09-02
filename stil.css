@@ -3139,7 +3139,23 @@ body[data-seite] > .navleiste a.glocke.aktiv {
 .pn-ak { align-items: stretch; margin: 0 0 10px; }
 .pn-misch { border-radius: 8px; padding: 8px 18px; line-height: 1.25; text-align: center; }
 .pn-misch .mini { color: #d9e2f5; font-size: 11.5px; }
+.pn-mischgruppe { display: flex; align-items: stretch; gap: 8px; }
+.pn-mischziel { display: flex; flex-direction: column; justify-content: center;
+  text-align: center; line-height: 1.3; }
+.pn-mischziel input { width: 52px; min-height: 36px; text-align: center;
+  font-size: 16px; font-weight: 700; margin: 2px auto; }
 .gs-filterhinweis { color: #7a3d00; }
+
+/* Bau-Tabelle: Linien desselben Spiels ruecken zusammen, zwischen den
+   Einsaetzen eine dicke Trennkante und Luft (Karam, 03.09.). Nur
+   Kanten und Abstaende - KEINE Hintergruende, die Kombi-Farben und
+   Zebra-Regeln bleiben unberuehrt. */
+#eigenbau .tb-tafel tbody tr:not(.tb-weiter) td {
+  border-top: 3px solid #aab6ca; padding-top: 8px;
+}
+#eigenbau .tb-tafel tbody tr.tb-weiter td {
+  border-top: 1px dashed #dde3ee;
+}
 @media (max-width: 700px) {
   .pn-misch { flex: 1 1 100%; }
 }

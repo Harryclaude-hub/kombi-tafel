@@ -1401,13 +1401,17 @@ function zeichneEigenbau() {
   if (!alle.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
   const ersatzMind = mindWert(liesZustand() || {});
 
-  // Wie viel steht schon auf welcher Wette? BEIDE Ablagen, nur dieser
-  // Ordner - liesVerlauf() allein waere bei angemeldetem Nutzer leer.
-  const proWette = {};
+  // Wie viel steht schon auf welcher LINIE? Karam (03.09.): die Summe
+  // gehoert an die Zeile der Linie, die wirklich gesetzt wurde - nicht
+  // immer an die oberste Zeile der Wette. BEIDE Ablagen, dieser Ordner.
+  // Alte Eintraege ohne Linien-Angabe landen weiter bei der ersten Zeile.
+  const proLinie = {};
   const gesetztListe = gesetzteEintraege();
   for (const e of gesetztListe)
-    for (const t of (e.wetten || []))
-      proWette[t.id] = (proWette[t.id] || 0) + (Number(e.einsatz) || 0);
+    for (const t of (e.wetten || [])) {
+      const k = t.id + "|" + (t.linie || "");
+      proLinie[k] = (proLinie[k] || 0) + (Number(e.einsatz) || 0);
+    }
   // Farbe je Kombination und Anbieter-Zeichen je Zeile (siehe kombiKarte)
   const karte = kombiKarte(gesetztListe);
 
@@ -1415,8 +1419,10 @@ function zeichneEigenbau() {
   for (const w of alle) {
     const vorbei = istVorbei(anstossFeld(w));
     const anzahl = Array.isArray(w.o) ? w.o.length : 0;
-    const gesetztH = proWette[w.id] || 0;
     for (let i = 0; i < anzahl; i++) {
+      // Die Summe DIESER Linie; Altbestand ohne Linie zaehlt zur ersten.
+      const gesetztH = (proLinie[w.id + "|" + optionName(w, i)] || 0) +
+        (i === 0 ? (proLinie[w.id + "|"] || 0) : 0);
       if (!vorbei) offen++;
       const treffer = zeilenTreffer(karte, w, i);
       const kzs = [];
@@ -1435,7 +1441,7 @@ function zeichneEigenbau() {
         '<td class="tb-q">' + Number(w.o[i][1]).toFixed(2) + "</td>" +
         '<td class="tb-q tb-mind">' + mindFuer(w, i, ersatzMind).toFixed(2) +
           (w.o[i].length > 2 ? "" : '<span class="tb-ersatz">*</span>') + "</td>" +
-        '<td class="tb-gesetzt">' + (i === 0 && gesetztH ? gesetztH.toFixed(2) + " &euro;" : "") + "</td></tr>";
+        '<td class="tb-gesetzt">' + (gesetztH ? gesetztH.toFixed(2) + " &euro;" : "") + "</td></tr>";
     }
   }
 
@@ -1457,7 +1463,8 @@ function zeichneEigenbau() {
       "eigene Zeile - du setzt nur eine davon. <b>Quote</b> ist die linke Spalte aus dem Foto, " +
       "<b>Mindest</b> die rechte. Ein <b>*</b> heißt: für diese Zeile stand im Foto keine " +
       "Mindestquote, es gilt der Ersatzwert " + ersatzMind.toFixed(2) + ". " +
-      "<b>gesetzt</b> ist die Summe, die auf diese Wette schon draußen ist. " +
+      "<b>gesetzt</b> ist die Summe, die auf GENAU DIESE Linie schon draußen ist " +
+      "(ältere Einträge ohne Linien-Angabe zählen zur ersten Zeile). " +
       "<b>wo</b> zeigt die Anbieter, bei denen die Wette in einer gesetzten Kombination steckt; " +
       "die Hintergrundfarbe ist die Farbe dieser Kombination (siehe Gesetzt), bei mehreren geteilt.</p>";
   ebZaehlen();
@@ -2403,10 +2410,15 @@ function zeichnePanel() {
       '<span class="ak-zeile"><b>' + n + "</b> Kombination" + (n === 1 ? "" : "en") + "</span>" +
       '<span class="ak-zeile">' + (d ? d.einsatz : 0).toFixed(2) + " &euro; gesetzt</span></button>";
   }
-  ak += '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Je Anbieter: die dort ' +
+  const zielWert = parseInt(localStorage.getItem("kt_misch_ziel") || "2", 10) || 2;
+  ak += '<span class="pn-mischgruppe">' +
+    '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Je Anbieter: die dort ' +
     'gesetzten Einsätze neu mischen; keine zwei Wetten, die schon zusammen gesetzt waren, ' +
     'kommen wieder zusammen">' +
-    "&#127922; Kombis neu mischen<br><span class='mini'>je Anbieter, keine Paare doppelt</span></button></div>";
+    "&#127922; Kombis neu mischen<br><span class='mini'>je Anbieter, keine Paare doppelt</span></button>" +
+    '<label class="pn-mischziel mini">jeder Einsatz insgesamt<br>' +
+    '<input id="pn_misch_ziel" type="number" min="1" max="9" value="' + zielWert +
+    '" inputmode="numeric"> mal</label></span></div>';
   kasten.insertAdjacentHTML("afterbegin", ak);
 
   // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
@@ -2509,13 +2521,28 @@ function gesetztePaare() {
   return verboten;
 }
 
+// Wie oft soll jeder Einsatz INSGESAMT gespielt sein? (Karam, 03.09.:
+// "alles einmal gesetzt -> ich will alles ein zweites Mal; oder drei,
+// vier ..."). Gemerkt je Geraet, Standard 2.
+function mischZielLesen() {
+  const feld = document.getElementById("pn_misch_ziel");
+  let ziel = feld ? parseInt(feld.value, 10) : parseInt(localStorage.getItem("kt_misch_ziel") || "2", 10);
+  if (!isFinite(ziel) || ziel < 1) ziel = 2;
+  if (ziel > 9) ziel = 9;
+  try { localStorage.setItem("kt_misch_ziel", String(ziel)); } catch (e) { }
+  return ziel;
+}
+
 function mischOhnePaare() {
   const e = einstellungenLesen();
   const z = liesZustand() || baueAlles();
   const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
+  const ziel = mischZielLesen();
 
-  // Topf je Anbieter: die Einsaetze aus den dort gesetzten Kombinationen.
-  // Nur Wetten, die noch laufen und deren Kennung in der Tafel steht.
+  // Topf je Anbieter: die Einsaetze aus den dort gesetzten Kombinationen,
+  // mit NUTZUNGSZAEHLER (wie oft schon gespielt). Wer sein Ziel erreicht
+  // hat, wird NICHT mehr gemischt; wer darunter liegt, darf so oft in
+  // neue Kombinationen, bis das Ziel steht. Nur laufende Wetten.
   const topfJeKz = {};
   for (const g of gesetzt) {
     if (!g.kz) continue;
@@ -2524,7 +2551,10 @@ function mischOhnePaare() {
       const w = wetteNachId(t.id);
       if (!w || istVorbei(anstossFeld(w))) continue;
       if (nichtDa(t.id, g.kz)) continue;
-      (topfJeKz[g.kz] = topfJeKz[g.kz] || new Map()).set(String(t.id), w);
+      const topf = (topfJeKz[g.kz] = topfJeKz[g.kz] || new Map());
+      const eintrag = topf.get(String(t.id)) || { w: w, nutzung: 0 };
+      eintrag.nutzung++;
+      topf.set(String(t.id), eintrag);
     }
   }
   const kzListe = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
@@ -2541,8 +2571,12 @@ function mischOhnePaare() {
   const weg = (z.scheine || []).filter(s => !behaltenIds.has(s.id));
   const wegEigene = weg.filter(s => s.art === "eigen").length;
   const verboten = gesetztePaare();
-  const toepfe = kzListe.map(kz => anbieterName(kz) + " " + topfJeKz[kz].size + " Einsätze").join(", ");
+  const toepfe = kzListe.map(kz => {
+    const offenN = [...topfJeKz[kz].values()].filter(x => x.nutzung < ziel).length;
+    return anbieterName(kz) + " " + topfJeKz[kz].size + " Einsätze (" + offenN + " unter dem Ziel)";
+  }).join(", ");
   if (!confirm("Kombis neu mischen - je Anbieter, ohne Paar-Wiederholung:\n\n" +
+    "- Ziel: jeder Einsatz soll insgesamt " + ziel + "-mal gespielt sein\n" +
     "- Töpfe: " + toepfe + "\n" +
     "- " + behalten.length + " gesetzte(r) Schein(e) bleiben unberührt\n" +
     "- " + weg.length + " ungesetzte Kombination(en) im Bau werden ersetzt" +
@@ -2567,51 +2601,67 @@ function mischOhnePaare() {
     if (ids.length) dreierGesetzt.add(String(g.kz) + "|" + ids.join("~"));
   }
   const neu = [];
+  const zielVerfehlt = [];   // Rest-Topf: wer sein Ziel nicht erreicht, wird GENANNT
   for (const kz of kzListe) {
-    const info = [...topfJeKz[kz].entries()].map(([id, w]) =>
-      ({ id: id, optIdx: gewaehlteOption(w), spiel: spielKennung(w) }));
-    let beste = null, bestePaare = null;
+    const info = [...topfJeKz[kz].entries()].map(([id, x]) =>
+      ({ id: id, optIdx: gewaehlteOption(x.w), spiel: spielKennung(x.w),
+         spielName: x.w.spiel, rest: Math.max(0, ziel - x.nutzung) }));
+    if (!info.some(x => x.rest > 0)) continue;
+    let beste = null, bestePaare = null, besteRest = null;
     for (let v = 0; v < 40; v++) {
-      const frei = mische(info.slice(), e.saat * 131 + v * 17 + 3);
+      // Jeder Einsatz darf so oft hinein, wie ihm zum Ziel fehlt.
+      const arbeit = new Map(info.map(x => [x.id, x.rest]));
       const p2 = new Set(paare);
       const gruppen = [];
-      while (frei.length >= 3) {
-        const a = frei.shift();
+      let sicherung = 200;                 // gegen Endlosschleifen
+      while (sicherung-- > 0) {
+        // Kandidaten mit Restbedarf, gemischt, hoher Bedarf zuerst -
+        // so werden die Untergespielten bevorzugt aufgefuellt.
+        const frei = mische(info.filter(x => arbeit.get(x.id) > 0), e.saat * 131 + v * 17 + sicherung)
+          .sort((x, y) => arbeit.get(y.id) - arbeit.get(x.id));
+        if (frei.length < 3) break;
         let fund = null;
         suche:
-        for (let i = 0; i < frei.length; i++) {
-          const b = frei[i];
-          if (b.spiel === a.spiel) continue;
-          if (p2.has(paarSchluessel(a.id, b.id))) continue;
-          for (let j = i + 1; j < frei.length; j++) {
-            const c = frei[j];
-            if (c.spiel === a.spiel || c.spiel === b.spiel) continue;
-            if (p2.has(paarSchluessel(a.id, c.id))) continue;
-            if (p2.has(paarSchluessel(b.id, c.id))) continue;
-            if (dreierGesetzt.has(kz + "|" + [a.id, b.id, c.id].sort().join("~"))) continue;
-            fund = { i: i, j: j };
-            break suche;
+        for (let a = 0; a < frei.length; a++) {
+          for (let i = a + 1; i < frei.length; i++) {
+            const A = frei[a], B = frei[i];
+            if (B.spiel === A.spiel) continue;
+            if (p2.has(paarSchluessel(A.id, B.id))) continue;
+            for (let j = i + 1; j < frei.length; j++) {
+              const C = frei[j];
+              if (C.spiel === A.spiel || C.spiel === B.spiel) continue;
+              if (p2.has(paarSchluessel(A.id, C.id))) continue;
+              if (p2.has(paarSchluessel(B.id, C.id))) continue;
+              if (dreierGesetzt.has(kz + "|" + [A.id, B.id, C.id].sort().join("~"))) continue;
+              fund = [A, B, C];
+              break suche;
+            }
           }
         }
-        if (!fund) continue;   // a findet keine erlaubten Partner - naechste Runde wieder
-        const b = frei[fund.i], c = frei[fund.j];
-        frei.splice(fund.j, 1);
-        frei.splice(fund.i, 1);
-        p2.add(paarSchluessel(a.id, b.id));
-        p2.add(paarSchluessel(a.id, c.id));
-        p2.add(paarSchluessel(b.id, c.id));
-        gruppen.push([a, b, c]);
+        if (!fund) break;
+        for (const x of fund) arbeit.set(x.id, arbeit.get(x.id) - 1);
+        p2.add(paarSchluessel(fund[0].id, fund[1].id));
+        p2.add(paarSchluessel(fund[0].id, fund[2].id));
+        p2.add(paarSchluessel(fund[1].id, fund[2].id));
+        gruppen.push(fund);
       }
-      if (!beste || gruppen.length > beste.length) { beste = gruppen; bestePaare = p2; }
+      if (!beste || gruppen.length > beste.length) { beste = gruppen; bestePaare = p2; besteRest = arbeit; }
     }
     for (const g of (beste || [])) neu.push({ kz: kz, teile: g });
     if (bestePaare) for (const pk of bestePaare) paare.add(pk);
+    if (besteRest) for (const x of info) {
+      const r = besteRest.get(x.id);
+      if (r > 0) zielVerfehlt.push(anbieterName(kz) + ": " + x.spielName + " (fehlt noch " + r + "x)");
+    }
   }
 
   if (!neu.length) {
-    meldung("<b>Keine neue Kombination möglich:</b> jedes Paar aus diesen Einsätzen war schon " +
-      "einmal zusammen in einer gesetzten Kombination. Diese Einsätze sind ausgemischt - " +
-      "es wurde nichts verändert.", "warn");
+    meldung("<b>Keine neue Kombination möglich:</b> jedes erlaubte Paar dieser Einsätze war schon " +
+      "einmal zusammen in einer gesetzten Kombination, oder alle haben ihr Ziel von " + ziel +
+      "-mal erreicht. Es wurde nichts verändert." +
+      (zielVerfehlt.length ? "<br><b>Unter dem Ziel bleiben:</b> " +
+        textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
+        (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") : ""), "warn");
     return;
   }
 
@@ -2630,9 +2680,14 @@ function mischOhnePaare() {
   const jeKzText = kzListe.map(kz =>
     anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length).join(", ");
   meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + jeKzText + ") - " +
-    "jeder Einsatz bleibt bei seinem Anbieter, und keine zwei Wetten, die schon einmal " +
-    "zusammen gesetzt waren, stecken wieder in einer. " + behalten.length +
-    " gesetzte(r) Schein(e) unberührt. Nochmal drücken baut die nächste Runde.", "gut");
+    "Ziel: jeder Einsatz insgesamt " + ziel + "-mal, jeder bleibt bei seinem Anbieter, " +
+    "keine zwei Wetten, die schon einmal zusammen gesetzt waren, stecken wieder in einer. " +
+    behalten.length + " gesetzte(r) Schein(e) unberührt." +
+    (zielVerfehlt.length
+      ? "<br><b>&#9888; Unter dem Ziel bleiben:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
+        (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") +
+        " - für sie gibt es kein erlaubtes Paar mehr."
+      : " Alle Einsätze erreichen ihr Ziel."), "gut");
   zeichne_();
 }
 // ============================================================
