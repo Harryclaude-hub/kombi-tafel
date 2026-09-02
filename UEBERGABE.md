@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **02.09.2026**, Fassung `20260902e` (Abschnitt 14 zuerst lesen!).
+Stand: **02.09.2026**, Fassung `20260902f` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -644,6 +644,38 @@ kombis.js: 9 Toene x 3 Helligkeiten = 27, Ordnerwechsel beginnt vorn);
 die Benachrichtigungs-Zeile in Mein Bereich ist raus, die Klingel in
 der Kopfleiste (wecker_knopf) ist die eine Stelle dafuer.
 
+### Fassung 20260902f (spaeter Abend): Misch-Automat + 5-Prozent-Regel
+
+- **Kombis neu mischen** (kombis.js, mischOhnePaare + gesetztePaare +
+  paarSchluessel): Knopf oben im Kombi-Bau-Panel. Nimmt JE ANBIETER die
+  Einsaetze aus den dort gesetzten Kombinationen des Ordners und baut
+  daraus neue 3er-Kombis beim SELBEN Anbieter - die Anbieter mischen
+  sich NIE (Karams harte Regel). Keine zwei Wetten, die schon einmal
+  zusammen in einer gesetzten Kombination waren, kommen wieder zusammen
+  in eine (Paar-Sperre aus BEIDEN Ablagen, gilt ueber Anbietergrenzen).
+  Eine Runde je Druck (jeder Einsatz max. einmal), 40 Mischversuche,
+  bester gewinnt, Scheine als art "normal". Gemessen: 12 Einsaetze ->
+  3 Runden a 4 Kombis, 0 Verstoesse, danach ehrliche
+  "ausgemischt"-Meldung ohne Zustandsaenderung.
+- **Anbieter-Blick + Filter** im Kombi-Bau-Panel: vier Karten
+  (Kombinationen + Einsatz je Anbieter, aus gesetzteEintraege). Klick =
+  Anzeige-Filter fuer Gesetzt-Liste und Kombis in Arbeit
+  (bauAnbieterFilter, nur im Speicher). Unlesbare bleiben immer
+  sichtbar; Farben der Gesetzt-Liste haengen an der UNgefilterten
+  Liste (sonst Farbwechsel beim Filtern).
+- **5-Prozent-Regel** (logik.js mindFuer): ohne Foto-Mindestquote gilt
+  rund2(Quote * 0.95) der jeweiligen Linie; Feld oben und 1,78 nur
+  noch ganz ohne lesbare Quote. Der kopierbare Einlese-Auftrag
+  (admin.js) sagt das jetzt auch und traegt eine
+  Sparsamkeits-Anweisung (gebuendelte Inserts, kein Erkunden).
+- **Fotos nachschieben** (admin.js): die Einlese-Vorschau hat eine
+  Ziel-Auswahl (vs_ziel/vsZielWahl) - neuer Ordner oder bestehender.
+  Bei bestehendem Ziel wird supaSatzAnlegen NICHT gerufen (Upsert
+  wuerde Titel/erstellt_von ueberschreiben); Dedupe gegen den
+  Ziel-Ordner.
+- **Mein Bereich**: im Kombi-Block Reihenfolge Personen -> Konto ->
+  Kombinationen -> Ergebnis-Eingabetafel.
+
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
@@ -653,3 +685,5 @@ der Kopfleiste (wecker_knopf) ist die eine Stelle dafuer.
    liefert die Zahlen zu Einzahlungen und Wettgewinn fuer die
    Buchhaltung - danach stehen buchhaltungs- und eintragsspezifische
    Aufgaben an (seine Worte, noch nicht naeher beschrieben).
+4. Karam testet den Misch-Automaten "die Tage" und will danach am
+   Design weitermachen.
