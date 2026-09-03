@@ -3146,6 +3146,13 @@ body[data-seite] > .navleiste a.glocke.aktiv {
   text-align: center; background: #6b7280; color: #fff; border: 0;
   font-weight: 700; cursor: pointer; }
 .pn-leeren:hover { background: #4b5563; }
+/* Grenzen unter dem Misch-Knopf (Karam, 03.09.). Reine Optik -
+   die Zahlen kommen aus mischGrenzen(), nicht von hier. */
+.pn-grenzen { flex: 1 1 100%; margin-top: 6px; font-size: 12.5px;
+  line-height: 1.5; }
+.pn-gr-zeile { color: #24406b; }
+.pn-gr-stop { color: #a00000; }
+.pn-gr-aus { color: #6b7280; }
 .pn-leeren .mini { color: #e5e7eb; font-size: 11.5px; font-weight: 400; }
 .pn-mischziel { display: flex; flex-direction: column; justify-content: center;
   text-align: center; line-height: 1.3; }

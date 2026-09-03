@@ -2503,7 +2503,9 @@ function zeichnePanel() {
       '<span class="ak-zeile"><b>' + n + "</b> Kombination" + (n === 1 ? "" : "en") + "</span>" +
       '<span class="ak-zeile">' + (d ? d.einsatz : 0).toFixed(2) + " &euro; gesetzt</span></button>";
   }
-  const zielWert = parseInt(localStorage.getItem("kt_misch_ziel") || "2", 10) || 2;
+  // Standard 1 (Karam, 03.09.): 1 heisst "jeder Einsatz einmal im Spiel" -
+  // und das ist er schon, also passiert nichts. Wer mehr will, stellt hoch.
+  const zielWert = parseInt(localStorage.getItem("kt_misch_ziel") || "1", 10) || 1;
   ak += '<span class="pn-mischgruppe">' +
     '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Erst den Anbieter ' +
     'aussuchen, dann NUR dessen gesetzte Einsätze untereinander neu mischen; keine zwei ' +
@@ -2511,11 +2513,11 @@ function zeichnePanel() {
     "&#127922; Kombis neu mischen<br><span class='mini'>ein Anbieter, keine Paare doppelt</span></button>" +
     '<label class="pn-mischziel mini">jeder Einsatz insgesamt<br>' +
     '<input id="pn_misch_ziel" type="number" min="1" max="9" value="' + zielWert +
-    '" inputmode="numeric"> mal</label>' +
+    '" inputmode="numeric" oninput="mischZielGeaendert()" onchange="mischZielGeaendert()"> mal</label>' +
     '<button class="pn-leeren" onclick="panelOffeneLoeschen()" title="Wirft alles aus ' +
     'dem Bau, wo noch NICHTS gesetzt wurde - gesetzte Kombinationen bleiben unberührt">' +
     "&#129529; Ungesetzte löschen<br><span class='mini'>alles ohne Einsatz</span></button>" +
-    '</span></div>';
+    '</span><div class="pn-grenzen" id="pn_grenzen">' + mischGrenzenHtml(zielWert) + "</div></div>";
   kasten.insertAdjacentHTML("afterbegin", ak);
 
   // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
@@ -2702,25 +2704,27 @@ function gesetztePaare() {
 // vier ..."). Gemerkt je Geraet, Standard 2.
 function mischZielLesen() {
   const feld = document.getElementById("pn_misch_ziel");
-  let ziel = feld ? parseInt(feld.value, 10) : parseInt(localStorage.getItem("kt_misch_ziel") || "2", 10);
-  if (!isFinite(ziel) || ziel < 1) ziel = 2;
+  let ziel = feld ? parseInt(feld.value, 10) : parseInt(localStorage.getItem("kt_misch_ziel") || "1", 10);
+  if (!isFinite(ziel) || ziel < 1) ziel = 1;
   if (ziel > 9) ziel = 9;
   try { localStorage.setItem("kt_misch_ziel", String(ziel)); } catch (e) { }
   return ziel;
 }
 
-function mischOhnePaare(kzWahl) {
-  const e = einstellungenLesen();
-  const z = liesZustand() || baueAlles();
-  const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
-  const ziel = mischZielLesen();
-
-  // Topf je Anbieter: die Einsaetze aus den dort gesetzten Kombinationen,
-  // mit NUTZUNGSZAEHLER (wie oft schon gespielt). Wer sein Ziel erreicht
-  // hat, wird NICHT mehr gemischt; wer darunter liegt, darf so oft in
-  // neue Kombinationen, bis das Ziel steht. Nur laufende Wetten.
+// ============================================================
+// TOEPFE UND GRENZEN - EINE Quelle fuer beide
+//
+// Der Misch-Knopf und die Anzeige darunter muessen dieselben Zahlen
+// sehen. Zwei Rechenwege waeren zwei Wahrheiten, und die driften
+// auseinander (genau das ist in diesem Projekt schon passiert).
+//
+// Topf je Anbieter: die Einsaetze aus den dort GESETZTEN
+// Kombinationen, mit Nutzungszaehler (wie oft schon gespielt).
+// Nur laufende Wetten, und nichts, was dort als "gibt es nicht"
+// markiert ist.
+function mischToepfe() {
   const topfJeKz = {};
-  for (const g of gesetzt) {
+  for (const g of gesetzteEintraege().filter(x => !x.unlesbar)) {
     if (!g.kz) continue;
     for (const t of (g.wetten || [])) {
       if (!t || !t.id) continue;
@@ -2733,6 +2737,109 @@ function mischOhnePaare(kzWahl) {
       topf.set(String(t.id), eintrag);
     }
   }
+  return topfJeKz;
+}
+
+// DIE GRENZE, je Anbieter - Karams Rechnung vom 03.09.:
+// "bei drei Kombis kann ich nicht neunmal jede Zahl vorkommen lassen,
+//  ohne dass sich das wiederholt."
+//
+// Reine Mathematik, keine Schaetzung. Ein Spiel hat im Topf (S-1)
+// moegliche Partner-Spiele. Jede Verwendung in einer Dreier-Kombination
+// verbraucht zwei davon, und kein Spiel-Paar darf sich je wiederholen.
+// Also geht jedes Spiel hoechstens floor((S-1)/2)-mal.
+//   Karams Beispiel: 3 gesetzte Kombis = 9 Spiele -> floor(8/2) = 4-mal
+//   je Einsatz, also 9*4/3 = 12 Kombinationen insgesamt, davon 3 schon
+//   gesetzt: 9 neue. Genau seine Zahl.
+// Unter 3 verschiedenen Spielen geht gar nichts - eine Kombination
+// braucht drei.
+function mischGrenzen(toepfe) {
+  const topfJeKz = toepfe || mischToepfe();
+  const raus = {};
+  for (const kz of KT_ANBIETER_RANG) {
+    const topf = topfJeKz[kz];
+    if (!topf) continue;
+    const spiele = new Set([...topf.values()]
+      .map(x => mischSpielSchluessel(x.w.spiel, null)).filter(Boolean));
+    const max = Math.max(1, Math.floor((spiele.size - 1) / 2));
+    let wenigste = Infinity;
+    for (const x of topf.values()) if (x.nutzung < wenigste) wenigste = x.nutzung;
+    raus[kz] = {
+      kz: kz,
+      einsaetze: topf.size,
+      spiele: spiele.size,
+      max: max,
+      // Dieselbe Bedingung wie kzMoeglich im Misch-Knopf, plus die
+      // Spiel-Bedingung: mit zwei verschiedenen Spielen laesst sich
+      // keine Dreier-Kombination bauen.
+      moeglich: topf.size >= 3 && spiele.size >= 3,
+      wenigste: wenigste === Infinity ? 0 : wenigste,
+      // Wie viele Kombinationen dieser Topf insgesamt hergibt und wie
+      // viele davon noch offen sind.
+      kombisGesamt: Math.floor(spiele.size * max / 3)
+    };
+  }
+  return raus;
+}
+
+// Was steht unter dem Misch-Knopf? Karam will es SEHEN, nicht erst in
+// der Rueckfrage lesen: "sag mir, okay, du kannst bei Stake so viel
+// mischen, bei Interwetten nur zweimal."
+function mischGrenzenHtml(ziel) {
+  const gr = mischGrenzen();
+  const kzs = KT_ANBIETER_RANG.filter(kz => gr[kz]);
+  let h = "";
+  if (Number(ziel) <= 1) h +=
+    '<div class="pn-gr-zeile pn-gr-stop">Bei <b>1</b> ist jeder Einsatz schon einmal im ' +
+    'Spiel - da gibt es nichts zu mischen. Stell auf 2, dann kommt jeder ein zweites Mal.</div>';
+  if (!kzs.length) return h +
+    '<div class="pn-gr-aus">Noch nichts gesetzt - es gibt nichts zu mischen.</div>';
+  for (const kz of kzs) {
+    const g = gr[kz];
+    const name = textSicherK2(anbieterName(kz));
+    if (!g.moeglich) {
+      h += '<div class="pn-gr-zeile pn-gr-stop">' + name + ": <b>geht nicht</b> - nur " +
+        g.spiele + (g.spiele === 1 ? " verschiedenes Spiel" : " verschiedene Spiele") +
+        " gesetzt. Eine Kombination braucht drei.</div>";
+      continue;
+    }
+    const eng = Number(ziel) > g.max;
+    h += '<div class="pn-gr-zeile' + (eng ? " pn-gr-stop" : "") + '">' + name +
+      ": höchstens <b>" + g.max + "-mal</b> je Einsatz (" + g.spiele + " Spiele, " +
+      g.kombisGesamt + " Kombinationen insgesamt möglich)" +
+      (eng ? " &ndash; <b>" + ziel + " geht dort nicht mehr</b>, sonst wiederholt sich ein Paar. " +
+        "Es wird auf " + g.max + " gedeckelt." : "") + "</div>";
+  }
+  return h;
+}
+
+// Zahl im Feld geaendert: die Grenzen sofort neu schreiben. Kein
+// zeichne_(), das wuerde beim Tippen die halbe Seite neu bauen.
+function mischZielGeaendert() {
+  const kasten = document.getElementById("pn_grenzen");
+  if (kasten) kasten.innerHTML = mischGrenzenHtml(mischZielLesen());
+}
+
+function mischOhnePaare(kzWahl) {
+  const e = einstellungenLesen();
+  const z = liesZustand() || baueAlles();
+  const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
+  const ziel = mischZielLesen();
+
+  // Karam, 03.09.: 1 ist der Standard und heisst "jeder Einsatz einmal
+  // im Spiel". Das ist er bereits - es gibt also nichts zu mischen.
+  if (ziel <= 1) {
+    meldung("<b>Bei 1 gibt es nichts zu mischen:</b> jeder gesetzte Einsatz ist schon einmal " +
+      "im Spiel. Stell die Zahl neben dem Knopf auf 2, dann kommt jeder ein zweites Mal vor - " +
+      "und so weiter, bis die Grenze unter dem Knopf erreicht ist.", "warn");
+    return;
+  }
+
+  // Topf je Anbieter: die Einsaetze aus den dort gesetzten Kombinationen,
+  // mit NUTZUNGSZAEHLER (wie oft schon gespielt). Wer sein Ziel erreicht
+  // hat, wird NICHT mehr gemischt; wer darunter liegt, darf so oft in
+  // neue Kombinationen, bis das Ziel steht. Nur laufende Wetten.
+  const topfJeKz = mischToepfe();
   const kzMoeglich = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
   if (!kzMoeglich.length) {
     meldung("<b>Zum Mischen braucht es gesetzte Kombinationen:</b> der Knopf nimmt bei EINEM " +
@@ -2773,12 +2880,9 @@ function mischOhnePaare(kzWahl) {
   // darf sich je wiederholen. Also geht jedes Spiel hoechstens
   // floor((S-1)/2)-mal. Bei 12 Einsaetzen: (12-1)/2 = 5.
   // Liegt Karams Ziel darueber, wird HART gedeckelt und angesagt.
+  const grenzen = mischGrenzen(topfJeKz);
   const maxJeKz = {};
-  for (const kz of kzListe) {
-    const spiele = new Set([...topfJeKz[kz].values()]
-      .map(x => mischSpielSchluessel(x.w.spiel, null)).filter(Boolean));
-    maxJeKz[kz] = Math.max(1, Math.floor((spiele.size - 1) / 2));
-  }
+  for (const kz of kzListe) maxJeKz[kz] = grenzen[kz].max;
 
   // Gesetzte Scheine bleiben. Von den ungesetzten fallen NUR die des
   // gewaehlten Anbieters weg - sonst raeumte eine Stake-Mischung Karams

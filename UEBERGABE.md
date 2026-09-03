@@ -935,6 +935,43 @@ standen; sie aendern sich nicht dadurch, dass hier das falsche Etikett
 klebte. Neu rechnen hiesse, eine echte Zahl durch eine geschaetzte zu
 ersetzen.
 
+### Fassung 20260903e: Misch-Ziel Standard 1 + Grenze je Anbieter sichtbar
+
+Karam am 03.09.: "bei drei Kombis kann ich nicht neunmal jede Zahl
+vorkommen lassen, ohne dass sich das wiederholt. Ich moechte, dass eins
+immer der Standard ist ... und sag mir, du kannst bei Stake so viel
+mischen, bei Interwetten nur zweimal."
+
+**Standard ist jetzt 1.** `mischZielLesen()` und das Feld im Panel
+gehen von 1 aus statt von 2. 1 heisst "jeder Einsatz einmal im Spiel" -
+und das ist er bereits, also passiert nichts. `mischOhnePaare()` bricht
+bei `ziel <= 1` gleich mit einer Erklaerung ab, statt still nichts zu
+tun. 2 heisst "jeder ein zweites Mal", und so weiter bis zur Grenze.
+
+**Die Grenze steht jetzt unter dem Knopf**, nicht erst in der
+Rueckfrage: `mischGrenzenHtml()` schreibt je Anbieter, wie oft jeder
+Einsatz hoechstens vorkommen kann, wie viele verschiedene Spiele im
+Topf liegen und wie viele Kombinationen der Topf insgesamt hergibt.
+Steht die Zahl im Feld darueber, wird die Zeile ROT und sagt, dass dort
+gedeckelt wird. `mischZielGeaendert()` schreibt das beim Tippen neu
+(nur den Kasten, kein `zeichne_()`).
+
+**Die Rechnung** (unveraendert, jetzt nur sichtbar): ein Spiel hat im
+Topf (S-1) moegliche Partner, jede Verwendung verbraucht zwei davon,
+kein Paar darf sich wiederholen -> hoechstens `floor((S-1)/2)`-mal je
+Einsatz, insgesamt `floor(S*max/3)` Kombinationen.
+Karams Beispiel geht auf: 3 gesetzte Kombis = 9 Spiele -> 4-mal je
+Einsatz, 12 Kombinationen insgesamt, davon 3 schon gesetzt = 9 neue.
+
+**EINE Quelle für beide Wege:** `mischToepfe()` und `mischGrenzen()`
+sind aus `mischOhnePaare()` herausgezogen; der Knopf nutzt jetzt
+dieselben Funktionen wie die Anzeige. Zwei Rechenwege waeren zwei
+Wahrheiten, und die driften auseinander - genau diese Fehlerklasse
+steht schon in `code-fehler-vermeiden`.
+
+Weiter gilt: es wird nur bei EINEM Anbieter gemischt (Abschnitt
+20260903b/c), Anbieter mischen sich nie untereinander.
+
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
