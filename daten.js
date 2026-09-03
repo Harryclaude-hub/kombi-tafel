@@ -29,8 +29,17 @@
 // Stimmt der Versatz einmal nicht mehr: hier auf 0 setzen, sonst nichts aendern.
 const ZEITVERSATZ_MINUTEN = 60;
 
+// KARAMS REGEL (03.09.2026): die eingetippte Quote gilt UNGETEILT als
+// die echte - auch bei Interwetten. Die fruehere Vorab-Teilung durch
+// 1,05 lag oft daneben ("meistens falsch"). Die Gebuehr entsteht jetzt
+// NUR noch rueckwaerts: Karam traegt den vom Anbieter angesagten
+// Hoechstgewinn ins moeglich-Feld ein, und die Tafel rechnet
+// Gebuehr = Einsatz x Quote laut Schein minus angesagter Gewinn
+// (kombis.js gebuehrText/baueVerlaufsEintrag). Die Teiler-Mechanik
+// bleibt stehen, falls je wieder ein Anbieter vorab teilen soll -
+// dann hier UND in den zwei Kopien in verteiler.js aendern.
 const GEBUEHREN_TEILER = {   // echte Quote = Eingabe / Teiler
-  iw: 1.05,   // Interwetten AT: 5 % Wettgebuehr, geprueft 24.08.2026
+  iw: 1.00,   // Interwetten AT: Eingabe gilt, Gebuehr kommt aus dem angesagten Gewinn
   bw: 1.00,   // Bwin uebernimmt selbst (seit Mai 2026)
   b3: 1.00,   // Bet365: kein Abzug
   st: 1.00    // Stake: kein Abzug (aber Krypto-Netzwerkgebuehr bei Auszahlung)

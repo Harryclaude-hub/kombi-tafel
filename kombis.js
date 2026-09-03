@@ -599,8 +599,11 @@ function quoteEintragen(scheinId, wettId, feld) {
   const mindW = mindFuer(w, eintrag.optIdx, z.einst.mind);
   if (sch.art === "normal" && echt < mindW - 0.0001) {
     feld.classList.add("fehler");
+    // Den "real nur"-Zusatz gibt es nur, wenn ein Teiler wirklich
+    // etwas abzieht - seit 03.09. stehen alle auf 1 (Karams Regel).
     meldung("Nicht übernommen: " + roh.toFixed(2) + " bei " + anbieterName(sch.kz) +
-      " sind real nur " + rund2(echt).toFixed(2) + ", das liegt unter der Mindestquote " +
+      (rund2(echt) !== rund2(roh) ? " sind real nur " + rund2(echt).toFixed(2) + ", das" : "") +
+      " liegt unter der Mindestquote " +
       mindW.toFixed(2) + " dieser Wette (aus dem Foto). Entweder du nimmst die Wette raus, " +
       "oder du suchst eine andere Linie desselben Spiels.",
       "warn");

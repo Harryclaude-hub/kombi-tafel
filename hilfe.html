@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260902m">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260902m">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260903a">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260903a">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,7 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260902m">
+<link rel="stylesheet" href="stil.css?v=20260903a">
 </head>
 <body data-seite="hilfe">
 
@@ -39,8 +39,8 @@ Für das grosse Handbuch mit Zahlenbeispielen gibt es die eigene Seite.</div>
 <div class="kern"><b>So gehst du vor:</b> Oben beim Anbieter-Filter z.&nbsp;B. <b>Bet365</b>
 anklicken, dann siehst du alle Wetten, die dort gesetzt werden. Alles setzen, dabei die
 Live-Quoten in die Felder tippen (jede Eingabe bekommt einen Zeitstempel). Dann den
-nächsten Anbieter anklicken, weiter. Interwetten-Eingaben rechnet das Programm sofort
-<b>durch 1,05</b> herunter; der echte Bestwert wird <b>grün</b> und die Wette wandert
+nächsten Anbieter anklicken, weiter. Deine Eingabe zählt bei JEDEM Anbieter
+<b>ungeteilt</b> (auch bei Interwetten); der Bestwert wird <b>grün</b> und die Wette wandert
 automatisch zum richtigen Anbieter-Filter. In jeder Zeile: <b>"Info + Links"</b> anklicken
 für Erklärung, Anbieter-Links und den Quoten-Vergleichslink.
 Bei [doppelt]-Spielen: nur EINE der Wetten in eine Kombi.
@@ -67,7 +67,8 @@ die Suche direkt zum Team. Bei Interwetten, Bet365 und Stake öffnet sich die Sp
 dort oben die Lupe antippen und den Teamnamen einfuegen, den du mit dem Knopf <b>"Name"</b> kopiert hast.</li>
 <li>Wette im richtigen Reiter suchen (Code in der letzten Spalte, Anleitung im Reiter-Kasten oben).</li>
 <li><b>Nur die Quote</b> ins Feld tippen, die dort steht. Nichts umrechnen, kein Einsatz.
-Bei Interwetten die ANGEZEIGTE Zahl, das Programm teilt selbst durch 1,05.</li>
+Auch bei Interwetten zählt die ANGEZEIGTE Zahl ungeteilt - die Gebühr rechnet die Tafel
+später aus deinem angesagten Höchstgewinn aus (siehe Gebühren-Kasten unten).</li>
 <li>Sobald du klickst oder tippst, merkt sich die Zelle <b>wann du zuletzt nachgeschaut hast</b>.
 So siehst du sofort, welche Quoten frisch sind und welche von gestern.</li>
 <li>Bei Klammer-Wetten vorher im Dropdown die Linie wählen und die Quote genau dieser Linie eintragen.</li>
@@ -82,7 +83,7 @@ Sobald in einer Zeile zwei Quoten stehen, ist <b>gruen</b> eine echte Aussage, u
 <table>
 <tr><th>Anbieter</th><th>Beim EINSETZEN</th><th>Beim GEWINNEN</th><th>Beim VERLIEREN</th><th>Ein-/Auszahlung</th></tr>
 <tr><td><b>Interwetten</b></td><td class="gruen">keine</td>
-<td class="rot">JA: die Anzeige wird durch 1,05 geteilt (5 % Wettgebuehr), du bekommst rund 4,8 % weniger ausgezahlt</td>
+<td class="rot">JA: rund 5 % Wettgebuehr, der angesagte Höchstgewinn auf dem Schein ist entsprechend niedriger als Einsatz &times; Quote. Trag GENAU diese angesagte Zahl ins möglich-Feld ein - die Tafel rechnet daraus die Gebühr.</td>
 <td class="gruen">keine, bei Verlust trägt Interwetten die Steuer selbst</td><td>keine bekannten</td></tr>
 <tr><td><b>Bwin</b></td><td class="gruen">keine</td><td class="gruen">keine, uebernimmt die 5 % seit Mai 2026 selbst</td>
 <td class="gruen">keine</td><td>keine von Bwin selbst, höchstens dein Zahlungsdienst</td></tr>
@@ -171,7 +172,7 @@ einbauen, sag Bescheid wenn du das willst.</p>
 <tr><td>Seite öffnen / Name</td><td>"Seite öffnen" springt zum jeweiligen Anbieter (bei Bwin direkt in die Suche, sonst auf die Sportwetten-Seite). "Name" kopiert den Teamnamen, damit du ihn dort in die Lupe einfuegen kannst.</td></tr>
 
 <tr><td>Gemeldet</td><td>Die zweite Zeitspalte der Fotos: wann der Tippgeber den Tipp eingetragen hat. Beispiel Zeile 1: Anstoss 27.08. 18:00, gemeldet 22.08. 11:50, der Tipp war beim Foto also schon 2 Tage alt. Je aelter, desto eher steht die Quote inzwischen woanders.</td></tr>
-<tr><td>real</td><td>Was du nach Gebühr wirklich bekommst. Nur bei Interwetten anders als die Anzeige: dort gilt <b>Anzeige geteilt durch 1,05</b> (5&nbsp;% Wettgebuehr, nur bei Gewinn fällig). Bwin, Bet365 und Stake zahlen voll.</td></tr>
+<tr><td>real</td><td>Seit 03.09.2026: <b>deine eingetippte Quote gilt bei allen vier Anbietern ungeteilt</b>. Die Interwetten-Gebühr (rund 5&nbsp;%, nur bei Gewinn fällig) steckt stattdessen im angesagten Höchstgewinn: trag beim Setzen die Zahl vom Wettschein ins möglich-Feld ein, die Tafel rechnet die Gebühr als Differenz aus. Bwin, Bet365 und Stake zahlen voll.</td></tr>
 <tr><td>Foto-Quote X, kein Abzug</td><td>Steht in den Zellen von Bwin/Bet365/Stake, solange du nichts getippt hast: dieser Anbieter zieht nichts ab, als Anhaltspunkt dient die Tabellenquote. Die echte Zahl siehst du erst in der App.</td></tr>
 </table>
 
@@ -215,11 +216,11 @@ Netzwerkgebuehr bei jeder Auszahlung.</td></tr>
 bei <b>Quoten-Boosts und Kombi-Aktionen</b> (die Boost-Quote schlaegt dann alle), und immer dann,
 wenn dein Bet365-Konto <b>limitiert</b> ist. Dazu: oesterreichischer Anbieter, Euro,
 deutschsprachiger Support, volle Rechtssicherheit.</td></tr>
-<tr><td>Interwetten besser</td><td>Fast nie, und zwar wegen der Gebühr: die Anzeige dort muss
-<b>mehr als 5&nbsp;% über allen anderen</b> liegen (Rechnung: beste andere Quote mal 1,05, das muss
-Interwetten im Schaufenster schlagen). Kommt am ehesten vor bei <b>oesterreichischen Bewerben</b> und
-eigenen Boost-Aktionen, oder wenn sonst niemand den Markt hat. Deshalb: nie ganz weglassen,
-aber immer mit der 1,05-Schwelle prüfen.</td></tr>
+<tr><td>Interwetten besser</td><td>Selten, und zwar wegen der Gebühr: rund 5&nbsp;% des Gewinns
+gehen weg (sichtbar am angesagten Höchstgewinn auf dem Schein). Damit sich Interwetten lohnt,
+sollte die Quote dort spürbar über allen anderen liegen - als Faustregel <b>mehr als 5&nbsp;% drüber</b>.
+Kommt am ehesten vor bei <b>oesterreichischen Bewerben</b> und eigenen Boost-Aktionen, oder wenn
+sonst niemand den Markt hat. Deshalb: nie ganz weglassen, aber die Gebühr im Kopf behalten.</td></tr>
 <tr><td>Bet365 besser</td><td>Im Schnitt bei: <b>asiatischen Linien</b> (Hausspezialitaet, meiste
 Linien), <b>Ecken in normalen Ligen</b>, <b>kleinen Tennis-Turnieren</b>, und überall dort, wo andere
 den Markt gar nicht führen. Und praktisch: als einziger in keinem der 80 Recherche-Kriterien
@@ -234,7 +235,7 @@ passend zum Markttyp der jeweiligen Wette.</p>
 <tr><td>Anstoss</td><td>Wann das Spiel beginnt. "Zeit?" = im Foto stand nur das Datum. Vergangene Spiele werden ausgeblendet (Schalter oben).</td></tr>
 <tr><td>[doppelt]</td><td>Dieses Spiel steht mehrfach in der Liste (z.&nbsp;B. Jablonec mit zwei verschiedenen Wetten). <b>Nur EINE davon in eine Kombi</b>, sonst hängen die Kombis zusammen und fallen gemeinsam.</td></tr>
 <tr><td>START-TIPP</td><td>Wo du bei dieser Wette ZUERST schauen sollst (Bet365 zuerst, weil ohne Gebühr und mit dem grössten Angebot; Interwetten wegen der Gebühr immer zuletzt). KEINE Aussage über die beste Live-Quote! Einschätzung, kein Beleg.</td></tr>
-<tr><td>BESTER (getippt)</td><td>Sobald du Live-Quoten eintippst, gewinnt der höchste ECHTE Wert (Interwetten durch 1,05 geteilt) und ersetzt die Vorgabe.</td></tr>
+<tr><td>BESTER (getippt)</td><td>Sobald du Live-Quoten eintippst, gewinnt der höchste eingetippte Wert und ersetzt die Vorgabe. Denk bei Interwetten an die ~5&nbsp;% Gebühr auf den Gewinn, die die anderen drei nicht haben.</td></tr>
 <tr><td>Markt duenn / kein Markt</td><td>Einschätzung, ob der Anbieter diese Wette in dieser Liga überhaupt führt. "Kein Markt (vermutl.)" hat deshalb kein Eingabefeld. Findest du die Wette dort doch: sag Bescheid, wird korrigiert.</td></tr>
 <tr><td>Anbieter-Rang (1. bis 4.)</td><td>Jede Wette hat eine Rangliste der vier Anbieter:
 mit getippten Live-Quoten zählt der echte Wert (absteigend), ohne Eingaben entscheidet
@@ -285,16 +286,16 @@ so wie das, was sie meinen.</p>
 schlank bleibt. Rechenwege und Filter stecken in der Tafel, hier steht nur Wissen.</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="krypto.js?v=20260902m"></script>
-<script src="medien.js?v=20260902m"></script>
-<script src="anruf-server.js?v=20260902m"></script>
-<script src="anruf.js?v=20260902m"></script>
-<script src="supa.js?v=20260902m"></script>
-<script src="benachrichtigung.js?v=20260902m"></script>
-<script src="profil.js?v=20260902m"></script>
-<script src="anhang.js?v=20260902m"></script>
-<script src="glocke.js?v=20260902m"></script>
-<script src="handy.js?v=20260902m"></script>
-<script src="klappen.js?v=20260902m"></script>
+<script src="krypto.js?v=20260903a"></script>
+<script src="medien.js?v=20260903a"></script>
+<script src="anruf-server.js?v=20260903a"></script>
+<script src="anruf.js?v=20260903a"></script>
+<script src="supa.js?v=20260903a"></script>
+<script src="benachrichtigung.js?v=20260903a"></script>
+<script src="profil.js?v=20260903a"></script>
+<script src="anhang.js?v=20260903a"></script>
+<script src="glocke.js?v=20260903a"></script>
+<script src="handy.js?v=20260903a"></script>
+<script src="klappen.js?v=20260903a"></script>
 </body>
 </html>

@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260902m">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260902m">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260903a">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260903a">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,7 +25,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260902m">
+<link rel="stylesheet" href="stil.css?v=20260903a">
 </head>
 <body data-seite="handbuch">
 
@@ -202,9 +202,13 @@ und umgekehrt. "Einsatz zurück" bleibt "Einsatz zurück".</p>
 
 <h2>8. Der Interwetten-Sonderfall</h2>
 
-<div class="zeitkern"><b>Bei Interwetten ist die angezeigte Quote nicht die echte Quote.</b>
+<div class="zeitkern"><b>Bei Interwetten zahlt der Schein weniger aus, als Einsatz mal Quote verspricht.</b>
 In Österreich fällt eine Wettgebühr von 5 Prozent an, und Interwetten ist der Einzige
-deiner vier, der sie an dich weitergibt. Gerechnet wird: <b>angezeigte Quote geteilt durch 1,05</b>.</div>
+deiner vier, der sie an dich weitergibt. Seit 03.09.2026 rechnet die Tafel deine eingetippte
+Quote trotzdem <b>ungeteilt</b> - denn die pauschale Umrechnung lag oft daneben. Stattdessen
+trägst du nach dem Setzen den <b>angesagten Höchstgewinn vom Wettschein</b> ins möglich-Feld ein,
+und die Tafel rechnet die echte Gebühr als Differenz aus. Die Tabelle unten zeigt,
+warum das wichtig ist: so viel frisst die Gebühr ungefähr.</div>
 
 <div class="bsp">
 <b class="kopf">Was das mit deinem Geld macht</b>
@@ -214,9 +218,10 @@ deiner vier, der sie an dich weitergibt. Gerechnet wird: <b>angezeigte Quote get
 <tr><td>2,00</td><td><b>1,90</b></td><td>19,05 &euro;</td><td>9,05 statt 10,00 &euro;</td></tr>
 <tr><td>3,00</td><td><b>2,86</b></td><td>28,57 &euro;</td><td>18,57 statt 20,00 &euro;</td></tr>
 </table>
-<p><b>Merk dir die Schwelle:</b> Damit Interwetten mit einem anderen Anbieter gleichzieht, muss dort
-<b>5 Prozent mehr</b> stehen. Bietet Bet365 2,00, dann braucht Interwetten <b>2,10</b> nur für
-ein Unentschieden.</p>
+<p><b>Merk dir die Faustregel:</b> Damit Interwetten mit einem anderen Anbieter gleichzieht, muss dort
+<b>rund 5 Prozent mehr</b> stehen. Bietet Bet365 2,00, dann braucht Interwetten etwa <b>2,10</b> nur für
+ein Unentschieden. Die Tafel rechnet das nicht mehr für dich vor - vergleiche selbst und trag
+nach dem Setzen den angesagten Höchstgewinn ein.</p>
 </div>
 
 <div class="fuss">
@@ -227,17 +232,17 @@ Alle Angaben ohne Gewähr.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="krypto.js?v=20260902m"></script>
-<script src="medien.js?v=20260902m"></script>
-<script src="anruf-server.js?v=20260902m"></script>
-<script src="anruf.js?v=20260902m"></script>
-<script src="supa.js?v=20260902m"></script>
-<script src="benachrichtigung.js?v=20260902m"></script>
-<script src="profil.js?v=20260902m"></script>
-<script src="anhang.js?v=20260902m"></script>
-<script src="glocke.js?v=20260902m"></script>
-<script src="schule.js?v=20260902m"></script>
-<script src="handy.js?v=20260902m"></script>
-<script src="klappen.js?v=20260902m"></script>
+<script src="krypto.js?v=20260903a"></script>
+<script src="medien.js?v=20260903a"></script>
+<script src="anruf-server.js?v=20260903a"></script>
+<script src="anruf.js?v=20260903a"></script>
+<script src="supa.js?v=20260903a"></script>
+<script src="benachrichtigung.js?v=20260903a"></script>
+<script src="profil.js?v=20260903a"></script>
+<script src="anhang.js?v=20260903a"></script>
+<script src="glocke.js?v=20260903a"></script>
+<script src="schule.js?v=20260903a"></script>
+<script src="handy.js?v=20260903a"></script>
+<script src="klappen.js?v=20260903a"></script>
 </body>
 </html>

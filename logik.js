@@ -604,7 +604,7 @@ function erklaerung(w, optIdx) {
 }
 
 const ANBIETER_GRUND = {
-  iw: "Gebühr: jede Quote zählt real nur durch 1,05 geteilt (nur bei Gewinn faellig).",
+  iw: "Gebühr: der Schein zahlt ~5 % weniger aus als Einsatz mal Quote. Deine Quote zählt ungeteilt - trag nach dem Setzen den angesagten Höchstgewinn ein, die Differenz ist die Gebühr.",
   bw: "Keine Gebühr (Bwin uebernimmt die 5 % seit Mai 2026 selbst).",
   b3: "Keine Gebühr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
   st: "Keine Gebühr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
@@ -790,7 +790,7 @@ function baueDetailZeile(w) {
         "der vier Anbieter. Interwetten und Stake sind dort nicht gelistet.</small>";
     })() +
     "<br><b>Gegenpruefen bei:</b> " + alternativText(w) +
-    "<br><b>Interwetten-Schwelle:</b> lohnt nur, wenn die Anzeige dort über beste andere Quote mal 1,05 liegt." +
+    "<br><b>Interwetten:</b> die eingetippte Quote zählt ungeteilt - die Gebühr rechnet die Tafel nach dem Setzen aus deinem angesagten Höchstgewinn aus." +
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
     "alle Anbieter-Quoten für dieses Spiel suchen</a> (öffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
     "<br><b>Die vier Anbieter für diese Wette:</b><ul>" + anbieterHtml + "</ul>" +

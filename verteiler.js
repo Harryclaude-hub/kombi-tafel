@@ -74,9 +74,11 @@
 /* Feste Groessen                                                      */
 /* ------------------------------------------------------------------ */
 
-// Nur Interwetten gibt die 5 Prozent Gebuehr weiter, die Quote wird dort
-// GETEILT. Die anderen drei rechnen glatt.
-var GEBUEHREN_TEILER = { iw: 1.05, bw: 1.00, b3: 1.00, st: 1.00 };
+// KARAMS REGEL (03.09.2026): die eingetippte Quote gilt UNGETEILT,
+// auch bei Interwetten - die Gebuehr rechnet die Tafel rueckwaerts aus
+// dem angesagten Hoechstgewinn (siehe daten.js). Teiler bleiben als
+// Mechanik stehen, alle auf 1.
+var GEBUEHREN_TEILER = { iw: 1.00, bw: 1.00, b3: 1.00, st: 1.00 };
 
 var ALLE_ANBIETER = ["iw", "bw", "b3", "st"];
 var LETZTE_WAHL = "b3";
@@ -775,9 +777,11 @@ FENSTER.verteilePaare = verteile;
    Feste Groessen
    --------------------------------------------------------------------- */
 
-// Nur Interwetten gibt die 5-Prozent-Gebuehr weiter, die Quote wird dort
-// GETEILT. Bei den anderen dreien bleibt die Quote wie angezeigt.
-var GEBUEHREN_TEILER = { iw: 1.05, bw: 1, b3: 1, st: 1 };
+// KARAMS REGEL (03.09.2026): die eingetippte Quote gilt UNGETEILT,
+// auch bei Interwetten - die Gebuehr rechnet die Tafel rueckwaerts aus
+// dem angesagten Hoechstgewinn (siehe daten.js). Teiler bleiben als
+// Mechanik stehen, alle auf 1.
+var GEBUEHREN_TEILER = { iw: 1, bw: 1, b3: 1, st: 1 };
 
 // Regel R6: Bet365 ist die letzte Wahl.
 var LETZTE_WAHL = "b3";

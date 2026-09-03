@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **03.09.2026 frueh**, Fassung `20260902m` (Abschnitt 14 zuerst lesen!).
+Stand: **03.09.2026**, Fassung `20260903a` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -819,6 +819,48 @@ dieselben Spiele kamen ueber andere Linien wieder zusammen.
   Spiel oefter als 5x, und tw12 (ungesetzt) tauchte NIRGENDS auf.
 - In der Verfehlt-Liste kann dasselbe Spiel zweimal stehen (je Linie
   ein Einsatz) - das ist ehrlich gemeint: zwei Einsaetze, ein Spiel.
+
+### Fassung 20260903a: Interwetten-Quote gilt UNGETEILT, Gebuehr nur noch rueckwaerts
+
+Karams Regel (03.09.): "Ich will, dass die Quote, die ich eingebe, die
+echte ist" - die pauschale Vorab-Teilung durch 1,05 lag meistens
+daneben. Und: "wenn alles ausgerechnet ist, schreib ich den
+hoechstmoeglichen Gewinn und dann rechnest du die Gebuehren aus."
+
+- **GEBUEHREN_TEILER: iw auf 1.00** (daten.js:32 plus die ZWEI lokalen
+  Kopien in verteiler.js Z.~79 und ~780 - alle drei muessen immer
+  zusammen geaendert werden). Damit neutralisieren sich ALLE
+  Teil-Stellen von selbst: zielQuote/quoteEintragen (kombis.js),
+  echteQuote/zelleAnbieter/rangliste (logik.js), verteiler-R5,
+  Pflichtquoten-Umrechnung, netto-Suffix im Fotonamen, "minus
+  Gebuehr"/"waere real"-Hinweise (alle an teiler!==1 gebunden).
+- **Die Gebuehr entsteht NUR noch rueckwaerts**: moeglich-Feld an der
+  Schein-Karte = vom Anbieter angesagter Hoechstgewinn; gebuehrText/
+  baueVerlaufsEintrag rechnen Gebuehr = Einsatz x Rohquote minus
+  angesagt (gab es schon, ist jetzt der EINZIGE Weg). Gemessen:
+  100 EUR x 2,0, angesagt 190 -> Gebuehr 10,00 (5,0 %); angesagt
+  200 -> "ohne Gebuehr"; 210 -> Warnung "mehr als der Schein hergibt".
+- **Nachrechnen (mein.js pruefAlles)**: Pruefung 2 verlangt nicht mehr
+  moeglich == Einsatz x Quote, sondern moeglich <= Einsatz x Quote
+  (Differenz = Gebuehr); FEHLER nur bei mehr, WARNUNG bei ueber 10 %
+  Abzug (so viel nimmt kein Anbieter). Die alte Pruefung 3 ("Gebuehr
+  von jeder Quote abgezogen") ist ersatzlos raus - ihre Praemisse ist
+  tot. pruefTeiler geloescht.
+- **tuEinsatz** radiert den angesagten Gewinn nicht mehr weg: beim
+  Einsatz-Aendern skaliert moeglich im Verhaeltnis der Einsaetze mit
+  (Rueckfall Einsatz x Quote nur ohne brauchbaren Altwert).
+- **Texte nachgezogen**: hilfe.html (Ablauf, AGB-Tabelle, "real",
+  Interwetten-besser, BESTER), kombis.html (Regel 1, Fussnote),
+  schule.html Kapitel 8 (Zahlentabelle bleibt als Erklaerung, die
+  Schwelle ist jetzt Faustregel), logik.js (ANBIETER_GRUND.iw,
+  Info-Zeile). admin.js (Saschas-Tabellen-Heuristik Spalte H = G/1,05)
+  bleibt UNBERUEHRT - das ist Foto-Einlesen, nicht Live-Quote.
+- **Server-Waechter braucht NICHTS**: index.ts und auswertung.mjs
+  rechnen nirgends mit Gebuehr oder Teiler (per MCP geprueft);
+  auswertung.js wurde nicht angefasst, also kein Redeploy.
+- ALT-Bestand: vor dem 03.09. gespeicherte IW-Scheine tragen die
+  geteilte Quote und passen weiter zu ihrer eigenen Rechnung -
+  Pruefung 2 laesst sie in Ruhe.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur

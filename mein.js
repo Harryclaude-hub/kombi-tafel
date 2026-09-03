@@ -2684,9 +2684,6 @@ const PRUEF_ZIEL = 400;          // Karams Ziel je Kombination
 function pruefWette(id) {
   return (typeof WETTEN !== "undefined") ? WETTEN.find(w => w.id === id) : null;
 }
-function pruefTeiler(kz) {
-  return (typeof GEBUEHREN_TEILER !== "undefined" && GEBUEHREN_TEILER[kz]) || 1;
-}
 function pruefSatzTitel(id) {
   if (typeof SAETZE !== "undefined") {
     const s = SAETZE.find(x => x.id === id);
@@ -2725,7 +2722,7 @@ function pruefAlles(scheine) {
 
   // ---- 2. Rechnung im Schein selbst ----
   geprueft.push("Gesamtquote = alle Einzelquoten multipliziert");
-  geprueft.push("möglicher Gewinn = Einsatz × Gesamtquote");
+  geprueft.push("möglicher Gewinn: nie mehr als Einsatz × Gesamtquote, Abzug = Gebühr");
   for (const s of scheine) {
     const d = s.daten || {};
     const wetten = d.wetten || [];
@@ -2753,11 +2750,23 @@ function pruefAlles(scheine) {
         wetten.map(t => Number(t.quote).toFixed(2)).join(" &times; ") + ") ergeben aber <b>" +
         rundM(produkt).toFixed(2) + "</b>.");
     }
+    // KARAMS REGEL (03.09.): der moegliche Gewinn ist der vom Anbieter
+    // ANGESAGTE Hoechstgewinn. Er darf UNTER Einsatz x Quote liegen -
+    // die Differenz ist die Gebuehr (bei Interwetten ~5 %). Fehler ist
+    // nur, wenn MEHR dasteht, als der Schein hergibt; eine sehr grosse
+    // Differenz nach unten bekommt eine Warnung (riecht nach Tippfehler).
     const sollGewinn = (Number(d.einsatz) || 0) * steht;
-    if (Math.abs(sollGewinn - (Number(d.moeglich) || 0)) > PRUEF_CENT) {
+    const moeglichIst = Number(d.moeglich) || 0;
+    if (moeglichIst - sollGewinn > PRUEF_CENT) {
       add("fehler", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b>: möglicher Gewinn steht mit <b>" +
-        (Number(d.moeglich) || 0).toFixed(2) + " &euro;</b>, Einsatz " + (Number(d.einsatz) || 0).toFixed(2) +
-        " &euro; &times; Quote " + steht.toFixed(2) + " ergibt aber <b>" + rundM(sollGewinn).toFixed(2) + " &euro;</b>.");
+        moeglichIst.toFixed(2) + " &euro;</b>, Einsatz " + (Number(d.einsatz) || 0).toFixed(2) +
+        " &euro; &times; Quote " + steht.toFixed(2) + " gibt aber höchstens <b>" +
+        rundM(sollGewinn).toFixed(2) + " &euro;</b> her.");
+    } else if (sollGewinn > 0 && moeglichIst > 0 &&
+               (sollGewinn - moeglichIst) / sollGewinn > 0.10) {
+      add("warnung", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b>: möglicher Gewinn <b>" +
+        moeglichIst.toFixed(2) + " &euro;</b> liegt mehr als 10 Prozent unter Einsatz &times; Quote (" +
+        rundM(sollGewinn).toFixed(2) + " &euro;) - so viel Gebühr nimmt kein Anbieter, bitte prüfen.");
     }
     if (!Number(d.einsatz)) {
       add("warnung", "Rechnung", "<b>" + textSicherM(pruefKurz(s)) + "</b> ist ohne Einsatz gespeichert - " +
@@ -2765,26 +2774,12 @@ function pruefAlles(scheine) {
     }
   }
 
-  // ---- 3. Gebuehr des Anbieters wirklich abgezogen ----
-  geprueft.push("Gebühr des Anbieters ist von jeder Quote abgezogen");
-  for (const s of scheine) {
-    const d = s.daten || {};
-    const teiler = pruefTeiler(d.kz);
-    if (teiler === 1) continue;
-    for (const t of d.wetten || []) {
-      const w = pruefWette(t.id);
-      if (!w || !Array.isArray(w.o)) continue;
-      const foto = w.o.map(x => x[1]).filter(x => x);
-      // Steht die gespeicherte Quote GENAU auf einer Quote aus dem Foto,
-      // dann wurde nicht durch den Gebuehren-Teiler geteilt.
-      if (foto.some(r => Math.abs(r - Number(t.quote)) < 0.005)) {
-        add("fehler", "Gebühr", "<b>" + textSicherM(d.anbieter || d.kz) + " / " + textSicherM(t.spiel || "") +
-          "</b>: gespeichert ist <b>" + Number(t.quote).toFixed(2) + "</b> - das ist genau die Quote vom Schein. " +
-          "Bei " + textSicherM(d.anbieter || d.kz) + " gehen " + Math.round((teiler - 1) * 100) +
-          " Prozent Gebühr weg, echt wären <b>" + (Number(t.quote) / teiler).toFixed(2) + "</b>.");
-      }
-    }
-  }
+  // ---- 3. (entfallen, 03.09.2026) Die fruehere Pruefung "Gebuehr von
+  // jeder Quote abgezogen" ist mit Karams Regel tot: die gespeicherte
+  // Quote SOLL jetzt genau die vom Schein sein, die Gebuehr steckt in
+  // der Differenz zwischen Einsatz x Quote und dem angesagten Gewinn
+  // (siehe Pruefung 2). Da alle Teiler auf 1 stehen, haette der alte
+  // Code ohnehin nie mehr gefeuert - weg damit, statt tot herumliegen.
 
   // ---- 4. Stecken die Wetten noch im Foto-Ordner? ----
   const satzGeladen = {};
@@ -3621,7 +3616,15 @@ async function tuEinsatz(id, wert) {
   if (Math.abs(alt - zahl) < 0.005) { zeichneBereich(); return; }   // nichts zu tun
 
   const quote = Number(d.quote) || 0;
-  const moeglichNeu = Math.round(zahl * quote * 100) / 100;
+  // KARAMS REGEL (03.09.): d.moeglich ist der vom Anbieter ANGESAGTE
+  // Hoechstgewinn (bei Interwetten schon nach Gebuehr). Stumpf
+  // Einsatz x Quote wuerde diese Ansage wegradieren. Also skaliert der
+  // angesagte Gewinn im Verhaeltnis der Einsaetze mit; nur wenn es
+  // keinen brauchbaren Altwert gibt, greift Einsatz x Quote.
+  const moeglichAlt = Number(d.moeglich) || 0;
+  const moeglichNeu = (alt > 0 && moeglichAlt > 0)
+    ? Math.round(moeglichAlt * (zahl / alt) * 100) / 100
+    : Math.round(zahl * quote * 100) / 100;
 
   if (!confirm(
     "Einsatz dieser Kombination ändern?\n\n" +
