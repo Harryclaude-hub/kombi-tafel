@@ -904,6 +904,37 @@ mische ich diese Kombis."
   Dreier-Gurt. Der Server-Waechter ist nicht betroffen
   (`auswertung.js` unberuehrt, kein Redeploy).
 
+### Fassung 20260903d: Anbieter-Wechsel zieht den Verlauf nach
+
+Karams Fall (03.09.): eine Kombination lag versehentlich auf Stake, in
+Wahrheit war es Interwetten. Er stellt die Karte im Bau auf Interwetten
+um - und oben stehen weiter neun bei Stake und eine bei Interwetten.
+
+**Warum:** `anbieterWechseln()` hat nur `sch.kz` im ZUSTAND geaendert.
+Die Anbieter-Kacheln oben und die Buchhaltung kommen aber aus dem
+VERLAUF (`gesetzteEintraege`), und dort stand weiter Stake - oertlich
+wie im Konto-Eintrag der Person.
+
+**Jetzt:** neue Funktion `verlaufAnbieterNachziehen(scheinId, neuKz)`,
+aufgerufen aus `anbieterWechseln` (jetzt `async`), sobald
+`schonGesetzt(scheinId)` etwas findet.
+
+- oertlich: `liesVerlauf()` -> `kz` + `anbieter` setzen ->
+  `speichereVerlauf()`.
+- Konto: passende `kontoScheine` finden (`daten.scheinId`), `daten`
+  aendern und mit `supaScheinDatenSchreiben(id, key, daten)` NEU
+  VERSCHLUESSELT schreiben (`kryptoBereich(u.id)`), danach
+  `kontoScheineLaden()`. `beine` zieht supa.js selbst mit.
+- Die 0-Zeilen-Falle wird geprueft: `r.data.length === 0` heisst an RLS
+  gescheitert und wird als "NICHT umgestellt" gemeldet, nicht als Erfolg.
+- Die Meldung sagt ausdruecklich, WAS mitgezogen wurde und was nicht.
+
+**Was bewusst stehen bleibt:** Einsatz, Quote, moeglicher Gewinn,
+Gebuehr. Das sind die Zahlen, die beim Anbieter wirklich auf dem Schein
+standen; sie aendern sich nicht dadurch, dass hier das falsche Etikett
+klebte. Neu rechnen hiesse, eine echte Zahl durch eine geschaetzte zu
+ersetzen.
+
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname

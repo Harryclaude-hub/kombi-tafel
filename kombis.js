@@ -329,7 +329,75 @@ function marke(kz) {
 }
 
 // Anbieter eines Scheins wechseln, mit Prüfung aller drei Wetten
-function anbieterWechseln(scheinId, neuKz) {
+// ============================================================
+// ANBIETER-WECHSEL ZIEHT DEN VERLAUF NACH (Karam, 03.09.)
+//
+// Karams Fall: eine Kombination lag versehentlich auf Stake, in
+// Wahrheit war es Interwetten. Er stellt die Karte auf Interwetten um -
+// und oben stehen weiter neun bei Stake und eine bei Interwetten. Grund:
+// anbieterWechseln hat nur den Schein IM BAU umgestellt. Die Zahlen oben
+// und die Buchhaltung kommen aber aus dem VERLAUF, und dort stand noch
+// Stake. Auch beim Konto-Eintrag der Person blieb Stake stehen.
+//
+// Deshalb wird der Wechsel jetzt ueberall nachgezogen, wo diese GENAUE
+// Kennung im Verlauf steht: oertlich (localStorage "verlauf") und im
+// Konto (kt_scheine, dafuer muss "daten" neu verschluesselt werden).
+//
+// WAS BEWUSST STEHEN BLEIBT: Einsatz, Quote, moeglicher Gewinn und
+// Gebuehr. Das sind die Zahlen, die beim Anbieter WIRKLICH auf dem
+// Schein standen - die aendern sich nicht dadurch, dass hier das
+// falsche Etikett klebte. Wer sie neu rechnen liesse, wuerde eine
+// echte Zahl durch eine geschaetzte ersetzen.
+async function verlaufAnbieterNachziehen(scheinId, neuKz) {
+  const raus = { geraet: 0, konto: 0, fehler: [] };
+  const name = anbieterName(neuKz);
+
+  // 1. Oertlicher Verlauf
+  try {
+    const v = liesVerlauf();
+    let dran = 0;
+    for (const e of v) {
+      if (e.scheinId !== scheinId || e.kz === neuKz) continue;
+      e.kz = neuKz; e.anbieter = name; dran++;
+    }
+    if (dran) {
+      if (speichereVerlauf(v)) raus.geraet = dran;
+      else raus.fehler.push("Gerätespeicher voll - der Verlauf auf diesem Gerät blieb, wie er war");
+    }
+  } catch (e) {
+    raus.fehler.push("Verlauf auf dem Gerät: " + (e && e.message ? e.message : "Fehler"));
+  }
+
+  // 2. Konto. Ohne Anmeldung gibt es hier nichts zu tun - das ist kein
+  //    Fehler, sondern der Normalfall auf einem fremden Geraet.
+  if (window.supa && typeof supaScheinDatenSchreiben === "function" &&
+      typeof supaNutzer === "function" && typeof kryptoBereich === "function") {
+    try {
+      const u = await supaNutzer();
+      if (u) {
+        const key = await kryptoBereich(u.id);
+        for (const x of kontoScheine) {
+          const d = x.daten;
+          if (!d || d.scheinId !== scheinId || d.kz === neuKz) continue;
+          d.kz = neuKz; d.anbieter = name;
+          const r = await supaScheinDatenSchreiben(x.id, key, d);
+          // Die 0-Zeilen-Falle: an RLS gescheitert sieht aus wie geschafft.
+          if (r.error) { raus.fehler.push("Nr. " + (x.nummer || "?") + ": " + r.error.message); continue; }
+          if (!r.data || !r.data.length) {
+            raus.fehler.push("Nr. " + (x.nummer || "?") + ": kein Recht dazu"); continue;
+          }
+          raus.konto++;
+        }
+        if (raus.konto) await kontoScheineLaden();
+      }
+    } catch (e) {
+      raus.fehler.push("Konto: " + (e && e.message ? e.message : "Fehler"));
+    }
+  }
+  return raus;
+}
+
+async function anbieterWechseln(scheinId, neuKz) {
   if (!neuKz) return;
   const z = liesZustand();
   const sch = z.scheine.find(s => s.id === scheinId);
@@ -353,16 +421,38 @@ function anbieterWechseln(scheinId, neuKz) {
   sch.kz = neuKz;
   speichereZustand(z);
 
+  // Steht diese GENAUE Kombination schon im Verlauf, muss der Wechsel
+  // auch dort ankommen - sonst zaehlen die Anbieter-Kacheln oben und die
+  // Buchhaltung weiter den alten Anbieter (Karam, 03.09.).
+  let nach = null;
+  if (schonGesetzt(scheinId)) nach = await verlaufAnbieterNachziehen(scheinId, neuKz);
+  let nachText = "";
+  if (nach) {
+    const teile = [];
+    if (nach.geraet) teile.push(nach.geraet + " Verlaufseintrag" +
+      (nach.geraet === 1 ? "" : "e") + " auf diesem Gerät");
+    if (nach.konto) teile.push(nach.konto + " gespeicherte" +
+      (nach.konto === 1 ? "r Schein" : " Scheine") + " im Konto");
+    if (teile.length) nachText = " <b>Mit umgestellt:</b> " + teile.join(" und " ) +
+      " - Einsatz, Quote und möglicher Gewinn bleiben, wie du sie gespeichert hast.";
+    if (nach.fehler.length) nachText += " <b>&#9888; NICHT umgestellt:</b> " +
+      textSicher(nach.fehler.join("; ")) + " - dort steht weiter " +
+      textSicher(anbieterName(alt)) + ".";
+    if (!teile.length && !nach.fehler.length) nachText =
+      " Im Verlauf stand schon " + textSicher(anbieterName(neuKz)) + ".";
+  }
+
   if (probleme.length) {
     meldung("Schein " + sch.nr + " steht jetzt auf " + anbieterName(neuKz) +
       ", aber <b>" + probleme.length + " von " + sch.wetten.length +
       " Wetten passen dort nicht</b>:<ul><li>" + probleme.join("</li><li>") +
       "</li></ul>Die betroffenen Zeilen sind rot. Nimm sie mit dem Menue rechts raus, " +
       "dann rueckt automatisch etwas Passendes nach. Oder stell zurueck auf " +
-      anbieterName(alt) + ".", "warn");
+      anbieterName(alt) + "." + nachText, "warn");
   } else {
     meldung("Schein " + sch.nr + " steht jetzt auf <b>" + anbieterName(neuKz) +
-      "</b>. Alle " + sch.wetten.length + " Wetten sind dort verfügbar und über der Mindestquote.", "gut");
+      "</b>. Alle " + sch.wetten.length + " Wetten sind dort verfügbar und über der Mindestquote." +
+      nachText, nach && nach.fehler.length ? "warn" : "gut");
   }
   zeichne_();
 }
