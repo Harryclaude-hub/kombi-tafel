@@ -862,6 +862,48 @@ hoechstmoeglichen Gewinn und dann rechnest du die Gebuehren aus."
   geteilte Quote und passen weiter zu ihrer eigenen Rechnung -
   Pruefung 2 laesst sie in Ruhe.
 
+### Fassung 20260903b/c: Ungesetzte wegraeumen + Mischen je EINEM Anbieter
+
+Zwei Wuensche von Karam am 03.09., beide im Kombi-Bau, beide in
+`kombis.js`.
+
+**b) Knopf "Ungesetzte loeschen"** (oben rechts in der Panel-Leiste,
+neben "jeder Einsatz insgesamt"). `panelOffeneLoeschen()` wirft in einem
+Zug alles aus dem Bau, wo noch NICHTS gesetzt wurde.
+
+- Die Menge ist genau die hinter der Kachel "noch nichts gesetzt":
+  Scheine, deren `stammId` im Verlauf (Geraet UND Konto) nicht vorkommt.
+- Gesetztes wird nie angefasst. Fotos gehen nur weg, wenn kein
+  Verlaufseintrag mehr daran haengt (`fotoNochGebraucht`) - dieselbe
+  Regel wie beim Einzel-Loeschen.
+- **Unlesbar-Riegel:** eine Konto-Kombination ohne Schluessel verraet
+  ihre `scheinId` nicht, ihr Stamm heisst `db:...` und trifft nie einen
+  Schein im Bau. Eine in Wahrheit GESETZTE Kombination saehe hier also
+  ungesetzt aus. Beim Einzel-Loeschen waere das ein Fehler, bei einem
+  Massen-Loeschen ein teurer - deshalb steht die Warnung mit Zahl ganz
+  oben in der Rueckfrage.
+- Optik in `stil.css` (`.pn-leeren`), loeschbar ohne Funktionsverlust.
+
+**c) Mischen: erst den Anbieter aussuchen.** Karams Worte: "es duerfen
+nur von dem einen Anbieter ... ich muss es mir dann aussuchen, dann
+mische ich diese Kombis."
+
+- Vorher lief `mischOhnePaare()` ueber ALLE Anbieter auf einmal. Danach
+  stand der Bau voll mit Kombinationen bei Anbietern, an die Karam gar
+  nicht gedacht hatte - fuer ihn sahen die aus wie Einsaetze, die er nie
+  gesetzt hat.
+- Jetzt: `kzListe = [kz1]`. Ist oben eine Anbieter-Karte angetippt
+  (`bauAnbieterFilter`), gilt die als Auswahl; sonst fragt der Knopf per
+  `prompt` mit Topfgroesse je Anbieter. Genau ein moeglicher Topf laeuft
+  ohne Frage durch.
+- **Wichtig:** von den ungesetzten Scheinen fallen nur die des
+  gewaehlten Anbieters weg (`s.kz === kz1`). Sonst raeumte eine
+  Stake-Mischung die ungesetzten Bwin-Kombinationen still mit ab.
+- Unveraendert: Topf NUR aus dort gesetzten Kombinationen, Paar-Sperre
+  aus gesetzten Kombinationen, Hoechstlimit `floor((S-1)/2)`,
+  Dreier-Gurt. Der Server-Waechter ist nicht betroffen
+  (`auswertung.js` unberuehrt, kein Redeploy).
+
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
