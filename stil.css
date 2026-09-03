@@ -3153,6 +3153,10 @@ body[data-seite] > .navleiste a.glocke.aktiv {
 .pn-gr-zeile { color: #24406b; }
 .pn-gr-stop { color: #a00000; }
 .pn-gr-aus { color: #6b7280; }
+/* Bau und Verlauf uneins (Karam, 03.09.). Nur Optik - der Knopf und
+   die Liste kommen aus bauVerlaufAbweichungen(). */
+.pn-abw ul { margin: 6px 0; padding-left: 20px; }
+.pn-abw button { margin-top: 8px; }
 .pn-leeren .mini { color: #e5e7eb; font-size: 11.5px; font-weight: 400; }
 .pn-mischziel { display: flex; flex-direction: column; justify-content: center;
   text-align: center; line-height: 1.3; }

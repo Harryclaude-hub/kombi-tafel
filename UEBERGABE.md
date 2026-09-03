@@ -972,6 +972,26 @@ steht schon in `code-fehler-vermeiden`.
 Weiter gilt: es wird nur bei EINEM Anbieter gemischt (Abschnitt
 20260903b/c), Anbieter mischen sich nie untereinander.
 
+### Fassung 20260903f: Altfaelle heilen - "Verlauf angleichen"
+
+20260903d zieht den Anbieter-Wechsel nach. Was es NICHT tut: schon
+bestehende Abweichungen heilen. Karams Fall genau: er hatte die Karte
+vor dem Update auf Interwetten gestellt, im Verlauf stand weiter Stake,
+und oben blieben neun bei Stake. Von selbst geht das nie weg -
+`anbieterWechseln` steigt aus, wenn die Karte schon richtig steht.
+
+- `bauVerlaufAbweichungen()` vergleicht je Schein im Bau die EXAKTE
+  Kennung mit den Verlaufseintraegen und meldet jede Zeile, in der
+  `e.kz !== s.kz`.
+- Das Panel zeigt die Liste als Warnung ("Verlauf X, Karte Y") mit dem
+  Hinweis, dass die Kacheln oben den Verlauf zaehlen, plus Knopf
+  **Verlauf angleichen**.
+- `bauVerlaufAngleichen()` fragt einmal mit allen Zeilen und ruft dann
+  je Schein `verlaufAnbieterNachziehen()` (Geraet + Konto, neu
+  verschluesselt). Einsatz, Quote, moeglicher Gewinn bleiben.
+- Bewusst NICHT still im Hintergrund beim Zeichnen: das sind
+  Buchhaltungseintraege.
+
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname

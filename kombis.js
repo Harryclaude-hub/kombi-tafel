@@ -2550,6 +2550,26 @@ function zeichnePanel() {
     "geladen werden (Netz oder Anmeldung). Was hier steht, ist unvollständig.</div>";
   if (warnung) kasten.insertAdjacentHTML("beforeend", warnung);
 
+  // Bau und Verlauf uneins? Genau Karams Fall: oben stehen die alten
+  // Anbieter, weil die Kacheln den VERLAUF zaehlen. Das muss dastehen,
+  // sonst sucht er den Fehler bei den Zahlen.
+  const abw = bauVerlaufAbweichungen();
+  if (abw.length) {
+    let ah = '<div class="pn-warn pn-abw"><b>&#9888; Bei ' + abw.length + " Kombination" +
+      (abw.length === 1 ? "" : "en") + " steht im Verlauf ein anderer Anbieter als auf der " +
+      "Karte im Bau:</b><ul>";
+    for (const x of abw.slice(0, 8)) {
+      ah += "<li>" + (x.nummer ? "Nr. " + textSicherK2(String(x.nummer)) + ": " : "") +
+        "Verlauf <b>" + textSicherK2(anbieterName(x.verlauf)) + "</b>, Karte <b>" +
+        textSicherK2(anbieterName(x.karte)) + "</b></li>";
+    }
+    if (abw.length > 8) ah += "<li class='mini'>und " + (abw.length - 8) + " weitere</li>";
+    ah += "</ul>Die Kacheln oben zählen den Verlauf - deshalb steht dort noch der alte " +
+      "Anbieter. Ein Klick stellt es überall um, auch im Konto der Person. " +
+      '<button class="haupt" onclick="bauVerlaufAngleichen()">Verlauf angleichen</button></div>';
+    kasten.insertAdjacentHTML("beforeend", ah);
+  }
+
   const liste = panelListeHtml(p);
   if (liste) kasten.insertAdjacentHTML("beforeend", liste);
 }
@@ -2565,6 +2585,75 @@ function zeichnePanel() {
 // saehe hier ungesetzt aus. Beim Einzel-Loeschen waere das ein Fehler,
 // hier waere es ein Massen-Fehler. Deshalb steht die Warnung ganz oben
 // in der Rueckfrage, mit Zahl.
+// ============================================================
+// BAU UND VERLAUF UNEINS (Karam, 03.09.)
+//
+// Sein Fall: er hat den Anbieter auf der Karte umgestellt, BEVOR es den
+// Nachzug gab (Fassung 20260903d). Seitdem sagt der Bau Interwetten und
+// der Verlauf weiter Stake - und oben stehen neun bei Stake, eins bei
+// Interwetten. Solche Altfaelle heilen NICHT von selbst: anbieterWechseln
+// steigt gleich aus, wenn die Karte schon auf dem richtigen Anbieter
+// steht, also gibt es dort nichts mehr nachzuziehen.
+//
+// Deshalb hier: die Abweichung suchen, ZEIGEN und mit einem Klick
+// angleichen. Nicht still im Hintergrund - das sind
+// Buchhaltungseintraege, und die aendert man nicht hinter Karams Ruecken.
+function bauVerlaufAbweichungen() {
+  const z = liesZustand();
+  if (!z || !z.scheine) return [];
+  const gesetzt = gesetzteEintraege();
+  const raus = [];
+  for (const s of z.scheine) {
+    for (const e of gesetzt) {
+      // EXAKTE Kennung, kein Stamm: jeder Teil ist beim Anbieter eine
+      // eigene Wette und kann woanders liegen als seine Geschwister.
+      if (e.unlesbar || e.scheinId !== s.id) continue;
+      if (!e.kz || e.kz === s.kz) continue;
+      raus.push({ id: s.id, nr: s.nr, karte: s.kz, verlauf: e.kz,
+                  nummer: e.nummer, woher: e.woher });
+    }
+  }
+  return raus;
+}
+
+async function bauVerlaufAngleichen() {
+  const ab = bauVerlaufAbweichungen();
+  if (!ab.length) { meldung("Es weicht nichts ab - Bau und Verlauf sind einig.", "gut"); return; }
+
+  const zeilen = ab.map(x => "   " + (x.nummer ? "Nr. " + x.nummer + "   " : "") +
+    anbieterName(x.verlauf) + "   ->   " + anbieterName(x.karte)).join("\n");
+  if (!confirm("Im Verlauf steht bei " + ab.length + " Kombination(en) ein anderer Anbieter " +
+      "als auf der Karte im Bau:\n\n" + zeilen + "\n\n" +
+      "Der Verlauf wird auf den Anbieter der Karte umgestellt - auf diesem Gerät und im " +
+      "Konto der Person.\n\n" +
+      "Einsatz, Quote und möglicher Gewinn bleiben unverändert: das sind die Zahlen, die " +
+      "beim Anbieter wirklich auf dem Schein standen.\n\nAngleichen?")) return;
+
+  let geraet = 0, konto = 0;
+  const fehler = [];
+  const schonDran = new Set();   // je Schein einmal, auch wenn er doppelt im Verlauf steht
+  for (const x of ab) {
+    if (schonDran.has(x.id)) continue;
+    schonDran.add(x.id);
+    const r = await verlaufAnbieterNachziehen(x.id, x.karte);
+    geraet += r.geraet; konto += r.konto;
+    for (const f of r.fehler) fehler.push(f);
+  }
+
+  const teile = [];
+  if (geraet) teile.push(geraet + " Verlaufseintrag" + (geraet === 1 ? "" : "e") + " auf diesem Gerät");
+  if (konto) teile.push(konto + " gespeicherte" + (konto === 1 ? "r Schein" : " Scheine") + " im Konto");
+  meldung(
+    (teile.length
+      ? "<b>Angeglichen:</b> " + teile.join(" und ") + ". Die Zahlen oben zählen jetzt richtig."
+      : "<b>Es wurde nichts geändert.</b>") +
+    (fehler.length
+      ? " <b>&#9888; NICHT umgestellt:</b> " + textSicherK2(fehler.join("; ")) + "."
+      : ""),
+    fehler.length ? "warn" : "gut");
+  zeichne_();
+}
+
 function panelOffeneLoeschen() {
   const z = liesZustand();
   if (!z || !z.scheine || !z.scheine.length) {
