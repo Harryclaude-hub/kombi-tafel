@@ -2415,10 +2415,10 @@ function zeichnePanel() {
   }
   const zielWert = parseInt(localStorage.getItem("kt_misch_ziel") || "2", 10) || 2;
   ak += '<span class="pn-mischgruppe">' +
-    '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Je Anbieter: die dort ' +
-    'gesetzten Einsätze neu mischen; keine zwei Wetten, die schon zusammen gesetzt waren, ' +
-    'kommen wieder zusammen">' +
-    "&#127922; Kombis neu mischen<br><span class='mini'>je Anbieter, keine Paare doppelt</span></button>" +
+    '<button class="haupt pn-misch" onclick="mischOhnePaare()" title="Erst den Anbieter ' +
+    'aussuchen, dann NUR dessen gesetzte Einsätze untereinander neu mischen; keine zwei ' +
+    'Wetten, die schon zusammen gesetzt waren, kommen wieder zusammen">' +
+    "&#127922; Kombis neu mischen<br><span class='mini'>ein Anbieter, keine Paare doppelt</span></button>" +
     '<label class="pn-mischziel mini">jeder Einsatz insgesamt<br>' +
     '<input id="pn_misch_ziel" type="number" min="1" max="9" value="' + zielWert +
     '" inputmode="numeric"> mal</label>' +
@@ -2619,7 +2619,7 @@ function mischZielLesen() {
   return ziel;
 }
 
-function mischOhnePaare() {
+function mischOhnePaare(kzWahl) {
   const e = einstellungenLesen();
   const z = liesZustand() || baueAlles();
   const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
@@ -2643,13 +2643,39 @@ function mischOhnePaare() {
       topf.set(String(t.id), eintrag);
     }
   }
-  const kzListe = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
-  if (!kzListe.length) {
-    meldung("<b>Zum Mischen braucht es gesetzte Kombinationen:</b> der Knopf nimmt je Anbieter " +
-      "die Einsätze aus deinen GESETZTEN Kombinationen dieses Ordners und mischt daraus neue - " +
-      "beim selben Anbieter. Es ist noch nichts (Laufendes) gesetzt, also gibt es nichts zu mischen.", "warn");
+  const kzMoeglich = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
+  if (!kzMoeglich.length) {
+    meldung("<b>Zum Mischen braucht es gesetzte Kombinationen:</b> der Knopf nimmt bei EINEM " +
+      "Anbieter die Einsätze aus deinen dort GESETZTEN Kombinationen dieses Ordners und mischt " +
+      "daraus neue. Es ist noch nichts (Laufendes) gesetzt, also gibt es nichts zu mischen.", "warn");
     return;
   }
+
+  // EIN ANBIETER JE MISCHUNG (Karam, 03.09.: "ich muss es mir dann aussuchen").
+  // Vorher lief der Knopf ueber ALLE Anbieter auf einmal - danach stand der
+  // Bau voll mit Kombinationen bei Anbietern, an die Karam gar nicht gedacht
+  // hatte, und die sahen fuer ihn aus wie Einsaetze, die er nie gesetzt hat.
+  // Jetzt wird genau ein Topf gemischt: die dort gesetzten Einsaetze
+  // untereinander. Ist oben eine Anbieter-Karte angetippt (bauAnbieterFilter),
+  // gilt die als Auswahl - sonst wird gefragt.
+  let kz1 = kzWahl && kzMoeglich.includes(kzWahl) ? kzWahl : null;
+  if (!kz1 && typeof bauAnbieterFilter !== "undefined" &&
+      bauAnbieterFilter && kzMoeglich.includes(bauAnbieterFilter)) kz1 = bauAnbieterFilter;
+  if (!kz1 && kzMoeglich.length === 1) kz1 = kzMoeglich[0];
+  if (!kz1) {
+    const wahlText = kzMoeglich.map((kz, i) =>
+      (i + 1) + " = " + anbieterName(kz) + " (" + topfJeKz[kz].size + " gesetzte Einsätze)").join("\n");
+    const a = prompt("Welchen Anbieter mischen?\n\nEs wird NUR dieser eine Topf gemischt - " +
+      "die dort gesetzten Einsätze untereinander. Die anderen Anbieter bleiben, wie sie sind.\n\n" +
+      wahlText + "\n\nNummer eingeben:", "1");
+    if (a === null) return;
+    const i = parseInt(a, 10);
+    if (!(i >= 1 && i <= kzMoeglich.length)) {
+      meldung("Das war keine der Nummern - es wurde nichts verändert.", "warn"); return;
+    }
+    kz1 = kzMoeglich[i - 1];
+  }
+  const kzListe = [kz1];
 
   // DAS HOECHSTLIMIT (Karam, 03.09.: "das muss anerkannt werden").
   // Reine Mathematik: ein Spiel hat im Topf (S-1) moegliche Partner-
@@ -2664,10 +2690,14 @@ function mischOhnePaare() {
     maxJeKz[kz] = Math.max(1, Math.floor((spiele.size - 1) / 2));
   }
 
-  // Gesetzte Scheine bleiben, ungesetzte werden ersetzt.
+  // Gesetzte Scheine bleiben. Von den ungesetzten fallen NUR die des
+  // gewaehlten Anbieters weg - sonst raeumte eine Stake-Mischung Karams
+  // ungesetzte Bwin-Kombinationen mit ab, ohne dass er es merkt.
   const behaltenIds = new Set(gesetzteScheine().map(s => s.id));
-  const behalten = (z.scheine || []).filter(s => behaltenIds.has(s.id));
-  const weg = (z.scheine || []).filter(s => !behaltenIds.has(s.id));
+  const behalten = (z.scheine || []).filter(s => behaltenIds.has(s.id) || s.kz !== kz1);
+  const weg = (z.scheine || []).filter(s => !behaltenIds.has(s.id) && s.kz === kz1);
+  const gesetztAnzahl = (z.scheine || []).filter(s => behaltenIds.has(s.id)).length;
+  const fremdOffen = behalten.length - gesetztAnzahl;
   const wegEigene = weg.filter(s => s.art === "eigen").length;
   const verboten = gesetztePaare();
   const toepfe = kzListe.map(kz => {
@@ -2677,19 +2707,23 @@ function mischOhnePaare() {
       "-mal (" + offenN + " unter dem Ziel)";
   }).join("\n  ");
   const gedeckelt = kzListe.filter(kz => ziel > maxJeKz[kz]);
-  if (!confirm("Kombis neu mischen - je Anbieter, KEIN Spiel-Paar je zweimal:\n\n" +
+  if (!confirm("Kombis neu mischen bei " + anbieterName(kz1) +
+    " - KEIN Spiel-Paar je zweimal:\n\n" +
     "- Dein Ziel: jeder Einsatz insgesamt " + ziel + "-mal\n" +
     (gedeckelt.length
       ? "- ACHTUNG: das liegt über dem mathematischen Höchstlimit bei " +
         gedeckelt.map(kz => anbieterName(kz) + " (max " + maxJeKz[kz] + ")").join(", ") +
         " - dort wird mit dem Höchstlimit gerechnet.\n"
       : "") +
-    "- Töpfe (NUR aus gesetzten Kombinationen):\n  " + toepfe + "\n" +
-    "- " + behalten.length + " gesetzte(r) Schein(e) bleiben unberührt\n" +
-    "- " + weg.length + " ungesetzte Kombination(en) im Bau werden ersetzt" +
+    "- Topf (NUR aus dort gesetzten Kombinationen):\n  " + toepfe + "\n" +
+    "- " + gesetztAnzahl + " gesetzte(r) Schein(e) bleiben unberührt\n" +
+    (fremdOffen ? "- " + fremdOffen + " ungesetzte Kombination(en) bei ANDEREN Anbietern " +
+      "bleiben ebenfalls stehen\n" : "") +
+    "- " + weg.length + " ungesetzte Kombination(en) bei " + anbieterName(kz1) +
+    " werden ersetzt" +
     (wegEigene ? " (davon " + wegEigene + " selbst gebaut!)" : "") + "\n" +
     "- " + verboten.size + " Spiel-Paare aus gesetzten Kombinationen sind gesperrt\n" +
-    "- die Anbieter mischen sich nicht: jeder Einsatz bleibt bei seinem Anbieter\n\n" +
+    "- es wird NUR bei " + anbieterName(kz1) + " gemischt, kein Einsatz wechselt den Anbieter\n\n" +
     "Mischen?")) return;
 
   // Je Anbieter mehrere Mischungen probieren, die mit den meisten
@@ -2799,9 +2833,9 @@ function mischOhnePaare() {
     anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length +
     (ziel > maxJeKz[kz] ? " (Ziel " + ziel + " auf Höchstlimit " + maxJeKz[kz] + " gedeckelt)" : "")).join(", ");
   meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + textSicher(jeKzText) + ") - " +
-    "NUR aus gesetzten Einsätzen, jeder bleibt bei seinem Anbieter, und KEIN Spiel-Paar, das " +
+    "NUR aus den bei " + textSicher(anbieterName(kz1)) + " gesetzten Einsätzen, und KEIN Spiel-Paar, das " +
     "schon einmal zusammen gesetzt war, steckt wieder in einer. " +
-    behalten.length + " gesetzte(r) Schein(e) unberührt." +
+    gesetztAnzahl + " gesetzte(r) Schein(e) unberührt." +
     (zielVerfehlt.length
       ? "<br><b>&#9888; Unter dem Limit bleiben:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
         (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") +
