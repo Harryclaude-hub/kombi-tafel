@@ -2421,7 +2421,11 @@ function zeichnePanel() {
     "&#127922; Kombis neu mischen<br><span class='mini'>je Anbieter, keine Paare doppelt</span></button>" +
     '<label class="pn-mischziel mini">jeder Einsatz insgesamt<br>' +
     '<input id="pn_misch_ziel" type="number" min="1" max="9" value="' + zielWert +
-    '" inputmode="numeric"> mal</label></span></div>';
+    '" inputmode="numeric"> mal</label>' +
+    '<button class="pn-leeren" onclick="panelOffeneLoeschen()" title="Wirft alles aus ' +
+    'dem Bau, wo noch NICHTS gesetzt wurde - gesetzte Kombinationen bleiben unberührt">' +
+    "&#129529; Ungesetzte löschen<br><span class='mini'>alles ohne Einsatz</span></button>" +
+    '</span></div>';
   kasten.insertAdjacentHTML("afterbegin", ak);
 
   // Die einzelnen Luecken darunter, damit man sieht, wo es klemmt.
@@ -2456,6 +2460,73 @@ function zeichnePanel() {
 
   const liste = panelListeHtml(p);
   if (liste) kasten.insertAdjacentHTML("beforeend", liste);
+}
+
+// Karam (03.09.): ein Knopf oben rechts, der in EINEM Zug alles aus dem
+// Bau wirft, wo noch NICHTS gesetzt wurde. Das ist genau die Menge hinter
+// der Kachel "noch nichts gesetzt": Scheine, deren Stamm im Verlauf
+// (Geraet UND Konto) gar nicht vorkommt. Gesetztes wird nie angefasst.
+//
+// WARUM DER UNLESBAR-RIEGEL: eine Konto-Kombination ohne Schluessel
+// verraet ihre scheinId nicht. Ihr Stamm heisst dann "db:...", trifft
+// nie einen Schein im Bau - und eine in Wahrheit GESETZTE Kombination
+// saehe hier ungesetzt aus. Beim Einzel-Loeschen waere das ein Fehler,
+// hier waere es ein Massen-Fehler. Deshalb steht die Warnung ganz oben
+// in der Rueckfrage, mit Zahl.
+function panelOffeneLoeschen() {
+  const z = liesZustand();
+  if (!z || !z.scheine || !z.scheine.length) {
+    meldung("Im Bau steht nichts, was man löschen könnte.", "warn"); return;
+  }
+
+  const eintraege = gesetzteEintraege();
+  const gesetztStamm = new Set();
+  for (const e of eintraege) if (!e.unlesbar) gesetztStamm.add(e.stamm);
+  const unlesbar = eintraege.filter(e => e.unlesbar).length;
+
+  const weg = z.scheine.filter(s => !gesetztStamm.has(stammId(s.id)));
+  if (!weg.length) { meldung("Es steht nichts Ungesetztes im Bau.", "gut"); return; }
+
+  const nrn = new Set(weg.map(s => s.nr));
+  const eigene = weg.filter(s => s.art === "eigen").length;
+
+  let frage = "";
+  if (unlesbar) frage +=
+    "ACHTUNG: " + unlesbar + " Kombination(en) aus deinem Konto lassen sich nicht " +
+    "öffnen (Schlüssel fehlt oder passt nicht). Was darin steht, weiß der Bau " +
+    "nicht. Ist eine davon in Wahrheit gesetzt, wird sie hier trotzdem als " +
+    "ungesetzt gelöscht - und die Wetten könnten ein ZWEITES MAL rausgehen.\n" +
+    "Kläre das erst, bevor du hier löschst.\n\n";
+
+  frage +=
+    "Alles löschen, wo noch NICHTS gesetzt wurde?\n\n" +
+    "- " + nrn.size + " Kombination(en), " + weg.length + " Schein(e) fallen weg" +
+    (eigene ? "\n- davon " + eigene + " SELBST GEBAUT" : "") + "\n" +
+    "- gesetzte Kombinationen bleiben unberührt\n" +
+    "- die Wetten werden wieder frei und beim nächsten Mischen neu verteilt\n\n" +
+    "Löschen?";
+
+  if (!confirm(frage)) return;
+
+  const raus = new Set(weg.map(s => s.id));
+  z.scheine = z.scheine.filter(s => !raus.has(s.id));
+  speichereZustand(z);
+
+  // Gleiche Aufraeumregel wie beim Einzel-Loeschen: ein Foto darf nur weg,
+  // wenn kein Verlaufseintrag mehr daran haengt. Sonst steht der Eintrag
+  // spaeter ohne Bild da.
+  let fotosWeg = 0;
+  for (const s of weg) {
+    if (fotoNochGebraucht(s.id)) continue;
+    if (localStorage.getItem(fotoSchluessel(s.id))) fotosWeg++;
+    fotoLoeschen(s.id);
+  }
+
+  meldung("<b>" + nrn.size + " ungesetzte Kombination(en) gelöscht</b>" +
+    (fotosWeg ? " (mit " + fotosWeg + " Foto" + (fotosWeg === 1 ? "" : "s") + ")" : "") +
+    ". Die Wetten sind wieder frei. <b>Die Nummern der übrigen Kombinationen " +
+    "rücken nach vorne.</b>", "gut");
+  zeichne_();
 }
 
 // Karam: was nicht voll gesetzt werden konnte, soll neu gemischt werden -
