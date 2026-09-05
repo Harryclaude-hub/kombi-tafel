@@ -3830,15 +3830,23 @@ body[data-seite] .navleiste #nav_profil,
 }
 @media print { #fussleiste, #logomenue { display: none !important; } }
 
-/* Seitenwechsel wie eine App (View Transitions - Browser, die es
-   koennen, blenden sanft; alle anderen wechseln wie bisher hart).
-   Nur transform/opacity, und wer Bewegung reduziert hat, bekommt keine. */
-@view-transition { navigation: auto; }
-@media screen and (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(root) { animation: lw-raus .14s ease-in both; }
-  ::view-transition-new(root) { animation: lw-rein .18s ease-out both; }
+/* Bereichswechsel wie eine App: die alte Seite schiebt hinaus, die
+   neue herein - RICHTUNGSECHT (leiste.js setzt die Klassen und
+   merkt sich die Wischrichtung ueber den Seitenwechsel). Nur
+   transform/opacity, nur am Handy, nicht bei reduzierter Bewegung.
+   Die fruehere View-Transition-Fassung ist raus - Klassen laufen
+   auf JEDEM Browser gleich. */
+@media screen and (max-width: 700px) and (prefers-reduced-motion: no-preference) {
+  body.lw-raus-links  { animation: lwRausLinks .13s ease-in both; }
+  body.lw-raus-rechts { animation: lwRausRechts .13s ease-in both; }
+  body.lw-rein-rechts { animation: lwReinRechts .22s cubic-bezier(.2,.8,.3,1); }
+  body.lw-rein-links  { animation: lwReinLinks .22s cubic-bezier(.2,.8,.3,1); }
+  /* Ansichten in Mein Bereich (Chat/Profil) schieben ebenfalls */
+  .mb-ansicht.offen { animation: lwReinRechts .2s cubic-bezier(.2,.8,.3,1); }
 }
-@keyframes lw-raus { to { opacity: 0; transform: translateX(-12px); } }
-@keyframes lw-rein { from { opacity: 0; transform: translateX(12px); } }
+@keyframes lwRausLinks  { to   { opacity: .25; transform: translateX(-30px); } }
+@keyframes lwRausRechts { to   { opacity: .25; transform: translateX(30px); } }
+@keyframes lwReinRechts { from { opacity: .3;  transform: translateX(36px); } }
+@keyframes lwReinLinks  { from { opacity: .3;  transform: translateX(-36px); } }
 /* ---- ENDE DESIGN-REWORK 05.09.2026 ---- */
 

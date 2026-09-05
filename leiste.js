@@ -65,17 +65,27 @@
     markiere();
   }
 
+  // In welche Richtung liegt das Ziel? (fuer die Schub-Animation)
+  function richtungZu(ziel) {
+    var l = document.getElementById("fussleiste");
+    var akt = l && l.querySelector(".fl-knopf.aktiv");
+    var von = akt ? REIHE.indexOf(akt.dataset.fl) : -1;
+    var nach = REIHE.indexOf(ziel);
+    if (von < 0 || nach < 0 || von === nach) return null;
+    return nach > von ? "links" : "rechts";
+  }
+
   function klick(ev) {
     var was = ev.currentTarget.dataset.fl;
     // Ein anderer Bereich als der Chat: erst den offenen Chat zumachen,
     // sonst laege er weiter ueber der Seite.
     if (was !== "chat" && document.getElementById("glockenpanel") &&
-        typeof window.glockeUmschalten === "function") window.glockeUmschalten();
-    if (was === "tafel")   { geh("original.html"); return; }
-    if (was === "bau")     { geh("kombis.html"); return; }
+        typeof window.glockeUmschalten === "function") { window.glockeUmschalten(); markiere(); }
+    if (was === "tafel")   { geh("original.html", richtungZu("tafel")); return; }
+    if (was === "bau")     { geh("kombis.html", richtungZu("bau")); return; }
     if (was === "bereich") {
       if (aufMein && typeof window.mbAnsichtZu === "function") { window.mbAnsichtZu(); markiere("bereich"); }
-      else location.href = "mein.html";
+      else geh("mein.html", richtungZu("bereich"));
       return;
     }
     if (was === "chat") {
@@ -89,13 +99,28 @@
     }
     if (was === "profil") {
       if (aufMein) { oeffneAnsicht(was); }
-      else location.href = "mein.html#" + was;
+      else {
+        if (schmal()) { try { sessionStorage.setItem("kt_swipe_richtung", "links"); } catch (e) { } }
+        location.href = "mein.html#" + was;
+      }
     }
   }
 
-  function geh(ziel) {
+  // Seitenwechsel MIT Schub-Animation (Karam 05.09. Nacht: "jede
+  // Wisch-Bewegung braucht eine geile Animation"). richtung "links"
+  // heisst: die neue Seite kommt von rechts herein. Die Richtung
+  // wird ueber den Seitenwechsel gemerkt (sessionStorage), die neue
+  // Seite faehrt dann passend ein. Ohne schmalen Schirm oder mit
+  // reduzierter Bewegung macht das CSS schlicht nichts daraus.
+  function geh(ziel, richtung) {
     // Auf der Zielseite selbst nur nach oben rollen statt neu laden.
     if (location.pathname.indexOf(ziel) >= 0) { window.scrollTo(0, 0); return; }
+    if (schmal() && richtung) {
+      try { sessionStorage.setItem("kt_swipe_richtung", richtung); } catch (e) { }
+      document.body.classList.add(richtung === "links" ? "lw-raus-links" : "lw-raus-rechts");
+      setTimeout(function () { location.href = ziel; }, 120);
+      return;
+    }
     location.href = ziel;
   }
 
@@ -192,22 +217,36 @@
     }
     return false;
   }
-  var wx = null, wy = null, wEl = null;
+  // Nach einem ECHTEN Wisch darf der Finger-Abdruck keinen Knopf
+  // ausloesen (Karam: "manchmal klickt es einen Knopf"). Der naechste
+  // Klick innerhalb von 350 ms wird geschluckt.
+  function klickSchlucken() {
+    var ohr = function (e) { e.preventDefault(); e.stopPropagation(); };
+    document.addEventListener("click", ohr, true);
+    setTimeout(function () { document.removeEventListener("click", ohr, true); }, 350);
+  }
+
+  var wx = null, wy = null, wEl = null, wZeit = 0;
   document.addEventListener("touchstart", function (e) {
     wx = null; wEl = null;
     if (!schmal() || e.touches.length !== 1) return;
     var z = e.target;
     if (z.closest && z.closest("input, textarea, select, #handyfoto, #logomenue")) return;
     if (querScrollbar(z)) return;
-    wx = e.touches[0].clientX; wy = e.touches[0].clientY; wEl = z;
+    wx = e.touches[0].clientX; wy = e.touches[0].clientY; wEl = z; wZeit = Date.now();
   }, { passive: true });
   document.addEventListener("touchend", function (e) {
     if (wx === null) return;
     var dx = e.changedTouches[0].clientX - wx;
     var dy = e.changedTouches[0].clientY - wy;
-    var von = wEl;
+    var von = wEl, dauer = Date.now() - wZeit;
     wx = null; wEl = null;
-    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    // Strengere Erkennung (Karam: falsche Treffer beim Scrollen):
+    // schnelle, klar waagrechte Geste - sonst ist es Scrollen/Tippen.
+    if (Math.abs(dx) < 60) return;
+    if (Math.abs(dy) > 50 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (dauer > 700) return;
+    klickSchlucken();
     // IM CHAT gilt WhatsApp: nach rechts wischen geht ZURUECK
     // (Gespraech -> Kontaktliste -> Panel zu). Nie Bereichswechsel.
     if (von && von.closest && von.closest("#glockenpanel")) {
@@ -215,7 +254,7 @@
         var inh = document.getElementById("gp-inhalt");
         if (inh && inh.classList.contains("gp-zeigt-gespraech") &&
             typeof window.glockeSpalteZeigen === "function") window.glockeSpalteZeigen("liste");
-        else if (typeof window.glockeUmschalten === "function") window.glockeUmschalten();
+        else if (typeof window.glockeUmschalten === "function") { window.glockeUmschalten(); markiere(); }
       }
       return;
     }
@@ -230,7 +269,9 @@
     var ziel = REIHE[i + (dx < 0 ? 1 : -1)];   // links wischen = naechster
     if (!ziel) return;
     var k = l.querySelector('.fl-knopf[data-fl="' + ziel + '"]');
-    if (k) k.click();
+    // Den Handler DIREKT rufen, nicht ueber einen DOM-Klick - den
+    // wuerde der Klick-Schlucker oben gleich mitfressen.
+    if (k) klick({ currentTarget: k });
   }, { passive: true });
 
   // Anker #chat / #profil von anderen Seiten - und Karams Handy-Start
@@ -239,23 +280,59 @@
     baue();
     spiegleBadge();
     klappWache();
-    if (!aufMein) return;
-    var anker = (location.hash || "").replace("#", "");
+    // Einfahr-Animation: kam der Wechsel von einem Wisch, faehrt die
+    // neue Seite aus der gemerkten Richtung herein.
+    try {
+      var r = sessionStorage.getItem("kt_swipe_richtung");
+      if (r && schmal()) {
+        sessionStorage.removeItem("kt_swipe_richtung");
+        var kl = (r === "links") ? "lw-rein-rechts" : "lw-rein-links";
+        document.body.classList.add(kl);
+        document.body.addEventListener("animationend", function ende(ev) {
+          if (ev.target !== document.body) return;
+          document.body.classList.remove(kl);
+          document.body.removeEventListener("animationend", ende);
+        });
+      }
+    } catch (e) { }
+    // Sicherheitsnetz fuer die Unten-Markierung: ist der Chat zu und
+    // keine Chat-Ansicht offen, darf unten nicht "Chat" leuchten.
+    setInterval(function () {
+      var l = document.getElementById("fussleiste");
+      var akt = l && l.querySelector(".fl-knopf.aktiv");
+      if (!akt || akt.dataset.fl !== "chat") return;
+      var chatDa = document.getElementById("glockenpanel") ||
+        (document.getElementById("ans_chat") && document.getElementById("ans_chat").classList.contains("offen"));
+      if (!chatDa) markiere();
+    }, 800);
+    var anker = aufMein ? (location.hash || "").replace("#", "") : "";
     if (anker === "chat" || anker === "profil") {
       try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { }
       oeffneAnsicht(anker);
-    } else if (schmal()) {
-      // Handy-Start wie WhatsApp: die allgemeine Chat-Liste (Karam
-      // 05.09.). ERST wenn die App angemeldet aufgebaut ist (ans_chat
-      // existiert) - sonst laege das Vollbild ueber der Anmeldemaske.
-      (function warte(v) {
-        if (document.getElementById("ans_chat")) {
-          if (typeof window.chatmodusAuf === "function") { window.chatmodusAuf(true); markiere("chat"); }
-          else oeffneAnsicht("chat");
-          return;
+    }
+    // Handy-Start wie WhatsApp: die allgemeine Chat-Liste - aber nur
+    // EINMAL je App-Oeffnung (sessionStorage), nicht bei jedem
+    // Seitenwechsel (Karams Fund: "Bereich" gedrueckt, Chat kam).
+    // Auf mein.html erst nach dem Anmelden (ans_chat), sonst laege
+    // das Vollbild ueber der Anmeldemaske.
+    if (schmal() && !anker) {
+      var schonGestartet = false;
+      try { schonGestartet = !!sessionStorage.getItem("kt_leiste_startchat"); } catch (e) { }
+      if (!schonGestartet) {
+        try { sessionStorage.setItem("kt_leiste_startchat", "1"); } catch (e) { }
+        if (aufMein) {
+          (function warte(v) {
+            if (document.getElementById("ans_chat")) {
+              if (typeof window.chatmodusAuf === "function") { window.chatmodusAuf(true); markiere("chat"); }
+              else oeffneAnsicht("chat");
+              return;
+            }
+            if (v < 50) setTimeout(function () { warte(v + 1); }, 300);
+          })(0);
+        } else if (typeof window.chatmodusAuf === "function") {
+          setTimeout(function () { window.chatmodusAuf(true); markiere("chat"); }, 250);
         }
-        if (v < 50) setTimeout(function () { warte(v + 1); }, 300);
-      })(0);
+      }
     }
   }
 

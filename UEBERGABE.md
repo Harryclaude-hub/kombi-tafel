@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905g` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905h` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,24 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+000000. Fassung 20260905h: Wisch-Animationen + Erkennungs-Feinschliff.
+   - JEDER Seiten-Wisch animiert richtungsecht: geh() setzt
+     lw-raus-links/rechts, merkt die Richtung in sessionStorage
+     kt_swipe_richtung, die Zielseite faehrt mit lw-rein-* ein
+     (leiste.js start; Klasse nach animationend wieder weg).
+     View-Transition-Fassung von 905g ERSETZT (Klassen laufen ueberall).
+   - Swipe strenger: dx>=60, |dy|<=50, dx>1.8|dy|... dauer<700ms;
+     nach echtem Wisch schluckt ein 350-ms-Capture-Listener den
+     Folgeklick (Karam: 'manchmal klickt es einen Knopf'). Der
+     Swipe-Wechsel ruft klick() DIREKT (ein DOM-Klick wuerde vom
+     eigenen Schlucker gefressen - Falle!).
+   - Unten-Markierung: Chat zu => Marke faellt auf den
+     Seiten-Standard zurueck (Swipe-Pfad + 800-ms-Sicherheitsnetz).
+   - Chat-Autostart nur EINMAL je App-Oeffnung (sessionStorage
+     kt_leiste_startchat), dafuer auf JEDER Seite; behebt Karams
+     Fund 'Bereich gedrueckt, Chat kam'. Desktop unveraendert.
+   - Gemessen: Startchat auf kombis, Wisch-zu -> Marke bau, Wisch
+     rechts -> lw-raus-rechts + original.html + Richtung geloescht.
 00000. Fassung 20260905g: fluessig am Handy + Chat in der Mitte.
    - LAG-URSACHE gefunden: body-Verlauf mit background-attachment
      fixed = Repaint bei jedem Scroll. Am Handy jetzt FLACHE Flaeche
