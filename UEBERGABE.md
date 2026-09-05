@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905e` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905f` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,15 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+0000. Fassung 20260905f: BONI-RADAR im Logo-Menue (ganz oben).
+   Echte, RECHERCHIERTE Wege (05.09.): Stake Bonus-Drop-Codes ueber
+   die offiziellen Kanaele t.me/StakecomDailyDrops und x.com/Stake
+   (einloesen: Konto -> Einstellungen -> Angebote; braucht Wager der
+   letzten 7 Tage), stake.com/promotions; Interwetten Bestandskunden-
+   Bonusseite; Bwin Angebote; Bet365 Offers. BEWUSST KEINE Dritt-
+   'Gratis-Code'-Seiten (Betrug/Kontosperre) - Warnkasten steht im
+   Menue. Links fliessen inline (#logomenue .lm-bonifeld a display
+   inline gegen die Block-Grundregel), Menue max-height 82vh.
 000. Fassung 20260905e: Chat-Feinschliff Handy (Karam).
    - Fussleiste bleibt IM Chat sichtbar: Panel endet bei
      bottom calc(72px+safe-area) - WICHTIG: die Regel braucht im
