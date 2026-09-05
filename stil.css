@@ -3717,6 +3717,68 @@ body[data-seite] .navleiste #nav_profil,
   }
 }
 
+/* ---- 16. Der Chat als Messenger (chatmodus.js schaltet die
+   Vollbild-Klasse; Funktion liegt unveraendert in glocke.js) ---- */
+#glockenpanel.gp-voll { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  width: auto; height: auto; max-width: none; max-height: none;
+  border-radius: 0; z-index: 1200; display: flex; flex-direction: column; }
+#glockenpanel.gp-voll #gp-inhalt { flex: 1; min-height: 0; }
+/* Mini-Modus (Rechtsklick): kompaktes Fenster unten rechts */
+@media (min-width: 701px) {
+  #glockenpanel:not(.gp-voll) { position: fixed; top: auto; left: auto;
+    right: 16px; bottom: 16px; width: 400px; max-width: 92vw;
+    height: 560px; max-height: 82vh; border-radius: 12px;
+    box-shadow: 0 10px 34px rgba(10, 20, 30, .35);
+    display: flex; flex-direction: column; overflow: hidden; }
+  #glockenpanel:not(.gp-voll) #gp-inhalt { flex: 1; min-height: 0; }
+}
+@media (max-width: 700px) {
+  #glockenpanel { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    width: auto; height: auto; max-width: none; max-height: none;
+    border-radius: 0; z-index: 1200; display: flex; flex-direction: column; }
+  #glockenpanel #gp-inhalt { flex: 1; min-height: 0; }
+}
+
+/* Der Grund des Chats: helles Grau mit leisen Wett-Zeichen
+   (Ball, Wuerfel, Pokal) - wie bei WhatsApp, nur unsere Welt. */
+#glockenpanel .gp-gespraech, #ans_chat .chatliste {
+  background-color: #eceff1;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cg fill='none' stroke='%23d3d9dd' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='12'/%3E%3Cpath d='M30 18v6M30 36v6M18 30h6M36 30h6'/%3E%3Crect x='86' y='16' width='26' height='26' rx='6'/%3E%3Ccircle cx='94' cy='24' r='2' fill='%23d3d9dd'/%3E%3Ccircle cx='104' cy='34' r='2' fill='%23d3d9dd'/%3E%3Cpath d='M22 96h24v10a12 12 0 0 1-24 0zM28 118h12M24 124h20'/%3E%3Ccircle cx='104' cy='104' r='13'/%3E%3Cpath d='M104 91v26M91 104h26'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* Kopf des Gespraechs wie ein Messenger: dunkel, Name gross */
+#glockenpanel .gp-gkopf { background: #1a2c50; color: #fff;
+  padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+#glockenpanel .gp-gkopf .gp-kopfname { font-weight: 700; font-size: 15px; }
+#glockenpanel .gp-gkopf .gp-kopfuser { opacity: .75; }
+#glockenpanel .gp-zurueck, #glockenpanel .gp-ruf { background: none; border: 0;
+  box-shadow: none; color: #fff; font-size: 18px; min-width: 40px; min-height: 40px;
+  border-radius: 50%; }
+#glockenpanel .gp-zurueck:hover, #glockenpanel .gp-ruf:hover { background: rgba(255, 255, 255, .15); }
+/* Die Chat-Liste: grosse, klare Zeilen mit Person im Blick */
+#glockenpanel .gp-freund { display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 58px; padding: 8px 10px; border: 0; border-bottom: 1px solid #e3e7ea;
+  border-radius: 0; background: #fff; box-shadow: none; text-align: left; }
+#glockenpanel .gp-freund:hover { background: #f0f3f6; }
+#glockenpanel .gp-freundname { font-weight: 700; display: flex; flex-direction: column; }
+#glockenpanel .gp-freunduser { font-weight: 400; }
+#glockenpanel .gp-freund .badge { margin-left: auto; }
+#glockenpanel .gp-bereich .gp-bkreis { width: 40px; height: 40px; border-radius: 50%;
+  background: var(--kenn, #1a2c50); color: #fff; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 18px; flex: 0 0 auto; }
+/* Schreibzeile: runde Eingabe, klarer Senden-Bereich */
+#glockenpanel .chateingabe, #ans_chat .chateingabe { background: #f0f2f5;
+  padding: 8px; display: flex; align-items: center; gap: 6px; }
+#glockenpanel .chateingabe input[type="text"], #glockenpanel .chateingabe input:not([type]),
+#ans_chat .chateingabe input[type="text"], #ans_chat .chateingabe input:not([type]) {
+  border-radius: 18px; padding: 9px 14px; border: 1px solid #cfd6dd; background: #fff; flex: 1; }
+
+/* ---- 17. Blitz-Rechner im Logo-Menue ---- */
+.lm-rechnerfeld { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
+.lm-rechnerfeld .lmr { width: 76px; padding: 7px 8px; border: 1px solid #cfd6dd;
+  border-radius: 6px; font: inherit; }
+.lm-ergebnis { width: 100%; font-weight: 700; padding-top: 2px;
+  font-variant-numeric: tabular-nums; }
+
 }
 @media print { #fussleiste, #logomenue { display: none !important; } }
 /* ---- ENDE DESIGN-REWORK 05.09.2026 ---- */

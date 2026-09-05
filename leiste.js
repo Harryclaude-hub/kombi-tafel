@@ -72,7 +72,16 @@
       else location.href = "mein.html";
       return;
     }
-    if (was === "chat" || was === "profil") {
+    if (was === "chat") {
+      // Karam 05.09.: der Chat-Knopf oeffnet den ALLGEMEINEN Chat
+      // (Kontaktliste, wie WhatsApp) - nicht den Bereichs-Chat. Der
+      // steht dort als erster Eintrag (chatmodus.js).
+      if (typeof window.chatmodusAuf === "function") { window.chatmodusAuf(true); markiere("chat"); }
+      else if (aufMein) { oeffneAnsicht("chat"); }
+      else location.href = "mein.html#chat";
+      return;
+    }
+    if (was === "profil") {
       if (aufMein) { oeffneAnsicht(was); }
       else location.href = "mein.html#" + was;
     }
@@ -177,21 +186,37 @@
     }
     return false;
   }
-  var wx = null, wy = null;
+  var wx = null, wy = null, wEl = null;
   document.addEventListener("touchstart", function (e) {
-    wx = null;
+    wx = null; wEl = null;
     if (!schmal() || e.touches.length !== 1) return;
     var z = e.target;
     if (z.closest && z.closest("input, textarea, select, #handyfoto, #logomenue")) return;
     if (querScrollbar(z)) return;
-    wx = e.touches[0].clientX; wy = e.touches[0].clientY;
+    wx = e.touches[0].clientX; wy = e.touches[0].clientY; wEl = z;
   }, { passive: true });
   document.addEventListener("touchend", function (e) {
     if (wx === null) return;
     var dx = e.changedTouches[0].clientX - wx;
     var dy = e.changedTouches[0].clientY - wy;
-    wx = null;
+    var von = wEl;
+    wx = null; wEl = null;
     if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    // IM CHAT gilt WhatsApp: nach rechts wischen geht ZURUECK
+    // (Gespraech -> Kontaktliste -> Panel zu). Nie Bereichswechsel.
+    if (von && von.closest && von.closest("#glockenpanel")) {
+      if (dx > 0) {
+        var inh = document.getElementById("gp-inhalt");
+        if (inh && inh.classList.contains("gp-zeigt-gespraech") &&
+            typeof window.glockeSpalteZeigen === "function") window.glockeSpalteZeigen("liste");
+        else if (typeof window.glockeUmschalten === "function") window.glockeUmschalten();
+      }
+      return;
+    }
+    if (von && von.closest && von.closest("#ans_chat")) {
+      if (dx > 0 && typeof window.mbAnsichtZu === "function") { window.mbAnsichtZu(); markiere("bereich"); }
+      return;
+    }
     var l = document.getElementById("fussleiste");
     var akt = l && l.querySelector(".fl-knopf.aktiv");
     var i = akt ? REIHE.indexOf(akt.dataset.fl) : -1;
@@ -214,7 +239,17 @@
       try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { }
       oeffneAnsicht(anker);
     } else if (schmal()) {
-      oeffneAnsicht("chat");
+      // Handy-Start wie WhatsApp: die allgemeine Chat-Liste (Karam
+      // 05.09.). ERST wenn die App angemeldet aufgebaut ist (ans_chat
+      // existiert) - sonst laege das Vollbild ueber der Anmeldemaske.
+      (function warte(v) {
+        if (document.getElementById("ans_chat")) {
+          if (typeof window.chatmodusAuf === "function") { window.chatmodusAuf(true); markiere("chat"); }
+          else oeffneAnsicht("chat");
+          return;
+        }
+        if (v < 50) setTimeout(function () { warte(v + 1); }, 300);
+      })(0);
     }
   }
 

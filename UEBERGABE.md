@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905c` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905d` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,25 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+00. Fassung 20260905d: Chat als Messenger + Blitz-Rechner im Logo.
+   - chatmodus.js (NEU, loeschbar): Chat-Knopf oben = allgemeiner Chat
+     (glockenpanel) im VOLLBILD (Klasse gp-voll), Rechtsklick = MINI
+     (Desktop 400x560 unten rechts); gleicher Modus nochmal = zu.
+     Capture-Listener am Dokument uebersteuern den glocke.js-Handler,
+     OHNE glocke.js anzufassen. Erster Listen-Eintrag: Bereichs-Chat
+     (oeffnet ans_chat bzw. mein.html#chat).
+   - leiste.js: Fussleisten-Chat + Handy-Start oeffnen den ALLGEMEINEN
+     Chat (erst wenn ans_chat existiert - sonst laege das Vollbild
+     ueber der Anmeldemaske); Rechts-Swipe im Chat = zurueck
+     (Gespraech -> Liste -> zu; in ans_chat -> mbAnsichtZu), im Panel
+     nie Bereichswechsel.
+   - CSS 16/17: Panel am Handy immer Vollbild; Chat-Grund = helles
+     Grau mit leisen Wett-Zeichen (SVG-data-URI: Ball/Wuerfel/Pokal),
+     dunkler Gespraechskopf, grosse Listen-Zeilen, runde Schreibzeile.
+   - logoknopf.js: Wuerfel raus, BLITZ-RECHNER rein (Einsatz x bis zu
+     3 Quoten = Gesamtquote + Auszahlung, gemessen 400x1,8x2,1=1512).
+   - Gemessen: Voll/Mini/zu am Desktop, Vollbild + Swipe-zu am Handy
+     (TouchEvent), Bereichs-Chat-Eintrag, Muster-Grund.
 0. Fassung 20260905c: Logo-Menue, Wischen, neue Knoepfe, Handy-Header.
    - `logoknopf.js` (NEU, alle 6 Seiten, loeschbar): Klick/Rechtsklick
      aufs Logo = Schnellmenue (Seiten, "Frisch laden" mit ?frisch gegen
