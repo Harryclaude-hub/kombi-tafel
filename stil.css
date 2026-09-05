@@ -3481,3 +3481,104 @@ h2.kl-kopf::after { content: " \25B4"; color: #8b95a8; font-size: 14px; }
 
 }
 /* ---- ENDE REDESIGN-SCHICHT 02.09.2026 ---- */
+
+
+/* ============================================================
+   DESIGN-REWORK 05.09.2026 ("besser stationiert")
+   Loeschbare Schicht nach Karams Trennregel: diesen Block bis
+   ENDE DESIGN-REWORK loeschen (und leiste.js samt der sechs
+   script-Zeilen), dann sieht alles aus wie vorher und laeuft
+   unveraendert. Nur Anordnung, Abstaende, Symmetrie - keine
+   Funktion, kein Rechenweg, kein Druckpfad (alles in
+   @media screen ausser der einen Druck-Ausblendung der neuen
+   Fussleiste ganz unten).
+   ============================================================ */
+@media screen {
+
+/* ---- 1. Kopfleiste: Seiten-Knoepfe links, Persoenliches rechts.
+   Karam 05.09.: "die Symbole sollen richtig stehen, richtige
+   bessere Knoepfe". Profil/Freunde/Chat/Klingel bilden rechts
+   eine eigene, gleich grosse Knopf-Gruppe. ---- */
+.navleiste { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; row-gap: 8px; }
+.navleiste .logo { margin-right: 6px; }
+.navleiste .navknopf { display: inline-flex; align-items: center; justify-content: center;
+  min-height: 38px; box-sizing: border-box; }
+.navleiste .navknopf.aktiv { box-shadow: inset 0 -3px 0 currentColor; }
+/* Die persoenliche Gruppe beginnt beim Freunde-Knopf */
+#nav_freunde { margin-left: auto; }
+#nav_freunde, #nav_nachrichten, #nav_profil, #wecker_knopf {
+  min-width: 44px; min-height: 38px; display: inline-flex; align-items: center;
+  justify-content: center; gap: 4px; }
+
+/* ---- 2. Mein Bereich: die vier Block-Knoepfe als gleich grosse,
+   symmetrische Kacheln ---- */
+.mb-navi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.mb-navi button { min-height: 48px; width: 100%; }
+@media (max-width: 700px) {
+  .mb-navi { grid-template-columns: repeat(2, 1fr); }
+  .mb-navi button { min-height: 52px; }
+}
+
+/* ---- 3. Bereichs-Tabs mit Pin-Knopf (die Funktion steckt in
+   mein.js/supa.js - hier nur die Optik) ---- */
+#bereichtabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#bereichtabs .tab-pin { width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid #c9c9c9; background: #f6f6f6; cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 0; opacity: .55; }
+#bereichtabs .tab-pin:hover { opacity: .85; }
+#bereichtabs .tab-pin.aktiv { opacity: 1; background: #fff3c4;
+  border-color: #d4a017; box-shadow: 0 0 0 2px rgba(212, 160, 23, .25); }
+@media (max-width: 700px) {
+  #bereichtabs .tab-pin { width: 44px; height: 44px; }
+}
+
+/* ---- 4. Buchhaltung: Symmetrie und Ordnung bei Menge.
+   Gleiche Kartenhoehen, feste Raster, ruhige Abstaende; das
+   Kassenbuch rollt ab 420px in sich (Kopfzeile bleibt stehen),
+   damit die Seite bei vielen Eintraegen uebersichtlich bleibt. ---- */
+.bb-kacheln { display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); align-items: stretch; }
+.bb-kacheln.bb-grossreihe { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
+.bb-kachel { display: flex; flex-direction: column; justify-content: center;
+  height: 100%; box-sizing: border-box; }
+.bb-kachelwert { font-variant-numeric: tabular-nums; }
+.bb-teil { margin: 18px 0; }
+.bb-urteil, .bb-klemmt, .bb-wem { margin: 14px 0; }
+.bb-wemliste li { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bb-wemzahl { font-variant-numeric: tabular-nums; margin-left: auto; }
+.bb-kassenbuch .tabellenrand { max-height: 420px; overflow: auto; }
+.bb-kassenbuch thead th { position: sticky; top: 0; background: #fff; z-index: 1;
+  box-shadow: 0 1px 0 #ddd; }
+@media (max-width: 700px) {
+  .bb-kacheln, .bb-kacheln.bb-grossreihe { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---- 5. Die Fussleiste (leiste.js): nur am Handy sichtbar.
+   Maximal fuenf grosse Knoepfe, weit auseinander (Karam:
+   "dass man sich nicht vertippen kann"), alles andere oben. ---- */
+#fussleiste { display: none; }
+@media (max-width: 700px) {
+  #fussleiste { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+    padding: 6px 10px calc(8px + env(safe-area-inset-bottom));
+    background: #1a2c50; box-shadow: 0 -2px 8px rgba(0, 0, 0, .25); }
+  #fussleiste .fl-knopf { min-height: 56px; border: 0; background: none; color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; border-radius: 10px; font: inherit; padding: 4px 0; }
+  #fussleiste .fl-knopf.aktiv { background: rgba(255, 255, 255, .18); }
+  #fussleiste .fl-zeichen { font-size: 22px; line-height: 1; position: relative; }
+  #fussleiste .fl-text { font-size: 11px; }
+  #fussleiste .fl-zeichen .badge { position: absolute; top: -6px; right: -14px; }
+  body.hat-fussleiste { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  /* Was unten liegt, verschwindet oben - oben bleiben Handbuch,
+     Erklaerungen, Freunde und die Klingel ("alles andere oben") */
+  body.hat-fussleiste .navleiste a[href="original.html"],
+  body.hat-fussleiste .navleiste a[href="kombis.html"],
+  body.hat-fussleiste .navleiste a.navknopf[href="mein.html"]:not(.glocke),
+  body.hat-fussleiste #nav_nachrichten { display: none; }
+}
+
+}
+@media print { #fussleiste { display: none !important; } }
+/* ---- ENDE DESIGN-REWORK 05.09.2026 ---- */
+

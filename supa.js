@@ -143,6 +143,36 @@ async function supaBereicheFuerMich() {
   return r.data || [];
 }
 
+// ---- Bereich fixieren (Karam, 05.09.2026) ----
+// Ein Pin heisst: von DIESEM geteilten Bereich will ich die
+// Server-Waechter-Meldungen (gewonnen/verloren) auf meine Geraete.
+// Der Waechter (ergebnis-scan) liest kt_bereich_pins und schickt an
+// Besitzer UND Fixierer mit gueltiger Freigabe.
+async function supaPinsLaden() {
+  const u = await supaNutzer();
+  if (!u) return [];
+  const r = await supa.from("kt_bereich_pins").select("bereich").eq("nutzer", u.id);
+  if (r.error) return [];
+  return (r.data || []).map(x => x.bereich);
+}
+
+async function supaPinSetzen(bereichId, an) {
+  const u = await supaNutzer();
+  if (!u) return { error: { message: "nicht angemeldet" } };
+  if (an) {
+    const r = await supa.from("kt_bereich_pins")
+      .upsert({ nutzer: u.id, bereich: bereichId }).select("bereich");
+    if (r.error) return { error: r.error };
+    // Stille RLS-Falle: 0 Zeilen = nicht gespeichert, das muss gesagt werden.
+    if (!r.data || !r.data.length) return { error: { message: "kein Schreibrecht (Freigabe fehlt?)" } };
+    return { ok: true };
+  }
+  const r = await supa.from("kt_bereich_pins").delete()
+    .eq("nutzer", u.id).eq("bereich", bereichId).select("bereich");
+  if (r.error) return { error: r.error };
+  return { ok: true };
+}
+
 async function supaTeilen(gastId, rolle) {
   const u = await supaNutzer();
   // Ende-zu-Ende: der Gast bekommt den Bereichsschlüssel, verschlüsselt

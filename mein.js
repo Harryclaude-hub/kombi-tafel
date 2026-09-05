@@ -7,6 +7,7 @@
 let ich = null;                 // {id, username}
 let aktiverBereich = null;      // {id, username, rolle}  rolle: "ich" | "close" | "friend"
 let meineBereiche = [];
+let meinePins = new Set();   // fixierte Bereiche (kt_bereich_pins)
 let chatTimer = null;
 let letzteChatId = 0;
 let ergSucheTimer = null;   // Selbstsuche fuer Ergebnisse (ergebnisse.js)
@@ -193,8 +194,14 @@ async function tuUsernameSetzen() {
 async function zeigeApp() {
   binAdmin = await supaIstAdmin();
   const geteilt = await supaBereicheFuerMich();
+  // Fixierte Bereiche (Karam, 05.09.): Pin = von diesem geteilten Bereich
+  // kommen die Waechter-Meldungen auch auf MEINE Geraete. Gepinnte stehen
+  // in der Tab-Leiste direkt nach dem eigenen Bereich.
+  meinePins = new Set(typeof supaPinsLaden === "function" ? await supaPinsLaden() : []);
+  const geteiltSortiert = geteilt.slice().sort((a, b) =>
+    (meinePins.has(b.owner) ? 1 : 0) - (meinePins.has(a.owner) ? 1 : 0));
   meineBereiche = [{ id: ich.id, username: ich.username, rolle: "ich" }]
-    .concat(geteilt.map(g => ({ id: g.owner, username: g.kt_profiles.username, rolle: g.rolle })));
+    .concat(geteiltSortiert.map(g => ({ id: g.owner, username: g.kt_profiles.username, rolle: g.rolle })));
   if (!aktiverBereich) aktiverBereich = meineBereiche[0];
 
   el("inhalt").innerHTML = `
@@ -532,6 +539,21 @@ async function zeichneTabs() {
       ' <span class="badge" style="display:none"></span>';
     a.onclick = (ev) => { ev.preventDefault(); aktiverBereich = b; zeigeApp(); };
     box.appendChild(a);
+    // Fixieren gibt es nur fuer GETEILTE Bereiche: der eigene meldet
+    // sich sowieso. Der Pin ist ein eigener Knopf NEBEN dem Tab, damit
+    // der Tab-Klick (Bereich wechseln) unberuehrt bleibt.
+    if (b.rolle !== "ich") {
+      const p = document.createElement("button");
+      const an = meinePins.has(b.id);
+      p.type = "button";
+      p.className = "tab-pin" + (an ? " aktiv" : "");
+      p.innerHTML = "&#128204;";
+      p.title = an
+        ? "Fixiert: die Gewonnen/Verloren-Meldungen dieses Bereichs kommen auf deine Geräte. Klick = wieder lösen."
+        : "Fixieren: dann kommen die Gewonnen/Verloren-Meldungen dieses Bereichs auch auf deine Geräte.";
+      p.onclick = (ev) => { ev.preventDefault(); tuBereichPin(b.id, b.username); };
+      box.appendChild(p);
+    }
   }
   await bereichBadges();
   // Fremder Bereich ohne Schluessel: der Gast sieht sonst nur Schloesser
@@ -548,6 +570,24 @@ async function zeichneTabs() {
       "Danach hier einmal neu laden.";
     box.parentNode.insertBefore(w, box.nextSibling);
   }
+}
+
+// Pin an/aus. Nach dem Speichern werden NUR die Tabs neu gezeichnet -
+// die Meldung sagt ehrlich, was der Pin tut und was nicht.
+async function tuBereichPin(bereichId, username) {
+  const an = !meinePins.has(bereichId);
+  const r = await supaPinSetzen(bereichId, an);
+  if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  if (an) meinePins.add(bereichId); else meinePins.delete(bereichId);
+  meldungM(an
+    ? "&#128204; <b>Bereich von " + textSicherM(username) + " fixiert.</b> Wenn der Server-Wächter dort " +
+      "eine Kombination als gewonnen oder verloren meldet, klingelt es jetzt auch auf DEINEN Geräten " +
+      "(die Klingel muss auf dem Gerät eingeschaltet sein - oben das &#128276;)."
+    : "Fixierung gelöst: vom Bereich von " + textSicherM(username) + " kommen keine Wächter-Meldungen mehr an dich.",
+    an ? "gut" : "warn");
+  // Reihenfolge der Tabs (gepinnt zuerst) stimmt erst nach dem naechsten
+  // vollen Aufbau; die Knopf-Farbe stimmt sofort.
+  await zeichneTabs();
 }
 
 async function neueNachrichten(bereichId) {

@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **03.09.2026**, Fassung `20260903a` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905a` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -991,6 +991,55 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   verschluesselt). Einsatz, Quote, moeglicher Gewinn bleiben.
 - Bewusst NICHT still im Hintergrund beim Zeichnen: das sind
   Buchhaltungseintraege.
+
+### Fassung 20260905a: Bereich fixieren + Fussleiste am Handy + Feinschliff
+
+**FUNKTION - Bereich fixieren (Pin):**
+- Tabelle `kt_bereich_pins` (nutzer, bereich; RLS: nur eigene Pins,
+  Anlegen nur mit Freigabe oder eigener Bereich; Migration
+  bereich_pins_fuer_benachrichtigungen). supa.js: supaPinsLaden/
+  supaPinSetzen (mit 0-Zeilen-Wache). mein.js: Pin-Knopf 📌 NEBEN
+  jedem geteilten Bereichs-Tab (tuBereichPin), gepinnte Bereiche
+  stehen in der Tab-Leiste direkt nach dem eigenen.
+- **OFFEN, MUSS-PUNKT: ergebnis-scan Version 3 deployen.** Die fertige
+  index.ts liegt in `server/ergebnis-scan.index.ts` (Push an Besitzer
+  UND Fixierer-mit-Freigabe; Anleitung in server/LIES-MICH.md).
+  Der MCP-Deploy scheiterte am 05.09. die GANZE Session an einem
+  Werkzeug-Schema-Fehler (alle Parameter kamen als Text an, ZodError
+  "expected boolean/array, received string" - auch im Unteragenten).
+  Bis zum Deploy speichert die App Pins, aber der Waechter (live:
+  Version 2) beachtet sie noch nicht - Karam weiss das.
+- Nach dem Deploy: Probe-Betrieb messen + get_edge_function (version 3)
+  gegenlesen. auswertung.js wurde NICHT geaendert (auswertung.mjs beim
+  Deploy frisch aus auswertung.js erzeugen, siehe LIES-MICH).
+
+**DESIGN (zwei loeschbare Schichten, Funktion unberuehrt):**
+- `leiste.js` (NEU, auf allen 6 Seiten nach handy.js): Fussleiste am
+  Handy im WhatsApp-Stil - FUENF grosse Knoepfe unten (Chat, Tafel,
+  Kombi-Bau, Bereich, Profil; 56px hoch, weit auseinander), badge vom
+  Kopf-Chat-Knopf wird per MutationObserver gespiegelt (nur abgelesen).
+  Auf mein.html oeffnen Chat/Profil die vorhandenen Ansichten
+  (mbAnsichtOeffnen via Poll bis die App steht), von anderen Seiten
+  per mein.html#chat/#profil. Am Handy startet mein.html im CHAT
+  (Karams Wunsch 05.09., bewusste Ausnahme von "nie in Sonder-Ansicht
+  starten" - nur schmal, nur mein.html, steckt in leiste.js).
+- stil.css "DESIGN-REWORK 05.09.2026" am Dateiende: Kopfleiste
+  (Seiten links, persoenliche Knopf-Gruppe ab #nav_freunde rechts,
+  einheitliche 38px-Knoepfe), mb-navi als 4er-Raster (Handy 2er),
+  Pin-Knopf-Optik, Buchhaltung symmetrisch (bb-kacheln als Raster
+  mit gleichen Hoehen, Kassenbuch rollt ab 420px mit stehender
+  Kopfzeile), Fussleisten-Optik; am Handy verschwinden oben die
+  Links, die unten liegen (Tafel/Kombi-Bau/Mein Bereich/Chat) -
+  oben bleiben Handbuch, Erklaerungen, Freunde, Klingel.
+- RUECKWEG: stil.css-Block "DESIGN-REWORK 05.09.2026" loeschen +
+  leiste.js samt der sechs script-Zeilen loeschen = alles wie vorher.
+- Gemessen (Pane-Artefakt beachten: verstecktes Fenster meldet
+  Breite 0 = "schmal"! Immer resize_window setzen): Desktop 1280
+  Leiste none + Freunde-Gruppe rechts (margin 184px); Handy 375
+  Leiste fixed 5 Spalten, Knopf 56x66, body-Polster 88px, oben
+  korrekt ausgeduennt, aktiver Knopf je Seite, Klick Chat ->
+  mein.html. Pin-UI und Chat-Start brauchen Anmeldung - nicht im
+  Sandkasten messbar, Code-Review + 0-Zeilen-Wachen stattdessen.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
