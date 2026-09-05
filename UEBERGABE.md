@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905d` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905e` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,17 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+000. Fassung 20260905e: Chat-Feinschliff Handy (Karam).
+   - Fussleiste bleibt IM Chat sichtbar: Panel endet bei
+     bottom calc(72px+safe-area) - WICHTIG: die Regel braucht im
+     Handy-Block BEIDE Selektoren (#glockenpanel, #glockenpanel.gp-voll),
+     sonst gewinnt die spezifischere gp-voll-Bildschirmregel und das
+     Panel laeuft bis ganz unten (gemessen 740 vs Leiste 742).
+   - Handy-Kopfzeile 'Nachrichten' klein (12px), schliessen-Knopf
+     dort weg (zu geht per Wisch oder Fussleiste); Desktop behaelt ihn.
+   - Chat-Knopf GANZ RECHTS in der Fussleiste (Reihe tafel-bau-
+     bereich-profil-chat, Swipe-REIHE mitgezogen); anderer
+     Fussleisten-Knopf schliesst einen offenen Chat zuerst.
 00. Fassung 20260905d: Chat als Messenger + Blitz-Rechner im Logo.
    - chatmodus.js (NEU, loeschbar): Chat-Knopf oben = allgemeiner Chat
      (glockenpanel) im VOLLBILD (Klasse gp-voll), Rechtsklick = MINI

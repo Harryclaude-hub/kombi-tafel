@@ -3733,10 +3733,20 @@ body[data-seite] .navleiste #nav_profil,
   #glockenpanel:not(.gp-voll) #gp-inhalt { flex: 1; min-height: 0; }
 }
 @media (max-width: 700px) {
-  #glockenpanel { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  /* Vollbild BIS ZUR FUSSLEISTE, nicht drueber (Karam 05.09.: die
+     fuenf Knoepfe unten muessen im Chat sichtbar bleiben). Die
+     .gp-voll-Fassung steht MIT hier, sonst gewinnt ihre Bildschirm-
+     Regel (hoehere Spezifitaet) und das Panel liefe bis ganz unten. */
+  #glockenpanel, #glockenpanel.gp-voll { position: fixed; top: 0; left: 0; right: 0;
+    bottom: calc(72px + env(safe-area-inset-bottom));
     width: auto; height: auto; max-width: none; max-height: none;
     border-radius: 0; z-index: 1200; display: flex; flex-direction: column; }
   #glockenpanel #gp-inhalt { flex: 1; min-height: 0; }
+  body.hat-fussleiste #fussleiste { z-index: 1300; }
+  /* Kopfzeile klein, ohne "schliessen" - zu geht per Wisch oder
+     Fussleiste */
+  #glockenpanel .gp-kopf { padding: 4px 10px; font-size: 12px; min-height: 0; }
+  #glockenpanel .gp-kopf .gp-zu { display: none; }
 }
 
 /* Der Grund des Chats: helles Grau mit leisen Wett-Zeichen

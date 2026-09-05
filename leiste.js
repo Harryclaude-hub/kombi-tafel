@@ -39,12 +39,14 @@
     if (document.getElementById("fussleiste")) return;
     var l = document.createElement("nav");
     l.id = "fussleiste";
+    // Chat GANZ RECHTS (Karam 05.09.: "ganz rechts beim Chat,
+    // der Rest davor") - dort liegt der Daumen.
     var knoepfe = [
-      { k: "chat",    text: "Chat",      zeichen: "💬" },
       { k: "tafel",   text: "Tafel",     zeichen: "📋" },
       { k: "bau",     text: "Kombi-Bau", zeichen: "🎯" },
       { k: "bereich", text: "Bereich",   zeichen: "📒" },
-      { k: "profil",  text: "Profil",    zeichen: "👤" }
+      { k: "profil",  text: "Profil",    zeichen: "👤" },
+      { k: "chat",    text: "Chat",      zeichen: "💬" }
     ];
     for (var i = 0; i < knoepfe.length; i++) {
       var kn = knoepfe[i];
@@ -65,6 +67,10 @@
 
   function klick(ev) {
     var was = ev.currentTarget.dataset.fl;
+    // Ein anderer Bereich als der Chat: erst den offenen Chat zumachen,
+    // sonst laege er weiter ueber der Seite.
+    if (was !== "chat" && document.getElementById("glockenpanel") &&
+        typeof window.glockeUmschalten === "function") window.glockeUmschalten();
     if (was === "tafel")   { geh("original.html"); return; }
     if (was === "bau")     { geh("kombis.html"); return; }
     if (was === "bereich") {
@@ -176,7 +182,7 @@
   // nichts ruckelt. Der Wisch zaehlt NICHT, wenn der Finger in einer
   // quer scrollbaren Tabelle, einem Eingabefeld, dem Foto-Kasten
   // oder dem Logo-Menue liegt - dort gilt das normale Verhalten.
-  var REIHE = ["chat", "tafel", "bau", "bereich", "profil"];
+  var REIHE = ["tafel", "bau", "bereich", "profil", "chat"];
   function querScrollbar(el) {
     for (var e = el; e && e !== document.body; e = e.parentElement) {
       if (e.scrollWidth > e.clientWidth + 5) {
