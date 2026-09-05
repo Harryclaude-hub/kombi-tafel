@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905f` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905g` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,21 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+00000. Fassung 20260905g: fluessig am Handy + Chat in der Mitte.
+   - LAG-URSACHE gefunden: body-Verlauf mit background-attachment
+     fixed = Repaint bei jedem Scroll. Am Handy jetzt FLACHE Flaeche
+     (#edf0f3). Merksatz: nie wieder fixed-Grund am Handy.
+   - Animationen Stufe 2, nur transform/opacity: Panel faehrt auf
+     (gp-auf .18s), Gespraech/Liste schieben seitlich herein;
+     Seitenwechsel per View Transitions (@view-transition navigation
+     auto + ::view-transition-old/new, hinter prefers-reduced-motion,
+     alte Browser wechseln hart wie bisher).
+   - Fussleiste: Tafel, Kombi-Bau, CHAT (Mitte), Bereich, Profil -
+     REIHE in leiste.js mitgezogen.
+   - chatmodus.js tauscht die Emoji-Rufknoepfe im Thread gegen
+     Linien-SVGs (Telefon/Video, per title erkannt, onclick bleibt);
+     gedrosselte Body-Wache (250 ms) zieht Symbole + Bereichs-Chat-
+     Eintrag nach. Gemessen mit eingeschleusten gp-ruf-Knoepfen.
 0000. Fassung 20260905f: BONI-RADAR im Logo-Menue (ganz oben).
    Echte, RECHERCHIERTE Wege (05.09.): Stake Bonus-Drop-Codes ueber
    die offiziellen Kanaele t.me/StakecomDailyDrops und x.com/Stake
