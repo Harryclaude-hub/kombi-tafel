@@ -580,10 +580,8 @@ async function tuBereichPin(bereichId, username) {
   if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
   if (an) meinePins.add(bereichId); else meinePins.delete(bereichId);
   meldungM(an
-    ? "&#128204; <b>Bereich von " + textSicherM(username) + " fixiert.</b> Wenn der Server-Wächter dort " +
-      "eine Kombination als gewonnen oder verloren meldet, klingelt es jetzt auch auf DEINEN Geräten " +
-      "(die Klingel muss auf dem Gerät eingeschaltet sein - oben das &#128276;)."
-    : "Fixierung gelöst: vom Bereich von " + textSicherM(username) + " kommen keine Wächter-Meldungen mehr an dich.",
+    ? "&#128204; <b>" + textSicherM(username) + " fixiert:</b> Gewonnen/Verloren-Meldungen kommen jetzt auch auf deine Geräte (&#128276; muss an sein)."
+    : "&#128204; gelöst: keine Meldungen mehr von " + textSicherM(username) + ".",
     an ? "gut" : "warn");
   // Reihenfolge der Tabs (gepinnt zuerst) stimmt erst nach dem naechsten
   // vollen Aufbau; die Knopf-Farbe stimmt sofort.
@@ -1563,6 +1561,44 @@ function kombiUebersichtHtml(ordnerId, scheine) {
     (typeof pkFormularHtml === "function" ? pkFormularHtml(ordnerId) : "");
 }
 
+// ---------- Schnell-Rechner je Anbieter (Karam, 05.09.2026) ----------
+// REINER Rechner, bucht NICHTS: rein/raus kommen aus der Kasse,
+// "aktuell drauf" tippt Karam - Gewinn = aktuell + raus - rein.
+// Der getippte Wert wird nur auf DIESEM Geraet gemerkt (localStorage)
+// und veraendert keine Zahl der Buchhaltung.
+function pkRechnerHtml(personId, p, zg) {
+  let h = '<div class="pk-rechner"><b>&#129518; Schnell-Rechner:</b> ' +
+    '<span class="mini">aktuellen Stand beim Anbieter eintippen, der Gewinn rechnet sich sofort. Bucht nichts.</span>' +
+    "<table><thead><tr><th>Anbieter</th><th>rein</th><th>raus</th><th>aktuell drauf</th><th>Gewinn</th></tr></thead><tbody>";
+  for (const kz of ["iw", "bw", "b3", "st"]) {
+    if (zg.anbieter[kz] === false) continue;
+    const a = p.anbieter[kz];
+    let merk = "";
+    try { merk = localStorage.getItem("kt_rechner_" + personId + "_" + kz) || ""; } catch (e) { }
+    h += "<tr><td>" + markeM(kz) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
+      "<td>" + a.geholt.toFixed(2) + " &euro;</td>" +
+      '<td><input type="number" step="0.01" class="einsatz" value="' + merk + '" placeholder="0.00" ' +
+      'data-rein="' + a.einge + '" data-raus="' + a.geholt + '" ' +
+      'data-merk="kt_rechner_' + personId + "_" + kz + '" oninput="pkRechner(this)"> &euro;</td>' +
+      '<td class="pk-rechnerwert">' + pkRechnerText(merk, a.einge, a.geholt) + "</td></tr>";
+  }
+  return h + "</tbody></table></div>";
+}
+
+function pkRechnerText(aktuell, rein, raus) {
+  const z = parseFloat(String(aktuell).replace(",", "."));
+  if (!isFinite(z)) return '<span class="mini">-</span>';
+  const g = rundM(z + raus - rein);
+  return '<b class="' + (g >= 0 ? "e-gew" : "e-ver") + '">' + (g >= 0 ? "+" : "") + g.toFixed(2) + " &euro;</b>";
+}
+
+function pkRechner(feld) {
+  try { localStorage.setItem(feld.dataset.merk, feld.value); } catch (e) { }
+  const zelle = feld.closest("tr").querySelector(".pk-rechnerwert");
+  if (zelle) zelle.innerHTML = pkRechnerText(feld.value,
+    parseFloat(feld.dataset.rein) || 0, parseFloat(feld.dataset.raus) || 0);
+}
+
 function zeichnePersonenKasse(scheine) {
   const box = el("personenkasse");
   if (!box) return;
@@ -1579,8 +1615,7 @@ function zeichnePersonenKasse(scheine) {
   const wartendHier = meineScheine.filter(s => scheinWartet(s)).length;
   if (wartendHier) {
     html += '<div class="fertighinweis"><b>' + wartendHier + " Schein" + (wartendHier === 1 ? "" : "e") +
-      " fertig:</b> alle Spiele sind aus. Bitte unten <b>gewonnen oder verloren</b> eintragen - " +
-      "erst dann stimmt die Rechnung hier.</div>";
+      " fertig:</b> bitte unten <b>gewonnen/verloren</b> eintragen.</div>";
   }
   if (p.probleme.length) {
     html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
@@ -1665,7 +1700,7 @@ function zeichnePersonenKasse(scheine) {
         "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td>" +
         (schreib ? "<td>" + standFeld(person.id, "anbieter", kz, a.guthaben) + "</td>" : "") + "</tr>";
     }
-    html += "</tbody></table>";
+    html += "</tbody></table>" + pkRechnerHtml(person.id, p, zg);
   }
 
   // ---------- Kombinationen ----------

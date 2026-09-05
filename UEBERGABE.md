@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905a` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905b` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1040,6 +1040,31 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   korrekt ausgeduennt, aktiver Knopf je Seite, Klick Chat ->
   mein.html. Pin-UI und Chat-Start brauchen Anmeldung - nicht im
   Sandkasten messbar, Code-Review + 0-Zeilen-Wachen stattdessen.
+
+### Fassung 20260905b: Handy entdoppelt, kurze Meldungen, maennlicher Look, Schnell-Rechner
+
+- Handy: #nav_profil oben ausgeblendet (liegt unten in der Fussleiste);
+  leiste.js klappt lange Erklaerkaesten (.kern/.fuellkern/.zeitkern/
+  p.mini ab 160 Zeichen) auf 2 Zeilen ein, Tipp oeffnet - warnkern/
+  #meldung/Kassenwarnung NIE; MutationObserver (400-ms-Drossel) fuer
+  nachgebaute Kaesten. Klapp-CSS wirkt NUR unter 700px (gemessen:
+  breites Fenster schneidet nichts ab).
+- Meldungen gekuerzt (Karam: "viel kuerzer, Details behalten"):
+  kombis.js quoteEintragen/Mahnung/Misch-Trio/Kein-Ersatz/Eigenbau,
+  mein.js Pin + fertighinweis. Muster: Fettkern + Zahlen, kein Absatz.
+- Kein Lila: Kennfarben handbuch -> #4e342e (Kastanie), mein ->
+  #8a5a00 (Bronze) - NUR Override in der 05.09-Schicht; die
+  Tippgeber-Zeilenfarben sind Bedeutung und blieben unangetastet.
+  Buttons: Grundton mit Kante/Verlauf/Gewicht (spezifischere
+  Alt-Regeln gewinnen weiter), button.haupt = Kennfarben-Verlauf
+  (color-mix mit einfachem Fallback), Body-Grund als ruhiger
+  Grauverlauf. Handbuch/Erklaerungen: kl-abschnitt als Karten mit
+  Kennkante, Tabellen mit Luft, volle Breite bleibt.
+- NEU pk-Rechner (mein.js, Personen-Kasse unter der Anbieter-Tabelle):
+  je Anbieter rein/raus aus der Kasse + Feld "aktuell drauf" ->
+  Gewinn = aktuell + raus - rein, live (pkRechner/pkRechnerText).
+  REINER Rechner: localStorage kt_rechner_<ordner>_<kz>, bucht NICHTS.
+  Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur

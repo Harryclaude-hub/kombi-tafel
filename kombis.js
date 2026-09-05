@@ -652,18 +652,12 @@ function wetteRaus(scheinId, wettId, grund) {
     let grundText;
     // Hier ist schon Stufe 2 gelaufen, also war auch ein dritter Schein
     // je Wette erlaubt. Was jetzt noch fehlt, fehlt wirklich.
-    if (i.offen === 0) grundText = "In diesem Ordner ist keine Wette mehr offen - alle Spiele " +
-      "haben schon angefangen.";
-    else if (i.frei === 0) grundText = "Von den " + i.offen + " noch offenen Wetten des Ordners " +
-      "passt keine in diesen Schein - auch dann nicht, wenn eine Wette ausnahmsweise in einen " +
-      "dritten Schein dürfte. Entweder steht das Spiel schon in diesem Schein, oder du hast " +
-      "die Wette hier vorher selbst herausgenommen.";
-    else grundText = "Von den " + i.frei + " Wetten, die hier hineinpassen würden, schafft keine " +
-      "bei " + anbieterName(sch.kz) + " deine Mindestquote " + z.einst.mind.toFixed(2) + ".";
-    meldung("<b>Kein Ersatz gefunden.</b> " + grundText +
-      " Der Schein hat jetzt " + sch.wetten.length + " Wetten. Deine Möglichkeiten: " +
-      "als " + sch.wetten.length + "er stehen lassen, oder oben auf <b>Anders mischen</b> " +
-      "drücken (verteilt alles neu), oder die Mindestquote senken.", "warn");
+    if (i.offen === 0) grundText = "keine Wette im Ordner mehr offen.";
+    else if (i.frei === 0) grundText = "keine der " + i.offen + " offenen Wetten passt in diesen Schein.";
+    else grundText = "keine der " + i.frei + " passenden schafft bei " + anbieterName(sch.kz) +
+      " die Mindestquote " + z.einst.mind.toFixed(2) + ".";
+    meldung("<b>Kein Ersatz:</b> " + grundText + " Schein hat jetzt " + sch.wetten.length +
+      " Wetten - stehen lassen, <b>Anders mischen</b> oder Mindestquote senken.", "warn");
   }
   zeichne_();
 }
@@ -689,13 +683,11 @@ function quoteEintragen(scheinId, wettId, feld) {
   const mindW = mindFuer(w, eintrag.optIdx, z.einst.mind);
   if (sch.art === "normal" && echt < mindW - 0.0001) {
     feld.classList.add("fehler");
-    // Den "real nur"-Zusatz gibt es nur, wenn ein Teiler wirklich
-    // etwas abzieht - seit 03.09. stehen alle auf 1 (Karams Regel).
-    meldung("Nicht übernommen: " + roh.toFixed(2) + " bei " + anbieterName(sch.kz) +
-      (rund2(echt) !== rund2(roh) ? " sind real nur " + rund2(echt).toFixed(2) + ", das" : "") +
-      " liegt unter der Mindestquote " +
-      mindW.toFixed(2) + " dieser Wette (aus dem Foto). Entweder du nimmst die Wette raus, " +
-      "oder du suchst eine andere Linie desselben Spiels.",
+    // Kurz melden (Karam 05.09.): Zahlen ja, Gelaber nein. Der
+    // "real"-Zusatz kommt nur, wenn ein Teiler wirklich abzieht.
+    meldung("<b>Nicht übernommen:</b> " + roh.toFixed(2) + " bei " + anbieterName(sch.kz) +
+      (rund2(echt) !== rund2(roh) ? " (real " + rund2(echt).toFixed(2) + ")" : "") +
+      " liegt unter der Mindestquote " + mindW.toFixed(2) + ". Wette raus oder andere Linie.",
       "warn");
     return;
   }
@@ -704,9 +696,8 @@ function quoteEintragen(scheinId, wettId, feld) {
   // Foto-Quote gibt es eine Mahnung - das riecht nach Tippfehler.
   const fotoRoh = w.o[eintrag.optIdx][1];
   if (fotoRoh && roh > fotoRoh * 1.15) {
-    meldung("<b>Mahnung, bitte prüfen:</b> deine Quote <b>" + roh.toFixed(2) + "</b> liegt weit über der " +
-      "Foto-Quote <b>" + fotoRoh.toFixed(2) + "</b> (mehr als 15 Prozent drüber). Vertippt? " +
-      "Übernommen ist sie trotzdem - wenn sie wirklich stimmt, ist alles gut.", "warn");
+    meldung("<b>Prüfen:</b> " + roh.toFixed(2) + " liegt weit über der Foto-Quote " +
+      fotoRoh.toFixed(2) + " - vertippt? Übernommen ist sie.", "warn");
   }
   speichereEingabe(wettId, opt, sch.kz, String(roh));
   merkeGeprueft(wettId, sch.kz);
@@ -1636,9 +1627,8 @@ function eigenbauAnlegen() {
   speichereZustand(z);
   // anzeigeNr erst NACH dem Speichern: vorher steht der neue Schein noch
   // nicht in der Liste, ueber die gezaehlt wird.
-  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> mit " + wetten.length +
-    " Wetten bei " + textSicher(anbieterName(kz)) + " angelegt - oben bei den Scheinen: " +
-    "Einsatz eintragen, fertig.", "gut");
+  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> (" + wetten.length + " Wetten, " +
+    textSicher(anbieterName(kz)) + ") angelegt - oben Einsatz eintragen.", "gut");
   zeichne_();
 }
 
@@ -2918,9 +2908,8 @@ function mischOhnePaare(kzWahl) {
   // Karam, 03.09.: 1 ist der Standard und heisst "jeder Einsatz einmal
   // im Spiel". Das ist er bereits - es gibt also nichts zu mischen.
   if (ziel <= 1) {
-    meldung("<b>Bei 1 gibt es nichts zu mischen:</b> jeder gesetzte Einsatz ist schon einmal " +
-      "im Spiel. Stell die Zahl neben dem Knopf auf 2, dann kommt jeder ein zweites Mal vor - " +
-      "und so weiter, bis die Grenze unter dem Knopf erreicht ist.", "warn");
+    meldung("<b>Bei 1 gibt es nichts zu mischen:</b> jeder Einsatz ist schon einmal im Spiel. " +
+      "Stell die Zahl auf 2 oder mehr.", "warn");
     return;
   }
 
@@ -2931,9 +2920,8 @@ function mischOhnePaare(kzWahl) {
   const topfJeKz = mischToepfe();
   const kzMoeglich = KT_ANBIETER_RANG.filter(kz => topfJeKz[kz] && topfJeKz[kz].size >= 3);
   if (!kzMoeglich.length) {
-    meldung("<b>Zum Mischen braucht es gesetzte Kombinationen:</b> der Knopf nimmt bei EINEM " +
-      "Anbieter die Einsätze aus deinen dort GESETZTEN Kombinationen dieses Ordners und mischt " +
-      "daraus neue. Es ist noch nichts (Laufendes) gesetzt, also gibt es nichts zu mischen.", "warn");
+    meldung("<b>Nichts zu mischen:</b> es ist noch nichts Laufendes gesetzt. Gemischt wird " +
+      "nur aus GESETZTEN Kombinationen (je Anbieter, mindestens 3 Einsätze).", "warn");
     return;
   }
 
@@ -3091,12 +3079,11 @@ function mischOhnePaare(kzWahl) {
   if (!neu.length) {
     const limitText = kzListe.map(kz => anbieterName(kz) + " max " +
       Math.min(ziel, maxJeKz[kz]) + "-mal").join(", ");
-    meldung("<b>Keine neue Kombination möglich:</b> jedes erlaubte Spiel-Paar dieser Einsätze war " +
-      "schon einmal zusammen in einer gesetzten Kombination, oder alle haben ihr Limit erreicht (" +
-      textSicher(limitText) + "). Es wurde nichts verändert." +
-      (zielVerfehlt.length ? "<br><b>Unter dem Limit bleiben:</b> " +
+    meldung("<b>Ausgemischt:</b> alle Spiel-Paare verbraucht oder Limit erreicht (" +
+      textSicher(limitText) + "). Nichts verändert." +
+      (zielVerfehlt.length ? "<br><b>Unter dem Limit:</b> " +
         textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
-        (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") : ""), "warn");
+        (zielVerfehlt.length > 8 ? " +" + (zielVerfehlt.length - 8) : "") : ""), "warn");
     return;
   }
 
@@ -3115,15 +3102,13 @@ function mischOhnePaare(kzWahl) {
   const jeKzText = kzListe.map(kz =>
     anbieterName(kz) + ": " + neu.filter(g => g.kz === kz).length +
     (ziel > maxJeKz[kz] ? " (Ziel " + ziel + " auf Höchstlimit " + maxJeKz[kz] + " gedeckelt)" : "")).join(", ");
-  meldung("<b>&#127922; " + neu.length + " neue Kombination(en) gemischt</b> (" + textSicher(jeKzText) + ") - " +
-    "NUR aus den bei " + textSicher(anbieterName(kz1)) + " gesetzten Einsätzen, und KEIN Spiel-Paar, das " +
-    "schon einmal zusammen gesetzt war, steckt wieder in einer. " +
-    gesetztAnzahl + " gesetzte(r) Schein(e) unberührt." +
+  meldung("<b>&#127922; " + neu.length + " neue Kombination(en)</b> (" + textSicher(jeKzText) + "). " +
+    "Nur aus Gesetzten bei " + textSicher(anbieterName(kz1)) + ", kein Spiel-Paar doppelt. " +
+    gesetztAnzahl + " Gesetzte unberührt." +
     (zielVerfehlt.length
-      ? "<br><b>&#9888; Unter dem Limit bleiben:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
-        (zielVerfehlt.length > 8 ? " und " + (zielVerfehlt.length - 8) + " weitere" : "") +
-        " - für sie gibt es kein erlaubtes Spiel-Paar mehr."
-      : " Alle Einsätze erreichen ihr Limit."), "gut");
+      ? "<br><b>&#9888; Unter dem Limit:</b> " + textSicher(zielVerfehlt.slice(0, 8).join("; ")) +
+        (zielVerfehlt.length > 8 ? " +" + (zielVerfehlt.length - 8) : "") + " - kein erlaubtes Paar mehr."
+      : " Alle am Limit."), "gut");
   zeichne_();
 }
 // ============================================================

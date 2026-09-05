@@ -128,11 +128,46 @@
     catch (e) { }
   }
 
+  // ---- Lange Erklaerkaesten am Handy einklappen (Karam 05.09.:
+  // "zu viel Text"). NICHTS wird entfernt: der Kasten zeigt zwei
+  // Zeilen, ein Tipp klappt ihn ganz auf und wieder zu. Warnkaesten
+  // (warnkern) bleiben immer offen - Warnungen kuerzt man nicht.
+  function klappe(el) {
+    if (el.dataset.knapp) return;
+    if ((el.textContent || "").length < 160) return;
+    if (el.closest("#fussleiste, #meldung, .warnkern, .kassenwarnung")) return;
+    el.dataset.knapp = "1";
+    el.classList.add("knapp", "zu");
+    el.addEventListener("click", function (e) {
+      if (e.target.closest("a, button, input, select, label, textarea, summary")) return;
+      this.classList.toggle("zu");
+    });
+  }
+  function klappAlle() {
+    if (!schmal()) return;
+    var ziele = document.querySelectorAll(".kern, .fuellkern, .zeitkern, p.mini");
+    for (var i = 0; i < ziele.length; i++) klappe(ziele[i]);
+  }
+  function klappWache() {
+    klappAlle();
+    // Mein Bereich baut seine Kaesten spaeter - eine gedrosselte Wache
+    // klappt Nachzuegler mit ein, ohne bei jedem Tastendruck zu laufen.
+    var wartet = false;
+    try {
+      new MutationObserver(function () {
+        if (wartet) return;
+        wartet = true;
+        setTimeout(function () { wartet = false; klappAlle(); }, 400);
+      }).observe(document.body, { childList: true, subtree: true });
+    } catch (e) { }
+  }
+
   // Anker #chat / #profil von anderen Seiten - und Karams Handy-Start
   // im Chat (nur schmal, nur ohne Anker, nur einmal je Laden).
   function start() {
     baue();
     spiegleBadge();
+    klappWache();
     if (!aufMein) return;
     var anker = (location.hash || "").replace("#", "");
     if (anker === "chat" || anker === "profil") {

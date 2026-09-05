@@ -3575,7 +3575,73 @@ h2.kl-kopf::after { content: " \25B4"; color: #8b95a8; font-size: 14px; }
   body.hat-fussleiste .navleiste a[href="original.html"],
   body.hat-fussleiste .navleiste a[href="kombis.html"],
   body.hat-fussleiste .navleiste a.navknopf[href="mein.html"]:not(.glocke),
+  body.hat-fussleiste #nav_profil,
   body.hat-fussleiste #nav_nachrichten { display: none; }
+}
+
+/* ---- 6. Maennlichere Kennfarben (Karam 05.09.: "kein Lila").
+   Nur die zwei Lila-Kennungen werden uebersteuert - die
+   Tippgeber-Zeilenfarben (Blau/Rot/Gelb/Lila) sind BEDEUTUNG
+   und bleiben unangetastet. ---- */
+body[data-seite="handbuch"] { --kenn: #4e342e; --kennhell: #f3ece9; }
+body[data-seite="mein"]     { --kenn: #8a5a00; --kennhell: #f7f1e3; }
+
+/* ---- 7. Buttons mit mehr Griff: klare Kante, leichte Tiefe,
+   kraeftige Schrift. Spezifischere Alt-Regeln (Marken, Pins,
+   Farbwahlen) gewinnen weiter - hier ist nur der Grundton. ---- */
+button {
+  border-radius: 8px;
+  border: 1px solid #33404d;
+  background: linear-gradient(180deg, #fbfcfd, #e8ecf0);
+  color: #1c242c;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 25, 35, .18);
+}
+button:hover { background: linear-gradient(180deg, #ffffff, #eef2f5); }
+button:active { transform: translateY(1px); box-shadow: none; }
+button.haupt {
+  background: var(--kenn, #1a2c50);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--kenn, #1a2c50) 86%, #ffffff), var(--kenn, #1a2c50));
+  color: #fff; border-color: rgba(0, 0, 0, .35);
+}
+.navleiste .navknopf { font-weight: 600; }
+
+/* ---- 8. Ruhiger, dunkel angehauchter Grund statt flacher Flaeche.
+   Sehr dezent - Tabellen und Karten behalten ihr Weiss, die
+   Bedeutungs-Farben (Zebra, Kombi-Farben) bleiben unberuehrt. ---- */
+body {
+  background: linear-gradient(180deg, #eef1f4 0%, #e4e9ee 55%, #dfe5eb 100%) fixed;
+}
+
+/* ---- 9. Schnell-Rechner in der Personen-Kasse ---- */
+.pk-rechner { margin: 10px 0 16px; padding: 10px 12px; border: 1px solid #cfd6dd;
+  border-left: 4px solid var(--kenn, #1a2c50); border-radius: 8px; background: #fff; }
+.pk-rechner input.einsatz { width: 110px; }
+.pk-rechnerwert { font-variant-numeric: tabular-nums; }
+
+/* ---- 10. Erklaerungen + Handbuch: Kapitel als Karten, Tabellen
+   mit Luft - volle Breite bleibt (Karams Regel). ---- */
+body[data-seite="handbuch"] .kl-abschnitt,
+body[data-seite="hilfe"] .kl-abschnitt {
+  background: #fff; border: 1px solid #d5dae0; border-left: 4px solid var(--kenn);
+  border-radius: 10px; padding: 4px 16px 10px; margin: 14px 0;
+  box-shadow: 0 1px 3px rgba(15, 25, 35, .07);
+}
+body[data-seite="handbuch"] table.klein td, body[data-seite="handbuch"] table.klein th,
+body[data-seite="hilfe"] table td, body[data-seite="hilfe"] table th {
+  padding: 7px 10px; }
+body[data-seite="handbuch"] .bsp { border-radius: 10px; }
+
+/* ---- 11. Eingeklappte Erklaerkaesten NUR am Handy (leiste.js
+   setzt .knapp/.zu; die Wirkung bleibt hier auf schmale Schirme
+   begrenzt, damit ein breit gezogenes Fenster nichts abschneidet) ---- */
+@media (max-width: 700px) {
+  .knapp { cursor: pointer; position: relative; padding-right: 30px; }
+  .knapp::before { content: "\25B4"; position: absolute; top: 6px; right: 9px;
+    color: #6b7683; font-size: 13px; }
+  .knapp.zu::before { content: "\25BE"; }
+  .knapp.zu { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; }
 }
 
 }
