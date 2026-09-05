@@ -276,10 +276,29 @@
 
   // Anker #chat / #profil von anderen Seiten - und Karams Handy-Start
   // im Chat (nur schmal, nur ohne Anker, nur einmal je Laden).
+  // Die anderen Seiten VORLADEN (Karam 06.09.: "die muessten alle
+  // geladen werden, damit nichts laedt beim Wischen"). rel=prefetch
+  // legt sie in den Browser-Speicher - der Wechsel kommt dann aus
+  // dem Cache. BEWUSST kein Service-Worker-Cache: Karams harte
+  // Regel "Updates muessen sofort ankommen" (sw.js) bleibt stehen.
+  function seitenVorladen() {
+    var hier = location.pathname.split("/").pop() || "original.html";
+    var alle = ["original.html", "kombis.html", "mein.html", "schule.html", "hilfe.html"];
+    for (var i = 0; i < alle.length; i++) {
+      if (hier.indexOf(alle[i]) === 0) continue;
+      var l = document.createElement("link");
+      l.rel = "prefetch";
+      l.href = alle[i];
+      l.as = "document";
+      document.head.appendChild(l);
+    }
+  }
+
   function start() {
     baue();
     spiegleBadge();
     klappWache();
+    setTimeout(seitenVorladen, 1500);   // erst wenn die eigene Seite steht
     // Einfahr-Animation: kam der Wechsel von einem Wisch, faehrt die
     // neue Seite aus der gemerkten Richtung herein.
     try {

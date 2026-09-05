@@ -3733,14 +3733,19 @@ body[data-seite] .navleiste #nav_profil,
   #glockenpanel:not(.gp-voll) #gp-inhalt { flex: 1; min-height: 0; }
 }
 @media (max-width: 700px) {
-  /* Vollbild BIS ZUR FUSSLEISTE, nicht drueber (Karam 05.09.: die
-     fuenf Knoepfe unten muessen im Chat sichtbar bleiben). Die
-     .gp-voll-Fassung steht MIT hier, sonst gewinnt ihre Bildschirm-
-     Regel (hoehere Spezifitaet) und das Panel liefe bis ganz unten. */
+  /* Der Chat ist am Handy eine EIGENE SEITE (Karam 06.09.: "nichts
+     dahinter"): das Panel deckt den GANZEN Schirm blickdicht ab,
+     der Inhalt endet per Polster ueber der Fussleiste (die liegt
+     mit z-index 1300 drueber). Die .gp-voll-Fassung steht MIT hier,
+     sonst gewinnt ihre Bildschirm-Regel (hoehere Spezifitaet). */
   #glockenpanel, #glockenpanel.gp-voll { position: fixed; top: 0; left: 0; right: 0;
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    bottom: 0; padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    box-sizing: border-box; background: #fff;
     width: auto; height: auto; max-width: none; max-height: none;
     border-radius: 0; z-index: 1200; display: flex; flex-direction: column; }
+  /* Solange der Chat offen ist, scrollt die Seite dahinter NICHT mit
+     (chatmodus.js setzt die Klasse) - kein Durchblitzen, kein Ruckeln. */
+  body.kt-chat-offen { overflow: hidden; }
   #glockenpanel #gp-inhalt { flex: 1; min-height: 0; }
   body.hat-fussleiste #fussleiste { z-index: 1300; }
   /* Kopfzeile klein, ohne "schliessen" - zu geht per Wisch oder

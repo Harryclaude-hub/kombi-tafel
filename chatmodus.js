@@ -69,7 +69,14 @@
       new MutationObserver(function () {
         if (wartet) return;
         wartet = true;
-        setTimeout(function () { wartet = false; rufSymbole(); eintrag(); }, 250);
+        setTimeout(function () {
+          wartet = false;
+          rufSymbole();
+          eintrag();
+          // Chat offen = die Seite dahinter haelt still (CSS sperrt
+          // ihr Scrollen; am Handy ist der Chat eine eigene Seite).
+          document.body.classList.toggle("kt-chat-offen", !!document.getElementById("glockenpanel"));
+        }, 250);
       }).observe(document.body, { childList: true, subtree: true });
     } catch (e) { }
   })();

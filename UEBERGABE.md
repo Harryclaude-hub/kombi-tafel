@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905h` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905i` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,21 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+0000000. Fassung 20260905i: Chat = eigene Seite, Seiten vorgeladen.
+   - Handy: #glockenpanel deckt jetzt den GANZEN Schirm (bottom 0,
+     background #fff opak, padding-bottom 72px+safe-area haelt den
+     Inhalt ueber der Fussleiste, Leiste liegt mit z-index 1300
+     drueber) - nichts blitzt mehr durch. chatmodus.js setzt
+     body.kt-chat-offen, CSS sperrt damit das Scrollen dahinter.
+   - leiste.js seitenVorladen(): rel=prefetch fuer die vier anderen
+     Seiten nach 1,5 s - Wechsel kommt aus dem Browser-Cache.
+     BEWUSST KEIN Service-Worker-Cache: sw.js traegt Karams harte
+     Regel 'kein Cache, Updates sofort' - ein SW-Precache waere die
+     100%-Loesung, braucht aber Karams ausdrueckliches Ja (offen).
+   - MESSFALLE dokumentiert: ist das Pane-Fenster minimiert, frieren
+     CSS-Animationen bei currentTime 0 ein (gp-auf hing im
+     from-Zustand, Panel 10px verschoben) - Endlage per
+     getAnimations().finish() messen, nicht als Layout-Bug jagen.
 000000. Fassung 20260905h: Wisch-Animationen + Erkennungs-Feinschliff.
    - JEDER Seiten-Wisch animiert richtungsecht: geh() setzt
      lw-raus-links/rechts, merkt die Richtung in sessionStorage
