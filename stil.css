@@ -3644,7 +3644,80 @@ body[data-seite="handbuch"] .bsp { border-radius: 10px; }
     overflow: hidden; }
 }
 
+/* ---- 12. Logo-Schnellmenue (logoknopf.js) ---- */
+.logoknopf { cursor: pointer; }
+.logoknopf:hover { filter: brightness(1.15); }
+.logoknopf.dreht { transition: transform .85s ease-in-out; transform: rotate(360deg); }
+#logomenue { position: absolute; top: calc(100% + 6px); left: 0; z-index: 950;
+  min-width: 240px; padding: 8px; border: 1px solid #33404d; border-radius: 10px;
+  background: #fff; box-shadow: 0 6px 22px rgba(10, 20, 30, .28);
+  display: flex; flex-direction: column; gap: 4px; }
+#logomenue a, #logomenue button { display: block; width: 100%; text-align: left;
+  padding: 9px 12px; border-radius: 7px; text-decoration: none; color: #1c242c;
+  background: none; border: 0; box-shadow: none; font: inherit; font-weight: 600;
+  cursor: pointer; }
+#logomenue a:hover, #logomenue button:hover { background: #eef2f5; }
+.lm-strich { border-top: 1px solid #d5dae0; margin: 3px 0; }
+.lm-fassung { padding: 4px 12px 2px; font-size: 11.5px; color: #6b7683; }
+@media (max-width: 700px) {
+  #logomenue a, #logomenue button { min-height: 44px; }
 }
-@media print { #fussleiste { display: none !important; } }
+
+/* ---- 13. Weg mit den Pillen (Karam 05.09.: "so haesslich und so
+   pillenfoermig"): die oberen Knoepfe werden kantige Werkzeug-Knoepfe
+   mit klarer Unterkante - Desktop UND Handy. Die Selektoren sind
+   bewusst so lang wie die der Kopfleisten-Schicht von 02.09.,
+   sonst verlieren sie dort. ---- */
+body[data-seite] > .navleiste a.navknopf:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf) {
+  border-radius: 5px;
+  border: 1px solid #33404d;
+  background: linear-gradient(180deg, #ffffff, #e9edf1);
+  color: #1c242c;
+  box-shadow: inset 0 -2px 0 rgba(51, 64, 77, .28), 0 1px 2px rgba(15, 25, 35, .15);
+}
+body[data-seite] > .navleiste a.navknopf:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf):hover {
+  background: linear-gradient(180deg, #ffffff, #f0f3f6);
+}
+body[data-seite] > .navleiste a.navknopf.aktiv:not(.glocke):not(.adminknopf):not(.installknopf):not(.updateknopf) {
+  background: var(--kenn, #1a2c50);
+  color: #fff;
+  border-color: var(--kenn, #1a2c50);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .38);
+}
+body[data-seite] > .navleiste a.navknopf.glocke,
+body[data-seite] .navleiste #wecker_knopf,
+body[data-seite] .navleiste #nav_profil,
+#bereichtabs a.navknopf {
+  border-radius: 5px;
+}
+.mb-navi button { border-radius: 5px; }
+
+/* ---- 14. Handy-Header aufgeraeumt: Logo links, Handbuch und
+   Erklaerungen fuellen die Mitte, Freunde und Klingel rechts -
+   alles gleich hoch, 44px-Tippziele. ---- */
+@media (max-width: 700px) {
+  body.hat-fussleiste .navleiste { display: flex; flex-wrap: nowrap;
+    align-items: stretch; gap: 6px; }
+  body.hat-fussleiste .navleiste .logo { align-self: center; flex: 0 0 auto; }
+  body.hat-fussleiste .navleiste a[href="schule.html"],
+  body.hat-fussleiste .navleiste a[href="hilfe.html"] {
+    flex: 1 1 0; justify-content: center; min-height: 44px; padding: 6px 4px; }
+  body.hat-fussleiste #nav_freunde { margin-left: 0; flex: 0 0 auto;
+    min-width: 44px; min-height: 44px; }
+  body.hat-fussleiste #wecker_knopf, body.hat-fussleiste #nav_profil {
+    flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+}
+
+/* ---- 15. Tabellen am Handy: geschmeidig quer rollen, ohne dass
+   die ganze Seite mitzieht ---- */
+@media (max-width: 700px) {
+  .tabellenrand, .scrollbox {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+}
+
+}
+@media print { #fussleiste, #logomenue { display: none !important; } }
 /* ---- ENDE DESIGN-REWORK 05.09.2026 ---- */
 

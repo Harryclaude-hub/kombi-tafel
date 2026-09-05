@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905b` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905c` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,23 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+0. Fassung 20260905c: Logo-Menue, Wischen, neue Knoepfe, Handy-Header.
+   - `logoknopf.js` (NEU, alle 6 Seiten, loeschbar): Klick/Rechtsklick
+     aufs Logo = Schnellmenue (Seiten, "Frisch laden" mit ?frisch gegen
+     die Cache-Falle, laufende Fassungsnummer, Wuerfel). EASTER EGG:
+     7 schnelle Klicks -> Logo dreht + "Jawohl, Chef."-Meldung.
+   - leiste.js: WISCHEN am Handy zwischen den fuenf Bereichen (Reihe
+     chat-tafel-bau-bereich-profil, links = weiter), passive:true
+     (ruckelfrei); wischt NIE in quer scrollbaren Tabellen, Eingaben,
+     Foto-Kasten, Logo-Menue. Gemessen per TouchEvent: bau -> bereich.
+   - Pillen weg: obere Knoepfe kantig (5px, Kante, Verlauf, aktiv =
+     Kennfarbe gefuellt). ACHTUNG Spezifitaet: die Kopfleisten-Schicht
+     02.09. nutzt body[data-seite] > .navleiste a.navknopf:not(...)-
+     Selektoren - Punkt 13 der 05.09-Schicht muss genauso lang bleiben,
+     sonst verliert er (erst gemessen, dann geglaubt).
+   - Handy-Header: flex-Zeile Logo | Handbuch + Erklaerungen (fuellen,
+     44px) | Freunde | Klingel. Tabellen quer: touch-Scrolling +
+     overscroll-behavior-x contain (.tabellenrand/.scrollbox).
 1. Dokumentierte Graubereiche der Maschine (bewusst so): 15er-Deckel nur
    fuer nacktes over/under; DC "12" unbekannt; Team-Totals per Teamname
    -> unklar; Handicaps ab 4 -> unklar.

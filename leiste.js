@@ -162,6 +162,46 @@
     } catch (e) { }
   }
 
+  // ---- Wischen zwischen den fuenf Bereichen (Karam 05.09.) ----
+  // Nur am Handy. passive:true = der Browser scrollt ungebremst,
+  // nichts ruckelt. Der Wisch zaehlt NICHT, wenn der Finger in einer
+  // quer scrollbaren Tabelle, einem Eingabefeld, dem Foto-Kasten
+  // oder dem Logo-Menue liegt - dort gilt das normale Verhalten.
+  var REIHE = ["chat", "tafel", "bau", "bereich", "profil"];
+  function querScrollbar(el) {
+    for (var e = el; e && e !== document.body; e = e.parentElement) {
+      if (e.scrollWidth > e.clientWidth + 5) {
+        var o = getComputedStyle(e).overflowX;
+        if (o === "auto" || o === "scroll") return true;
+      }
+    }
+    return false;
+  }
+  var wx = null, wy = null;
+  document.addEventListener("touchstart", function (e) {
+    wx = null;
+    if (!schmal() || e.touches.length !== 1) return;
+    var z = e.target;
+    if (z.closest && z.closest("input, textarea, select, #handyfoto, #logomenue")) return;
+    if (querScrollbar(z)) return;
+    wx = e.touches[0].clientX; wy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", function (e) {
+    if (wx === null) return;
+    var dx = e.changedTouches[0].clientX - wx;
+    var dy = e.changedTouches[0].clientY - wy;
+    wx = null;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    var l = document.getElementById("fussleiste");
+    var akt = l && l.querySelector(".fl-knopf.aktiv");
+    var i = akt ? REIHE.indexOf(akt.dataset.fl) : -1;
+    if (i < 0) return;
+    var ziel = REIHE[i + (dx < 0 ? 1 : -1)];   // links wischen = naechster
+    if (!ziel) return;
+    var k = l.querySelector('.fl-knopf[data-fl="' + ziel + '"]');
+    if (k) k.click();
+  }, { passive: true });
+
   // Anker #chat / #profil von anderen Seiten - und Karams Handy-Start
   // im Chat (nur schmal, nur ohne Anker, nur einmal je Laden).
   function start() {
