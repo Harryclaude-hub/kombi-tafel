@@ -3832,6 +3832,20 @@ body[data-seite] .navleiste #nav_profil,
   border-radius: 18px; padding: 9px 16px; }
 #glockenpanel .gp-gkopf { padding: 9px 12px; gap: 10px; }
 
+
+/* ---- 20. Admiral, der fuenfte Anbieter (06.09.2026): Weinrot als
+   Hausfarbe (klar getrennt vom Warn-Rot #a00000), dieselben
+   Selektormuster wie die vier alten Marken. ---- */
+.m-ad { background: #8d1b2e; color: #fff; border-color: #5f1420; }
+.ab-ad { background: #8d1b2e; color: #fff; border-color: #5f1420; }
+.ak-ad { border-color: #8d1b2e; } .ak-ad .ak-name { color: #8d1b2e; }
+.marke.m-ad::before { content: "AD"; color: #8d1b2e; }
+.ak-ad .ak-name::before { content: "AD"; background: #8d1b2e; color: #fff; }
+.s-wo:has(.s-wo-name.m-ad) { background: #8d1b2e; }
+.s-wo:has(.s-wo-name.m-ad) .s-wo-name { color: #fff; }
+.schein:has(.s-kopf .m-ad):not(:has(.niedrigkopf)) { border-top: 5px solid #8d1b2e; }
+.schein:has(.s-kopf .m-ad) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #8d1b2e 9%, #fff); border-bottom-color: #8d1b2e; }
+
 }
 @media print { #fussleiste, #logomenue { display: none !important; } }
 

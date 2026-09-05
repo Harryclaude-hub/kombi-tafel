@@ -111,7 +111,7 @@ function pkFormularHtml(ordnerId) {
   const s = pkStand;
   const neu = !pkOffen.scheinId;
   const anbieter = (typeof KASSE_ANBIETER !== "undefined" && KASSE_ANBIETER.length)
-    ? KASSE_ANBIETER : [["st", "Stake"], ["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"]];
+    ? KASSE_ANBIETER : [["st", "Stake"], ["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"], ["ad", "Admiral"]];
 
   let zeilen = "";
   s.wetten.forEach((w, i) => {

@@ -78,16 +78,16 @@
 // auch bei Interwetten - die Gebuehr rechnet die Tafel rueckwaerts aus
 // dem angesagten Hoechstgewinn (siehe daten.js). Teiler bleiben als
 // Mechanik stehen, alle auf 1.
-var GEBUEHREN_TEILER = { iw: 1.00, bw: 1.00, b3: 1.00, st: 1.00 };
+var GEBUEHREN_TEILER = { iw: 1.00, bw: 1.00, b3: 1.00, st: 1.00, ad: 1.00 };
 
-var ALLE_ANBIETER = ["iw", "bw", "b3", "st"];
+var ALLE_ANBIETER = ["iw", "bw", "b3", "st", "ad"];
 var LETZTE_WAHL = "b3";
 // KARAMS RANGFOLGE (28.08.): Stake zuerst, dann Interwetten, dann Bwin
 // (bzw. Sportingbet - dasselbe Haus), Bet365 ganz zuletzt.
 // Kleinere Zahl = lieber. Das ist ein WUNSCH, keine Pflicht: bringt ein
 // bevorzugter Anbieter keinen Dreier zustande, gewinnt trotzdem der, der
 // einen zustande bringt. Kein einziger Dreier geht dafuer verloren.
-var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3 };
+var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3, ad: 4 };
 function anbRang(kz) {
   return Object.prototype.hasOwnProperty.call(ANBIETER_RANG, kz) ? ANBIETER_RANG[kz] : 2;
 }          // R6
@@ -781,7 +781,7 @@ FENSTER.verteilePaare = verteile;
 // auch bei Interwetten - die Gebuehr rechnet die Tafel rueckwaerts aus
 // dem angesagten Hoechstgewinn (siehe daten.js). Teiler bleiben als
 // Mechanik stehen, alle auf 1.
-var GEBUEHREN_TEILER = { iw: 1, bw: 1, b3: 1, st: 1 };
+var GEBUEHREN_TEILER = { iw: 1, bw: 1, b3: 1, st: 1, ad: 1 };
 
 // Regel R6: Bet365 ist die letzte Wahl.
 var LETZTE_WAHL = "b3";
@@ -790,7 +790,7 @@ var LETZTE_WAHL = "b3";
 // Kleinere Zahl = lieber. Das ist ein WUNSCH, keine Pflicht: bringt ein
 // bevorzugter Anbieter keinen Dreier zustande, gewinnt trotzdem der, der
 // einen zustande bringt. Kein einziger Dreier geht dafuer verloren.
-var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3 };
+var ANBIETER_RANG = { st: 0, iw: 1, bw: 2, b3: 3, ad: 4 };
 function anbRang(kz) {
   return Object.prototype.hasOwnProperty.call(ANBIETER_RANG, kz) ? ANBIETER_RANG[kz] : 2;
 }
@@ -865,7 +865,7 @@ function bereiteVor(eingabe) {
   var saat = typeof einstRoh.saat === "number" ? einstRoh.saat : 1;
   var anbieter = Array.isArray(einstRoh.anbieter) && einstRoh.anbieter.length
     ? einstRoh.anbieter.slice()
-    : ["iw", "bw", "b3", "st"];
+    : ["iw", "bw", "b3", "st", "ad"];
 
   var anzahlA = anbieter.length;
   var v = {

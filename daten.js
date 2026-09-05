@@ -42,7 +42,8 @@ const GEBUEHREN_TEILER = {   // echte Quote = Eingabe / Teiler
   iw: 1.00,   // Interwetten AT: Eingabe gilt, Gebuehr kommt aus dem angesagten Gewinn
   bw: 1.00,   // Bwin uebernimmt selbst (seit Mai 2026)
   b3: 1.00,   // Bet365: kein Abzug
-  st: 1.00    // Stake: kein Abzug (aber Krypto-Netzwerkgebuehr bei Auszahlung)
+  st: 1.00,   // Stake: kein Abzug (aber Krypto-Netzwerkgebuehr bei Auszahlung)
+  ad: 1.00    // Admiral (NEU 06.09.2026): Eingabe gilt, Gebuehr wie ueberall rueckwaerts
 };
 
 const WETTEN = [

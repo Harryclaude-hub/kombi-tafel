@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905i` (Abschnitt 14 zuerst lesen!).
+Stand: **05.09.2026**, Fassung `20260905j` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -1067,6 +1067,22 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
 ### Weitere offene Punkte
+00000000. Fassung 20260905j: ADMIRAL als fuenfter Anbieter (kz "ad").
+   Ueberall nachgezogen (Drift-Gefahr!): daten.js GEBUEHREN_TEILER,
+   kombis.js KT_ANBIETER_RANG + kurz-Map, logik.js verfuegbarkeit
+   (fest "D" = pruefen, keine Liga-Daten), standardAnbieter/
+   rangliste (Admiral zuletzt), ANBIETER (admiral.at), ANBIETER_GRUND;
+   mein.js namen/KASSE_ANBIETER/farbe/#8d1b2e + BEIDE
+   [iw,bw,b3,st]-Schleifen (Kasse + pk-Rechner) + 3849-Reihenfolge;
+   personkombi.js Fallback; verteiler.js BEIDE Kopien (Teiler,
+   ALLE_ANBIETER, ANBIETER_RANG ad:4, 868er-Liste); kombis.html
+   anbwahl/grenzwahl ad; stil.css Punkt 20 Marken (Weinrot #8d1b2e,
+   bewusst getrennt vom Warn-Rot); hilfe.html AGB-Zeile ehrlich
+   "ungeprueft". Gemessen im Browser: Rang 5er, Teiler 1, Name,
+   ANBIETER 5, ak-ad-Karte, Marke weinrot, Checkbox, verfueg D.
+   MERKE: logik.js/mein.js liegen mit CRLF auf Platte - mehrzeilige
+   
+-Muster in Patch-Skripten greifen NICHT (zeilenweise ersetzen).
 0000000. Fassung 20260905i: Chat = eigene Seite, Seiten vorgeladen.
    - Handy: #glockenpanel deckt jetzt den GANZEN Schirm (bottom 0,
      background #fff opak, padding-bottom 72px+safe-area haelt den
