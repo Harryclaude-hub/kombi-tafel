@@ -199,9 +199,18 @@ async function tuSatzFotos(input, satzId) {
       neuerOrdner = !r.error;
     }
   }
+  // Zusaetzlich als Bilddateien auf den Laptop legen, damit das spaetere
+  // Einlesen durch Claude schnell geht (siehe fotoablage.js). Klappt es
+  // nicht, faellt nur die Beschleunigung weg - hochgeladen sind sie schon.
+  let ablageText = "";
+  if (ok) {
+    const ab = (typeof fotoAblageOrdnerSichern === "function")
+      ? await fotoAblageOrdnerSichern(datum, false) : { ok: false };
+    if (ab.ok) ablageText = " " + ab.anzahl + " liegen auch als Bilddatei auf dem Laptop.";
+  }
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
     " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
-    (neuerOrdner ? ". <b>Ordner automatisch angelegt.</b>" : ".") +
+    (neuerOrdner ? ". <b>Ordner automatisch angelegt.</b>" : ".") + ablageText +
     (ok ? " <b>Das Einlesen startet jetzt von selbst...</b>" : ""), ok || doppelt ? "gut" : "warn");
   await adminSaetze();
   if (ok) {
@@ -1114,11 +1123,20 @@ async function tuSatzWeg(id) {
 const SCAN_TRENNER = /\t|\s*\|\s*/;
 let scanGeprueft = {};   // Ordner -> gepruefte Zeilen
 
-function satzScannen(ordner) {
+async function satzScannen(ordner) {
   const box = elA("scan_" + ordner);
   if (!box) return;
   if (box.dataset.offen === "1") { box.innerHTML = ""; box.dataset.offen = ""; return; }
   box.dataset.offen = "1";
+  box.innerHTML = '<div class="scankasten"><p class="mini">Die Fotos werden gerade als ' +
+    "Dateien auf dem Laptop abgelegt...</p></div>";
+  // ZUERST die Fotos als Bilddateien auf den Laptop legen (siehe fotoablage.js).
+  // Nur wenn das klappt, bekommt Claude den schnellen Weg genannt. Klappt es
+  // nicht, steht im Auftrag weiterhin der alte Weg ueber die Datenbank - der
+  // ist langsam, aber er funktioniert.
+  const ablage = (typeof fotoAblageOrdnerSichern === "function")
+    ? await fotoAblageOrdnerSichern(ordner, true)
+    : { ok: false, grund: "browser" };
   // Der vollstaendige Auftrag. Er enthaelt ALLES, was Claude braucht, um
   // die Arbeit ohne Rueckfrage zu Ende zu bringen: wo die Fotos liegen,
   // was gelesen werden soll und in welcher Form es in die Datenbank gehoert.
@@ -1127,12 +1145,35 @@ function satzScannen(ordner) {
   // jeder Wette derselbe Ersatzwert 1,78. Karam soll nichts mehr
   // einfuegen muessen - die Zeilen landen direkt im Ordner, und der
   // Kombi-Bau rechnet danach von selbst weiter.
-  const satz = [
-    "Bitte lies den Ordner " + ordner + " der Kombi-Tafel ein und trag die Zeilen selbst ein.",
-    "",
+  // Der Fundort steht an EINER Stelle: entweder die Dateien auf dem Laptop
+  // (schnell) oder die Datenbank (langsam). Alles andere am Auftrag bleibt gleich.
+  const wo = ablage.ok ? [
+    "WO DIE FOTOS LIEGEN: als fertige Bilddateien auf diesem Laptop, im Ordner",
+    "  " + ablage.pfad,
+    "Darin liegen " + ablage.anzahl + " Bilder (01.jpg, 02.jpg, ...). Oeffne sie direkt",
+    "als Datei und sieh sie dir an, Bild fuer Bild.",
+    "Hole sie NICHT aus der Datenbank: eine Daten-URL durch die SQL-Schnittstelle zu",
+    "ziehen hat am 07.09.2026 ueber eine halbe Stunde gedauert fuer ein einziges Foto.",
+    "Das ist der falsche Weg."
+  ] : [
     "WO DIE FOTOS LIEGEN: Supabase-Projekt mqmevpyatjsambervgtu, Tabelle kt_satz_uploads,",
     "Spalte satz_datum = " + ordner + ". Sie stehen dort als Daten-URL und sind nur fuer",
     "Admins lesbar. Sieh sie dir wirklich an, Bild fuer Bild.",
+    "ACHTUNG: dieser Weg ist langsam. Dauert er laenger als 10 Minuten, brich ab und sag",
+    "mir, ich soll im Admin-Bereich auf \"Fotos auf den Laptop legen\" druecken. Dann",
+    "liegen sie als Bilddateien da und du liest sie in Sekunden."
+  ];
+  const satz = [
+    "Bitte lies den Ordner " + ordner + " der Kombi-Tafel ein und trag die Zeilen selbst ein.",
+    "",
+    "ZUERST: haengt an meiner Nachricht schon ein Bild, dann lies einfach das und suche",
+    "nirgendwo sonst danach. Das ist immer der schnellste Weg.",
+    "",
+    "ZEITGRENZE: das Einlesen darf hoechstens 10 Minuten dauern. Nur bei sehr vielen",
+    "Fotos darf es laenger sein. Dauert ein Weg laenger, ist es der falsche Weg -",
+    "brich ihn ab und sag mir kurz, woran es liegt.",
+    ""
+  ].concat(wo).concat([
     "",
     "WAS ICH BRAUCHE:",
     "1. Lies JEDE Zeile von JEDEM Foto. Keine Zeile ueberspringen.",
@@ -1171,12 +1212,13 @@ function satzScannen(ordner) {
     "genauso: lieber ohne, als eine geratene.",
     "",
     "Sag mir zum Schluss, wie viele Zeilen jetzt im Ordner stehen."
-  ].join("\n");
+  ]).join("\n");
   box.innerHTML =
     '<div class="scankasten">' +
     "<h3>&#128270; Ordner scannen</h3>" +
     '<p class="mini">Die Texterkennung im Browser liest diese Tabellen nicht zuverlässig ' +
     "(gemessen: 0 von 12 Zeilen brauchbar). Deshalb liest <b>Claude</b> die Fotos.</p>" +
+    scanAblageHtml(ordner, ablage) +
     '<ol class="scanschritte">' +
     "<li><b>Diesen Auftrag an Claude schicken</b> (er macht dann alles allein):<br>" +
     '<button class="haupt" onclick="scanSatzKopieren(\'' + sicherA(ordner) + '\')">' +
@@ -1193,6 +1235,42 @@ function satzScannen(ordner) {
     '<button class="haupt" onclick="scanPruefen(\'' + sicherA(ordner) + '\')">' +
     "&#128269; Zeilen prüfen</button></li></ol>" +
     '<div id="scan_ergebnis_' + sicherA(ordner) + '"></div></div>';
+}
+
+// Zeigt, ob die Fotos als Dateien auf dem Laptop liegen. Liegen sie nicht da,
+// steht hier der Knopf, mit dem Karam den Ablage-Ordner einmal freigibt.
+function scanAblageHtml(ordner, ablage) {
+  if (ablage && ablage.ok) {
+    return '<p class="kern mini">&#128190; <b>' + ablage.anzahl + " Foto" +
+      (ablage.anzahl === 1 ? "" : "s") + " liegen als Bilddatei auf dem Laptop:</b><br>" +
+      "<code>" + sicherA(ablage.pfad) + "</code><br>" +
+      "Claude liest sie von dort in Sekunden statt in einer halben Stunde.</p>";
+  }
+  const grund = (ablage && ablage.grund) || "kein-ordner";
+  if (grund === "browser") {
+    return '<p class="warnkern mini">Dieser Browser kann keine Dateien ablegen. ' +
+      "In <b>Chrome</b> oder <b>Edge</b> oeffnen, dann geht das Einlesen viel schneller. " +
+      "So lange holt Claude die Fotos aus der Datenbank, das dauert deutlich laenger.</p>";
+  }
+  if (grund === "keine-fotos") {
+    return '<p class="warnkern mini">In diesem Ordner liegt noch kein Foto.</p>';
+  }
+  return '<p class="warnkern mini"><b>Die Fotos liegen noch nicht als Datei auf dem Laptop.</b> ' +
+    "Dann muss Claude sie aus der Datenbank ziehen, und das dauert sehr lange. " +
+    "Einmal den Ordner freigeben genuegt, danach passiert es von selbst:<br>" +
+    '<button class="haupt" onclick="tuFotoAblageEinrichten(\'' + sicherA(ordner) + '\')">' +
+    "&#128193; Fotos auf den Laptop legen</button></p>";
+}
+
+// Einmal einrichten, danach den Scan-Kasten frisch aufbauen, damit
+// der Auftrag sofort den Datei-Weg nennt.
+async function tuFotoAblageEinrichten(ordner) {
+  const r = await fotoAblageEinrichten();
+  if (!r.ok) { meldungA("Ablage nicht eingerichtet: " + sicherA(r.grund), "warn"); return; }
+  meldungA("Ablage eingerichtet: <code>" + sicherA(r.pfad) + "</code>. " +
+    "Die Fotos werden jetzt dort abgelegt.", "gut");
+  const box = elA("scan_" + ordner);
+  if (box) { box.dataset.offen = ""; await satzScannen(ordner); }
 }
 
 function scanSatzKopieren(ordner) {

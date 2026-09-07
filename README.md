@@ -55,6 +55,32 @@ Alle paar Tage kommen neue Fotos. Der Weg ist immer derselbe:
 Wenn ein Anbieter seine Gebuehrenregel aendert: nur `GEBUEHREN_TEILER` in `daten.js`
 anpassen, nichts anderes.
 
+## Fotos einlesen: warum sie auf dem Laptop liegen (seit 07.09.2026)
+
+Die Fotos stehen in Supabase (`kt_satz_uploads.foto`) als Daten-URL. Ein Foto sind
+rund 105.000 Zeichen Base64. Wenn Claude sie von dort holen muss, geht das durch die
+SQL-Schnittstelle in kleinen Stuecken: am 07.09.2026 hat EIN Foto mit 13 Zeilen ueber
+eine halbe Stunde gedauert.
+
+Deshalb liegen die Fotos zusaetzlich als echte Bilddateien auf dem Laptop:
+
+```
+C:\Users\Home\kombi-tafel\fotos\<Ordnername>\01.jpg, 02.jpg, ...
+```
+
+- `fotoablage.js` schreibt sie dorthin (Chrome/Edge, File System Access API).
+- Beim Hochladen passiert das von selbst, und **Ordner scannen** legt sie vorher
+  immer frisch ab - so sind auch Fotos vom Handy dabei.
+- Einmalig muss der Ordner freigegeben werden: der Knopf **Fotos auf den Laptop legen**
+  im Scan-Kasten. Danach merkt der Browser sich den Ordner.
+- Der Scan-Auftrag nennt Claude dann genau diesen Pfad. Ziel: **hoechstens 10 Minuten**
+  fuer einen Ordner.
+- Klappt die Ablage nicht (Firefox/Safari, Ordner nicht freigegeben), steht im Auftrag
+  weiterhin der alte Weg ueber die Datenbank. Es geht nichts kaputt, es dauert nur laenger.
+- Der Ordner `fotos/` steht in `.gitignore` und wird nicht mitgeschickt.
+
+Die Datenbank bleibt die Wahrheit. Die Dateien sind nur die schnelle Leseform.
+
 ## Nach jeder Aenderung: Versionsnummer hochzaehlen
 
 In `index.html` und `original.html` haengt an jedem `.js`- und `.css`-Verweis ein
