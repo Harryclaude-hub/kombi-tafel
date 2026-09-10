@@ -1786,18 +1786,131 @@ function baueVerlaufsEintrag(scheinId) {
     fotoName: localStorage.getItem(fotoSchluessel(scheinId) + "_name") };
 }
 
+// ============================================================
+// SCHON DA? DANN AENDERN, NICHT DANEBENLEGEN (Karam, 10.09.2026)
+//
+// Karam: "Wenn ich was im Verlauf aendere, soll das komplett geaendert
+// werden - nicht dass das Geld doppelt gilt. Einmal gerechnet, und nur
+// die Zahl wird umgeaendert."
+//
+// Frueher gab es hier nur ja/nein: noch einmal speichern oder gar
+// nichts. Wer den falschen Einsatz eingetippt hatte, musste den alten
+// Eintrag erst in Mein Bereich suchen und loeschen. Tat er das nicht,
+// stand die Kombination zweimal in der Buchhaltung - genau Karams Fall
+// "haben wir da doppelt reingemacht".
+//
+// Jetzt ist AENDERN der erste Vorschlag. Der zweite Eintrag bleibt
+// moeglich, aber nur nach einer eigenen, deutlichen Rueckfrage.
+//
+// KEINE NEUE RECHNUNG: die neuen Zahlen kommen aus baueVerlaufsEintrag,
+// also aus genau denselben zwei Feldern an der Karte (Einsatz und
+// moeglicher Gewinn), aus denen auch ein neuer Eintrag entsteht.
+// ============================================================
+function scheinSchonDaFragen(scheinId, drin, einsatz) {
+  const wo = drin.woher === "konto" ? "in deinem Konto" : "auf diesem Gerät";
+  const alt = Number(drin.einsatz) || 0;
+  const kopf = "Diese Kombination steht schon im Verlauf" +
+    (drin.nummer ? " als Nr. " + drin.nummer : "") + " (" + wo +
+    (alt ? ", " + alt.toFixed(2) + " Euro" : "") + ").\n\n";
+
+  // Gleicher Betrag: da gibt es nichts zu aendern, nur die harte Frage.
+  if (Math.abs(alt - einsatz) >= 0.005) {
+    if (confirm(kopf +
+        "Den vorhandenen Eintrag auf " + einsatz.toFixed(2) + " Euro ÄNDERN?\n\n" +
+        "   OK        = ändern. Es bleibt EINE Buchung, nur die Zahl wird neu.\n" +
+        "   Abbrechen = nicht ändern (danach wirst du gefragt, ob du sie\n" +
+        "               wirklich ein zweites Mal daneben speichern willst).")) {
+      scheinAendernStattDoppelt(scheinId, drin);
+      return false;
+    }
+  }
+  return confirm(kopf +
+    "Wirklich ein ZWEITES Mal speichern?\n\n" +
+    "Dann steht sie zweimal im Verlauf und zählt in der Buchhaltung mit " +
+    einsatz.toFixed(2) + " Euro doppelt.\n\n" +
+    "   OK        = trotzdem zusätzlich speichern\n" +
+    "   Abbrechen = gar nichts tun");
+}
+
+async function scheinAendernStattDoppelt(scheinId, drin) {
+  const b = baueVerlaufsEintrag(scheinId);
+  if (!b) { meldung("Nicht geändert: diese Karte gibt es nicht mehr.", "warn"); return; }
+  const n = b.eintrag;
+
+  // ---- Auf diesem Geraet ----
+  if (drin.woher !== "konto") {
+    const v = liesVerlauf();
+    const i = v.findIndex(e => e.scheinId === scheinId);
+    if (i < 0) { meldung("Nicht geändert: der Eintrag ist nicht mehr da.", "warn"); return; }
+    const altBetrag = Number(v[i].einsatz) || 0;
+    // Stand, Notiz, Zeit und Nummer bleiben - geaendert wird nur, was
+    // an der Karte steht.
+    v[i] = Object.assign({}, v[i], { kz: n.kz, anbieter: n.anbieter,
+      einsatz: n.einsatz, quote: n.quote, moeglich: n.moeglich,
+      quoteRoh: n.quoteRoh, brutto: n.brutto, gebuehr: n.gebuehr, wetten: n.wetten });
+    if (!speichereVerlauf(v)) return;    // speichereVerlauf sagt selbst Bescheid
+    meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + n.einsatz.toFixed(2) +
+      " Euro. Er steht weiter <b>einmal</b> im Verlauf.", "gut");
+    zeichneVerlauf(); zeichneKonto();
+    if (typeof zeichneGesetzte === "function") zeichneGesetzte();
+    if (typeof zeichnePanel === "function") zeichnePanel();
+    return;
+  }
+
+  // ---- Im Konto ----
+  if (!drin.dbId || typeof supaScheinHolen !== "function") {
+    meldung("Nicht geändert: dieser Eintrag lässt sich von hier aus nicht öffnen. " +
+      "Ändere ihn in <a href=\"mein.html\"><b>Mein Bereich</b></a>.", "warn");
+    return;
+  }
+  // FRISCH holen, nicht aus der Ansicht: die kann alt sein, und ein
+  // Ueberschreiben mit alten Werten faellt niemandem auf (dieselbe
+  // Lektion wie bei tuEinsatz in mein.js).
+  const holen = await supaScheinHolen(drin.dbId);
+  if (holen.fehler) { meldung("Nicht geändert: " + textSicher(holen.fehler), "warn"); return; }
+  const alt = holen.daten || {};
+  const altBetrag = Number(alt.einsatz) || 0;
+  const daten = Object.assign({}, alt, { kz: n.kz, anbieter: n.anbieter,
+    einsatz: n.einsatz, quote: n.quote, moeglich: n.moeglich,
+    quoteRoh: n.quoteRoh, brutto: n.brutto, gebuehr: n.gebuehr, wetten: n.wetten });
+  const r = await supaScheinDatenSchreiben(drin.dbId, holen.key, daten);
+  if (r.error) { meldung("Nicht geändert: " + textSicher(String(r.error.message).slice(0, 140)), "warn"); return; }
+  // Die 0-Zeilen-Falle: an den Rechten gescheitert sieht aus wie geschafft.
+  if (!r.data || !r.data.length) {
+    meldung("Nicht geändert - kein Schreibrecht oder die Kombination ist weg.", "warn"); return;
+  }
+  // Die Spur. Schlaegt sie fehl, ist der Einsatz trotzdem geaendert -
+  // das muss dann auch so dastehen und nicht als Gesamtfehler.
+  if (typeof supaAnmerken === "function") {
+    try {
+      const a = await supaAnmerken(holen.bereich, drin.dbId,
+        "Einsatz beim erneuten Speichern geändert: " + altBetrag.toFixed(2) +
+        " -> " + n.einsatz.toFixed(2) + " Euro (statt zweitem Eintrag)");
+      if (a && a.error) {
+        meldung("Eintrag geändert auf " + n.einsatz.toFixed(2) +
+          " Euro. Die Anmerkung dazu ließ sich nicht speichern.", "warn");
+        await kontoScheineLaden(); zeichneKonto();
+        if (typeof zeichnePanel === "function") zeichnePanel();
+        return;
+      }
+    } catch (e) { }
+  }
+  meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + n.einsatz.toFixed(2) +
+    " Euro. Er steht weiter <b>einmal</b> im Konto und zählt in der Buchhaltung einmal.", "gut");
+  await kontoScheineLaden();
+  zeichneKonto();
+  if (typeof zeichneGesetzte === "function") zeichneGesetzte();
+  if (typeof zeichnePanel === "function") zeichnePanel();
+}
+
 function scheinMerken(scheinId) {
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
   if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
   // Doppelt gespeichert heisst doppelt in der Buchhaltung. Karam nennt
   // genau das als Grund fuer den Loeschknopf: "haben wir da doppelt
-  // reingemacht". Also lieber einmal fragen.
+  // reingemacht". Deshalb wird zuerst ANDERN angeboten (siehe oben).
   const drin = schonGesetzt(scheinId);
-  if (drin && !confirm("Diese Kombination steht schon im Verlauf" +
-      (drin.nummer ? " als Nr. " + drin.nummer : "") +
-      (drin.einsatz ? " mit " + Number(drin.einsatz).toFixed(2) + " Euro" : "") + ".\n\n" +
-      "Noch einmal speichern? Dann steht sie zweimal drin und zaehlt in der " +
-      "Buchhaltung doppelt.")) return;
+  if (drin && !scheinSchonDaFragen(scheinId, drin, einsatz)) return;
   // Eingeloggt? Dann ist die Konto-Ordner-Frage PFLICHT (Karams Regel:
   // jede Kombination muss zugeordnet sein). Ohne Konto wie bisher lokal.
   if (typeof supaNutzer === "function" && window.supa) {

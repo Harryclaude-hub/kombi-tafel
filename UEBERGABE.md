@@ -1066,6 +1066,76 @@ und oben blieben neun bei Stake. Von selbst geht das nie weg -
   REINER Rechner: localStorage kt_rechner_<ordner>_<kz>, bucht NICHTS.
   Ohne Anmeldung nicht messbar - Formel einfach, Felder numerisch.
 
+### Fassung 20260910a: Kombi-Konto, je Person, und Aendern statt Doppelt
+
+Karam am 10.09.: "Jede gesamte Kombi haelt ihren Zeitraum ein, von wann
+bis wann. Ich hab vierhundert da, hundertfuenfzig da - und das Gesamte,
+was wir gesetzt haben. Dann trag ich ein, ob gewonnen oder verloren,
+und du rechnest aus, wie viel Geld wir gemacht haben und wie viel wir
+jetzt eigentlich haben sollten. Rueckwirkend ab dem ersten Tag." Dazu:
+"Wenn ich was im Verlauf aendere, soll das komplett geaendert werden -
+nicht dass das Geld doppelt gilt."
+
+- NEU **Kombi-Konto** (mein.js, in der Buchhaltung ueber den Berichten):
+  eine Zeile je GANZER Kombination statt je Anbieter-Teil. Schluessel
+  ist `satz|stammIdM(scheinId)|ordner` - **derselbe Schnitt wie in der
+  Selbstpruefung "Ziel je Kombination"**; wer einen aendert, muss in
+  den anderen schauen. Teile bei zwei Anbietern (400 + 150) stehen als
+  EIN Eintrag mit 550 Euro Gesamteinsatz.
+- **Zeitraum rueckwirkend ohne Nacharbeit**: von/bis kommt aus
+  `daten.wetten[].an`, also aus der Anstosszeit, die seit 20260902a an
+  jedem Bein haengt (dieselbe Quelle wie `scheinEnde`). Kein
+  Datenbank-Umbau, keine Wanderung, gilt sofort fuer alles Alte.
+- **gewonnen/verloren fuer die ganze Kombination** (`tuGruppeStand`):
+  setzt `stand` auf allen Teilen, mit Rueckfrage und 0-Zeilen-Pruefung
+  je Teil. Legt nie eine Buchung an, stellt nur die vorhandenen um.
+- **Zwei Rechenwege, und der Vergleich steht sichtbar da** (Falle 7):
+  Weg 1 = Konten (`Balance + Auszahlungen - Einzahlungen - Start`),
+  Weg 2 = Kombinationen (`zurueck - Einsatz der entschiedenen`).
+  Verglichen wird nicht Gewinn mit Gewinn, sondern die **erwartete
+  Balance** (`Start + Einz - Ausz + Gewinn - im Spiel`) mit der
+  eingetragenen. Weichen sie ab, sagt ein Kasten warum es abweichen
+  KANN (fehlende Buchung, "wirklich zurueck" nicht eingetragen) -
+  statt eine der beiden Zahlen als Wahrheit hinzustellen.
+  ACHTUNG beim Weiterbauen: `Gewinn(Konten) = Gewinn(Kombis) - im
+  Spiel`. Die beiden Kacheln zeigen mit Absicht verschiedene Zahlen,
+  und genau dieser Satz steht auch als Erklaerung in der Oberflaeche.
+  Nachgerechnet mit einem Node-Harness (vm + logik.js + mein.js,
+  8 Testscheine): Bericht, Kombi-Konto und Handrechnung kommen auf
+  dieselben 1570 / 420 / 1985 / 835.
+- **Rest-Topf statt Wegwerfen** (Falle 4): Kombinationen ohne
+  Anstosszeit (Handeingaben) lassen sich keinem Zeitraum zuordnen. Bei
+  gesetztem Filter fallen sie nicht heraus, sondern werden unten mit
+  Anzahl und Summe genannt.
+- **Geschaetzte Rueckfluesse werden als geschaetzt gezeigt**: wo
+  `echt_zurueck` fehlt, rechnet `echtZurueckWert` weiter mit
+  `moeglich` (wie bisher ueberall) - die Zeile bekommt aber "geschaetzt"
+  dazu und der Abweichungs-Kasten nennt die Zahl.
+- NEU **Je Person** (mein.js, direkt darunter): gesetzt / im Spiel /
+  zurueck / Gewinn je Person, plus erhalten und ausgezahlt aus
+  `kt_person_zahlungen`. Reine Aufteilung der Zahlen von oben, keine
+  zweite Rechnung. **Bewusst NICHT** mit Liste 1 verheiratet:
+  `kt_buchungen.person` ist freier Text, ein Abgleich ueber den Namen
+  waere Falle 2.
+- Liste 1: das Personen-Feld hat jetzt eine `datalist` mit den
+  angelegten Personen, damit dort immer derselbe Name steht. Frei
+  tippen bleibt moeglich, Spalte und Datenbank unveraendert.
+- **Aendern statt Doppelt** (kombis.js, `scheinSchonDaFragen` +
+  `scheinAendernStattDoppelt`): steht die Kombination schon im
+  Verlauf, ist ANDERN jetzt der erste Vorschlag - der vorhandene
+  Eintrag bekommt Einsatz, Quote, moeglich, Brutto, Gebuehr und Wetten
+  aus den Feldern der Karte, es bleibt EINE Buchung. Der zweite
+  Eintrag geht weiter, aber erst nach einer eigenen deutlichen Frage.
+  Werte kommen aus `baueVerlaufsEintrag`, also **keine neue Formel**;
+  im Konto wird frisch geholt (`supaScheinHolen`), per `Object.assign`
+  auf den alten Block gelegt, 0-Zeilen geprueft und eine Anmerkung
+  gesetzt - dasselbe Muster wie `tuEinsatz` und `pkSpeichern`.
+
+Nicht getestet: alles nur mit dem Node-Harness und synthetischen
+Scheinen. Im Browser mit echten Daten hat es noch niemand gesehen.
+(Die Fassung 20260907a - Fotos als Bilddatei - ist hier nie
+nachgetragen worden.)
+
 ### Weitere offene Punkte
 00000000. Fassung 20260905j: ADMIRAL als fuenfter Anbieter (kz "ad").
    Ueberall nachgezogen (Drift-Gefahr!): daten.js GEBUEHREN_TEILER,

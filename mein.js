@@ -2352,6 +2352,444 @@ function tuBerichtWord() {
   }
 }
 
+// ============================================================
+// KOMBI-KONTO (Karam, 10.09.2026)
+//
+// Karams Wunsch: "Jede gesamte Kombi haelt ihren Zeitraum ein, von wann
+// bis wann. Ich hab vierhundert da, hundertfuenfzig da - und das Gesamte,
+// was wir gesetzt haben. Dann trag ich ein, ob gewonnen oder verloren,
+// und du rechnest aus, wie viel Geld wir gemacht haben und wie viel wir
+// jetzt eigentlich haben sollten. Rueckwirkend ab dem ersten Tag."
+//
+// RUECKWIRKEND OHNE NACHTRAGEN: der Zeitraum wird nicht neu erfasst,
+// sondern aus dem gelesen, was an jeder Kombination ohnehin seit jeher
+// dranhaengt - die Anstosszeit jeder einzelnen Wette (wetten[].an,
+// dieselbe Quelle wie scheinEnde). Deshalb gilt diese Ansicht sofort
+// fuer ALLES, was gespeichert ist: keine Zeile nachpflegen, kein
+// Datenbank-Umbau, keine Wanderung alter Daten.
+//
+// EINE Kombination = alle Teile mit demselben Stamm bei derselben
+// Person. Wird dieselbe Kombination auf zwei Anbieter aufgeteilt
+// ("400 hier, 150 da"), ist das hier EIN Eintrag mit 550 Euro
+// Gesamteinsatz - und gewonnen/verloren wird fuer alle Teile auf
+// einmal eingetragen.
+//
+// KEINE NEUE RECHENART: der Gewinn ist derselbe wie in der Konto-
+// Tabelle und im Bericht - zurueck minus Einsatz der ENTSCHIEDENEN
+// Kombinationen. Offenes Geld zaehlt nicht als Verlust, es steht
+// getrennt als "im Spiel".
+// ============================================================
+
+// Was gerade gezeigt wird. Voreinstellung ist bewusst "alles":
+// Karam will es rueckwirkend ab dem ersten Tag sehen, nicht ab heute.
+let kkWahl = null;
+function kkWahlLesen() {
+  if (kkWahl) return kkWahl;
+  try { kkWahl = JSON.parse(localStorage.getItem("kt_kombikonto_wahl") || "null"); } catch (e) { }
+  if (!kkWahl) kkWahl = { von: "", bis: "", person: "alle", stand: "alle" };
+  return kkWahl;
+}
+function tuKkWahl(feld, wert) {
+  const w = kkWahlLesen();
+  w[feld] = wert;
+  try { localStorage.setItem("kt_kombikonto_wahl", JSON.stringify(w)); } catch (e) { }
+  zeichneBuchhaltung();
+}
+function tuKkZuruecksetzen() {
+  kkWahl = { von: "", bis: "", person: "alle", stand: "alle" };
+  try { localStorage.setItem("kt_kombikonto_wahl", JSON.stringify(kkWahl)); } catch (e) { }
+  zeichneBuchhaltung();
+}
+
+// Zeitraum EINER gespeicherten Kombination: fruehester und spaetester
+// Anstoss ihrer Wetten. Fehlt die Zeit an einem Bein, zaehlt nur dieses
+// Bein nicht mit; fehlt sie ueberall, gibt es keinen Zeitraum. Solche
+// Kombinationen werden NICHT weggeworfen, sondern unten sichtbar
+// gesammelt (sonst faellt genau das Geld heraus, das niemand mehr
+// nachrechnet).
+function kkSpanne(s) {
+  let von = null, bis = null, ohne = 0;
+  for (const t of ((s.daten || {}).wetten || [])) {
+    const a = (typeof liesAnstoss === "function") ? liesAnstoss(t.an || "") : { fehlt: true, zeit: new Date(NaN) };
+    if (a.fehlt || isNaN(a.zeit.getTime())) { ohne++; continue; }
+    if (!von || a.zeit < von) von = a.zeit;
+    if (!bis || a.zeit > bis) bis = a.zeit;
+  }
+  return { von: von, bis: bis, ohneZeit: ohne };
+}
+
+function kkDatum(d) {
+  if (!d) return "?";
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
+    "." + d.getFullYear();
+}
+
+// Alle Teile zu Gesamt-Kombinationen zusammenfassen.
+// SCHLUESSEL: Foto-Ordner + Stamm + Person. Genau derselbe Schnitt wie
+// in der Selbstpruefung ("Ziel je Kombination", weiter unten in dieser
+// Datei) - wer einen von beiden aendert, muss in den anderen schauen.
+function kkGruppen() {
+  const liste = Array.isArray(kasseScheine) ? kasseScheine.filter(s => s.daten) : [];
+  const dopp = doppelteM(liste);
+  const karte = {};
+  for (const s of liste) {
+    const d = s.daten;
+    const key = (d.satz || "?") + "|" + stammIdM(d.scheinId) + "|" + (s.ordner || "-");
+    let g = karte[key];
+    if (!g) {
+      g = karte[key] = { key: key, person: s.ordner || "", satz: d.satz || "",
+        ids: [], nummern: [], anbieter: [], teile: 0,
+        einsatz: 0, einsatzEntschieden: 0, imSpiel: 0, zurueck: 0,
+        offen: 0, gewonnen: 0, verloren: 0,
+        geschaetzt: 0, doppelt: 0, ohneZeit: 0, von: null, bis: null };
+    }
+    const sp = kkSpanne(s);
+    if (sp.ohneZeit) g.ohneZeit += sp.ohneZeit;
+    if (sp.von && (!g.von || sp.von < g.von)) g.von = sp.von;
+    if (sp.bis && (!g.bis || sp.bis > g.bis)) g.bis = sp.bis;
+
+    const einsatz = Number(d.einsatz) || 0;
+    g.ids.push(s.id);
+    g.teile++;
+    g.einsatz += einsatz;
+    if (s.nummer != null && g.nummern.indexOf(s.nummer) < 0) g.nummern.push(s.nummer);
+    if (d.kz && g.anbieter.indexOf(d.kz) < 0) g.anbieter.push(d.kz);
+    if (dopp[s.id] && dopp[s.id].spaeter) g.doppelt++;
+
+    if (s.stand === "offen") { g.offen++; g.imSpiel += einsatz; }
+    else {
+      g.einsatzEntschieden += einsatz;
+      if (s.stand === "gewonnen") {
+        g.gewonnen++;
+        g.zurueck += echtZurueckWert(s);
+        // Ohne eingetragenen Betrag rechnet echtZurueckWert mit
+        // "moeglich" weiter. Das ist eine Schaetzung und wird als
+        // solche gezeigt, statt als harte Zahl durchzugehen.
+        if (s.echt_zurueck === null || s.echt_zurueck === undefined) g.geschaetzt++;
+      } else g.verloren++;
+    }
+  }
+  const raus = Object.keys(karte).map(k => karte[k]);
+  for (const g of raus) {
+    g.einsatz = rundM(g.einsatz);
+    g.einsatzEntschieden = rundM(g.einsatzEntschieden);
+    g.imSpiel = rundM(g.imSpiel);
+    g.zurueck = rundM(g.zurueck);
+    // DIESELBE Formel wie berichtDaten() und zeichneKontoDb():
+    // zurueck minus Einsatz der schon entschiedenen Teile.
+    g.gewinn = rundM(g.zurueck - g.einsatzEntschieden);
+    g.stand = g.offen
+      ? (g.gewonnen || g.verloren ? "teils" : "offen")
+      : (g.gewonnen ? (g.verloren ? "teils" : "gewonnen") : "verloren");
+  }
+  // Neueste zuerst: nach letztem Anstoss, Kombinationen ohne Zeit ans Ende.
+  raus.sort((a, b) => {
+    if (!a.bis && !b.bis) return 0;
+    if (!a.bis) return 1;
+    if (!b.bis) return -1;
+    return b.bis - a.bis;
+  });
+  return raus;
+}
+
+// Die Auswahl oben anwenden. Eine Kombination liegt im Zeitraum, wenn
+// sich ihr Zeitraum mit dem gewaehlten UEBERSCHNEIDET - eine Kombi vom
+// 12. bis 15. gehoert auch dann dazu, wenn nur bis zum 13. gefiltert wird.
+function kkGefiltert(gruppen) {
+  const w = kkWahlLesen();
+  const vonG = w.von ? new Date(w.von + "T00:00") : null;
+  const bisG = w.bis ? new Date(w.bis + "T23:59:59") : null;
+  const raus = [], ohneZeit = [];
+  for (const g of gruppen) {
+    if (w.person !== "alle") {
+      if (w.person === "ohne" ? !!g.person : g.person !== w.person) continue;
+    }
+    if (w.stand === "offen" && !g.offen) continue;
+    if (w.stand === "fertig" && g.offen) continue;
+    if (!g.von && !g.bis) {
+      // Ohne Zeit laesst sich nicht sagen, ob sie in den Zeitraum faellt.
+      // Bei "alles" zaehlt sie normal mit, sonst kommt sie in den Rest-Topf.
+      if (!vonG && !bisG) raus.push(g); else ohneZeit.push(g);
+      continue;
+    }
+    const a = g.von || g.bis, b = g.bis || g.von;
+    if (vonG && b < vonG) continue;
+    if (bisG && a > bisG) continue;
+    raus.push(g);
+  }
+  return { gruppen: raus, ohneZeit: ohneZeit };
+}
+
+// Gewonnen oder verloren fuer die GANZE Kombination - alle Teile auf
+// einmal. Genau das hat Karam verlangt: er entscheidet einmal pro
+// Kombination, nicht einmal pro Anbieter-Teil.
+async function tuGruppeStand(keyKodiert, wert) {
+  if (!wert) return;
+  const key = decodeURIComponent(keyKodiert);
+  const g = kkGruppen().find(x => x.key === key);
+  if (!g) { meldungM("Diese Kombination ist nicht mehr da - bitte neu laden.", "warn"); return; }
+  const offeneIds = g.ids.filter(id => {
+    const s = (kasseScheine || []).find(x => x.id === id);
+    return s && s.stand !== wert;
+  });
+  if (!offeneIds.length) { zeichneBereich(); return; }
+  if (!confirm(
+      "Die ganze Kombination auf \"" + wert + "\" setzen?\n\n" +
+      "   Teile:          " + offeneIds.length + " von " + g.teile + "\n" +
+      "   Gesamteinsatz:  " + g.einsatz.toFixed(2) + " Euro\n" +
+      (g.person ? "   Person:         " + (ordnerNameM(g.person) || "?") + "\n" : "") +
+      "\nDas aendert dieselben Zeilen wie das Feld \"Stand\" in der Kombi-Tabelle - " +
+      "es entsteht keine zweite Buchung, die vorhandene wird nur umgestellt.")) return;
+  const fehler = [];
+  for (const id of offeneIds) {
+    const r = await supaScheinAendern(id, { stand: wert });
+    if (r.error) { fehler.push(String(r.error.message).slice(0, 60)); continue; }
+    // Die 0-Zeilen-Falle: an RLS gescheitert sieht aus wie geschafft.
+    if (!r.data || !r.data.length) fehler.push("kein Schreibrecht");
+  }
+  if (fehler.length) {
+    meldungM("<b>" + (offeneIds.length - fehler.length) + " von " + offeneIds.length +
+      " Teilen umgestellt.</b> Nicht umgestellt: " + textSicherM(fehler.join("; ")), "warn");
+  } else {
+    meldungM("Kombination auf \"" + wert + "\" gesetzt (" + offeneIds.length +
+      (offeneIds.length === 1 ? " Teil" : " Teile") + ").", "gut");
+  }
+  zeichneBereich();
+}
+
+// Das Kombi-Konto als HTML. einz/ausz/start und letzteBalance kommen
+// FERTIG aus zeichneBuchhaltung - hier wird nichts davon neu gesucht,
+// damit oben und hier nie zwei verschiedene Zahlen stehen koennen.
+function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
+  const w = kkWahlLesen();
+  const alle = kkGruppen();
+  const f = kkGefiltert(alle);
+  const g = f.gruppen;
+
+  const s = { n: g.length, einsatz: 0, entschieden: 0, imSpiel: 0, zurueck: 0,
+    offen: 0, fertig: 0, geschaetzt: 0, doppelt: 0 };
+  for (const x of g) {
+    s.einsatz += x.einsatz;
+    s.entschieden += x.einsatzEntschieden;
+    s.imSpiel += x.imSpiel;
+    s.zurueck += x.zurueck;
+    s.geschaetzt += x.geschaetzt;
+    s.doppelt += x.doppelt;
+    if (x.offen) s.offen++; else s.fertig++;
+  }
+  s.einsatz = rundM(s.einsatz); s.entschieden = rundM(s.entschieden);
+  s.imSpiel = rundM(s.imSpiel); s.zurueck = rundM(s.zurueck);
+  const gewinn = rundM(s.zurueck - s.entschieden);
+
+  // ---- Der zweite Rechenweg ----
+  // Weg 1 (oben in der Buchhaltung): Gewinn = Balance + Auszahlungen
+  //        - Einzahlungen - Startkapital. Der kommt aus den KONTEN.
+  // Weg 2 (hier): Gewinn = zurueck - Einsatz der entschiedenen Kombis.
+  //        Der kommt aus den KOMBINATIONEN.
+  //
+  // ACHTUNG, das ist der Punkt, an dem man sich verrechnet: die beiden
+  // Zahlen sind NICHT gleich, sie unterscheiden sich um genau das Geld,
+  // das gerade in offenen Kombinationen steckt. Der Anbieter hat den
+  // Einsatz schon von der Balance abgezogen, zurueck ist er noch nicht -
+  // Weg 1 rechnet ihn deshalb heute wie einen Verlust, Weg 2 laesst ihn
+  // bewusst draussen. Es gilt:  Gewinn(Konten) = Gewinn(Kombis) - im Spiel.
+  // Genau deshalb wird unten nicht Gewinn mit Gewinn verglichen, sondern
+  // die erwartete Balance mit der eingetragenen - da faellt "im Spiel"
+  // sauber heraus. Und der Unterschied wird Karam hingeschrieben, statt
+  // ihn zwei verschiedene Gewinne suchen zu lassen.
+  const sollGeld = rundM(start + einz - ausz + gewinn - s.imSpiel);
+  const gewinnKonten = (letzteBalance === null) ? null : rundM(letzteBalance + ausz - einz - start);
+  const zeitraumGanz = !w.von && !w.bis && w.person === "alle" && w.stand === "alle";
+  const diff = (letzteBalance === null || !zeitraumGanz) ? null : rundM(letzteBalance - sollGeld);
+
+  const persOpt = ['<option value="alle"' + (w.person === "alle" ? " selected" : "") + ">alle Personen</option>",
+    '<option value="ohne"' + (w.person === "ohne" ? " selected" : "") + ">ohne Person</option>"]
+    .concat((ordnerListe || []).map(o => '<option value="' + o.id + '"' + (w.person === o.id ? " selected" : "") +
+      ">" + textSicherM(o.name) + "</option>")).join("");
+  const standOpt = [["alle", "alle"], ["offen", "nur offene"], ["fertig", "nur entschiedene"]]
+    .map(([k, n]) => '<option value="' + k + '"' + (w.stand === k ? " selected" : "") + ">" + n + "</option>").join("");
+
+  let h = '<details open class="bb-teil bb-kombikonto">' +
+    "<summary>&#127919; Kombi-Konto: jede Kombination mit Zeitraum, Gesamteinsatz und Gewinn (" +
+    alle.length + ")</summary>" +
+    '<p class="mini">Eine Zeile ist eine <b>ganze</b> Kombination. Liegt sie bei zwei Anbietern, ' +
+    "steht hier der Einsatz beider Teile zusammen. Der Zeitraum kommt aus den Anstosszeiten " +
+    "ihrer Spiele - deshalb gilt diese Liste ohne Nacharbeit auch f&uuml;r alles, was " +
+    "schon fr&uuml;her gespeichert wurde.</p>" +
+    '<div class="bb-filterzeile">' +
+    "<label>von <input type=\"date\" value=\"" + textSicherM(w.von) +
+      "\" onchange=\"tuKkWahl('von', this.value)\"></label> " +
+    "<label>bis <input type=\"date\" value=\"" + textSicherM(w.bis) +
+      "\" onchange=\"tuKkWahl('bis', this.value)\"></label> " +
+    "<label>Person <select onchange=\"tuKkWahl('person', this.value)\">" + persOpt + "</select></label> " +
+    "<label>Stand <select onchange=\"tuKkWahl('stand', this.value)\">" + standOpt + "</select></label> " +
+    '<button onclick="tuKkZuruecksetzen()">alles zeigen</button>' +
+    "</div>";
+
+  h += '<div class="bb-kacheln">' +
+    bbKachel("Gesamt gesetzt", bbGeld(s.einsatz), s.n + (s.n === 1 ? " Kombination" : " Kombinationen"), "") +
+    bbKachel("Davon noch im Spiel", bbGeld(s.imSpiel), s.offen + " offen", "bb-warten") +
+    bbKachel("Zur&uuml;ckbekommen", bbGeld(s.zurueck), s.fertig + " entschieden", "") +
+    bbKachel("Gewinn daraus", bbGeldVz(gewinn), "zur&uuml;ck minus Einsatz der entschiedenen",
+      gewinn >= 0 ? "bb-plus" : "bb-minus") +
+    "</div>";
+
+  // Warum oben eine andere Zahl steht. Ohne diesen Satz sucht Karam den
+  // Fehler in zwei Gewinnen, die beide richtig sind.
+  if (zeitraumGanz && gewinnKonten !== null && Math.abs(gewinnKonten - gewinn) > 0.005) {
+    h += '<p class="mini">Oben im Bericht steht <b>' + bbGeldVz(gewinnKonten) +
+      "</b> als Gewinn, hier <b>" + bbGeldVz(gewinn) + "</b>. Beide stimmen. Der Unterschied " +
+      "ist genau das Geld, das gerade in offenen Kombinationen steckt (<b>" + bbGeld(s.imSpiel) +
+      "</b>): der Anbieter hat es von der Balance schon abgezogen, zur&uuml;ck ist es noch nicht. " +
+      "Oben wird es deshalb heute wie ein Verlust gerechnet, hier bleibt es bewusst drau&szlig;en. " +
+      "Sobald die offenen Kombinationen entschieden sind, treffen sich die beiden Zahlen.</p>";
+  }
+
+  // ---- So viel Geld muesste jetzt da sein ----
+  h += '<div class="bb-rechnung">' +
+    '<div class="bb-rz"><span class="bb-rzname">Startkapital</span><span class="bb-rzwert">' +
+      bbGeld(start) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">plus Einzahlungen</span><span class="bb-rzwert">+ ' +
+      bbGeld(einz) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">minus Auszahlungen</span><span class="bb-rzwert">&minus; ' +
+      bbGeld(ausz) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">plus Gewinn der entschiedenen Kombinationen</span>' +
+      '<span class="bb-rzwert">' + (gewinn >= 0 ? "+ " : "&minus; ") + bbGeld(Math.abs(gewinn)) + "</span></div>" +
+    '<div class="bb-rz"><span class="bb-rzname">minus was in offenen Kombinationen steckt</span>' +
+      '<span class="bb-rzwert">&minus; ' + bbGeld(s.imSpiel) + "</span></div>" +
+    '<div class="bb-rz bb-rzende"><span class="bb-rzname">= so viel m&uuml;sste jetzt auf den Konten liegen</span>' +
+      '<span class="bb-rzwert">' + bbGeld(sollGeld) + "</span></div>" +
+    "</div>";
+
+  if (!zeitraumGanz) {
+    h += '<p class="mini">Diese Rechnung gilt nur bei <b>alles zeigen</b>: Startkapital, ' +
+      "Ein- und Auszahlungen lassen sich nicht auf einen Zeitraum oder eine Person aufteilen. " +
+      "Solange oben gefiltert ist, sind die vier Kacheln richtig, der Vergleich mit den " +
+      "Konten aber nicht.</p>";
+  } else if (diff === null) {
+    h += '<p class="mini">Sobald in Liste 2 die heutige Gesamtbalance steht, vergleicht das ' +
+      "Programm sie mit dieser Zahl. Weichen beide voneinander ab, fehlt irgendwo eine Buchung.</p>";
+  } else if (Math.abs(diff) < 0.02) {
+    h += '<div class="merk"><b>&#10004; Die Konten stimmen mit den Kombinationen &uuml;berein.</b> ' +
+      "Gesamtbalance vom " + textSicherM(balanceDatum || "?") + ": " + bbGeld(letzteBalance) +
+      " - genau so viel, wie hier herauskommt. Zwei verschiedene Rechenwege, dasselbe Ergebnis.</div>";
+  } else {
+    h += '<div class="warnkern"><b>&#9888; ' + bbGeld(Math.abs(diff)) +
+      (diff > 0 ? " mehr" : " weniger") + " auf den Konten als erwartet.</b> " +
+      "Gesamtbalance vom " + textSicherM(balanceDatum || "?") + ": " + bbGeld(letzteBalance) +
+      ", erwartet: " + bbGeld(sollGeld) + ". Das ist kein Rechenfehler des Programms, sondern " +
+      "ein Hinweis: entweder fehlt eine Ein- oder Auszahlung in Liste 1, oder bei einer " +
+      "gewonnenen Kombination steht noch nicht, was wirklich zur&uuml;ckkam" +
+      (s.geschaetzt ? " (" + s.geschaetzt + "-mal wird gerade mit dem m&ouml;glichen Gewinn gerechnet)" : "") +
+      ".</div>";
+  }
+
+  if (s.doppelt) {
+    h += '<div class="warnkern"><b>&#9888; ' + s.doppelt + " Teil(e) sind doppelt gespeichert.</b> " +
+      "Sie z&auml;hlen oben mit vollem Einsatz mit und dr&uuml;cken den Gewinn um genau diesen " +
+      "Betrag. In der Kombi-Tabelle sind sie markiert und k&ouml;nnen dort weg - der erste " +
+      "Eintrag bleibt.</div>";
+  }
+
+  // ---- Die Liste ----
+  const schreib = darfSchreiben();
+  if (g.length) {
+    h += '<div class="tabellenrand"><table><thead><tr><th>Zeitraum</th><th>Nr.</th><th>Person</th>' +
+      "<th>Anbieter</th><th>Teile</th><th>Gesamteinsatz</th><th>Zur&uuml;ck</th>" +
+      "<th>Gewinn</th><th>gewonnen / verloren</th></tr></thead><tbody>";
+    for (const x of g) {
+      const zeitraum = (!x.von && !x.bis) ? "<span class='mini'>Zeit unbekannt</span>"
+        : (x.von && x.bis && kkDatum(x.von) === kkDatum(x.bis)
+            ? kkDatum(x.von)
+            : kkDatum(x.von) + " &ndash; " + kkDatum(x.bis));
+      const key = encodeURIComponent(x.key);
+      h += "<tr class='st-" + x.stand + "'>" +
+        "<td class='mini'>" + zeitraum + "</td>" +
+        "<td>" + (x.nummern.length ? textSicherM(x.nummern.join(", ")) : "<span class='mini'>-</span>") + "</td>" +
+        "<td>" + (x.person ? textSicherM(ordnerNameM(x.person) || "?") : "<span class='mini'>ohne Person</span>") + "</td>" +
+        "<td class='mini'>" + x.anbieter.map(kz => textSicherM(anbieterNameM(kz) || kz)).join(", ") + "</td>" +
+        "<td>" + x.teile + (x.doppelt ? " <span class='rot' title='doppelt gespeichert'>&#9888;</span>" : "") + "</td>" +
+        "<td><b>" + x.einsatz.toFixed(2) + " &euro;</b>" +
+          (x.imSpiel && x.imSpiel !== x.einsatz
+            ? "<div class='mini'>davon " + x.imSpiel.toFixed(2) + " &euro; noch im Spiel</div>" : "") + "</td>" +
+        "<td>" + (x.gewonnen ? x.zurueck.toFixed(2) + " &euro;" +
+          (x.geschaetzt ? "<div class='mini rot'>gesch&auml;tzt</div>" : "") : "<span class='mini'>-</span>") + "</td>" +
+        "<td class='" + (x.offen && !x.gewonnen && !x.verloren ? "" : (x.gewinn >= 0 ? "gruen" : "rot")) + "'>" +
+          (x.offen && !x.gewonnen && !x.verloren ? "<span class='mini'>l&auml;uft noch</span>"
+            : "<b>" + (x.gewinn >= 0 ? "+" : "") + x.gewinn.toFixed(2) + " &euro;</b>") + "</td>" +
+        "<td>" + (schreib
+          ? "<select onchange=\"tuGruppeStand('" + key + "', this.value)\">" +
+            '<option value="">' + textSicherM(x.stand) + "</option>" +
+            '<option value="gewonnen">alles gewonnen</option>' +
+            '<option value="verloren">alles verloren</option>' +
+            '<option value="offen">wieder offen</option></select>'
+          : textSicherM(x.stand)) + "</td></tr>";
+    }
+    h += "</tbody></table></div>";
+  } else {
+    h += '<p class="mini">Auf diese Auswahl passt keine Kombination. Mit <b>alles zeigen</b> ' +
+      "kommt wieder alles.</p>";
+  }
+
+  // Rest-Topf: was der Zeitraum-Filter nicht beurteilen kann, wird
+  // gezeigt statt verschluckt.
+  if (f.ohneZeit.length) {
+    const summe = rundM(f.ohneZeit.reduce((p, x) => p + x.einsatz, 0));
+    h += '<div class="warnkern"><b>' + f.ohneZeit.length + " Kombination(en) ohne Anstosszeit</b> " +
+      "(zusammen " + bbGeld(summe) + ") lassen sich keinem Zeitraum zuordnen und sind in der " +
+      "Liste oben deshalb nicht dabei. Bei <b>alles zeigen</b> z&auml;hlen sie normal mit. " +
+      "Meist sind das von Hand nachgetragene Kombinationen ohne Datum an den Spielen.</div>";
+  }
+
+  return h + "</details>";
+}
+
+// Je Person: was ist bei wem gesetzt, zurueckgekommen und verdient
+// worden. Reine Aufteilung derselben Zahlen wie oben, keine zweite
+// Rechnung - deshalb ergibt die Spalte "Gewinn" zusammengezaehlt genau
+// den Gewinn aus dem Kombi-Konto.
+function zeichneJePersonHtml() {
+  const f = kkGefiltert(kkGruppen());
+  const karte = {};
+  for (const g of f.gruppen) {
+    const id = g.person || "";
+    if (!karte[id]) karte[id] = { id: id, n: 0, einsatz: 0, entschieden: 0, imSpiel: 0, zurueck: 0 };
+    const k = karte[id];
+    k.n++; k.einsatz += g.einsatz; k.entschieden += g.einsatzEntschieden;
+    k.imSpiel += g.imSpiel; k.zurueck += g.zurueck;
+  }
+  // Die Personen-Buchungen (erhalten / zum Anbieter / ausgezahlt) dazu,
+  // damit in EINER Zeile steht, was bei der Person passiert ist.
+  const pb = Array.isArray(personBuchungen) ? personBuchungen : [];
+  const reihen = Object.keys(karte).map(k => karte[k]);
+  for (const r of reihen) {
+    r.gewinn = rundM(r.zurueck - r.entschieden);
+    r.erhalten = rundM(pb.filter(b => (b.ordner || "") === r.id && b.art === "erhalten")
+      .reduce((p, b) => p + (Number(b.betrag) || 0), 0));
+    r.ausgezahlt = rundM(pb.filter(b => (b.ordner || "") === r.id && b.art === "ausgezahlt")
+      .reduce((p, b) => p + (Number(b.betrag) || 0), 0));
+  }
+  reihen.sort((a, b) => b.einsatz - a.einsatz);
+  if (!reihen.length) return "";
+  let h = '<details class="bb-teil bb-jeperson"><summary>&#128100; Je Person: gesetzt, zur&uuml;ck, Gewinn (' +
+    reihen.length + ")</summary>" +
+    '<p class="mini">Dieselbe Auswahl wie im Kombi-Konto dar&uuml;ber. Die Gewinne aller Zeilen ' +
+    "zusammen ergeben genau den Gewinn von oben.</p>" +
+    '<div class="tabellenrand"><table><thead><tr><th>Person</th><th>Kombis</th><th>Gesetzt</th>' +
+    "<th>Im Spiel</th><th>Zur&uuml;ck</th><th>Gewinn</th><th>erhalten</th><th>ausgezahlt</th>" +
+    "</tr></thead><tbody>";
+  for (const r of reihen) {
+    h += "<tr><td>" + (r.id ? textSicherM(ordnerNameM(r.id) || "?") : "<span class='mini'>ohne Person</span>") +
+      "</td><td>" + r.n + "</td><td>" + rundM(r.einsatz).toFixed(2) + " &euro;</td>" +
+      "<td>" + rundM(r.imSpiel).toFixed(2) + " &euro;</td>" +
+      "<td>" + rundM(r.zurueck).toFixed(2) + " &euro;</td>" +
+      "<td class='" + (r.gewinn >= 0 ? "gruen" : "rot") + "'><b>" + (r.gewinn >= 0 ? "+" : "") +
+        r.gewinn.toFixed(2) + " &euro;</b></td>" +
+      "<td>" + r.erhalten.toFixed(2) + " &euro;</td><td>" + r.ausgezahlt.toFixed(2) + " &euro;</td></tr>";
+  }
+  return h + "</tbody></table></div></details>";
+}
+
 async function zeichneBuchhaltung() {
   const box = el("buchhaltung");
   if (!box) return;
@@ -2447,6 +2885,12 @@ async function zeichneBuchhaltung() {
     bbKachel("Ausgezahlt", bbGeld(ausz), "Geld, das ihr herausgeholt habt", "") +
     bbKachel("Startkapital", bbGeld(start), "womit ihr angefangen habt", "") +
     "</div>";
+
+  // ---- 3a. Kombi-Konto: jede Kombination mit Zeitraum und Gewinn
+  // (Karam 10.09.). Die vier Geldzahlen werden UEBERGEBEN, nicht neu
+  // gesucht - sonst koennte hier eine andere Summe stehen als oben.
+  html += zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum);
+  html += zeichneJePersonHtml();
 
   // ---- 3b. Berichte: filtern, ansehen, herunterladen (Karam 03.09.) ----
   html += zeichneBerichtHtml();
@@ -2560,7 +3004,16 @@ async function zeichneBuchhaltung() {
       '<option value="startkapital">Startkapital</option></select>' +
       '<select id="bu_konto"><option>Interwetten</option><option>Bwin</option>' +
       '<option>Bet365</option><option>Stake</option><option>Sonstiges</option></select>' +
-      '<input id="bu_person" placeholder="Person" value="' + textSicherM(ich.username) + '" style="width:110px">' +
+      // Person: die angelegten Personen stehen zur Auswahl, damit hier
+      // immer DERSELBE Name steht und nicht einmal "Ali" und einmal
+      // "ali ". Frei tippen bleibt moeglich (z. B. jemand, der keine
+      // eigene Person ist) - deshalb Liste UND Feld, kein reines Menue.
+      '<input id="bu_person" list="bu_personen" placeholder="Person" value="' +
+        textSicherM(ich.username) + '" style="width:130px">' +
+      '<datalist id="bu_personen">' +
+        (ordnerListe || []).map(o => '<option value="' + textSicherM(o.name) + '">').join("") +
+        '<option value="' + textSicherM(ich.username) + '">' +
+      "</datalist>" +
       '<input type="number" step="0.01" min="0.01" id="bu_betrag" placeholder="Betrag" style="width:90px">' +
       '<button class="haupt" onclick="tuBuchen()">Eintragen</button></div>';
   }
