@@ -3,7 +3,7 @@
 //
 // Zwei getrennte Toepfe:
 //
-// 1) ANBIETER_QUOTEN  = echte Quoten deiner vier Anbieter.
+// 1) ANBIETER_QUOTEN  = echte Quoten deiner Anbieter.
 //    Quelle: Screenshots, die Karam aus den Apps schickt.
 //    Claude liest sie ab und traegt sie hier ein. Sie erscheinen
 //    in der Tafel als graue Vorbelegung im jeweiligen Feld und
@@ -16,7 +16,7 @@
 
 const RECHERCHE_STAND = "Fremdvergleich 25.08.2026 ca. 13:00 Uhr. Anbieter-Quoten: noch keine.";
 
-// ---- Topf 1: echte Quoten der vier Anbieter (aus Screenshots) ----
+// ---- Topf 1: echte Quoten der Anbieter (aus Screenshots) ----
 // Beispiel, wie ein Eintrag spaeter aussieht:
 // "1.11": { b3: { "-0.5": 2.45 }, bw: { "-0.5": 2.40 },
 //           _zeit: "25.08. 19:20", _quelle: "Screenshot Karam" },

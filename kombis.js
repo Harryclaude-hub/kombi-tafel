@@ -117,7 +117,8 @@ function nrNaechste() {
   return n;
 }
 
-// Karams Reihenfolge, an EINER Stelle. Stake zuerst, Bet365 zuletzt.
+// Karams Reihenfolge, an EINER Stelle. Stake zuerst, danach Bet365,
+// seit 06.09.2026 Admiral und seit 11.09.2026 Betway ganz zuletzt.
 // Bwin und Sportingbet sind derselbe Anbieter, deshalb steht dort nur bw.
 const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad", "bt"];   // ad = Admiral (06.09.2026), bt = Betway (NEU 11.09.2026)
 
@@ -1107,7 +1108,7 @@ function zeichneReste(z) {
     // Ein Vertippen haette die Wette fuer immer aus allen Kombinationen
     // gehalten, ohne dass man etwas dagegen tun kann.
     html += "<h3>Kein Anbieter hat sie (" + nirgends.length + ")</h3>" +
-      "<p class='mini'>Du hast bei allen vier gesagt, dass es die Wette dort nicht " +
+      "<p class='mini'>Du hast bei allen Anbietern gesagt, dass es die Wette dort nicht " +
       "gibt. Sie kommt deshalb in keine Kombination mehr. War es ein Versehen, " +
       "hol sie mit dem Knopf zurück.</p><ul>";
     for (const w of nirgends) {
@@ -1402,7 +1403,7 @@ function hintergrundFuer(karte, treffer) {
 // Kleines Zeichen in der Hausfarbe des Anbieters (eigene Marke, kein
 // fremdes Logo - Logobilder muesste Karam erst liefern).
 function anbieterZeichen(kz) {
-  const kurz = { st: "S", iw: "IW", bw: "bw", b3: "365", ad: "AD" };
+  const kurz = { st: "S", iw: "IW", bw: "bw", b3: "365", ad: "AD", bt: "BTW" };
   return '<span class="ab ab-' + kz + '" title="' + textSicher(anbieterName(kz) || kz) + '">' + (kurz[kz] || kz) + "</span>";
 }
 
@@ -2850,7 +2851,7 @@ function panelRestMischen() {
 // ============================================================
 
 // Der Anbieter-Filter fuer den Kombi-Bau (Karam, 02.09.): Klick auf eine
-// der vier Karten oben zeigt in der Gesetzt-Liste und bei den Kombis in
+// der Anbieter-Karten oben zeigt in der Gesetzt-Liste und bei den Kombis in
 // Arbeit nur diesen Anbieter. Bewusst NUR im Speicher, nicht in
 // localStorage - beim naechsten Laden ist wieder alles zu sehen.
 let bauAnbieterFilter = "";

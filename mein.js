@@ -2194,9 +2194,12 @@ function berichtInnenHtml() {
     : (w.person === "ohne" ? "ohne Person" : (ordnerNameM(w.person) || "?"));
   const satzName = w.satz === "alle" ? "alle Ordner"
     : ((typeof SAETZE !== "undefined" && (SAETZE.find(x => x.id === w.satz) || {}).titel) || w.satz);
-  const farbe = { st: "#1a2c38", iw: "#0a7d3e", bw: "#111", b3: "#14805e", ad: "#8d1b2e" };
+  const farbe = { st: "#1a2c38", iw: "#0a7d3e", bw: "#111", b3: "#14805e", ad: "#8d1b2e", bt: "#00a826" };
+  // Betway-Gruen ist hell: darauf braucht es dunkle statt weisser Schrift.
+  const schrift = { bt: "#0b1f10" };
   const marke = (kz) => '<span style="display:inline-block;padding:1px 7px;border-radius:4px;' +
-    'color:#fff;font-weight:bold;font-size:11px;background:' + (farbe[kz] || "#555") + '">' +
+    'color:' + (schrift[kz] || "#fff") + ';font-weight:bold;font-size:11px;background:' +
+    (farbe[kz] || "#555") + '">' +
     textSicherM(anbieterNameM(kz) || kz || "?") + "</span>";
   const geld = (x) => Number(x || 0).toFixed(2) + " &euro;";
   const kachel = (titel, wert, farbe2) =>
@@ -3002,8 +3005,9 @@ async function zeichneBuchhaltung() {
       '<select id="bu_art"><option value="einzahlung">Einzahlung</option>' +
       '<option value="auszahlung">Auszahlung</option>' +
       '<option value="startkapital">Startkapital</option></select>' +
-      '<select id="bu_konto"><option>Interwetten</option><option>Bwin</option>' +
-      '<option>Bet365</option><option>Stake</option><option>Sonstiges</option></select>' +
+      '<select id="bu_konto">' +
+      KASSE_ANBIETER.map(a => "<option>" + a[1] + "</option>").join("") +
+      '<option>Sonstiges</option></select>' +
       // Person: die angelegten Personen stehen zur Auswahl, damit hier
       // immer DERSELBE Name steht und nicht einmal "Ali" und einmal
       // "ali ". Frei tippen bleibt moeglich (z. B. jemand, der keine
@@ -4231,7 +4235,7 @@ function doppelteM(scheine) {
   return raus;
 }
 // ============================================================
-// ANBIETER-KOPF (Karam, 02.09.2026): die vier Anbieter nebeneinander
+// ANBIETER-KOPF (Karam, 02.09.2026): alle Anbieter nebeneinander
 // ganz oben - je Anbieter der rechnerische Geldstand und was in den
 // offenen Kombinationen noch zu holen ist. Ein Klick filtert die EINE
 // Kombi-Liste unten und klappt die komplette Uebersicht auf

@@ -41,7 +41,7 @@
   Ein Schein gehoert IMMER genau einem Anbieter (R4). Also ist der Anbieter
   der Topf, und die Frage ist nur, welche Wette in welchen Topf wandert.
   Wetten, die nur ein einziger Anbieter fuehrt, sind der Engpass. Wetten,
-  die alle vier fuehren, sind Verschiebemasse. Deshalb bekommt in jeder
+  die alle Anbieter fuehren, sind Verschiebemasse. Deshalb bekommt in jeder
   Runde der Anbieter den Zuschlag, der gerade die "unbeweglichsten" Wetten
   verbaut, und nicht einfach der erste in der Liste.
 
@@ -1298,7 +1298,7 @@ function schnellPunkte(trip, v) {
     if (v.guete[trip[2]][a] < minG) minG = v.guete[trip[2]][a];
     raenge[anzahl++] = minG >= GUETE_BELEGT ? 3 : (minG >= GUETE_GESCHAETZT ? 2 : 1);
   }
-  // absteigend sortieren, hoechstens vier Werte
+  // absteigend sortieren, so viele Werte wie mitspielende Anbieter
   for (var i = 1; i < anzahl; i++) {
     var h = raenge[i], j = i - 1;
     while (j >= 0 && raenge[j] < h) { raenge[j + 1] = raenge[j]; j--; }

@@ -8,7 +8,7 @@ Anzeige-Programm fuer die Wett-Tabelle vom 24.08.2026 (vier Fotos, 73 Wetten).
 
 - Zeigt alle Wetten wie im Original-Tabellenblatt: eine Zeile pro Wette, sortiert nach Anstoss
 - Kategorien-Filter: Sieg/Handicap, Tore, Ecken, BTTS, Halbzeit/Endstand, DNB, Tennis
-- Vier Anbieter-Spalten (Interwetten, Bwin, Bet365, Stake) mit Eingabefeldern fuer Live-Quoten
+- Sechs Anbieter-Spalten (Interwetten, Bwin, Bet365, Stake, Admiral, Betway) mit Eingabefeldern fuer Live-Quoten
 - Interwetten-Eingaben werden automatisch durch 1,05 geteilt (5 % Wettgebuehr AT)
 - Der beste ECHTE Wert wird gruen markiert, rechts steht die Ansage "Setzen bei"
 - Begriffe-Kasten oben erklaert jeden Begriff aus den Fotos
@@ -19,7 +19,7 @@ Anzeige-Programm fuer die Wett-Tabelle vom 24.08.2026 (vier Fotos, 73 Wetten).
 - `original.html`: die vier Fotos eins zu eins als eine Tabelle (gleiche Spalten wie das
   Original-Excel, inkl. Meldezeit, beider Quoten-Spalten, der stornierten Zeile und der
   Foto-Ueberlappung; nichts gerechnet)
-- Anbieter-Rang-Filter (Bester bis Viertbester): zeigt fuer jede Wette den Anbieter auf
+- Anbieter-Rang-Filter (Bester bis Sechstbester): zeigt fuer jede Wette den Anbieter auf
   diesem Platz ihrer Rangliste, falls der beste Anbieter gerade nicht erreichbar ist
 
 ## Aufbau (Design von Funktion getrennt)

@@ -1,6 +1,6 @@
 # Kombi-Tafel — Übergabe
 
-Stand: **05.09.2026**, Fassung `20260905j` (Abschnitt 14 zuerst lesen!).
+Stand: **11.09.2026**, Fassung `20260911a` (Abschnitt 14 zuerst lesen!).
 Dieser Text ist der Einstieg. Wer ihn gelesen hat, kann weiterarbeiten,
 ohne den alten Chat zu kennen.
 
@@ -27,7 +27,7 @@ ohne den alten Chat zu kennen.
 ## 1. Worum es geht
 
 Karam verwaltet mit Freunden **echtes Geld**. Aus einer Tabelle mit Wetten
-werden **3er-Kombinationen** gebaut, bei vier Anbietern gesetzt,
+werden **3er-Kombinationen** gebaut, bei sechs Anbietern gesetzt,
 fotografiert und abgerechnet. Alles läuft im Browser, ohne Build-Schritt.
 
 **Das ist kein Bastelprojekt.** Ein Rechenfehler kostet Geld, ein
@@ -58,18 +58,20 @@ als annehmen.
 
 ## 2. Die Rechenregeln — das hier nie raten
 
-### Die vier Anbieter
+### Die sechs Anbieter
 
 Reihenfolge steht an **einer** Stelle: `KT_ANBIETER_RANG` in `kombis.js`.
 
 ```js
-const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3"];
+const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad", "bt"];
 ```
 
 1. **Stake** (`st`) — erste Wahl
 2. **Interwetten** (`iw`)
 3. **Bwin** (`bw`) — Sportingbet ist derselbe Anbieter, deshalb steht dort nur `bw`
-4. **Bet365** (`b3`) — letzte Wahl
+4. **Bet365** (`b3`) — letzte Wahl unter den geprueften (Regel R6)
+5. **Admiral** (`ad`) — neu am 06.09.2026, Maerkte und Gebuehren ungeprueft
+6. **Betway** (`bt`) — neu am 11.09.2026, Maerkte und Gebuehren ungeprueft
 
 Wenn nicht lesbar ist, ob ein Spiel dort überhaupt angeboten wird, ist das
 in Ordnung — dann wird es geschätzt und als „Markt nur geschätzt" markiert.
@@ -77,7 +79,7 @@ in Ordnung — dann wird es geschätzt und als „Markt nur geschätzt" markiert
 ### Die Gebührenregel
 
 ```js
-const GEBUEHREN_TEILER = { iw: 1.05, bw: 1, b3: 1, st: 1 };
+const GEBUEHREN_TEILER = { iw: 1, bw: 1, b3: 1, st: 1, ad: 1, bt: 1 };
 ```
 
 Nur **Interwetten** gibt die 5 % Gebühr weiter: die angezeigte Quote wird
@@ -328,7 +330,7 @@ ist, baut den Fehler neu ein.
   Verlaufseintrag mehr daran hängt
 - **„Anbieter hat die Wette nicht"** → die **ganze Kombination** wandert
   zum nächsten Anbieter, alle drei Wetten bleiben. Erst wenn keiner der
-  vier sie hat, fliegt die Wette raus. Gemerkt in `kt_nicht_da`.
+  sechs sie hat, fliegt die Wette raus. Gemerkt in `kt_nicht_da`.
 - **Nachrücken**: fällt eine Wette raus, kommt Ersatz — **nur aus
   demselben Ordner** — bis wirklich nichts mehr da ist
   (`ERSATZ_MAX_NUTZUNG = 2`, Notfall 3, weil ein voller Bau jede der 51
@@ -560,7 +562,8 @@ Fassung **`20260902b`**, alles committet und live. Was seit dem 01.09. dazukam:
 ### Mein Bereich
 
 - **Anbieter-Kopf** (`#anbieterkopf`, zeichneAnbieterKopf in mein.js):
-  vier Karten Stake/Interwetten/Bwin/Bet365 mit "drauf", "noch moeglich",
+  sechs Karten Stake/Interwetten/Bwin/Bet365/Admiral/Betway mit "drauf",
+  "noch moeglich",
   Zaehlern. Klick = Filter der Kombi-Liste (anbieterFilter) + komplette
   Uebersicht je Person mit dem "wirklich drauf"-Feld (Korrektur wird als
   stand_anbieter-Buchung gespeichert - so uebersteuert Karam jede Zahl,
@@ -659,7 +662,7 @@ der Kopfleiste (wecker_knopf) ist die eine Stelle dafuer.
   bester gewinnt, Scheine als art "normal". Gemessen: 12 Einsaetze ->
   3 Runden a 4 Kombis, 0 Verstoesse, danach ehrliche
   "ausgemischt"-Meldung ohne Zustandsaenderung.
-- **Anbieter-Blick + Filter** im Kombi-Bau-Panel: vier Karten
+- **Anbieter-Blick + Filter** im Kombi-Bau-Panel: sechs Karten
   (Kombinationen + Einsatz je Anbieter, aus gesetzteEintraege). Klick =
   Anzeige-Filter fuer Gesetzt-Liste und Kombis in Arbeit
   (bauAnbieterFilter, nur im Speicher). Unlesbare bleiben immer
@@ -1137,6 +1140,47 @@ Scheinen. Im Browser mit echten Daten hat es noch niemand gesehen.
 nachgetragen worden.)
 
 ### Weitere offene Punkte
+000000000. Fassung 20260911a: BETWAY als sechster Anbieter (kz "bt").
+   Ueberall nachgezogen: daten.js GEBUEHREN_TEILER; kombis.js
+   KT_ANBIETER_RANG + kurz-Map ("BTW", NICHT "BW" - das ist Bwin);
+   logik.js verfuegbarkeit (fest "D"), standardAnbieter/rangliste,
+   ANBIETER (betway.com/de/sports), ANBIETER_GRUND; mein.js namen/
+   KASSE_ANBIETER/farbe+schrift/BEIDE Schleifen/Anbieterkopf;
+   personkombi.js Fallback; verteiler.js BEIDE Kopien (Teiler,
+   ALLE_ANBIETER, ANBIETER_RANG bt:5, 868er-Liste); kombis.html
+   anbwahl/grenzwahl; stil.css Punkt 21; hilfe.html AGB-Zeile.
+   HAUSFARBE Betway-Gruen #00a826 mit SCHWARZER Schrift #0b1f10,
+   Text auf Weiss #00751f. Bewusst hell: zwei dunkle Gruen (iw, b3)
+   gab es schon, ein drittes waere auf 11px nicht zu unterscheiden.
+   Betway ist jetzt der einzige helle Chip von sechs.
+
+   DABEI GEFUNDEN - drei Fehler, die seit ADMIRAL drin waren und
+   nichts mit Betway zu tun haben:
+   - logik.js Rangfilter stand fest auf [1..4]. Der fuenfte und
+     sechste Anbieter waren im Filter gar nicht auswaehlbar.
+     Baut sich jetzt aus ANBIETER.length.
+   - logik.js baueDetailZeile hatte td.colSpan = 12 fest. Die Tabelle
+     hat 8 feste Spalten PLUS eine je Anbieter, war also seit Admiral
+     zu kurz. Jetzt 8 + ANBIETER.length.
+   - logik.js "x von 4 Quoten getippt": die 4 war fest verdrahtet.
+   - mein.js Kassenbuch-Menue (bu_konto) kannte nur die ersten vier.
+     Auf Admiral oder Betway liess sich keine Einzahlung verbuchen.
+     Kommt jetzt aus KASSE_ANBIETER.
+
+   NOCH OFFEN: logoknopf.js fuehrt Bonus-Links nur fuer st/iw/bw/b3.
+   Admiral und Betway fehlen dort. Bewusst nicht ergaenzt, weil die
+   richtigen Bonus-Adressen nicht bekannt sind und geraten werden
+   muessten. logik.js anbieterName() stuerzt bei einem unbekannten
+   Kuerzel mit TypeError ab (ANBIETER.find(...).name ohne Pruefung).
+
+   MERKE: stil.css steckt ab Zeile 3496 in @media screen - der
+   Marken-Block gehoert dort HINEIN, sonst greift er nie.
+   MERKE: logik.js hat GEMISCHTE Zeilenenden (CRLF und LF in
+   derselben Datei). Mehrzeilige Muster in Patch-Skripten greifen
+   nicht, auch nicht mit blindem 
+. Zeilenweise ganze Zeilen
+   vergleichen, sonst passiert gar nichts und man merkt es nicht.
+
 00000000. Fassung 20260905j: ADMIRAL als fuenfter Anbieter (kz "ad").
    Ueberall nachgezogen (Drift-Gefahr!): daten.js GEBUEHREN_TEILER,
    kombis.js KT_ANBIETER_RANG + kurz-Map, logik.js verfuegbarkeit

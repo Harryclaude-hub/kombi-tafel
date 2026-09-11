@@ -238,7 +238,7 @@ img.minifoto { max-width: 120px; border: 1px solid #999; margin-top: 3px; }
 button.aufloesen { margin-left: 8px; font-size: 12px; padding: 2px 8px;
   border: 1px solid #c8102e; color: #c8102e; background: #fff; cursor: pointer; }
 
-/* ---- Erkennungsmarken der vier Anbieter ----
+/* ---- Erkennungsmarken der sechs Anbieter ----
    Eigene Marken in den bekannten Hausfarben, KEINE fremden Logos. */
 .marke { display: inline-block; padding: 2px 8px; font-size: 11.5px; font-weight: bold;
   letter-spacing: 0.3px; border: 1px solid #000; white-space: nowrap; }
@@ -3285,7 +3285,7 @@ body[data-seite="original"] tr[title] > td:first-child::after {
 }
 
 /* ---- 6. Anbieter IMMER mit Zeichen und Hausfarbe ---- */
-/* Das kleine Zeichen (S, IW, bw, 365) vor jedem Namens-Schild - dieselbe
+/* Das kleine Zeichen (S, IW, bw, 365, AD, BTW) vor jedem Namens-Schild - dieselbe
    Optik wie die .ab-Marken im Kombi-Bau. */
 .marke::before {
   display: inline-block; min-width: 18px; margin-right: 5px; padding: 0 3px;
@@ -3845,6 +3845,25 @@ body[data-seite] .navleiste #nav_profil,
 .s-wo:has(.s-wo-name.m-ad) .s-wo-name { color: #fff; }
 .schein:has(.s-kopf .m-ad):not(:has(.niedrigkopf)) { border-top: 5px solid #8d1b2e; }
 .schein:has(.s-kopf .m-ad) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #8d1b2e 9%, #fff); border-bottom-color: #8d1b2e; }
+
+/* ---- 21. Betway, der sechste Anbieter (11.09.2026): Betway-Gruen
+   #00a826 als Hausfarbe, aber mit SCHWARZER Schrift statt weisser.
+   WARUM SCHWARZ: es gibt schon zwei dunkle Gruen (Interwetten #0a7d3e,
+   Bet365 #14805e). Ein drittes dunkles Gruen waere auf einem 11px-Chip
+   nicht mehr zu unterscheiden. Mit hellem Grund und dunkler Schrift ist
+   Betway der EINZIGE helle Chip von allen sechs und sofort erkennbar.
+   Weisse Schrift auf #00a826 waere zu blass (Kontrast rund 2,8:1).
+   Fuer Text auf weissem Grund (Kartenname) das dunklere #00751f.
+   Sitzt bewusst im selben @media screen wie Admiral. ---- */
+.m-bt { background: #00a826; color: #0b1f10; border-color: #00751f; }
+.ab-bt { background: #00a826; color: #0b1f10; border-color: #00751f; }
+.ak-bt { border-color: #00a826; } .ak-bt .ak-name { color: #00751f; }
+.marke.m-bt::before { content: "BTW"; color: #00751f; }
+.ak-bt .ak-name::before { content: "BTW"; background: #00a826; color: #0b1f10; border-color: #00751f; }
+.s-wo:has(.s-wo-name.m-bt) { background: #00a826; }
+.s-wo:has(.s-wo-name.m-bt) .s-wo-name { color: #0b1f10; }
+.schein:has(.s-kopf .m-bt):not(:has(.niedrigkopf)) { border-top: 5px solid #00a826; }
+.schein:has(.s-kopf .m-bt) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #00a826 12%, #fff); border-bottom-color: #00a826; }
 
 }
 @media print { #fussleiste, #logomenue { display: none !important; } }

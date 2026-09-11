@@ -402,7 +402,7 @@ function liveBester(w, optIdx) {
   return anzahl > 0 ? { kz: bester, echt: wert, anzahl: anzahl } : null;
 }
 
-// Rangliste der vier Anbieter für DIESE Wette, bester zuerst.
+// Rangliste aller Anbieter für DIESE Wette, bester zuerst.
 // Getippte echte Quoten zaehlen zuerst (absteigend); ohne Eingaben entscheidet
 // die Markt-Verfügbarkeit und dann die Standard-Reihenfolge der Recherche.
 function rangliste(w) {
@@ -559,7 +559,11 @@ function baueFilter() {
 
   // 3) Anbieter-Rang
   zeile("rangfilter", "Anbieter-Rang",
-    [[1, "1. Bester"], [2, "2. Zweitbester"], [3, "3. Drittbester"], [4, "4. Viertbester"]]
+    // Waechst mit der Anbieterzahl mit. Stand frueher fest auf 1 bis 4 -
+    // seit Admiral (5.) und Betway (6.) waren die hinteren Raenge nicht waehlbar.
+    ["1. Bester", "2. Zweitbester", "3. Drittbester", "4. Viertbester", "5. Fünftbester",
+     "6. Sechstbester", "7. Siebtbester", "8. Achtbester"]
+      .slice(0, ANBIETER.length).map((name, i) => [i + 1, name])
       .map(([r, name]) => ({ kz: r, text: name,
         titel: "Zeigt für jede Wette den Anbieter auf Platz " + r + " ihrer Rangliste" })),
     e => e.kz === aktiverRang,
@@ -768,7 +772,7 @@ function baueDetailZeile(w) {
   tr.className = "detail";
   tr.id = "d_" + w.id;
   const td = document.createElement("td");
-  td.colSpan = 12;
+  td.colSpan = 8 + ANBIETER.length;   // 8 feste Spalten + eine je Anbieter
 
   const v = verfuegbarkeit(w);
   let anbieterHtml = "";
@@ -795,13 +799,13 @@ function baueDetailZeile(w) {
         ", gesucht am " + r.zeit + ". " + r.notiz +
         ' <a href="' + r.url + '" target="_blank" rel="noopener">Quelle öffnen</a>' +
         "<br><small>Das ist die beste Quote des Quotenvergleichs, NICHT die eines bestimmten " +
-        "der vier Anbieter. Interwetten und Stake sind dort nicht gelistet.</small>";
+        "deiner Anbieter. Interwetten und Stake sind dort nicht gelistet.</small>";
     })() +
     "<br><b>Gegenpruefen bei:</b> " + alternativText(w) +
     "<br><b>Interwetten:</b> die eingetippte Quote zählt ungeteilt - die Gebühr rechnet die Tafel nach dem Setzen aus deinem angesagten Höchstgewinn aus." +
     "<br><b>Vergleich mit einem Klick:</b> <a href=\"" + vergleichsLink(w) + "\" target=\"_blank\" rel=\"noopener\">" +
     "alle Anbieter-Quoten für dieses Spiel suchen</a> (öffnet die Suche nach dem Spiel auf einem Quotenvergleich)" +
-    "<br><b>Die vier Anbieter für diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
+    "<br><b>Deine Anbieter für diese Wette:</b><ul>" + anbieterHtml + "</ul>" +
     "<b>Datenstand dieser Zeile:</b> abgetippt aus dem Foto vom 24.08.2026 (Foto-Quote " + w.o[optIdx][1].toFixed(2) +
     "). Markt-Angaben: Einschätzung vom 24.08.2026, kein Beleg. Angezeigt: " + jetztText() + ".";
   tr.appendChild(td);
@@ -888,7 +892,8 @@ function baueZeile(w) {
   const rangWort = (zu.rang === 1) ? "" : (zu.rang + ". Wahl: ");
   if (zu.quelle === "getippt") {
     td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) + "</b> real " + rund2(zu.echt).toFixed(2) +
-      (zu.anzahl < 4 ? '<div class="real">' + zu.anzahl + " von 4 Quoten getippt</div>" : "");
+      (zu.anzahl < ANBIETER.length ? '<div class="real">' + zu.anzahl +
+        " von " + ANBIETER.length + " Quoten getippt</div>" : "");
   } else {
     td.innerHTML = rangWort + '<b class="gruen">' + anbieterName(zu.kz) +
       '</b><div class="real">' + (zu.rang === 1 ? "Start-Tipp" : "Rang-Vorgabe") + ", KEINE Live-Quote</div>";
