@@ -119,7 +119,7 @@ function nrNaechste() {
 
 // Karams Reihenfolge, an EINER Stelle. Stake zuerst, Bet365 zuletzt.
 // Bwin und Sportingbet sind derselbe Anbieter, deshalb steht dort nur bw.
-const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad"];   // ad = Admiral (NEU 06.09.2026)
+const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad", "bt"];   // ad = Admiral (06.09.2026), bt = Betway (NEU 11.09.2026)
 
 function einstellungenLesen() {
   const anb = [];

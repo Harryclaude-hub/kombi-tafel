@@ -241,7 +241,7 @@ function verfuegbarkeit(w) {
   const v = VERF[marktTyp(w) + "_" + stufe] || ["J","J","J","J"];
   // Admiral (NEU): noch keine Markt-Einschaetzungen je Liga - ehrlich
   // als "D" (Markt duenn, pruefen) statt still "J" zu raten.
-  return { iw: v[0], bw: v[1], b3: v[2], st: v[3], ad: "D" };
+  return { iw: v[0], bw: v[1], b3: v[2], st: v[3], ad: "D", bt: "D" };
 }
 
 // Start-Vorgabe (solange keine Live-Quoten getippt sind):
@@ -250,8 +250,8 @@ function verfuegbarkeit(w) {
 function standardAnbieter(w) {
   const typ = marktTyp(w);
   const rang = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
-    ? ["b3", "st", "bw", "iw", "ad"]     // Spezialmaerkte: Bet365, dann Stake
-    : ["b3", "bw", "st", "iw", "ad"];    // Standardmaerkte; Admiral zuletzt (neu, ungeprueft)
+    ? ["b3", "st", "bw", "iw", "ad", "bt"]     // Spezialmaerkte: Bet365, dann Stake
+    : ["b3", "bw", "st", "iw", "ad", "bt"];    // Standardmaerkte; Admiral und Betway zuletzt (neu, ungeprueft)
   const v = verfuegbarkeit(w);
   for (const kz of rang) if (v[kz] === "J") return kz;
   for (const kz of rang) if (v[kz] === "D") return kz;
@@ -324,7 +324,9 @@ const ANBIETER = [
   { kz: "st", name: "Stake", url: "https://stake.com/de/sports",
     suche: "https://stake.com/de/sports/search?query=%s", direkt: false },
   { kz: "ad", name: "Admiral", url: "https://www.admiral.at/",
-    suche: "https://www.admiral.at/", direkt: false }
+    suche: "https://www.admiral.at/", direkt: false },
+  { kz: "bt", name: "Betway", url: "https://www.betway.com/de/sports",
+    suche: "https://www.betway.com/de/sports", direkt: false }
 ];
 
 // Erster Teamname einer Wette, zum Suchen und Kopieren
@@ -409,7 +411,7 @@ function rangliste(w) {
   const v = verfuegbarkeit(w);
   const typ = marktTyp(w);
   const basis = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
-    ? ["b3", "st", "bw", "iw", "ad"] : ["b3", "bw", "st", "iw", "ad"];
+    ? ["b3", "st", "bw", "iw", "ad", "bt"] : ["b3", "bw", "st", "iw", "ad", "bt"];
   const vw = { J: 2, D: 1, N: 0 };
   const liste = ANBIETER.map(a => {
     let echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
@@ -611,6 +613,7 @@ const ANBIETER_GRUND = {
   iw: "Gebühr: der Schein zahlt ~5 % weniger aus als Einsatz mal Quote. Deine Quote zählt ungeteilt - trag nach dem Setzen den angesagten Höchstgewinn ein, die Differenz ist die Gebühr.",
   bw: "Keine Gebühr (Bwin uebernimmt die 5 % seit Mai 2026 selbst).",
   b3: "Keine Gebühr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
+  bt: "Betway: neu in der Tafel, Märkte und Gebühren noch ungeprüft - vor dem ersten Setzen selbst nachsehen. Die Gebühr rechnest du wie überall über den angesagten Höchstgewinn.",
   ad: "Admiral (Österreich): neu in der Tafel, Märkte und Gebühren noch ungeprüft - vor dem ersten Setzen selbst nachsehen. Die Gebühr rechnest du wie überall über den angesagten Höchstgewinn.",
   st: "Keine Gebühr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
 };

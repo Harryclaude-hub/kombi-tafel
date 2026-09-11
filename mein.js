@@ -15,7 +15,7 @@ let ergSucheTimer = null;   // Selbstsuche fuer Ergebnisse (ergebnisse.js)
 function el(id) { return document.getElementById(id); }
 function rundM(x) { return Math.round(x * 100) / 100; }
 function markeM(kz) {
-  const namen = { iw: "Interwetten", bw: "Bwin", b3: "Bet365", st: "Stake", ad: "Admiral" };
+  const namen = { iw: "Interwetten", bw: "Bwin", b3: "Bet365", st: "Stake", ad: "Admiral", bt: "Betway" };
   return '<span class="marke m-' + kz + '">' + (namen[kz] || kz) + "</span>";
 }
 function meldungM(text, art) {
@@ -1304,7 +1304,7 @@ let personDatenKarte = {};   // ordnerId -> entschluesseltes Personendaten-Objek
 const KASSE_WEGE = [["paypal", "PayPal"], ["paysafe", "Paysafe"], ["neteller", "Neteller"], ["skrill", "Skrill"]];
 const KASSE_ARTEN = [["erhalten", "auf den Weg erhalten"], ["zum_anbieter", "zum Anbieter eingezahlt"],
   ["vom_anbieter", "vom Anbieter zurück"], ["ausgezahlt", "auf eigenes Konto ausgezahlt (raus)"]];
-const KASSE_ANBIETER = [["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"], ["st", "Stake"], ["ad", "Admiral"]];
+const KASSE_ANBIETER = [["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"], ["st", "Stake"], ["ad", "Admiral"], ["bt", "Betway"]];
 
 function wegName(w) { const x = KASSE_WEGE.find(k => k[0] === w); return x ? x[1] : w; }
 function artName(a) { const x = KASSE_ARTEN.find(k => k[0] === a); return x ? x[1] : a; }
@@ -1570,7 +1570,7 @@ function pkRechnerHtml(personId, p, zg) {
   let h = '<div class="pk-rechner"><b>&#129518; Schnell-Rechner:</b> ' +
     '<span class="mini">aktuellen Stand beim Anbieter eintippen, der Gewinn rechnet sich sofort. Bucht nichts.</span>' +
     "<table><thead><tr><th>Anbieter</th><th>rein</th><th>raus</th><th>aktuell drauf</th><th>Gewinn</th></tr></thead><tbody>";
-  for (const kz of ["iw", "bw", "b3", "st", "ad"]) {
+  for (const kz of ["iw", "bw", "b3", "st", "ad", "bt"]) {
     if (zg.anbieter[kz] === false) continue;
     const a = p.anbieter[kz];
     let merk = "";
@@ -1687,7 +1687,7 @@ function zeichnePersonenKasse(scheine) {
       "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>gewonnen</th>" +
       "<th>fertig</th><th>Ergebnis ab</th><th>liegt dort</th>" +
       (schreib ? "<th>wirklich drauf</th>" : "") + "</tr></thead><tbody>";
-    for (const kz of ["iw", "bw", "b3", "st", "ad"]) {
+    for (const kz of ["iw", "bw", "b3", "st", "ad", "bt"]) {
       if (zg.anbieter[kz] === false) continue;
       const a = p.anbieter[kz];
       html += "<tr><td>" + markeM(kz) + korrekturMarke(a.korrektur) + "</td><td>" + a.einge.toFixed(2) + " &euro;</td>" +
@@ -4299,7 +4299,7 @@ function zeichneAnbieterKopf() {
     '<span class="ak-zeile mini">Filter aus</span></button>';
   // Karams Reihenfolge (KT_ANBIETER_RANG steht in kombis.js, das diese
   // Seite nicht laedt - deshalb hier dieselbe Folge ausgeschrieben).
-  for (const [kz, name] of ["st", "iw", "bw", "b3", "ad"].map(k => KASSE_ANBIETER.find(x => x[0] === k))) {
+  for (const [kz, name] of ["st", "iw", "bw", "b3", "ad", "bt"].map(k => KASSE_ANBIETER.find(x => x[0] === k))) {
     const a = summe[kz];
     html += '<button class="ak-karte ak-' + kz + (anbieterFilter === kz ? " ak-aktiv" : "") +
       '" onclick="tuAnbieterFilter(\'' + kz + '\')">' +
