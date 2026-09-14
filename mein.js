@@ -50,6 +50,14 @@ async function startMein() {
   if (!nutzer) { zeigeAnmeldung(); return; }
   if (!profil) { zeigeUsernameWahl(); return; }
   ich = profil;
+  // Der Kombi-Bau verlinkt "bei <Person>" hierher: ?person=<ordnerId>
+  // oder ?person=ohne. Dann ist die Liste beim Ankommen schon auf diese
+  // Person gefiltert (15.09.2026). Eine unbekannte Kennung faellt in
+  // zeichneBereich von selbst auf "alle" zurueck.
+  try {
+    const p = new URLSearchParams(location.search).get("person");
+    if (p) ordnerFilter = p;
+  } catch (e) { /* dann eben ungefiltert */ }
   await zeigeApp();
 }
 

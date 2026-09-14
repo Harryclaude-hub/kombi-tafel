@@ -3982,3 +3982,25 @@ body[data-seite] .navleiste #nav_profil,
   .s-fuss .gebuehr { order: 4; flex-basis: 100%; margin-left: 0; }
 }
 /* ---- ENDE SCHEIN-FUSS ZWEI ZEILEN ---- */
+
+/* ---- "bei <Person>": der Klick-Chip hinter dem Verlauf-Knopf (loeschbar) ---- */
+/* Karam (15.09.2026): sichtbar, direkt hinter "in den Verlauf", anklickbar. */
+.s-fuss a.s-person, .s-drin a.s-person, .s-wer a.s-person {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: 999px; text-decoration: none;
+  background: #1a7a1a; color: #fff; font-weight: bold; font-size: 12.5px;
+  border: 1px solid #145c14; min-height: 30px; box-sizing: border-box;
+}
+.s-fuss a.s-person b, .s-drin a.s-person b, .s-wer a.s-person b { color: #fff; }
+.s-fuss a.s-person:hover, .s-wer a.s-person:hover { background: #145c14; }
+a.s-person.s-person-fehlt { background: #b7791f; border-color: #8a5a12; }
+a.s-person.s-person-fehlt:hover { background: #8a5a12; }
+/* Im Kopf-Merker und in der Fusszeile kleiner, damit die Zeile nicht springt. */
+.s-drin a.s-person, .s-wer a.s-person { min-height: 22px; padding: 2px 9px; font-size: 12px; }
+/* Im Knopf-Feld: direkt hinter "in den Verlauf" (gleiche Ordnung 10). */
+.s-fuss a.s-person { order: 10; }
+/* Halber Bildschirm: der Chip bekommt zwischen den beiden Knopfreihen
+   eine eigene volle Zeile - gross, nicht zu uebersehen. */
+@media (max-width: 1100px) {
+  .s-fuss a.s-person { order: 15; flex-basis: 100%; justify-content: center; }
+}

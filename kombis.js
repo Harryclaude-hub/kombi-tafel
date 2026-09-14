@@ -1152,9 +1152,7 @@ function scheinHtml(s, z, gesetzt) {
         // an der Kombination stehen, nicht nur in Mein Bereich. Fehlt die
         // Person, wird das ausdruecklich gesagt - eine Kombination ohne
         // Person faellt in der Abrechnung sonst durch.
-        (personName(imVerlauf.ordner)
-          ? ' &middot; bei <b>' + textSicher(personName(imVerlauf.ordner)) + '</b>'
-          : (imVerlauf.woher === "konto" ? ' &middot; <b>ohne Person</b>' : '')) + '</span>'
+        (imVerlauf.woher === "konto" ? ' &middot; ' + personLinkHtml(imVerlauf) : '') + '</span>'
       : "") +
     (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
     (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
@@ -1191,6 +1189,9 @@ function scheinHtml(s, z, gesetzt) {
       '<button class="merken' + (imVerlauf ? ' schonda' : '') + '" ' +
         'onclick="scheinMerken(\'' + s.id + '\')">' +
         (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
+      // Karam (15.09.2026): "gleich hinter dem Verlauf-Knopf muss stehen,
+      // bei welcher Person sie ist - und draufklicken bringt mich hin."
+      (imVerlauf ? personLinkHtml(imVerlauf) : "") +
       // Karam (14.09.2026): der Weg zurueck stand bisher nur im Panel.
       // Wer hier speichert, muss es auch hier wieder zuruecknehmen
       // koennen - dieselbe gepruefte Loeschung wie im Panel, mit
@@ -1217,11 +1218,9 @@ function scheinHtml(s, z, gesetzt) {
     (imVerlauf
       ? '<div class="s-wer mini">&#10003; Gespeichert' +
         (imVerlauf.nummer ? ' als <b>Nr. ' + imVerlauf.nummer + '</b>' : '') +
-        (personName(imVerlauf.ordner)
-          ? ' bei <b>' + textSicher(personName(imVerlauf.ordner)) + '</b>'
-          : (imVerlauf.woher === "konto"
-            ? ' <b>ohne Person</b> - in <a href="mein.html">Mein Bereich</a> zuordnen'
-            : ' auf diesem Gerät (kein Konto)')) +
+        (imVerlauf.woher === "konto"
+          ? ' ' + personLinkHtml(imVerlauf, true)
+          : ' auf diesem Gerät (kein Konto)') +
         (imVerlauf.einsatz ? ', Einsatz ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') +
         "</div>"
       : "") +
@@ -3425,6 +3424,25 @@ function personName(ordnerId) {
   if (!ordnerId) return "";
   const o = kontoOrdner.find(x => x.id === ordnerId);
   return o ? String(o.name || "") : "";
+}
+
+// "Bei WEM liegt diese Kombination" - als Link nach Mein Bereich,
+// dort schon auf die Person gefiltert (mein.js liest ?person=...).
+// Karam (15.09.2026): "ich will draufklicken und dann komm ich auf die
+// Person, bei der ich es gespeichert hab."
+// Ist der Name noch nicht geladen, steht "Person" - NIE "ohne Person",
+// solange eine zugeordnet ist. Das waere eine falsche Warnung.
+function personLinkHtml(e, lang) {
+  if (!e || e.woher !== "konto") return "";
+  if (e.ordner) {
+    const name = personName(e.ordner) || "Person";
+    return '<a class="s-person" href="mein.html?person=' + encodeURIComponent(e.ordner) +
+      '" title="Zu ' + textSicher(name) + ' in Mein Bereich">&#128100; bei <b>' +
+      textSicher(name) + '</b></a>';
+  }
+  return '<a class="s-person s-person-fehlt" href="mein.html?person=ohne" ' +
+    'title="Diese Kombination hat keine Person - in Mein Bereich zuordnen">&#9888; ohne Person' +
+    (lang ? ' - jetzt zuordnen' : '') + '</a>';
 }
 
 // Laeuft schon eines? Dann auf DAS warten, statt still nichts zu tun.
