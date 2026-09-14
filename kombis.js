@@ -761,26 +761,108 @@ function fotoName(scheinId) {
 function fotoAusCanvas(c, scheinId, herkunft) {
   const name = fotoName(scheinId);
   let daten = c.toDataURL("image/jpeg", 0.82);
-  for (let versuch = 0; versuch < 4; versuch++) {
-    try {
-      localStorage.setItem(fotoSchluessel(scheinId), daten);
-      localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
-      localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
-      meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
-        Math.round(daten.length / 1024) + " KB).", "gut");
+  let aufgeraeumt = -1;
+  for (let versuch = 0; versuch < 5; versuch++) {
+    if (fotoInSpeicher(scheinId, daten, name)) {
+      // ERST zeichnen, DANN melden: zeichne_ schreibt selbst in denselben
+      // Meldungskasten (archivierte Wetten) und wuerde die Bestaetigung
+      // sofort wieder ueberschreiben - dann sieht es aus, als sei nichts
+      // passiert (14.09.2026, dieselbe Falle wie bei verlaufEintragLoeschen).
       zeichne_();
+      meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
+        Math.round(daten.length / 1024) + " KB)." +
+        (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
+          "deren Kombination es nicht mehr gibt." : "") + bilderSpeicherText(), "gut");
       return true;
-    } catch (err) {
-      const k = document.createElement("canvas");
-      k.width = Math.max(1, Math.round(c.width * 0.75));
-      k.height = Math.max(1, Math.round(c.height * 0.75));
-      k.getContext("2d").drawImage(c, 0, 0, k.width, k.height);
-      c = k;
-      daten = c.toDataURL("image/jpeg", 0.7);
     }
+    // Zuerst Platz schaffen, erst dann das Bild schlechter machen:
+    // ein unleserlicher Wettschein nuetzt niemandem.
+    if (aufgeraeumt < 0) {
+      aufgeraeumt = bilderVerwaisteWeg();
+      if (aufgeraeumt > 0) continue;
+    }
+    const k = document.createElement("canvas");
+    k.width = Math.max(1, Math.round(c.width * 0.75));
+    k.height = Math.max(1, Math.round(c.height * 0.75));
+    k.getContext("2d").drawImage(c, 0, 0, k.width, k.height);
+    c = k;
+    daten = c.toDataURL("image/jpeg", 0.7);
   }
-  meldung("Das Bild passt nicht in den Speicher. Lösch ältere Bilder oder nimm einen kleineren Ausschnitt.", "warn");
+  meldung("Das Bild passt <b>nicht</b> in den Speicher und wurde NICHT gespeichert - " +
+    "deshalb steht es auch nicht unter der Kombination. Lösch ältere Bilder " +
+    '("Foto weg" unter einer Kombination) oder nimm einen kleineren Ausschnitt.' +
+    bilderSpeicherText(), "warn");
   return false;
+}
+
+// Bild, Zeit und Name gehoeren zusammen. Passt eines nicht mehr in den
+// Speicher, wird auch der Rest wieder weggeraeumt - ein halb geschriebenes
+// Bild wuerde sonst Platz fressen, ohne je angezeigt zu werden.
+function fotoInSpeicher(scheinId, daten, name) {
+  try {
+    localStorage.setItem(fotoSchluessel(scheinId), daten);
+    localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
+    localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
+    return true;
+  } catch (e) {
+    try {
+      localStorage.removeItem(fotoSchluessel(scheinId));
+      localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
+      localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
+    } catch (e2) { /* dann eben nicht */ }
+    return false;
+  }
+}
+
+// PLATZ SCHAFFEN, OHNE ETWAS SICHTBARES WEGZUWERFEN (14.09.2026).
+// Karam: das erste Bild war da, das zweite nicht mehr. Der Browser gibt
+// fuer den ganzen Speicher nur rund 5 MB her, und die Scheinbilder von
+// gestern und vorgestern blieben bisher ewig liegen. Weg kommen nur
+// Bilder, deren Kombination es im aktuellen Zustand gar nicht mehr gibt:
+// die kann ohnehin niemand mehr sehen, denn ihre Karte ist weg. Wurde die
+// Kombination gespeichert, liegt ihr Bild ausserdem im Konto
+// (baueVerlaufsEintrag gibt es mit). Im Zweifel wird nichts angefasst.
+function bilderVerwaisteWeg() {
+  let z = null;
+  try { z = liesZustand(); } catch (e) { z = null; }
+  if (!z || !Array.isArray(z.scheine) || !z.scheine.length) return 0;
+  const da = new Set(z.scheine.map(s => s.id));
+  const weg = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf("foto_") !== 0) continue;
+      if (k.indexOf("foto_analyse_") === 0 || /_zeit$|_name$/.test(k)) continue;
+      const id = k.slice(5);
+      if (!da.has(id)) weg.push(id);
+    }
+    for (const id of weg) {
+      localStorage.removeItem("foto_" + id);
+      localStorage.removeItem("foto_" + id + "_zeit");
+      localStorage.removeItem("foto_" + id + "_name");
+      localStorage.removeItem("foto_analyse_" + id);
+    }
+  } catch (e) { /* was weg ist, ist weg - der Rest bleibt */ }
+  return weg.length;
+}
+
+// Wieviel Platz die Scheinfotos auf diesem Geraet schon belegen. Steht in
+// den Meldungen, damit "der Screenshot ist nicht da" nicht geraten werden
+// muss: ein volles Geraet sagt es dann selbst.
+function bilderSpeicherText() {
+  try {
+    let zahl = 0, zeichen = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf("foto_") !== 0) continue;
+      if (k.indexOf("foto_analyse_") === 0 || /_zeit$|_name$/.test(k)) continue;
+      zahl++;
+      zeichen += (localStorage.getItem(k) || "").length;
+    }
+    if (!zahl) return "";
+    return " Auf diesem Gerät liegen " + zahl + " Scheinbilder, zusammen rund " +
+      (zeichen / 1024 / 1024).toFixed(1) + " MB (der Browser gibt etwa 5 MB her).";
+  } catch (e) { return ""; }
 }
 
 // Dateiname zum Herunterladen (ohne Leerzeichen)
@@ -803,16 +885,28 @@ function fotoHochladen(scheinId, input) {
       c.height = Math.round(bild.height * faktor);
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
       const daten = c.toDataURL("image/jpeg", 0.7);
-      try {
-        const name = fotoName(scheinId);
-        localStorage.setItem(fotoSchluessel(scheinId), daten);
-        localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
-        localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
-        meldung("Foto gespeichert und benannt: <b>" + name + "</b> (" +
-          Math.round(daten.length / 1024) + " KB).", "gut");
+      const name = fotoName(scheinId);
+      // Beim ersten Fehlschlag Platz schaffen und genau einmal nachlegen -
+      // derselbe Weg wie beim Bildschirm-Ausschnitt.
+      let aufgeraeumt = 0;
+      let gespeichert = fotoInSpeicher(scheinId, daten, name);
+      if (!gespeichert) {
+        aufgeraeumt = bilderVerwaisteWeg();
+        if (aufgeraeumt > 0) gespeichert = fotoInSpeicher(scheinId, daten, name);
+      }
+      if (gespeichert) {
+        // Erst zeichnen, dann melden - sonst wischt zeichne_ die
+        // Bestaetigung gleich wieder weg (siehe fotoAusCanvas).
         zeichne_();
-      } catch (err) {
-        meldung("Foto zu gross für den Speicher. Lösch aeltere Fotos oder mach einen Ausschnitt.", "warn");
+        meldung("Foto gespeichert und benannt: <b>" + name + "</b> (" +
+          Math.round(daten.length / 1024) + " KB)." +
+          (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
+            "deren Kombination es nicht mehr gibt." : "") + bilderSpeicherText(), "gut");
+      } else {
+        meldung("Das Foto passt <b>nicht</b> in den Speicher und wurde NICHT gespeichert - " +
+          "deshalb steht es auch nicht unter der Kombination. Lösch ältere Fotos " +
+          '("Foto weg" unter einer Kombination) oder nimm den Bildschirm-Ausschnitt.' +
+          bilderSpeicherText(), "warn");
       }
     };
     bild.src = ev.target.result;
