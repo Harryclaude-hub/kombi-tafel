@@ -1147,7 +1147,14 @@ function scheinHtml(s, z, gesetzt) {
     (imVerlauf
       ? ' <span class="s-drin" title="Diese Kombination ist gespeichert - du findest sie in Mein Bereich.">' +
         '&#10003; im Verlauf' + (imVerlauf.nummer ? ' als Nr. ' + imVerlauf.nummer : '') +
-        (imVerlauf.einsatz ? ', ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') + '</span>'
+        (imVerlauf.einsatz ? ', ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') +
+        // Karam (14.09.2026): "bei wem hab ich das gespeichert?" Das muss
+        // an der Kombination stehen, nicht nur in Mein Bereich. Fehlt die
+        // Person, wird das ausdruecklich gesagt - eine Kombination ohne
+        // Person faellt in der Abrechnung sonst durch.
+        (personName(imVerlauf.ordner)
+          ? ' &middot; bei <b>' + textSicher(personName(imVerlauf.ordner)) + '</b>'
+          : (imVerlauf.woher === "konto" ? ' &middot; <b>ohne Person</b>' : '')) + '</span>'
       : "") +
     (s.art === "eigen" ? ' <span class="s-warn">selbst gebaut</span>' : "") +
     (s.teil ? ' <span class="s-warn">Teil ' + s.teil +
@@ -1204,6 +1211,20 @@ function scheinHtml(s, z, gesetzt) {
         'title="Schneidet einen Bereich direkt vom Bildschirm aus - ohne Umweg über eine Datei auf dem Laptop.">' +
         "&#9986; Bildschirm-Ausschnitt</button>" +
     "</div>" +
+    // Ganz unten an der Karte noch einmal im Klartext: bei WEM liegt diese
+    // Kombination? Karam (14.09.2026) liest genau hier nach, wenn er den
+    // Schein in der Hand hat - oben im Kopf ist es ihm zu weit weg.
+    (imVerlauf
+      ? '<div class="s-wer mini">&#10003; Gespeichert' +
+        (imVerlauf.nummer ? ' als <b>Nr. ' + imVerlauf.nummer + '</b>' : '') +
+        (personName(imVerlauf.ordner)
+          ? ' bei <b>' + textSicher(personName(imVerlauf.ordner)) + '</b>'
+          : (imVerlauf.woher === "konto"
+            ? ' <b>ohne Person</b> - in <a href="mein.html">Mein Bereich</a> zuordnen'
+            : ' auf diesem Gerät (kein Konto)')) +
+        (imVerlauf.einsatz ? ', Einsatz ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') +
+        "</div>"
+      : "") +
     '<div class="zielzeile" id="ziel_' + s.id + '">' + gruppenText(z, s.nr) + "</div>" +
     '<div class="ordnerwahl" id="ordnerwahl_' + s.id + '"></div>' +
     (foto ? (function () {
