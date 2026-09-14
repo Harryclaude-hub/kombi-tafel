@@ -721,6 +721,11 @@ const scheinFotoCache = {};      // scheinId -> {foto, name}
 const scheinFotoVersucht = {};   // scheinId -> true: nur EIN Anlauf je Karte
 
 function fotoFuerKarte(scheinId, imVerlauf) {
+  // 1. Was schon im Arbeitsspeicher liegt, ist sofort da.
+  const c = scheinFotoCache[scheinId];
+  if (c && c.foto) return { foto: c.foto, name: c.name, zeit: c.zeit || null, ausDb: !!c.ausDb };
+  // 2. Alter Bestand im localStorage, falls der Umzug ins Bildlager
+  //    gerade noch laeuft. Danach gibt es dort nichts mehr.
   const lokal = localStorage.getItem(fotoSchluessel(scheinId));
   if (lokal) {
     return { foto: lokal,
@@ -728,19 +733,42 @@ function fotoFuerKarte(scheinId, imVerlauf) {
       zeit: localStorage.getItem(fotoSchluessel(scheinId) + "_zeit"),
       ausDb: false };
   }
-  const c = scheinFotoCache[scheinId];
-  if (c) return { foto: c.foto, name: c.name, zeit: c.zeit || null, ausDb: true };
-  // Nichts da: einmal aus der Datenbank holen und danach neu zeichnen.
-  // scheinFotoVersucht verhindert, dass ein Fehlschlag bei jedem
-  // Zeichnen eine neue Abfrage ausloest.
-  if (imVerlauf && imVerlauf.dbId && !scheinFotoVersucht[scheinId] &&
-      typeof supaScheinFotoHolen === "function") {
+  // 3. Sonst einmal nachsehen: erst im Bildlager (IndexedDB), dann in
+  //    der Datenbank. scheinFotoVersucht sorgt dafuer, dass ein
+  //    Fehlschlag nicht bei jedem Zeichnen neu abgefragt wird.
+  if (!scheinFotoVersucht[scheinId]) {
     scheinFotoVersucht[scheinId] = true;
-    supaScheinFotoHolen(imVerlauf.dbId).then(r => {
-      if (r && r.foto) { scheinFotoCache[scheinId] = r; zeichne_(); }
-    }).catch(() => { /* dann eben kein Bild - die Kombination zaehlt trotzdem */ });
+    (async () => {
+      let satz = (typeof bildLagerHolen === "function") ? await bildLagerHolen(scheinId) : null;
+      if ((!satz || !satz.foto) && imVerlauf && imVerlauf.dbId &&
+          typeof supaScheinFotoHolen === "function") {
+        const r = await supaScheinFotoHolen(imVerlauf.dbId);
+        if (r && r.foto) {
+          satz = { foto: r.foto, name: r.name, zeit: null, ausDb: true };
+          // Einmal geholt, bleibt es oertlich liegen - im Bildlager,
+          // nicht im localStorage.
+          if (typeof bildLagerSetzen === "function") await bildLagerSetzen(scheinId, satz);
+        }
+      }
+      if (satz && satz.foto) {
+        scheinFotoCache[scheinId] = satz;
+        neuZeichnenSicher();
+      }
+    })().catch(() => { /* dann eben kein Bild - die Kombination zaehlt trotzdem */ });
   }
   return null;
+}
+
+// Ein Bild ablegen: sofort sichtbar (Arbeitsspeicher) und dauerhaft
+// (Bildlager). Der localStorage wird dafuer NICHT mehr angefasst - er
+// muss frei bleiben, sonst kann sich Karam nicht mehr einloggen.
+async function fotoAblegen(scheinId, daten, name) {
+  const satz = { foto: daten, name: name || "Wettschein", zeit: new Date().toISOString() };
+  scheinFotoCache[scheinId] = satz;
+  scheinFotoVersucht[scheinId] = true;
+  if (typeof bildLagerSetzen !== "function") return false;
+  try { return await bildLagerSetzen(scheinId, satz); }
+  catch (e) { return false; }
 }
 
 // Kurzform eines Spielnamens fuer den Bildnamen:
@@ -790,114 +818,31 @@ function fotoName(scheinId) {
 }
 
 // Ein fertiges Bild (Ausschnitt oder Foto) dem Schein zuordnen.
-// Passt es nicht in den Speicher, wird es schrittweise kleiner gerechnet,
-// statt mit einem Fehler abzubrechen.
-function fotoAusCanvas(c, scheinId, herkunft) {
+// Es geht ins Bildlager (IndexedDB), NICHT mehr in den localStorage:
+// der muss frei bleiben, sonst kann die Anmeldung nicht geschrieben
+// werden und das Einloggen scheitert (siehe bildlager.js).
+// Verkleinert wird deshalb auch nichts mehr - der Wettschein bleibt
+// scharf, im Bildlager ist Platz.
+async function fotoAusCanvas(c, scheinId, herkunft) {
   const name = fotoName(scheinId);
-  let daten = c.toDataURL("image/jpeg", 0.82);
-  let aufgeraeumt = -1;
-  for (let versuch = 0; versuch < 5; versuch++) {
-    if (fotoInSpeicher(scheinId, daten, name)) {
-      // ERST zeichnen, DANN melden: zeichne_ schreibt selbst in denselben
-      // Meldungskasten (archivierte Wetten) und wuerde die Bestaetigung
-      // sofort wieder ueberschreiben - dann sieht es aus, als sei nichts
-      // passiert (14.09.2026, dieselbe Falle wie bei verlaufEintragLoeschen).
-      // Scheitert das Zeichnen, kommt die Bestaetigung trotzdem.
-      neuZeichnenSicher();
-      meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
-        Math.round(daten.length / 1024) + " KB)." +
-        (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
-          "deren Kombination es nicht mehr gibt." : "") + bilderSpeicherText(), "gut");
-      return true;
-    }
-    // Zuerst Platz schaffen, erst dann das Bild schlechter machen:
-    // ein unleserlicher Wettschein nuetzt niemandem.
-    if (aufgeraeumt < 0) {
-      aufgeraeumt = bilderVerwaisteWeg();
-      if (aufgeraeumt > 0) continue;
-    }
-    const k = document.createElement("canvas");
-    k.width = Math.max(1, Math.round(c.width * 0.75));
-    k.height = Math.max(1, Math.round(c.height * 0.75));
-    k.getContext("2d").drawImage(c, 0, 0, k.width, k.height);
-    c = k;
-    daten = c.toDataURL("image/jpeg", 0.7);
-  }
-  meldung("Das Bild passt <b>nicht</b> in den Speicher und wurde NICHT gespeichert - " +
-    "deshalb steht es auch nicht unter der Kombination. Lösch ältere Bilder " +
-    '("Foto weg" unter einer Kombination) oder nimm einen kleineren Ausschnitt.' +
-    bilderSpeicherText(), "warn");
-  return false;
-}
-
-// Bild, Zeit und Name gehoeren zusammen. Passt eines nicht mehr in den
-// Speicher, wird auch der Rest wieder weggeraeumt - ein halb geschriebenes
-// Bild wuerde sonst Platz fressen, ohne je angezeigt zu werden.
-function fotoInSpeicher(scheinId, daten, name) {
-  try {
-    localStorage.setItem(fotoSchluessel(scheinId), daten);
-    localStorage.setItem(fotoSchluessel(scheinId) + "_zeit", new Date().toISOString());
-    localStorage.setItem(fotoSchluessel(scheinId) + "_name", name);
-    return true;
-  } catch (e) {
-    try {
-      localStorage.removeItem(fotoSchluessel(scheinId));
-      localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
-      localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
-    } catch (e2) { /* dann eben nicht */ }
+  const daten = c.toDataURL("image/jpeg", 0.82);
+  const ok = await fotoAblegen(scheinId, daten, name);
+  if (!ok) {
+    meldung("Das Bild konnte <b>nicht</b> abgelegt werden und steht deshalb auch nicht " +
+      "unter der Kombination. Melde dich, das darf nicht passieren.", "warn");
     return false;
   }
-}
-
-// PLATZ SCHAFFEN, OHNE ETWAS SICHTBARES WEGZUWERFEN (14.09.2026).
-// Karam: das erste Bild war da, das zweite nicht mehr. Der Browser gibt
-// fuer den ganzen Speicher nur rund 5 MB her, und die Scheinbilder von
-// gestern und vorgestern blieben bisher ewig liegen. Weg kommen nur
-// Bilder, deren Kombination es im aktuellen Zustand gar nicht mehr gibt:
-// die kann ohnehin niemand mehr sehen, denn ihre Karte ist weg. Wurde die
-// Kombination gespeichert, liegt ihr Bild ausserdem im Konto
-// (baueVerlaufsEintrag gibt es mit). Im Zweifel wird nichts angefasst.
-function bilderVerwaisteWeg() {
-  let z = null;
-  try { z = liesZustand(); } catch (e) { z = null; }
-  if (!z || !Array.isArray(z.scheine) || !z.scheine.length) return 0;
-  const da = new Set(z.scheine.map(s => s.id));
-  const weg = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || k.indexOf("foto_") !== 0) continue;
-      if (k.indexOf("foto_analyse_") === 0 || /_zeit$|_name$/.test(k)) continue;
-      const id = k.slice(5);
-      if (!da.has(id)) weg.push(id);
-    }
-    for (const id of weg) {
-      localStorage.removeItem("foto_" + id);
-      localStorage.removeItem("foto_" + id + "_zeit");
-      localStorage.removeItem("foto_" + id + "_name");
-      localStorage.removeItem("foto_analyse_" + id);
-    }
-  } catch (e) { /* was weg ist, ist weg - der Rest bleibt */ }
-  return weg.length;
-}
-
-// Wieviel Platz die Scheinfotos auf diesem Geraet schon belegen. Steht in
-// den Meldungen, damit "der Screenshot ist nicht da" nicht geraten werden
-// muss: ein volles Geraet sagt es dann selbst.
-function bilderSpeicherText() {
-  try {
-    let zahl = 0, zeichen = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || k.indexOf("foto_") !== 0) continue;
-      if (k.indexOf("foto_analyse_") === 0 || /_zeit$|_name$/.test(k)) continue;
-      zahl++;
-      zeichen += (localStorage.getItem(k) || "").length;
-    }
-    if (!zahl) return "";
-    return " Auf diesem Gerät liegen " + zahl + " Scheinbilder, zusammen rund " +
-      (zeichen / 1024 / 1024).toFixed(1) + " MB (der Browser gibt etwa 5 MB her).";
-  } catch (e) { return ""; }
+  // ERST zeichnen, DANN melden: zeichne_ schreibt selbst in denselben
+  // Meldungskasten (archivierte Wetten) und wuerde die Bestaetigung
+  // sofort wieder ueberschreiben - dann sieht es aus, als sei nichts
+  // passiert (14.09.2026, dieselbe Falle wie bei verlaufEintragLoeschen).
+  // Scheitert das Zeichnen, kommt die Bestaetigung trotzdem.
+  neuZeichnenSicher();
+  meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
+    Math.round(daten.length / 1024) + " KB). Es liegt im Bildlager dieses Browsers " +
+    'und wandert in die Datenbank, sobald die Kombination in den Verlauf kommt. ' +
+    '<a href="bilder.html"><b>Alle Bilder ansehen</b></a>', "gut");
+  return true;
 }
 
 // Dateiname zum Herunterladen (ohne Leerzeichen)
@@ -933,26 +878,21 @@ function fotoHochladen(scheinId, input) {
         "). Das passiert vor allem bei <b>HEIC</b> vom iPhone. Nimm einen " +
         "normalen Screenshot als JPG oder PNG, oder den <b>Bildschirm-Ausschnitt</b>.", "warn");
     };
-    bild.onload = () => {
+    bild.onload = async () => {
       feldLeeren();
       try {
-      // Verkleinern, damit es in den Speicher passt
-      const maxB = 700;
+      // Im Bildlager ist Platz, also bleibt der Schein lesbar: 1400 statt
+      // der frueheren 700 Punkte. Frueher musste hier kleingerechnet
+      // werden, weil alles in den 5-MB-localStorage sollte.
+      const maxB = 1400;
       const faktor = Math.min(1, maxB / bild.width);
       const c = document.createElement("canvas");
       c.width = Math.round(bild.width * faktor);
       c.height = Math.round(bild.height * faktor);
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
-      const daten = c.toDataURL("image/jpeg", 0.7);
+      const daten = c.toDataURL("image/jpeg", 0.82);
       const name = fotoName(scheinId);
-      // Beim ersten Fehlschlag Platz schaffen und genau einmal nachlegen -
-      // derselbe Weg wie beim Bildschirm-Ausschnitt.
-      let aufgeraeumt = 0;
-      let gespeichert = fotoInSpeicher(scheinId, daten, name);
-      if (!gespeichert) {
-        aufgeraeumt = bilderVerwaisteWeg();
-        if (aufgeraeumt > 0) gespeichert = fotoInSpeicher(scheinId, daten, name);
-      }
+      const gespeichert = await fotoAblegen(scheinId, daten, name);
       if (gespeichert) {
         // Erst zeichnen, dann melden - sonst wischt zeichne_ die
         // Bestaetigung gleich wieder weg (siehe fotoAusCanvas). Scheitert
@@ -960,14 +900,12 @@ function fotoHochladen(scheinId, input) {
         // das Bild IST gespeichert, und Karam muss das sehen.
         neuZeichnenSicher();
         meldung("Foto gespeichert und benannt: <b>" + name + "</b> (" +
-          Math.round(daten.length / 1024) + " KB)." +
-          (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
-            "deren Kombination es nicht mehr gibt." : "") + bilderSpeicherText(), "gut");
+          Math.round(daten.length / 1024) + " KB). Es liegt im Bildlager dieses " +
+          "Browsers und wandert in die Datenbank, sobald die Kombination in den " +
+          'Verlauf kommt. <a href="bilder.html"><b>Alle Bilder ansehen</b></a>', "gut");
       } else {
-        meldung("Das Foto passt <b>nicht</b> in den Speicher und wurde NICHT gespeichert - " +
-          "deshalb steht es auch nicht unter der Kombination. Lösch ältere Fotos " +
-          '("Foto weg" unter einer Kombination) oder nimm den Bildschirm-Ausschnitt.' +
-          bilderSpeicherText(), "warn");
+        meldung("Das Foto konnte <b>nicht</b> abgelegt werden und steht deshalb auch " +
+          "nicht unter der Kombination. Melde dich, das darf nicht passieren.", "warn");
       }
       } catch (e) {
         meldung("Das Foto konnte nicht verarbeitet werden: " +
@@ -997,11 +935,12 @@ function fotoLoeschen(scheinId) {
   localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
   localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
   localStorage.removeItem("foto_analyse_" + scheinId);
-  // Liegt das Bild (auch) in der Datenbank, muss es DORT weg - sonst
-  // kaeme es beim naechsten Zeichnen einfach wieder. Die Kombination
-  // selbst bleibt, nur ihr Bild faellt weg.
+  // Das Bild liegt an bis zu drei Stellen: Arbeitsspeicher, Bildlager
+  // und Datenbank. Es muss ueberall weg, sonst kaeme es beim naechsten
+  // Zeichnen einfach wieder. Die Kombination selbst bleibt.
   delete scheinFotoCache[scheinId];
   scheinFotoVersucht[scheinId] = true;
+  if (typeof bildLagerWeg === "function") bildLagerWeg(scheinId).catch(() => { });
   const drin = schonGesetzt(scheinId);
   if (drin && drin.dbId && typeof supaScheinFotoLoeschen === "function") {
     supaScheinFotoLoeschen(drin.dbId).then(r => {
@@ -1980,8 +1919,13 @@ function baueVerlaufsEintrag(scheinId) {
   // Frueher hing hier die Foto-Auswertung mit dran. Das Foto wird jetzt
   // nur noch mitgenommen, nicht mehr gelesen.
   return { s: s, eintrag: eintrag,
-    foto: localStorage.getItem(fotoSchluessel(scheinId)),
-    fotoName: localStorage.getItem(fotoSchluessel(scheinId) + "_name") };
+    // Das Bild kommt aus dem Arbeitsspeicher (dort liegt es, seit die
+    // Karte gezeichnet wurde), sonst noch aus dem alten localStorage.
+    // So wandert es beim Speichern mit in die Datenbank.
+    foto: (scheinFotoCache[scheinId] && scheinFotoCache[scheinId].foto) ||
+          localStorage.getItem(fotoSchluessel(scheinId)),
+    fotoName: (scheinFotoCache[scheinId] && scheinFotoCache[scheinId].name) ||
+          localStorage.getItem(fotoSchluessel(scheinId) + "_name") };
 }
 
 // ============================================================

@@ -798,8 +798,19 @@ async function tuImport() {
   const liegenGeblieben = [];   // nur die, die NICHT durchgingen
   let ersterFehler = "";
   for (const e of lokal) {
-    const foto = e.scheinId ? localStorage.getItem("foto_" + e.scheinId) : null;
-    const fotoName = e.scheinId ? localStorage.getItem("foto_" + e.scheinId + "_name") : null;
+    // Das Bild liegt seit 14.09.2026 im Bildlager (IndexedDB), nicht mehr
+    // im localStorage - sonst waere es beim Uebernehmen verlorengegangen.
+    let foto = null, fotoName = null;
+    if (e.scheinId) {
+      if (typeof bildLagerHolen === "function") {
+        const satz = await bildLagerHolen(e.scheinId);
+        if (satz && satz.foto) { foto = satz.foto; fotoName = satz.name || null; }
+      }
+      if (!foto) {
+        foto = localStorage.getItem("foto_" + e.scheinId);
+        fotoName = localStorage.getItem("foto_" + e.scheinId + "_name");
+      }
+    }
     // scheinId und satz MUESSEN mit: ohne sie kann der Kombi-Bau nicht
     // erkennen, dass diese Kombination schon gesetzt ist, und alle
     // uebernommenen Scheine fielen dort auf einen gemeinsamen Topf.

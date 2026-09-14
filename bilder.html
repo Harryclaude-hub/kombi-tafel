@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meine Wettschein-Bilder</title>
+<link rel="stylesheet" href="stil.css?v=20260914a">
+<link rel="icon" href="logo.svg">
+</head>
+<body>
+<div class="huelle">
+  <h1>&#128247; Meine Wettschein-Bilder</h1>
+  <p class="mini">Hier steht <b>jedes</b> Bild, das auf diesem Gerät liegt - auch die,
+  deren Kombination es nicht mehr gibt. Der Name trägt Anbieter, Teams, Einsatz,
+  die Einzelquoten und die Gesamtquote, so wie beim Speichern vergeben.</p>
+
+  <div id="lage" class="kern">Wird geladen...</div>
+
+  <p>
+    <a href="kombis.html"><button>&#8592; zurück zum Kombi-Bau</button></a>
+    <a href="mein.html"><button>Mein Bereich</button></a>
+    <button onclick="alleHolen()">&#128260; neu laden</button>
+  </p>
+
+  <div id="bilder"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="bildlager.js?v=20260914a"></script>
+<script>
+"use strict";
+
+function sicher(t) {
+  return String(t === null || t === undefined ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+
+function dateiname(name) {
+  return String(name || "Wettschein").replace(/ /g, "_").replace(/[\\/:*?"<>|]/g, "-") + ".jpg";
+}
+
+async function alleHolen() {
+  const lage = document.getElementById("lage");
+  const kasten = document.getElementById("bilder");
+  kasten.innerHTML = "";
+  lage.className = "kern";
+  lage.textContent = "Wird geladen...";
+
+  // Erst umziehen, falls noch etwas im alten Browserspeicher liegt.
+  let umzug = null;
+  try { umzug = await bildLagerUmzug(); } catch (e) { umzug = null; }
+
+  let liste = [];
+  try { liste = await bildLagerListe(); } catch (e) { liste = []; }
+
+  const belegt = localStorageBelegung();
+  let groesse = 0;
+  for (const b of liste) groesse += (b.foto || "").length;
+
+  lage.innerHTML =
+    "<b>" + liste.length + " Bild" + (liste.length === 1 ? "" : "er") + "</b> im Bildlager, " +
+    "zusammen rund " + (groesse / 1024 / 1024).toFixed(1) + " MB." +
+    (umzug && umzug.umgezogen
+      ? " <b>" + umzug.umgezogen + " davon eben aus dem alten Browserspeicher gerettet</b> (" +
+        umzug.frei.toFixed(1) + " MB dort frei geworden)."
+      : "") +
+    (belegt !== null
+      ? "<br><span class='mini'>Im Browserspeicher (localStorage) liegen jetzt " +
+        belegt.toFixed(2) + " MB. Der fasst nur rund 5 MB, und dort liegt auch deine " +
+        "Anmeldung - ist er voll, kannst du dich nicht mehr einloggen. Genau deshalb " +
+        "sind die Bilder hier umgezogen.</span>"
+      : "");
+
+  if (!liste.length) {
+    kasten.innerHTML = '<div class="warnkern">Auf diesem Gerät liegt kein Bild. ' +
+      "Bilder von gespeicherten Kombinationen stehen in <a href='mein.html'><b>Mein Bereich</b></a> " +
+      "bei der jeweiligen Kombination - die liegen in der Datenbank.</div>";
+    return;
+  }
+
+  let html = "";
+  for (const b of liste) {
+    html += '<div class="schein"><div class="s-kopf"><b>' + sicher(b.name) + "</b>" +
+      '<span class="mini"> &nbsp;Kennung ' + sicher(b.scheinId) +
+      (b.zeit ? " &nbsp;&middot;&nbsp; " + sicher(new Date(b.zeit).toLocaleString("de-AT")) : "") +
+      "</span></div>" +
+      '<div class="s-foto"><img src="' + sicher(b.foto) + '" alt="' + sicher(b.name) + '">' +
+      '<div class="mini"><a href="' + sicher(b.foto) + '" download="' + sicher(dateiname(b.name)) +
+      '">unter diesem Namen herunterladen</a></div></div></div>';
+  }
+  kasten.innerHTML = html;
+}
+
+alleHolen();
+</script>
+</body>
+</html>
