@@ -19,15 +19,38 @@ function ausschnittGehtHier() {
 
 async function ausschnittStarten(scheinId) {
   if (!ausschnittGehtHier()) {
-    meldung("Dieses Gerät kann den Bildschirm nicht im Programm aufnehmen (am Handy geht das nie). " +
-      "Mach dort einen normalen Screenshot und nimm den Knopf <b>Foto vom Wettschein</b>.", "warn");
+    // Karam (14.09.2026): "ich druecke drauf und es passiert gar nichts."
+    // Die Bildschirmaufnahme gibt es nur in einer sicheren Verbindung.
+    // Wird die Seite als Datei geoeffnet (file://) oder ueber eine
+    // ungesicherte Adresse, ist navigator.mediaDevices gar nicht da -
+    // frueher stand hier nur "dieses Geraet kann das nicht", was in die
+    // Irre fuehrte.
+    const unsicher = (typeof location !== "undefined" &&
+      location.protocol !== "https:" && location.hostname !== "localhost" &&
+      location.hostname !== "127.0.0.1");
+    meldung(unsicher
+      ? "Der Bildschirm-Ausschnitt geht nur über eine gesicherte Verbindung (https). " +
+        "Diese Seite läuft gerade über <b>" + String(location.protocol).replace(/[^a-z:]/g, "") +
+        "</b>. Ruf die Seite über ihre https-Adresse auf, oder nimm " +
+        "<b>Foto vom Wettschein</b> mit einem normalen Screenshot."
+      : "Dieser Browser kann den Bildschirm nicht im Programm aufnehmen (am Handy geht das nie, " +
+        "und Firefox/Safari können es auch nicht). Nimm Chrome oder Edge, oder mach einen " +
+        "normalen Screenshot und nimm den Knopf <b>Foto vom Wettschein</b>.", "warn");
     return;
   }
   let strom = null;
   try {
+    meldung("Wähle jetzt oben im Fenster aus, welchen Bildschirm du teilen willst...", "gut");
     strom = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false });
   } catch (e) {
-    meldung("Es wurde kein Bildschirm ausgewählt - es ist nichts aufgenommen worden.", "warn");
+    // NICHT verschlucken: abgebrochen ist etwas anderes als verboten.
+    const name = (e && e.name) ? e.name : "";
+    meldung(name === "NotAllowedError"
+      ? "Es wurde kein Bildschirm ausgewählt - es ist nichts aufgenommen worden. " +
+        "Falls gar kein Auswahlfenster kam: der Browser hat die Bildschirmaufnahme " +
+        "für diese Seite gesperrt (Schloss-Symbol in der Adresszeile)."
+      : "Die Bildschirmaufnahme ging nicht: " +
+        String(name || (e && e.message) || e) + ". Nimm solange <b>Foto vom Wettschein</b>.", "warn");
     return;
   }
   let bild = null;

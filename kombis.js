@@ -802,7 +802,8 @@ function fotoAusCanvas(c, scheinId, herkunft) {
       // Meldungskasten (archivierte Wetten) und wuerde die Bestaetigung
       // sofort wieder ueberschreiben - dann sieht es aus, als sei nichts
       // passiert (14.09.2026, dieselbe Falle wie bei verlaufEintragLoeschen).
-      zeichne_();
+      // Scheitert das Zeichnen, kommt die Bestaetigung trotzdem.
+      neuZeichnenSicher();
       meldung((herkunft || "Bild") + " übernommen und benannt: <b>" + name + "</b> (" +
         Math.round(daten.length / 1024) + " KB)." +
         (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
@@ -904,13 +905,37 @@ function fotoDateiname(name) {
   return name.replace(/ /g, "_").replace("Quote_", "Q") + ".jpg";
 }
 
+// KEIN STILLES SCHEITERN MEHR (14.09.2026).
+// Karam: "ich druecke drauf, es passiert gar nichts." Genau das konnte
+// hier passieren: schlug das Lesen der Datei oder das Decodieren des
+// Bildes fehl, gab es dafuer keinen Empfaenger - bild.onload kam nie,
+// und niemand hat je etwas gesagt. Ein HEIC-Bild vom iPhone reicht dafuer
+// schon, das kann der Browser nicht decodieren. Ab jetzt sagt jeder Weg,
+// was los ist.
 function fotoHochladen(scheinId, input) {
   const datei = input.files && input.files[0];
   if (!datei) return;
+  // Das Feld sofort leeren: sonst loest dieselbe Datei beim naechsten Mal
+  // gar kein "change" mehr aus - und es "passiert wieder nichts".
+  const feldLeeren = () => { try { input.value = ""; } catch (e) { /* egal */ } };
+  meldung("Foto wird gelesen...", "gut");
   const leser = new FileReader();
+  leser.onerror = () => {
+    feldLeeren();
+    meldung("Diese Datei liess sich nicht lesen (" + textSicher(datei.name) + "). " +
+      "Versuch es mit dem <b>Bildschirm-Ausschnitt</b>.", "warn");
+  };
   leser.onload = ev => {
     const bild = new Image();
+    bild.onerror = () => {
+      feldLeeren();
+      meldung("Dieses Bildformat kann der Browser nicht öffnen (" + textSicher(datei.name) +
+        "). Das passiert vor allem bei <b>HEIC</b> vom iPhone. Nimm einen " +
+        "normalen Screenshot als JPG oder PNG, oder den <b>Bildschirm-Ausschnitt</b>.", "warn");
+    };
     bild.onload = () => {
+      feldLeeren();
+      try {
       // Verkleinern, damit es in den Speicher passt
       const maxB = 700;
       const faktor = Math.min(1, maxB / bild.width);
@@ -930,8 +955,10 @@ function fotoHochladen(scheinId, input) {
       }
       if (gespeichert) {
         // Erst zeichnen, dann melden - sonst wischt zeichne_ die
-        // Bestaetigung gleich wieder weg (siehe fotoAusCanvas).
-        zeichne_();
+        // Bestaetigung gleich wieder weg (siehe fotoAusCanvas). Scheitert
+        // das Zeichnen, darf die Bestaetigung trotzdem nicht ausfallen:
+        // das Bild IST gespeichert, und Karam muss das sehen.
+        neuZeichnenSicher();
         meldung("Foto gespeichert und benannt: <b>" + name + "</b> (" +
           Math.round(daten.length / 1024) + " KB)." +
           (aufgeraeumt > 0 ? " Dafür wurden " + aufgeraeumt + " alte Bilder weggeräumt, " +
@@ -942,10 +969,27 @@ function fotoHochladen(scheinId, input) {
           '("Foto weg" unter einer Kombination) oder nimm den Bildschirm-Ausschnitt.' +
           bilderSpeicherText(), "warn");
       }
+      } catch (e) {
+        meldung("Das Foto konnte nicht verarbeitet werden: " +
+          textSicher(e && e.message ? e.message : String(e)), "warn");
+      }
     };
     bild.src = ev.target.result;
   };
   leser.readAsDataURL(datei);
+}
+
+// Neu zeichnen, ohne dass ein Fehler beim Zeichnen die Bestaetigung
+// verschluckt. Vorher galt: wirft zeichne_, kommt die Meldung nie, und
+// fuer Karam "passiert gar nichts" - obwohl das Bild laengst liegt.
+function neuZeichnenSicher() {
+  try { zeichne_(); return true; }
+  catch (e) {
+    try {
+      console.error("zeichne_ ist gescheitert:", e);
+    } catch (e2) { /* egal */ }
+    return false;
+  }
 }
 
 function fotoLoeschen(scheinId) {
