@@ -3441,7 +3441,7 @@ h2.kl-kopf::after { content: " \25B4"; color: #8b95a8; font-size: 14px; }
   #personenkasse .kassenkasten table { display: block; overflow-x: auto;
     -webkit-overflow-scrolling: touch; }
   /* Panel als 2er-Raster statt Einerspalte. */
-  .pn-kachel { flex: 1 1 calc(50% - 5px); }
+  .pn-kachel { flex: 1 1 calc(50% - 9px); }
   .pn-ak .ak-karte { flex: 1 1 calc(50% - 4px); }
   /* Bau-Tabelle: greifbare Haekchen, klebende Bauen-Leiste unter der
      klebenden Kopfleiste. */
@@ -3888,3 +3888,97 @@ body[data-seite] .navleiste #nav_profil,
 @keyframes lwReinLinks  { from { opacity: .3;  transform: translateX(-36px); } }
 /* ---- ENDE DESIGN-REWORK 05.09.2026 ---- */
 
+
+/* ======================================================================
+   SCHEIN-FUSS IN ZWEI ZEILEN (15.09.2026) - KOMPLETT LOESCHBAR
+   Karams Auftrag: "die Knoepfe nebeneinander in zwei Zeilen, auch wenn
+   ich das Programm auf dem halben Bildschirm habe, symmetrisch, die
+   sinnvollsten Knoepfe links, und sichtbar, bei welcher Person es
+   gespeichert wurde."
+
+   Reine Optik. Es wird KEIN Knopf hinzugefuegt, keiner entfernt, keine
+   Reihenfolge im HTML geaendert - nur die Anordnung auf dem Schirm.
+   Loescht man diesen Block, steht wieder alles in einer Reihe, und es
+   funktioniert genau gleich weiter.
+
+   Zeile 1: Einsatz, moeglicher Gewinn, Gebuehr (das Geld).
+   Zeile 2: links die taeglichen Handgriffe, rechts das Seltene und das
+            Gefaehrliche.
+   ====================================================================== */
+
+.s-fuss {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 7px 9px; padding: 8px 10px;
+}
+
+/* Der Umbruch zwischen den beiden Zeilen: ein leeres Element ueber die
+   volle Breite. Alles mit kleinerer Ordnung landet darueber, alles mit
+   groesserer darunter. Ohne diesen Trick braeuchte es zusaetzliche
+   Kaesten im HTML - und das waere Funktion angefasst. */
+.s-fuss::after { content: ""; flex-basis: 100%; height: 0; order: 5; }
+
+/* ---- Zeile 1: das Geld ---- */
+/* Die Beschriftungen ("Einsatz", "moeglich", "EUR") sind blosser Text und
+   haben von sich aus Ordnung 0 - sie bleiben also oben bei ihren Feldern. */
+.s-fuss .einsatz { order: 0; width: 92px; }
+.s-fuss .gewinn  { order: 0; width: 104px; }
+.s-fuss .gebuehr { order: 0; margin-left: 4px; }
+
+/* ---- Zeile 2 links: was Karam jeden Tag braucht ---- */
+.s-fuss button.merken      { order: 10; font-weight: bold; }
+.s-fuss label.fotoknopf    { order: 11; }
+.s-fuss button.fotoknopf   { order: 12; }
+
+/* ---- Zeile 2 rechts: selten, rueckgaengig, gefaehrlich ---- */
+/* margin-left:auto schiebt diese Gruppe an den rechten Rand - daher die
+   Symmetrie: linke Gruppe links, rechte Gruppe rechts, Luft dazwischen. */
+.s-fuss button[onclick^="scheinTeilen"]            { order: 20; margin-left: auto; }
+.s-fuss button[onclick^="verlaufEintragLoeschen"]  { order: 21; }
+.s-fuss button.knopfweg                            { order: 22; margin-left: 0; }
+
+/* ---- Bei WEM liegt die Kombination: sichtbar, nicht kleingedruckt ---- */
+.s-wer.mini {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px;
+  padding: 8px 12px; border-top: 1px solid #cfe3cf;
+  background: #eef7ee; color: #145c14;
+  font-size: 13.5px; font-weight: 600;
+}
+.s-wer.mini b { color: #0b3d0b; font-size: 14.5px; }
+/* Ohne Person steht dort ein Link nach Mein Bereich - nur dann. Das faellt
+   aus dem Gruen heraus, weil eine Kombination ohne Person in der
+   Abrechnung durchfaellt. Kann der Browser :has() nicht, bleibt es gruen -
+   der Text sagt es trotzdem. */
+.s-wer.mini:has(a) {
+  background: #fff6e6; border-top-color: #e3c98a; color: #7a4e05;
+}
+.s-wer.mini:has(a) b { color: #5d3b03; }
+
+/* ---- Halber Bildschirm: zwei Zeilen bleiben zwei Zeilen ---- */
+/* Die Knoepfe teilen sich die Breite gleichmaessig auf, statt zu einer
+   ausgefransten Treppe zu werden. */
+/* Sechs Knoepfe passen auf dem halben Bildschirm nicht in EINE Reihe.
+   Statt einer ausgefransten Treppe brechen sie dann sauber auf drei je
+   Reihe um - und weil die Ordnung oben schon nach Bedeutung sortiert
+   ist, steht dann von selbst das Taegliche in der einen Reihe
+   (Verlauf, Foto, Ausschnitt) und das Seltene in der anderen
+   (weiterer Anbieter, zurueck aus dem Verlauf, loeschen). */
+@media (max-width: 1100px) {
+  .s-fuss button, .s-fuss label.fotoknopf {
+    flex: 1 1 28%; text-align: center; justify-content: center;
+    /* Ohne min-width:0 darf ein Knopf nie schmaler werden als seine
+       laengste Beschriftung - dann passen nur zwei statt drei in die
+       Reihe. Die Beschriftung darf stattdessen umbrechen. */
+    min-width: 0; white-space: normal; line-height: 1.2;
+    align-self: stretch;
+  }
+  .s-fuss button[onclick^="scheinTeilen"] { margin-left: 0; }
+}
+@media (max-width: 620px) {
+  .s-fuss button, .s-fuss label.fotoknopf { flex: 1 1 44%; }
+}
+/* Ganz schmal (Handy, vierteltel Bildschirm): das Geld darf auch umbrechen. */
+@media (max-width: 560px) {
+  .s-fuss .einsatz, .s-fuss .gewinn { width: 84px; }
+  .s-fuss .gebuehr { order: 4; flex-basis: 100%; margin-left: 0; }
+}
+/* ---- ENDE SCHEIN-FUSS ZWEI ZEILEN ---- */
