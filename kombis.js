@@ -709,6 +709,40 @@ function quoteEintragen(scheinId, wettId, feld) {
 
 function fotoSchluessel(scheinId) { return "foto_" + scheinId; }
 
+// ---------- Wo das Bild einer Karte herkommt ----------
+// Karam (14.09.2026): "es soll in der Datenbank gespeichert werden und
+// nicht im Browser." Sobald eine Kombination im Konto liegt, ist ihr Bild
+// dort mitgespeichert (supaScheinAnlegen) - der Browser gibt seine Kopie
+// dann ab (siehe scheinInsKonto). Zum Anzeigen wird das Bild einmal
+// nachgeladen und nur im Arbeitsspeicher gehalten, nie wieder auf die
+// Platte geschrieben. Solange die Kombination noch NICHT gespeichert ist,
+// gibt es in der Datenbank keine Zeile dafuer - dann bleibt es lokal.
+const scheinFotoCache = {};      // scheinId -> {foto, name}
+const scheinFotoVersucht = {};   // scheinId -> true: nur EIN Anlauf je Karte
+
+function fotoFuerKarte(scheinId, imVerlauf) {
+  const lokal = localStorage.getItem(fotoSchluessel(scheinId));
+  if (lokal) {
+    return { foto: lokal,
+      name: localStorage.getItem(fotoSchluessel(scheinId) + "_name") || "Wettschein",
+      zeit: localStorage.getItem(fotoSchluessel(scheinId) + "_zeit"),
+      ausDb: false };
+  }
+  const c = scheinFotoCache[scheinId];
+  if (c) return { foto: c.foto, name: c.name, zeit: c.zeit || null, ausDb: true };
+  // Nichts da: einmal aus der Datenbank holen und danach neu zeichnen.
+  // scheinFotoVersucht verhindert, dass ein Fehlschlag bei jedem
+  // Zeichnen eine neue Abfrage ausloest.
+  if (imVerlauf && imVerlauf.dbId && !scheinFotoVersucht[scheinId] &&
+      typeof supaScheinFotoHolen === "function") {
+    scheinFotoVersucht[scheinId] = true;
+    supaScheinFotoHolen(imVerlauf.dbId).then(r => {
+      if (r && r.foto) { scheinFotoCache[scheinId] = r; zeichne_(); }
+    }).catch(() => { /* dann eben kein Bild - die Kombination zaehlt trotzdem */ });
+  }
+  return null;
+}
+
 // Kurzform eines Spielnamens fuer den Bildnamen:
 // "Bayern München - Borussia Dortmund" -> "Bay-Bor"
 function spielKuerzel(spiel) {
@@ -919,6 +953,18 @@ function fotoLoeschen(scheinId) {
   localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
   localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
   localStorage.removeItem("foto_analyse_" + scheinId);
+  // Liegt das Bild (auch) in der Datenbank, muss es DORT weg - sonst
+  // kaeme es beim naechsten Zeichnen einfach wieder. Die Kombination
+  // selbst bleibt, nur ihr Bild faellt weg.
+  delete scheinFotoCache[scheinId];
+  scheinFotoVersucht[scheinId] = true;
+  const drin = schonGesetzt(scheinId);
+  if (drin && drin.dbId && typeof supaScheinFotoLoeschen === "function") {
+    supaScheinFotoLoeschen(drin.dbId).then(r => {
+      if (r && r.error) meldung("Das Bild ist auf diesem Gerät weg, in der Datenbank " +
+        "aber noch da: " + textSicher(r.error.message), "warn");
+    }).catch(() => { });
+  }
   zeichne_();
 }
 
@@ -1097,8 +1143,9 @@ function scheinHtml(s, z, gesetzt) {
         "<option>will ich nicht</option></select></td></tr>";
   }).join("");
 
-  const foto = localStorage.getItem(fotoSchluessel(s.id));
-  const fotoZeit = localStorage.getItem(fotoSchluessel(s.id) + "_zeit");
+  const bild = fotoFuerKarte(s.id, imVerlauf);
+  const foto = bild ? bild.foto : null;
+  const fotoZeit = bild ? bild.zeit : null;
   const kopfKlasse = (s.art === "niedrig") ? "s-kopf niedrigkopf" : "s-kopf";
 
   const wahl = '<select class="anbwechsel" onchange="anbieterWechseln(\'' + s.id + "', this.value)\">" +
@@ -1177,10 +1224,12 @@ function scheinHtml(s, z, gesetzt) {
     '<div class="zielzeile" id="ziel_' + s.id + '">' + gruppenText(z, s.nr) + "</div>" +
     '<div class="ordnerwahl" id="ordnerwahl_' + s.id + '"></div>' +
     (foto ? (function () {
-      const name = localStorage.getItem(fotoSchluessel(s.id) + "_name") || "Wettschein";
+      const name = bild.name || "Wettschein";
       return '<div class="s-foto"><div class="fotoname">' + name + "</div>" +
         '<img src="' + foto + '" alt="' + name + '">' +
-        '<div class="mini">hochgeladen ' + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "") +
+        '<div class="mini">' + (bild.ausDb
+          ? "liegt in der Datenbank"
+          : "hochgeladen " + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "")) +
         ' &nbsp;<a href="' + foto + '" download="' + fotoDateiname(name) + '">unter diesem Namen herunterladen</a>' +
         ' &nbsp;<button onclick="fotoLoeschen(\'' + s.id + '\')">Foto weg</button></div>' +
         "</div>";
@@ -2118,6 +2167,19 @@ function scheinInsKonto(scheinId, bereichId, ordnerId) {
       return;
     }
     ordnerWahlZu(scheinId);
+    // DER BROWSER GIBT SEINE KOPIE AB (14.09.2026, Karams Mittelweg).
+    // Das Bild ist jetzt in der Datenbank (supaScheinAnlegen hat es
+    // verschluesselt mitgeschrieben) - erst JETZT, nach bestaetigtem
+    // Speichern, faellt die oertliche Kopie weg. So sammelt sich im
+    // Browser nichts mehr an, und unter der Karte bleibt es trotzdem
+    // stehen: es kommt aus dem Arbeitsspeicher, nicht mehr von der Platte.
+    if (b.foto) {
+      scheinFotoCache[scheinId] = { foto: b.foto, name: b.fotoName || "Wettschein" };
+      localStorage.removeItem(fotoSchluessel(scheinId));
+      localStorage.removeItem(fotoSchluessel(scheinId) + "_zeit");
+      localStorage.removeItem(fotoSchluessel(scheinId) + "_name");
+      localStorage.removeItem("foto_analyse_" + scheinId);
+    }
     meldung("Kombination " + b.eintrag.nummer + " in dein Konto gespeichert und der Person zugeordnet: " +
       '<a href="mein.html"><b>Mein Bereich</b></a>.', "gut");
     zeichneKonto();

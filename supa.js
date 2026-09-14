@@ -309,6 +309,31 @@ async function supaScheineKurz(bereichId) {
   return mitFehler(liste, r);
 }
 
+// EIN Bild einer gespeicherten Kombination nachladen (14.09.2026).
+// Karam: "es soll in der Datenbank gespeichert werden und nicht im
+// Browser." Die Liste kommt weiter ohne Bilder (supaScheineKurz, das
+// waeren schnell mehrere Megabyte) - das Bild EINER Karte wird erst
+// geholt, wenn es angezeigt werden soll.
+async function supaScheinFotoHolen(id) {
+  const r = await supa.from("kt_scheine").select("id, bereich, foto, foto_name")
+    .eq("id", id).maybeSingle();
+  if (r.error || !r.data || !r.data.foto) return null;
+  const key = await kryptoBereich(r.data.bereich);
+  if (!key) return null;
+  let foto = await e2eAuf(key, r.data.foto);
+  // Kaputt oder falscher Schluessel: lieber kein Bild als ein kaputtes.
+  if (!foto || !String(foto).startsWith("data:")) return null;
+  const name = r.data.foto_name ? await e2eAuf(key, r.data.foto_name) : "";
+  return { foto: foto, name: name || "Wettschein" };
+}
+
+// Das Bild einer gespeicherten Kombination wieder entfernen. Die
+// Kombination selbst bleibt, nur Bild und Bildname fallen weg.
+async function supaScheinFotoLoeschen(id) {
+  return await supa.from("kt_scheine")
+    .update({ foto: null, foto_name: null }).eq("id", id).select("id");
+}
+
 // Die Beine eines Scheins fuer den Server-Waechter (ergebnis-scan):
 // NUR satz + je Bein spiel/linie/anstoss, UNverschluesselt in der neuen
 // Spalte "beine" - mehr braucht der Server nicht, um verloren/gewonnen
