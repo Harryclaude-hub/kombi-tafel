@@ -1060,6 +1060,16 @@ function scheinHtml(s, z, gesetzt) {
       '<button class="merken' + (imVerlauf ? ' schonda' : '') + '" ' +
         'onclick="scheinMerken(\'' + s.id + '\')">' +
         (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
+      // Karam (14.09.2026): der Weg zurueck stand bisher nur im Panel.
+      // Wer hier speichert, muss es auch hier wieder zuruecknehmen
+      // koennen - dieselbe gepruefte Loeschung wie im Panel, mit
+      // Rueckfrage und Guthaben-Hinweis (verlaufEintragLoeschen).
+      (imVerlauf
+        ? '<button title="Diese Kombination wieder aus dem Verlauf nehmen. ' +
+          'Die Wette beim Anbieter bleibt davon unberührt." ' +
+          'onclick="verlaufEintragLoeschen(\'' + (imVerlauf.dbId || "") + '\',\'' +
+          String(imVerlauf.zeit || "").replace(/'/g, "") + '\')">&#8617; aus dem Verlauf nehmen</button>'
+        : "") +
       '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Der Anbieter lässt nicht mehr zu? Gleiche Wetten zusätzlich bei einem weiteren Anbieter setzen.">&#10133; Rest bei weiterem Anbieter</button>' +
       '<button class="knopfweg" title="Diese Kombination löschen" ' +
         'onclick="kombiLoeschen(\'' + s.id + '\')">&#128465; Löschen</button>' +

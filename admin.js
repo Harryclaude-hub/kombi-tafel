@@ -179,19 +179,48 @@ async function tuSatzFotos(input, satzId) {
   const dateien = Array.from(input.files || []);
   input.value = "";
   if (!dateien.length) return;
-  let ok = 0, doppelt = 0;
+  // WARUM DAS IN ZWEI SCHRITTEN LAEUFT (14.09.2026):
+  // Frueher wurde je Foto sofort entschieden. Lag ein Foto in diesem
+  // Ordner schon (gleicher Fingerabdruck), wurde es stillschweigend
+  // uebersprungen - und weil dann ok=0 blieb, startete auch das
+  // Einlesen nicht. Von aussen sah das so aus, als nehme das Programm
+  // die Screenshots gar nicht mehr an: ein Toast, danach nichts.
+  // Jetzt werden erst alle Bilder geprueft, dann EINMAL gefragt, und
+  // der Durchlauf laeuft auch dann weiter, wenn nichts Neues dazukam.
+  const bilder = [];
+  let kaputt = 0;
   for (const datei of dateien) {
     const dataUrl = await verkleinereBild(datei, 1600);
-    if (!dataUrl) continue;
+    if (!dataUrl) { kaputt++; continue; }
     const hash = await fotoFingerabdruck(dataUrl);
-    if (hash && await supaUploadHashDa(datum, hash)) { doppelt++; continue; }
-    const r = await supaSatzFotoHochladen(adminIch.id, datum, dataUrl, hash);
+    const schonDa = hash ? await supaUploadHashDa(datum, hash) : false;
+    bilder.push({ dataUrl: dataUrl, hash: hash, schonDa: schonDa });
+  }
+  const schonDaZahl = bilder.filter(b => b.schonDa).length;
+  let trotzdem = false;
+  if (schonDaZahl) {
+    trotzdem = confirm(
+      (schonDaZahl === bilder.length
+        ? "Diese " + schonDaZahl + " Foto(s) liegen im Ordner " + datum + " schon."
+        : schonDaZahl + " der " + bilder.length + " Fotos liegen im Ordner " + datum + " schon.") +
+      "\n\nOK = trotzdem noch einmal hochladen (sie stehen dann doppelt im Ordner)." +
+      "\nAbbrechen = " + (schonDaZahl === bilder.length
+        ? "die vorhandenen Fotos einfach neu einlesen."
+        : "nur die neuen hochladen und einlesen."));
+  }
+  let ok = 0, doppelt = 0;
+  for (const b of bilder) {
+    if (b.schonDa && !trotzdem) { doppelt++; continue; }
+    const r = await supaSatzFotoHochladen(adminIch.id, datum, b.dataUrl, b.hash);
     if (!r.error) ok++;
     else meldungA("Foto nicht gespeichert: " + sicherA(r.error.message), "warn");
   }
+  // Auch ohne ein einziges neues Foto geht es weiter, solange welche
+  // im Ordner liegen - sonst endet der Weg wieder stumm.
+  const weiter = ok > 0 || doppelt > 0;
   // Der Ordner entsteht automatisch mit dem Datum als Namen
   let neuerOrdner = false;
-  if (ok) {
+  if (weiter) {
     const daSaetze = await supaSaetzeLaden();
     if (!daSaetze.some(s => s.id === datum)) {
       const d = datum.split("-");
@@ -203,17 +232,18 @@ async function tuSatzFotos(input, satzId) {
   // Einlesen durch Claude schnell geht (siehe fotoablage.js). Klappt es
   // nicht, faellt nur die Beschleunigung weg - hochgeladen sind sie schon.
   let ablageText = "";
-  if (ok) {
+  if (weiter) {
     const ab = (typeof fotoAblageOrdnerSichern === "function")
       ? await fotoAblageOrdnerSichern(datum, false) : { ok: false };
     if (ab.ok) ablageText = " " + ab.anzahl + " liegen auch als Bilddatei auf dem Laptop.";
   }
   meldungA(ok + " von " + dateien.length + " Fotos zum Satz vom " + sicherA(datum) +
-    " hochgeladen" + (doppelt ? ", " + doppelt + " war(en) schon da (gleiches Foto) und wurden übersprungen" : "") +
+    " hochgeladen" + (doppelt ? ", " + doppelt + " lag(en) schon im Ordner und wurde(n) übersprungen" : "") +
+    (kaputt ? ", " + kaputt + " Bild(er) liessen sich nicht lesen" : "") +
     (neuerOrdner ? ". <b>Ordner automatisch angelegt.</b>" : ".") + ablageText +
-    (ok ? " <b>Das Einlesen startet jetzt von selbst...</b>" : ""), ok || doppelt ? "gut" : "warn");
+    (weiter ? " <b>Das Einlesen startet jetzt von selbst...</b>" : ""), weiter ? "gut" : "warn");
   await adminSaetze();
-  if (ok) {
+  if (weiter) {
     // DER DURCHLAUF: neue Fotos -> sofort einlesen. Saubere Zeilen gehen
     // automatisch in die Datenbank; nur Unklares wartet auf Karam.
     durchlaufDatum = datum;
