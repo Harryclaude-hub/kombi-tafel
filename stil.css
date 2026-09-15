@@ -4028,3 +4028,245 @@ a.s-person.s-person-fehlt:hover { background: #8a5a12; }
 @media (max-width: 1100px) {
   .s-fuss a.s-person { order: 15; flex-basis: 100%; justify-content: center; }
 }
+
+/* ======================================================================
+   MEIN BEREICH: RUNDER, KLARER GETRENNT, FOTOS GROSS (16.09.2026)
+   KOMPLETT LOESCHBAR - diesen Block bis "ENDE MEIN BEREICH RUNDER"
+   loeschen, dann sieht Mein Bereich aus wie vorher und rechnet
+   unveraendert weiter.
+
+   Karam: "den Buchhaltungsprogramm komplett ueberarbeiten, da wo die
+   Screenshots sind einfach viel schoener darstellen, ein bisschen
+   abgerundeter, ein bisschen besser getrennt, und auch ein bisschen
+   mit Farben markiert."
+
+   WAS DIESER BLOCK TUT
+   1. Jeder Abschnitt wird eine eigene weisse Karte mit Rundung und
+      farbiger Kante. Vorher liefen Personen, Konto, Kombinationen und
+      Ergebnisse ohne sichtbare Grenze ineinander.
+   2. Die Wettschein-Fotos werden von 74 auf 112 Pixel groesser, bekommen
+      Rundung, Schatten und einen Namen als kleine Sprechblase darueber.
+   3. Die Tabellen verlieren das harte graue Gitter und behalten nur
+      duenne Trennlinien.
+   4. Anbieter-Marken und Stand-Pillen werden groesser, damit die Farbe,
+      die es laengst gibt, auf einen Blick lesbar ist.
+
+   WAS ER NICHT TUT (Leitplanken aus den frueheren Schichten)
+   - Keine Flaechenfarbe auf tr oder td. Gelb "ohne Person", Orange
+     "fertig", Gruen und Rot sind BEDEUTUNG und bleiben, wie sie sind.
+   - Keine Farbe an .bb-kachel, .bb-urteil, .st-mark, .marke, .ak-karte,
+     td.standzelle - dort wird nur Rundung und Groesse angefasst.
+   - Kein !important, kein z-index, keine Animation (die Seite bleibt
+     stundenlang offen), kein neues Gelb/Gold/Orange/Gruen/Rot.
+     Verwendet werden nur var(--kenn)/var(--kennhell) und Blaugrau.
+   - Nur body[data-seite="mein"]: Kombi-Bau, Tafel und Admin bleiben
+     unberuehrt.
+   ====================================================================== */
+@media screen {
+
+/* ---- 1. Abschnitte als Karten, klar voneinander getrennt ---- */
+body[data-seite="mein"] #tagesuebersicht,
+body[data-seite="mein"] #ordnerbox,
+body[data-seite="mein"] #konto_db,
+body[data-seite="mein"] #scheine_db,
+body[data-seite="mein"] #ergebnisse,
+body[data-seite="mein"] #pruefbericht,
+body[data-seite="mein"] #ordnerbilanz,
+body[data-seite="mein"] #buchhaltung {
+  background: #fff;
+  border: 1px solid #d3d9e4;
+  border-left: 4px solid var(--kenn, #1a2c50);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0 20px;
+  box-shadow: 0 1px 2px rgba(15, 25, 40, .08), 0 3px 12px rgba(15, 25, 40, .07);
+}
+
+/* Leere Kaesten zeichnen sonst einen leeren Rahmen: es gibt nicht immer
+   eine Tagesuebersicht, eine Personen-Kasse oder Ergebnisse. */
+body[data-seite="mein"] #tagesuebersicht:empty,
+body[data-seite="mein"] #ordnerbox:empty,
+body[data-seite="mein"] #konto_db:empty,
+body[data-seite="mein"] #scheine_db:empty,
+body[data-seite="mein"] #ergebnisse:empty,
+body[data-seite="mein"] #pruefbericht:empty,
+body[data-seite="mein"] #ordnerbilanz:empty,
+body[data-seite="mein"] #buchhaltung:empty,
+body[data-seite="mein"] #personenkasse:empty,
+body[data-seite="mein"] #importkasten:empty { display: none; }
+
+/* Die Personen-Kasse ist schon ein Kasten (.kassenkasten); sie bekommt
+   nur dieselbe Rundung und dieselbe Kante, damit die Reihe stimmt. */
+body[data-seite="mein"] #personenkasse > .kassenkasten {
+  border-radius: 12px;
+  border-left-width: 4px;
+  padding: 14px 16px;
+  margin: 12px 0 20px;
+}
+
+/* ---- 2. Ueberschriften als Bandzeile, damit man den Abschnitt findet ---- */
+body[data-seite="mein"] #blk_kombis > h2,
+body[data-seite="mein"] #blk_pruefen > h2,
+body[data-seite="mein"] #ergebnisse > h2 {
+  border-top: 0;
+  border-left: 6px solid var(--kenn, #1a2c50);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--kennhell, #eef1f7) 70%, #fff);
+  padding: 10px 14px;
+  margin: 26px 0 10px;
+}
+/* Die erste Ueberschrift im Block braucht oben keinen Abstand. */
+body[data-seite="mein"] .mb-block > h2:first-child { margin-top: 4px; }
+
+/* ---- 3. Tabellen: duenne Linien statt hartem Gitter ---- */
+/* Nur Rahmen und Abstand. KEINE Flaeche - Gelb, Orange, Gruen und Rot
+   in den Zeilen sind Bedeutung und bleiben unberuehrt. */
+body[data-seite="mein"] #scheine_db td,
+body[data-seite="mein"] #konto_db td,
+body[data-seite="mein"] #ordnerbox td,
+body[data-seite="mein"] #ordnerbilanz td,
+body[data-seite="mein"] #buchhaltung td {
+  border-left: 0; border-right: 0; border-top: 0;
+  border-bottom: 1px solid #e6eaf1;
+  padding: 7px 9px;
+}
+body[data-seite="mein"] #scheine_db th,
+body[data-seite="mein"] #konto_db th,
+body[data-seite="mein"] #ordnerbox th,
+body[data-seite="mein"] #ordnerbilanz th,
+body[data-seite="mein"] #buchhaltung th {
+  border-left: 0; border-right: 0; border-top: 0;
+  padding: 8px 9px;
+  letter-spacing: .02em;
+}
+/* Die letzte Zeile braucht keine Linie mehr, der Kartenrand schliesst ab. */
+body[data-seite="mein"] #scheine_db tbody tr:last-child td,
+body[data-seite="mein"] #konto_db tbody tr:last-child td { border-bottom: 0; }
+
+/* ---- 4. Die Wettschein-Fotos: groesser, rund, mit Namensschild ---- */
+body[data-seite="mein"] img.minifoto {
+  max-width: 112px; max-height: 112px;
+  border: 1px solid #ccd3e0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 25, 35, .14);
+  margin: 0 0 6px 10px;
+}
+body[data-seite="mein"] img.minifoto:hover { border-color: var(--kenn, #1a2c50); }
+/* WICHTIG: beim Klick wird das Bild gross (zeilen.js setzt .foto-gross).
+   Ohne diese Zeile wuerde die 112-Pixel-Grenze von oben das Vergroessern
+   aufheben - die Regel muss deshalb genauer sein als die davor. */
+body[data-seite="mein"] img.minifoto.foto-gross,
+body[data-seite="mein"] img.foto-gross {
+  max-width: 100%; max-height: none;
+  box-shadow: 0 2px 10px rgba(15, 25, 35, .18);
+}
+body[data-seite="mein"] .fotoname {
+  display: inline-block; max-width: 100%;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f0f3f8;
+  border: 1px solid #dde2ec;
+  color: #55627a;
+  font-size: 11.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  vertical-align: bottom;
+  margin-bottom: 4px;
+}
+/* Ausweise und Dokumente in den Personendaten mitrunden. */
+body[data-seite="mein"] img.pd-vorschau {
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 25, 35, .14);
+}
+
+/* ---- 5. Farbmarken groesser: die Farbe gibt es laengst, sie war zu klein ---- */
+/* Nur Groesse und Rundung. Die Hausfarben der Anbieter und die
+   Bedeutungsfarben von gewonnen/verloren/offen kommen weiter aus den
+   Regeln darueber und werden hier NICHT angefasst. */
+body[data-seite="mein"] .marke {
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+}
+body[data-seite="mein"] .st-mark {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+body[data-seite="mein"] .fertigbadge,
+body[data-seite="mein"] .warnbadge,
+body[data-seite="mein"] .korrekturmarke { border-radius: 999px; padding: 1px 8px; }
+
+/* ---- 6. Buchhaltung: Kacheln und Klappfelder runder, Koepfe sichtbar ---- */
+body[data-seite="mein"] #buchhaltung .bb-kachel,
+body[data-seite="mein"] #buchhaltung .bb-urteil,
+body[data-seite="mein"] #buchhaltung .bb-rechnung,
+body[data-seite="mein"] #buchhaltung .bb-kindsatz,
+body[data-seite="mein"] #buchhaltung details.bb-teil,
+body[data-seite="mein"] #buchhaltung .bb-berichtschau,
+body[data-seite="mein"] #buchhaltung .tabellenrand { border-radius: 12px; }
+body[data-seite="mein"] #buchhaltung .bb-wemliste li { border-radius: 10px; }
+
+body[data-seite="mein"] #buchhaltung details.bb-teil > summary,
+body[data-seite="mein"] #buchhaltung details.bb-bericht > summary {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--kennhell, #eef1f7) 60%, #fff);
+  font-weight: bold;
+}
+body[data-seite="mein"] #buchhaltung .bb-kacheln { gap: 12px; }
+/* Der Bericht traegt seine Farben fest im HTML, weil derselbe Text auch
+   als PDF und Word hinausgeht. Deshalb wird er hier nur eingerahmt. */
+body[data-seite="mein"] #buchhaltung .bb-berichtschau {
+  border: 1px solid #e0e5ee;
+  padding: 12px 14px;
+  background: #fdfdfe;
+}
+
+/* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */
+body[data-seite="mein"] .tabellenrand { border-radius: 12px; }
+body[data-seite="mein"] .vf-schalter {
+  border: 1px solid #dde2ec;
+  border-radius: 10px;
+  background: #f7f9fc;
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+body[data-seite="mein"] .ordnerfilter button { border-radius: 999px; }
+body[data-seite="mein"] .ak-karte,
+body[data-seite="mein"] .ak-detail { border-radius: 10px; }
+body[data-seite="mein"] .notizfeld { border-radius: 8px; }
+body[data-seite="mein"] .pkkasten,
+body[data-seite="mein"] .pk-rechner,
+body[data-seite="mein"] .persondaten,
+body[data-seite="mein"] .bilanzordner { border-radius: 12px; }
+
+/* ---- 8. Handy: gleiche Handschrift, weniger Rand ---- */
+@media (max-width: 700px) {
+  body[data-seite="mein"] #tagesuebersicht,
+  body[data-seite="mein"] #ordnerbox,
+  body[data-seite="mein"] #konto_db,
+  body[data-seite="mein"] #scheine_db,
+  body[data-seite="mein"] #ergebnisse,
+  body[data-seite="mein"] #pruefbericht,
+  body[data-seite="mein"] #ordnerbilanz,
+  body[data-seite="mein"] #buchhaltung,
+  body[data-seite="mein"] #personenkasse > .kassenkasten {
+    padding: 10px 10px;
+    border-radius: 10px;
+    margin: 10px 0 14px;
+  }
+  body[data-seite="mein"] #blk_kombis > h2,
+  body[data-seite="mein"] #blk_pruefen > h2,
+  body[data-seite="mein"] #ergebnisse > h2 { padding: 8px 10px; margin: 18px 0 8px; }
+  /* Am Handy ist die Kombi-Zeile selbst eine Karte (Handy-Schicht):
+     das Foto bleibt Miniatur, angetippt oeffnet handy.js es ohnehin
+     bildschirmfuellend. */
+  body[data-seite="mein"] img.minifoto { max-width: 96px; max-height: 96px; }
+  body[data-seite="mein"] img.minifoto.foto-gross,
+  body[data-seite="mein"] img.foto-gross { max-width: 100%; max-height: none; }
+}
+
+}
+/* ---- ENDE MEIN BEREICH RUNDER ---- */
