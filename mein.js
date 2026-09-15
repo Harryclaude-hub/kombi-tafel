@@ -223,6 +223,10 @@ async function zeigeApp() {
 <div id="tagesuebersicht"></div>
 </div>
 
+<div id="blk_auswerten" class="mb-block">
+<div id="auswerten"></div>
+</div>
+
 <div id="blk_kombis" class="mb-block">
 <h2>&#128100; Personen</h2>
 <p class="mini">Deine Personen: je ein Account oder ein Mensch, bei dem du Kombinationen
@@ -430,10 +434,18 @@ async function tuPushEinschalten() {
 
 const MB_BLOECKE = [
   ["tag", "&#128197; Tagesübersicht"],
+  ["auswerten", "&#9989; Auswerten"],
   ["kombis", "&#127919; Kombinationen und Personen"],
   ["buch", "&#128210; Buchhaltung"],
   ["pruefen", "&#128269; Nachrechnen"]
 ];
+
+// Hat die Auswert-Ansicht einen Stand geaendert? Dann stimmen die grosse
+// Tabelle, die Personen-Kasse und die Badges nicht mehr. Sie werden NICHT
+// sofort neu gezeichnet (bei 150 Scheinen jedes Mal eine Gedenksekunde),
+// sondern beim naechsten Wechsel des Reiters.
+let kasseVeraltet = false;
+function kasseScheineGeaendert() { kasseVeraltet = true; }
 
 // Profil, Freunde & Teilen und Chat sind seit dem 02.09. KEINE Bloecke
 // mehr, sondern eigene Ansichten hinter den Knoepfen oben.
@@ -455,6 +467,14 @@ function mbBlockZeigen(kurz) {
   // Die Buchhaltung genauso (Falle 5): sie laedt ihre Buchungen selbst
   // und wird nach dem Datenladen von zeichneBereich nochmal aufgefrischt.
   if (kurz === "buch" && typeof zeichneBuchhaltung === "function") zeichneBuchhaltung();
+  if (kurz === "auswerten" && typeof zeichneAuswerten === "function") zeichneAuswerten();
+  // Wurde in der Auswert-Ansicht etwas umgestellt, stimmen Tabelle,
+  // Personen-Kasse und Badges nicht mehr. Jetzt ist der ruhige Moment,
+  // sie nachzuziehen.
+  if (kasseVeraltet && kurz !== "auswerten" && typeof zeichneBereich === "function") {
+    kasseVeraltet = false;
+    zeichneBereich();
+  }
   for (const [k] of MB_BLOECKE) {
     const blk = el("blk_" + k);
     if (blk) blk.classList.toggle("offen", k === kurz);

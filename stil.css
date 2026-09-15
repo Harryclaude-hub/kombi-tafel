@@ -4127,8 +4127,11 @@ body[data-seite="mein"] #ordnerbox td,
 body[data-seite="mein"] #ordnerbilanz td,
 body[data-seite="mein"] #buchhaltung td {
   border-left: 0; border-right: 0; border-top: 0;
-  border-bottom: 1px solid #e6eaf1;
-  padding: 7px 9px;
+  /* Karam (16.09.2026): "immer so ein bisschen dickere Linie zwischen den
+     einzelnen Werten, das muss leichter erkennbar sein." Deshalb 2px und
+     ein kraeftigerer Ton als die erste Fassung mit 1px #e6eaf1. */
+  border-bottom: 2px solid #ccd3e0;
+  padding: 8px 9px;
 }
 body[data-seite="mein"] #scheine_db th,
 body[data-seite="mein"] #konto_db th,
@@ -4234,6 +4237,100 @@ body[data-seite="mein"] #buchhaltung .bb-export {
   margin: 0 0 12px;
 }
 body[data-seite="mein"] #buchhaltung .bb-export .mini { margin-top: 6px; color: #55627a; }
+
+/* ---- 6c. Auswerten: eine Karte je Schein, Bild links, Tasten rechts ----
+   Gruen und Rot sind hier BEDEUTUNG (aufgegangen / nicht aufgegangen),
+   deshalb dieselben Toene wie ueberall sonst: #1a7a1a und #a00000. */
+body[data-seite="mein"] #auswerten .aw-zeiten { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+body[data-seite="mein"] #auswerten .aw-zeit { border-radius: 999px; }
+body[data-seite="mein"] #auswerten .aw-zeit.aktiv {
+  background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
+}
+body[data-seite="mein"] #auswerten .aw-zeile { margin: 6px 0; }
+body[data-seite="mein"] #auswerten .aw-spanne {
+  margin: 6px 0 2px; padding: 7px 12px; border-radius: 8px;
+  background: color-mix(in srgb, var(--kennhell, #eef1f7) 70%, #fff);
+  color: #22314c; font-size: 13.5px;
+}
+/* Die laufende Nummer im Zeitraum: bewusst ruhig, damit sie die feste
+   Scheinnummer daneben nicht verdraengt. */
+body[data-seite="mein"] #auswerten .aw-lfd {
+  display: inline-block; min-width: 46px; text-align: center;
+  padding: 1px 8px; border-radius: 999px;
+  background: #eef1f7; border: 1px solid #d3d9e4;
+  color: #55627a; font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+
+body[data-seite="mein"] #auswerten .aw-summe {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px; margin: 12px 0 16px;
+}
+body[data-seite="mein"] #auswerten .aw-kachel {
+  border: 1px solid #d3d9e4; border-top: 4px solid var(--kenn, #1a2c50);
+  border-radius: 12px; background: #fff; padding: 10px 12px;
+}
+body[data-seite="mein"] #auswerten .aw-kachel.aw-plus { border-top-color: #1a7a1a; }
+body[data-seite="mein"] #auswerten .aw-kachel.aw-minus { border-top-color: #a00000; }
+body[data-seite="mein"] #auswerten .aw-kt { font-size: 11px; color: #55627a; }
+body[data-seite="mein"] #auswerten .aw-kw { font-size: 19px; font-weight: bold; color: #22314c; }
+body[data-seite="mein"] #auswerten .aw-kachel.aw-plus .aw-kw { color: #0a5a0a; }
+body[data-seite="mein"] #auswerten .aw-kachel.aw-minus .aw-kw { color: #a00000; }
+body[data-seite="mein"] #auswerten .aw-ku { font-size: 11px; color: #6d7789; margin-top: 2px; }
+
+body[data-seite="mein"] #auswerten .aw-karte {
+  display: flex; gap: 12px; align-items: flex-start;
+  border: 1px solid #d3d9e4; border-left: 4px solid #ccd3e0;
+  border-radius: 12px; background: #fff; padding: 10px 12px; margin: 8px 0;
+}
+body[data-seite="mein"] #auswerten .aw-karte.aw-gewonnen { border-left-color: #1a7a1a; }
+body[data-seite="mein"] #auswerten .aw-karte.aw-verloren { border-left-color: #a00000; }
+body[data-seite="mein"] #auswerten .aw-karte.aw-laeuft { opacity: .55; }
+body[data-seite="mein"] #auswerten .aw-bild { flex: 0 0 auto; width: 112px; }
+body[data-seite="mein"] #auswerten .aw-bild img.minifoto {
+  float: none; margin: 0; max-width: 112px; max-height: 112px;
+}
+body[data-seite="mein"] #auswerten .aw-bild img.minifoto.foto-gross {
+  max-width: 100%; max-height: none;
+}
+body[data-seite="mein"] #auswerten .aw-keinbild {
+  width: 112px; height: 112px; border: 1px dashed #ccd3e0; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; color: #8e98a8;
+}
+body[data-seite="mein"] #auswerten .aw-text { flex: 1 1 auto; min-width: 0; }
+body[data-seite="mein"] #auswerten .aw-zeile1 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+body[data-seite="mein"] #auswerten .aw-spiele { margin: 5px 0; color: #3c4761; }
+body[data-seite="mein"] #auswerten .aw-geld { font-size: 12.5px; color: #22314c; }
+body[data-seite="mein"] #auswerten .aw-tasten {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+  min-width: 190px;
+}
+body[data-seite="mein"] #auswerten .aw-gruen,
+body[data-seite="mein"] #auswerten .aw-rot {
+  min-height: 40px; font-size: 14px; font-weight: bold; border-radius: 9px;
+}
+body[data-seite="mein"] #auswerten .aw-gruen { border: 2px solid #1a7a1a; color: #0a5a0a; background: #f1f8f1; }
+body[data-seite="mein"] #auswerten .aw-rot { border: 2px solid #a00000; color: #8a0f0f; background: #fdf2f1; }
+body[data-seite="mein"] #auswerten .aw-gruen.aktiv { background: #1a7a1a; color: #fff; }
+body[data-seite="mein"] #auswerten .aw-rot.aktiv { background: #a00000; color: #fff; }
+body[data-seite="mein"] #auswerten .aw-ergebnis { color: #55627a; }
+body[data-seite="mein"] #auswerten .aw-echt { width: 90px; }
+body[data-seite="mein"] #auswerten .aw-geschaetzt { color: #b35a00; }
+body[data-seite="mein"] #auswerten .aw-wartet { color: #b35a00; font-weight: bold; }
+body[data-seite="mein"] #auswerten .aw-weg {
+  border: 1px dashed #ccd3e0; border-radius: 10px; padding: 8px 12px;
+  margin: 8px 0; color: #55627a;
+}
+body[data-seite="mein"] #auswerten .aw-karte.aw-unlesbar { border-left-color: #b35a00; }
+
+@media (max-width: 700px) {
+  body[data-seite="mein"] #auswerten .aw-karte { flex-wrap: wrap; }
+  body[data-seite="mein"] #auswerten .aw-bild,
+  body[data-seite="mein"] #auswerten .aw-keinbild { width: 84px; }
+  body[data-seite="mein"] #auswerten .aw-bild img.minifoto { max-width: 84px; max-height: 84px; }
+  body[data-seite="mein"] #auswerten .aw-tasten { min-width: 100%; }
+  body[data-seite="mein"] #auswerten .aw-gruen,
+  body[data-seite="mein"] #auswerten .aw-rot { min-height: 46px; }
+}
 
 /* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */
 body[data-seite="mein"] .tabellenrand { border-radius: 12px; }
