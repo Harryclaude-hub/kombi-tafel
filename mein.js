@@ -16,7 +16,13 @@ function el(id) { return document.getElementById(id); }
 function rundM(x) { return Math.round(x * 100) / 100; }
 function markeM(kz) {
   const namen = { iw: "Interwetten", bw: "Bwin", b3: "Bet365", st: "Stake", ad: "Admiral", bt: "Betway", mb: "Merkur Bets" };
-  return '<span class="marke m-' + kz + '">' + (namen[kz] || kz) + "</span>";
+  const name = namen[kz] || kz;
+  // Die Marke mit Logo lebt in logik.js, weil der Kombi-Bau sie auch
+  // braucht. Fehlt logik.js, bleibt die alte Marke - dann sieht man den
+  // Namen statt gar nichts.
+  return (typeof anbieterMarkeHtml === "function")
+    ? anbieterMarkeHtml(kz, name)
+    : '<span class="marke m-' + kz + '">' + name + "</span>";
 }
 function meldungM(text, art) {
   const box = el("meldung");

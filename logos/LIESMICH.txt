@@ -1,0 +1,41 @@
+LOGOS DER WETTANBIETER
+======================
+
+Hier hinein kommen die Logos, die in der Kombi-Tafel neben jeder
+Kombination stehen sollen.
+
+WIE DIE DATEI HEISSEN MUSS
+Genau nach dem Kuerzel des Anbieters, klein geschrieben, als .png:
+
+  st.png    Stake
+  iw.png    Interwetten
+  bw.png    Bwin
+  b3.png    Bet365
+  ad.png    Admiral
+  bt.png    Betway
+  mb.png    Merkur Bets
+
+Kommt ein neuer Anbieter dazu, heisst seine Datei so wie sein Kuerzel
+in logik.js (ANBIETER).
+
+WIE DAS BILD AUSSEHEN SOLL
+- PNG mit durchsichtigem Hintergrund
+- etwa 120 mal 40 Bildpunkte, breiter als hoch
+- moeglichst klein halten: jedes Bild wird in jeder Tabellenzeile
+  geladen. Unter 10 KB je Datei ist gut.
+
+WAS PASSIERT, WENN EINE DATEI FEHLT
+Dann steht dort weiter die farbige Marke mit dem Namen, so wie bisher.
+Es geht nichts kaputt und es fehlt nichts. Du kannst also einzeln
+nachlegen, Anbieter fuer Anbieter.
+
+WARUM HIER KEINE LOGOS MITGELIEFERT WERDEN
+Die Logos gehoeren den Wettanbietern. Sie in dieses Verzeichnis zu legen
+und auf GitHub zu veroeffentlichen, waere eine Verbreitung fremder
+Marken. Deshalb legt sie nur Karam selbst hinein, und nur solche, die er
+verwenden darf.
+
+NACH DEM HINEINLEGEN
+Die Fassungsnummer hochziehen, sonst zeigt der Browser das alte Bild:
+
+  node naechste-fassung.js --setzen

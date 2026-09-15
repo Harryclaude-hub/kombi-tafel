@@ -4347,6 +4347,24 @@ body[data-seite="mein"] #auswerten .aw-karte.aw-unlesbar { border-left-color: #b
   body[data-seite="mein"] #auswerten .aw-rot { min-height: 46px; }
 }
 
+/* ---- 6e. Anbieter-Logos ----
+   Liegt logos/<kuerzel>.png, zeigt die Marke das Logo statt des Namens.
+   Fehlt die Datei, nimmt logik.js die Klasse "mit-logo" wieder weg und
+   der Name steht da wie bisher - deshalb haengt hier alles an dieser
+   einen Klasse. Reine Optik: ohne diesen Block sieht man Logo UND Namen
+   nebeneinander, es geht nichts verloren. */
+.marke.mit-logo {
+  display: inline-flex; align-items: center; gap: 0;
+  padding: 3px 8px; line-height: 0;
+}
+.marke.mit-logo .anb-logo { display: block; height: 20px; width: auto; max-width: 96px; }
+.marke.mit-logo .anb-name { display: none; }
+/* Ohne Logo: das Kuerzel-Zeichen und der Name wie bisher. */
+.marke:not(.mit-logo) .anb-logo { display: none; }
+.marke.mit-logo::before { content: none; }
+/* In den grossen Auswert-Karten darf das Logo etwas hoeher sein. */
+body[data-seite="mein"] #auswerten .marke.mit-logo .anb-logo { height: 24px; max-width: 120px; }
+
 /* ---- 6d. Kombi-Konto: Foto neben der Nummer, Tasten statt Menue ---- */
 body[data-seite="mein"] #buchhaltung .kk-nr { white-space: nowrap; }
 body[data-seite="mein"] #buchhaltung img.kk-foto {

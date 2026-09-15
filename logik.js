@@ -87,6 +87,30 @@ function wannText(wann) {
     String(t.getMinutes()).padStart(2, "0");
 }
 
+// ---------- Anbieter-Marke mit Logo ----------
+// Karam (16.09.2026): "Ich moechte, dass jeder Anbieter mit seinem Logo
+// dasteht. Nicht nur einfach den Namen, sondern das Logo."
+//
+// SO FUNKTIONIERT ES: Liegt im Ordner logos/ eine Datei <kuerzel>.png,
+// wird sie gezeigt. Fehlt sie, bleibt die farbige Marke mit dem Namen,
+// genau wie bisher. Das macht der onerror-Haken am Bild: schlaegt das
+// Laden fehl, faellt das Bild weg und die Marke zeigt sich wieder.
+// Kein Netz noetig, keine fremde Adresse, kein Nachladen im Hintergrund.
+//
+// WARUM HIER KEINE LOGOS MITGELIEFERT WERDEN: die Logos der Wettanbieter
+// sind deren Marken. Sie gehoeren nicht in dieses Verzeichnis, solange
+// Karam sie nicht selbst hineinlegt. Wie, steht in logos/LIESMICH.txt.
+function anbieterMarkeHtml(kz, name, klasse) {
+  const text = String(name || kz || "?");
+  const sicher = text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return '<span class="marke m-' + kz + ' mit-logo' + (klasse ? " " + klasse : "") +
+    '" title="' + sicher + '">' +
+    '<img class="anb-logo" src="logos/' + kz + '.png" alt="' + sicher + '" ' +
+    "onerror=\"this.parentNode.classList.remove('mit-logo'); this.remove();\">" +
+    '<span class="anb-name">' + sicher + "</span></span>";
+}
+
 // ---------- Personen (Konto-Ordner): Suche, Nummer, Reihenfolge ----------
 // Liegt hier, weil kombis.html UND mein.html logik.js laden. Vorher
 // stand das nur in kombis.js, und mein.js haette eine zweite Fassung
