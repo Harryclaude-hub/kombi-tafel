@@ -241,7 +241,7 @@ function verfuegbarkeit(w) {
   const v = VERF[marktTyp(w) + "_" + stufe] || ["J","J","J","J"];
   // Admiral (NEU): noch keine Markt-Einschaetzungen je Liga - ehrlich
   // als "D" (Markt duenn, pruefen) statt still "J" zu raten.
-  return { iw: v[0], bw: v[1], b3: v[2], st: v[3], ad: "D", bt: "D" };
+  return { iw: v[0], bw: v[1], b3: v[2], st: v[3], ad: "D", bt: "D", mb: "D" };
 }
 
 // Start-Vorgabe (solange keine Live-Quoten getippt sind):
@@ -250,8 +250,8 @@ function verfuegbarkeit(w) {
 function standardAnbieter(w) {
   const typ = marktTyp(w);
   const rang = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
-    ? ["b3", "st", "bw", "iw", "ad", "bt"]     // Spezialmaerkte: Bet365, dann Stake
-    : ["b3", "bw", "st", "iw", "ad", "bt"];    // Standardmaerkte; Admiral und Betway zuletzt (neu, ungeprueft)
+    ? ["b3", "st", "bw", "iw", "ad", "bt", "mb"]     // Spezialmaerkte: Bet365, dann Stake
+    : ["b3", "bw", "st", "iw", "ad", "bt", "mb"];    // Standardmaerkte; Admiral und Betway zuletzt (neu, ungeprueft)
   const v = verfuegbarkeit(w);
   for (const kz of rang) if (v[kz] === "J") return kz;
   for (const kz of rang) if (v[kz] === "D") return kz;
@@ -326,7 +326,13 @@ const ANBIETER = [
   { kz: "ad", name: "Admiral", url: "https://www.admiral.at/",
     suche: "https://www.admiral.at/", direkt: false },
   { kz: "bt", name: "Betway", url: "https://www.betway.com/de/sports",
-    suche: "https://www.betway.com/de/sports", direkt: false }
+    suche: "https://www.betway.com/de/sports", direkt: false },
+  // Merkur Bets (NEU 15.09.2026). direkt: false, weil die Sprung-Adresse
+  // in die Suche NICHT geprueft ist - es oeffnet die Startseite und der
+  // Kopier-Knopf steht in der Zelle. Lieber ein Klick mehr als eine
+  // Adresse, die beim Setzen ins Leere geht.
+  { kz: "mb", name: "Merkur Bets", url: "https://www.merkurbets.de/",
+    suche: "https://www.merkurbets.de/", direkt: false }
 ];
 
 // Erster Teamname einer Wette, zum Suchen und Kopieren
@@ -411,7 +417,7 @@ function rangliste(w) {
   const v = verfuegbarkeit(w);
   const typ = marktTyp(w);
   const basis = (typ === "ASIAN" || typ === "CORNER" || typ === "TENNIS")
-    ? ["b3", "st", "bw", "iw", "ad", "bt"] : ["b3", "bw", "st", "iw", "ad", "bt"];
+    ? ["b3", "st", "bw", "iw", "ad", "bt", "mb"] : ["b3", "bw", "st", "iw", "ad", "bt", "mb"];
   const vw = { J: 2, D: 1, N: 0 };
   const liste = ANBIETER.map(a => {
     let echt = echteQuote(a.kz, liesEingabe(w.id, opt, a.kz));
@@ -619,6 +625,7 @@ const ANBIETER_GRUND = {
   b3: "Keine Gebühr. Groesstes Marktangebot, asiatische Linien und Ecken sind Spezialitaet.",
   bt: "Betway: neu in der Tafel, Märkte und Gebühren noch ungeprüft - vor dem ersten Setzen selbst nachsehen. Die Gebühr rechnest du wie überall über den angesagten Höchstgewinn.",
   ad: "Admiral (Österreich): neu in der Tafel, Märkte und Gebühren noch ungeprüft - vor dem ersten Setzen selbst nachsehen. Die Gebühr rechnest du wie überall über den angesagten Höchstgewinn.",
+  mb: "Merkur Bets: neu in der Tafel, Märkte und Gebühren noch ungeprüft - vor dem ersten Setzen selbst nachsehen. Die Gebühr rechnest du wie überall über den angesagten Höchstgewinn.",
   st: "Keine Gebühr, aber nur Krypto; Netzwerkgebuehr bei jeder Auszahlung."
 };
 const VERF_LANG = { J: "Markt: vorhanden", D: "Markt: nur duenn (prüfen)", N: "Markt: vermutlich NICHT vorhanden" };

@@ -3870,6 +3870,25 @@ body[data-seite] .navleiste #nav_profil,
 .schein:has(.s-kopf .m-bt):not(:has(.niedrigkopf)) { border-top: 5px solid #00a826; }
 .schein:has(.s-kopf .m-bt) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #00a826 12%, #fff); border-bottom-color: #00a826; }
 
+/* ---- MERKUR BETS (NEU 15.09.2026), nur Optik ----
+   Merkur-Gold #e8a800 mit DUNKLER Schrift. Warum Gold: die sechs
+   bestehenden Chips sind Dunkelblau, zwei Dunkelgruen, Schwarz,
+   Dunkelrot und Hellgruen - ein warmer Gelbton ist der einzige
+   Bereich, der noch frei ist und sich auf einem 11px-Chip klar
+   abhebt. Weisse Schrift auf Gold waere unlesbar (Kontrast ~1,9:1),
+   dunkle liegt bei rund 9:1. Fuer Text auf weissem Grund das
+   dunklere #8a6400. Faellt dieser Block weg, ist Merkur Bets
+   trotzdem ueberall waehlbar, nur ohne eigene Farbe. ---- */
+.m-mb { background: #e8a800; color: #1f1500; border-color: #8a6400; }
+.ab-mb { background: #e8a800; color: #1f1500; border-color: #8a6400; }
+.ak-mb { border-color: #e8a800; } .ak-mb .ak-name { color: #8a6400; }
+.marke.m-mb::before { content: "MB"; color: #8a6400; }
+.ak-mb .ak-name::before { content: "MB"; background: #e8a800; color: #1f1500; border-color: #8a6400; }
+.s-wo:has(.s-wo-name.m-mb) { background: #e8a800; }
+.s-wo:has(.s-wo-name.m-mb) .s-wo-name { color: #1f1500; }
+.schein:has(.s-kopf .m-mb):not(:has(.niedrigkopf)) { border-top: 5px solid #e8a800; }
+.schein:has(.s-kopf .m-mb) > .s-kopf:not(.niedrigkopf) { background-color: color-mix(in srgb, #e8a800 12%, #fff); border-bottom-color: #e8a800; }
+
 }
 @media print { #fussleiste, #logomenue { display: none !important; } }
 

@@ -120,7 +120,7 @@ function nrNaechste() {
 // Karams Reihenfolge, an EINER Stelle. Stake zuerst, danach Bet365,
 // seit 06.09.2026 Admiral und seit 11.09.2026 Betway ganz zuletzt.
 // Bwin und Sportingbet sind derselbe Anbieter, deshalb steht dort nur bw.
-const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad", "bt"];   // ad = Admiral (06.09.2026), bt = Betway (NEU 11.09.2026)
+const KT_ANBIETER_RANG = ["st", "iw", "bw", "b3", "ad", "bt", "mb"];   // ad = Admiral (06.09.2026), bt = Betway (NEU 11.09.2026)
 
 function einstellungenLesen() {
   const anb = [];
@@ -1559,7 +1559,7 @@ function hintergrundFuer(karte, treffer) {
 // Kleines Zeichen in der Hausfarbe des Anbieters (eigene Marke, kein
 // fremdes Logo - Logobilder muesste Karam erst liefern).
 function anbieterZeichen(kz) {
-  const kurz = { st: "S", iw: "IW", bw: "bw", b3: "365", ad: "AD", bt: "BTW" };
+  const kurz = { st: "S", iw: "IW", bw: "bw", b3: "365", ad: "AD", bt: "BTW", mb: "MB" };
   return '<span class="ab ab-' + kz + '" title="' + textSicher(anbieterName(kz) || kz) + '">' + (kurz[kz] || kz) + "</span>";
 }
 
