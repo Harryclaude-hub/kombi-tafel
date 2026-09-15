@@ -2645,18 +2645,44 @@ async function tuGruppeStand(keyKodiert, wert) {
 // Das Kombi-Konto als HTML. einz/ausz/start und letzteBalance kommen
 // FERTIG aus zeichneBuchhaltung - hier wird nichts davon neu gesucht,
 // damit oben und hier nie zwei verschiedene Zahlen stehen koennen.
-// Das erste Foto einer Gruppe, klein neben der Nummer. Hat kein Teil ein
-// Foto, bleibt der Platz leer - kein Platzhalter, der die Zeile aufblaeht.
-function kkFotoHtml(x) {
+// Wann wurde diese Gruppe gesetzt? Der frueheste Speicher-Moment ihrer
+// Teile, mit Datum UND Uhrzeit. Das ist eine ANDERE Zeit als "Spiele
+// laufen bis" daneben: die kommt aus den Anstosszeiten.
+function kkGesetztText(x) {
   const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  let frueh = null;
   for (const id of (x.ids || [])) {
     const s = liste.find(y => y.id === id);
-    if (s && s.foto && String(s.foto).startsWith("data:")) {
-      return '<img class="minifoto kk-foto" src="' + textSicherM(s.foto) +
-        '" alt="Wettschein" title="Antippen macht das Bild groß">';
-    }
+    if (!s || !s.created_at) continue;
+    const t = new Date(s.created_at);
+    if (isNaN(t.getTime())) continue;
+    if (!frueh || t < frueh) frueh = t;
   }
-  return "";
+  if (!frueh) return "<span class='mini'>Zeit unbekannt</span>";
+  return (typeof wannText === "function") ? wannText(frueh) : frueh.toLocaleString("de-AT");
+}
+
+// Alle Fotos einer Gruppe, klein neben der Nummer. Karam (16.09.2026):
+// "warum ist nicht ueberall ein Foto dabei? Ist eigentlich bei jedem
+// Einzelnen ein Foto." Deshalb wird jetzt JEDES Teil gezeigt, nicht nur
+// das erste - eine geteilte Kombination hat je Teil einen eigenen Schein.
+// Ein Foto, das sich nicht entschluesseln liess, wird als solches
+// benannt, statt wie "kein Foto" auszusehen.
+function kkFotoHtml(x) {
+  const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  let h = "", kaputt = 0;
+  for (const id of (x.ids || [])) {
+    const s = liste.find(y => y.id === id);
+    if (!s) continue;
+    if (s.foto && String(s.foto).startsWith("data:")) {
+      h += '<img class="minifoto kk-foto" src="' + textSicherM(s.foto) +
+        '" alt="Wettschein Nr. ' + (s.nummer || "") +
+        '" title="Nr. ' + (s.nummer || "?") + ' - antippen macht das Bild groß">';
+    } else if (s.fotoUnlesbar) kaputt++;
+  }
+  if (kaputt) h += '<div class="kk-fotokaputt mini">' + kaputt +
+    " Foto(s) nicht lesbar</div>";
+  return h;
 }
 
 // Karam (16.09.2026): "diese Teile sind doppelt gespeichert worden - kann
@@ -2830,7 +2856,11 @@ function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
   // ---- Die Liste ----
   const schreib = darfSchreiben();
   if (g.length) {
-    h += '<div class="tabellenrand"><table><thead><tr><th>Zeitraum</th><th>Nr.</th><th>Person</th>' +
+    // Karam (16.09.2026): "Du hast hier zwei Zeitraeume. Einmal wann es
+    // aufgeht, Ende-Datum. Und einmal wann es gesetzt wurde. Nenn das so,
+    // dass es erkannt wird. Und beim Gesetzt Datum und Uhrzeit."
+    h += '<div class="tabellenrand"><table><thead><tr>' +
+      "<th>Gesetzt am</th><th>Spiele laufen bis</th><th>Nr.</th><th>Person</th>" +
       "<th>Anbieter</th><th>Teile</th><th>Gesamteinsatz</th><th>Zur&uuml;ck</th>" +
       "<th>Gewinn</th><th>gewonnen / verloren</th></tr></thead><tbody>";
     for (const x of g) {
@@ -2840,6 +2870,8 @@ function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
             : kkDatum(x.von) + " &ndash; " + kkDatum(x.bis));
       const key = encodeURIComponent(x.key);
       h += "<tr class='st-" + x.stand + "'>" +
+        // Gesetzt: der frueheste Speicher-Moment der Teile, mit Uhrzeit.
+        "<td class='mini'>" + kkGesetztText(x) + "</td>" +
         "<td class='mini'>" + zeitraum + "</td>" +
         // Karam (16.09.2026): "bei den Kombis immer ein Mini-Foto neben
         // der Nummer, das ich groesser machen kann." Antippen macht es
@@ -2877,7 +2909,7 @@ function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
               : "")
           : textSicherM(x.stand)) + "</td></tr>" +
         // Platz fuer die Doppelt-Aufloesung, wird erst auf Klick gefuellt
-        "<tr class='kk-doppzeile' id='kkd_" + x.ids[0] + "' hidden><td colspan='9'></td></tr>";
+        "<tr class='kk-doppzeile' id='kkd_" + x.ids[0] + "' hidden><td colspan='10'></td></tr>";
     }
     h += "</tbody></table></div>";
   } else {

@@ -127,6 +127,18 @@ function awPersonName(id) {
 }
 function awGeld(x) { return Number(x || 0).toFixed(2) + " &euro;"; }
 
+// Wann ist diese Kombination durch? Das letzte Spiel darin entscheidet.
+// scheinEnde() aus mein.js rechnet es (Anstoss plus Spieldauer-Puffer) -
+// dieselbe Funktion, die auch "alle Spiele aus, Ergebnis?" auslöst.
+// Karam wollte hier NUR das Datum, keine Uhrzeit.
+function awEndeText(s) {
+  if (typeof scheinEnde !== "function") return "?";
+  const e = scheinEnde(s);
+  if (!e || isNaN(e.getTime())) return "Zeit unbekannt";
+  return String(e.getDate()).padStart(2, "0") + "." +
+    String(e.getMonth() + 1).padStart(2, "0") + "." + e.getFullYear();
+}
+
 // ---------- Zeichnen ----------
 function zeichneAuswerten() {
   const box = el("auswerten");
@@ -259,7 +271,11 @@ function awKarteHtml(s, lfd, gesamt) {
       (s.foto
         ? '<img class="minifoto" src="' + textSicherM(s.foto) + '" alt="Wettschein Nr. ' +
           (s.nummer || "") + '" title="Antippen macht das Bild groß">'
-        : '<div class="aw-keinbild mini">kein Foto</div>') +
+        // Ein Foto, das sich nicht entschluesseln liess, ist NICHT
+        // dasselbe wie gar keines. Vorher sah beides gleich aus.
+        : (s.fotoUnlesbar
+          ? '<div class="aw-keinbild aw-fotokaputt mini">Foto da,<br>nicht lesbar</div>'
+          : '<div class="aw-keinbild mini">kein Foto</div>')) +
     "</div>" +
     '<div class="aw-text">' +
       '<div class="aw-zeile1">' +
@@ -270,10 +286,13 @@ function awKarteHtml(s, lfd, gesamt) {
           ' in diesem Zeitraum">' + lfd + "/" + gesamt + "</span> " : "") +
         "<b>Nr. " + (s.nummer || "?") + "</b> " +
         (typeof markeM === "function" ? markeM(d.kz) : textSicherM(d.kz || "")) + " " +
-        // Gesetzt und gespeichert: genau der Moment, in dem sie in den
-        // Verlauf kam. Mit Datum UND Uhrzeit.
-        '<span class="aw-wann mini" title="Gesetzt und gespeichert am">&#128337; ' +
-          (typeof wannText === "function" ? wannText(s.created_at) : "") + "</span> " +
+        // Zwei verschiedene Zeiten, deshalb beide ausgeschrieben.
+        // Karam (16.09.2026): "Nenn das so, dass es erkannt wird."
+        '<span class="aw-zeit-gesetzt" title="Der Moment, in dem du sie in den Verlauf gelegt hast">' +
+          '<span class="aw-zl">Gesetzt am</span> <b>' +
+          (typeof wannText === "function" ? wannText(s.created_at) : "") + "</b></span> " +
+        '<span class="aw-zeit-laeuft" title="Wann das letzte Spiel dieser Kombination durch ist">' +
+          '<span class="aw-zl">Läuft bis</span> <b>' + awEndeText(s) + "</b></span> " +
         // Derselbe Personen-Knopf wie in allen anderen Tabellen
         // (personKnopfM in mein.js) - nicht ein zweiter, der sich
         // spaeter anders verhaelt.

@@ -4310,7 +4310,23 @@ body[data-seite="mein"] #auswerten .aw-bild img.minifoto.foto-gross {
 body[data-seite="mein"] #auswerten .aw-keinbild {
   width: 112px; height: 112px; border: 1px dashed #ccd3e0; border-radius: 10px;
   display: flex; align-items: center; justify-content: center; color: #8e98a8;
+  text-align: center;
 }
+/* "Foto da, aber nicht lesbar" ist ein Hinweis, kein Normalzustand. */
+body[data-seite="mein"] #auswerten .aw-fotokaputt {
+  border: 2px solid #b35a00; color: #8a4600; background: #fff8ef;
+}
+/* Die zwei Zeiten: kleine Beschriftung davor, damit man sie nicht
+   verwechselt. Gesetzt am hat Datum UND Uhrzeit, Laeuft bis nur Datum. */
+body[data-seite="mein"] #auswerten .aw-zeit-gesetzt,
+body[data-seite="mein"] #auswerten .aw-zeit-laeuft {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 2px 9px; border-radius: 999px; font-size: 12px;
+  border: 1px solid #dde2ec; background: #f7f9fc; color: #22314c;
+  white-space: nowrap;
+}
+body[data-seite="mein"] #auswerten .aw-zeit-laeuft { background: #f3f6fb; }
+body[data-seite="mein"] #auswerten .aw-zl { font-size: 10.5px; color: #55627a; }
 body[data-seite="mein"] #auswerten .aw-text { flex: 1 1 auto; min-width: 0; }
 body[data-seite="mein"] #auswerten .aw-zeile1 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 body[data-seite="mein"] #auswerten .aw-spiele { margin: 5px 0; color: #3c4761; }
@@ -4347,6 +4363,26 @@ body[data-seite="mein"] #auswerten .aw-karte.aw-unlesbar { border-left-color: #b
   body[data-seite="mein"] #auswerten .aw-rot { min-height: 46px; }
 }
 
+/* ---- 6f. Die Person ist ein KNOPF, keine Schrift ----
+   Karam (16.09.2026): "Ich moechte, dass die Leute als Button da sind und
+   nicht einfach als eine gelbe, als eine blaue Schrift."
+   Der Chip war bisher nur im Kombi-Bau gestaltet (.s-fuss, .s-drin,
+   .s-wer). In den Tabellen von Mein Bereich blieb deshalb ein nackter
+   Link uebrig. Hier bekommt er ueberall dasselbe Knopf-Aussehen. */
+body[data-seite="mein"] a.s-person {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; min-height: 30px; box-sizing: border-box;
+  border-radius: 999px; text-decoration: none;
+  background: #1a7a1a; color: #fff; border: 1px solid #145c14;
+  font-weight: bold; font-size: 12.5px; white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 25, 35, .18);
+}
+body[data-seite="mein"] a.s-person:hover { background: #145c14; }
+body[data-seite="mein"] a.s-person.s-person-fehlt { background: #b7791f; border-color: #8a5a12; }
+body[data-seite="mein"] a.s-person.s-person-fehlt:hover { background: #8a5a12; }
+/* In engen Tabellenzellen etwas kleiner, damit die Zeile nicht springt. */
+body[data-seite="mein"] td a.s-person { min-height: 26px; padding: 3px 10px; font-size: 12px; }
+
 /* ---- 6e. Anbieter-Logos ----
    Liegt logos/<kuerzel>.png, zeigt die Marke das Logo statt des Namens.
    Fehlt die Datei, nimmt logik.js die Klasse "mit-logo" wieder weg und
@@ -4368,8 +4404,14 @@ body[data-seite="mein"] #auswerten .marke.mit-logo .anb-logo { height: 24px; max
 /* ---- 6d. Kombi-Konto: Foto neben der Nummer, Tasten statt Menue ---- */
 body[data-seite="mein"] #buchhaltung .kk-nr { white-space: nowrap; }
 body[data-seite="mein"] #buchhaltung img.kk-foto {
-  float: none; display: block; max-width: 64px; max-height: 64px;
-  margin: 0 0 4px 0; border-radius: 8px; border: 1px solid #ccd3e0;
+  float: none; display: inline-block; max-width: 64px; max-height: 64px;
+  margin: 0 4px 4px 0; border-radius: 8px; border: 1px solid #ccd3e0;
+  vertical-align: top;
+}
+body[data-seite="mein"] #buchhaltung .kk-fotokaputt {
+  display: inline-block; padding: 2px 8px; border-radius: 8px;
+  border: 1px solid #b35a00; background: #fff8ef; color: #8a4600;
+  margin: 0 0 4px 0;
 }
 body[data-seite="mein"] #buchhaltung img.kk-foto.foto-gross {
   max-width: 100%; max-height: none;

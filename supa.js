@@ -275,8 +275,18 @@ async function supaScheineLaden(bereichId) {
       catch (e) { s.daten = { kz: "?", anbieter: "?", wetten: [], einsatz: 0, quote: 0, moeglich: 0, gesperrt: true }; }
     }
     if (s.foto) {
-      s.foto = await e2eAuf(key, s.foto);
-      if (s.foto && !s.foto.startsWith("data:")) s.foto = null;
+      const klar = await e2eAuf(key, s.foto);
+      if (klar && String(klar).startsWith("data:")) { s.foto = klar; }
+      else {
+        // HIER STAND EIN STILLER FEHLER (gefunden 16.09.2026, Karam:
+        // "warum ist nicht ueberall ein Foto dabei?"): liess sich das
+        // Bild nicht entschluesseln, wurde s.foto auf null gesetzt. Am
+        // Bildschirm sah das genauso aus wie "hat nie eines gehabt".
+        // Jetzt bleibt eine Marke daran, damit die Anzeige den
+        // Unterschied sagen kann.
+        s.foto = null;
+        s.fotoUnlesbar = true;
+      }
     }
     if (s.notiz) s.notiz = await e2eAuf(key, s.notiz);
     // Der Fotoname traegt praktisch den ganzen Schein (Anbieter, Einsatz,
