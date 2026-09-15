@@ -67,6 +67,107 @@ function jetztText() {
     ". " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
 }
 
+// Zeitstempel als Text: "15.09.2026 14:02", Ortszeit des Geraets.
+// Karam (15.09.2026): "bei jeder Kombi immer Datum und Uhrzeit" - und
+// weil er die Buchhaltung gegen eine Excel-Liste abgleicht, MIT Jahr.
+// Nimmt ISO-Text (UTC mit Z oder +00:00, wie created_at und eintrag.zeit)
+// oder ein Date. Das Format lebt nur HIER: mein.js (zeitM, kasseZeit) und
+// kombis.js (Karte, Verlauf) rufen diese eine Funktion, statt es je
+// einmal nachzubauen. NICHT zeitText() nehmen, die ist fuer Anstoss-
+// zeiten mit "?"-Logik und Zeitversatz.
+function wannText(wann) {
+  if (!wann) return "";
+  const t = (wann instanceof Date) ? wann : new Date(wann);
+  if (isNaN(t.getTime())) return "";
+  return String(t.getDate()).padStart(2, "0") + "." + String(t.getMonth() + 1).padStart(2, "0") +
+    "." + t.getFullYear() + " " + String(t.getHours()).padStart(2, "0") + ":" +
+    String(t.getMinutes()).padStart(2, "0");
+}
+
+// ---------- Personen (Konto-Ordner): Suche, Nummer, Reihenfolge ----------
+// Liegt hier, weil kombis.html UND mein.html logik.js laden. Vorher
+// stand das nur in kombis.js, und mein.js haette eine zweite Fassung
+// gebraucht - genau der Drift, der spaeter niemandem mehr auffaellt.
+//
+// Karams Personen heissen "P-1", "P-12 Max" oder nur "P-7". Deshalb:
+//  - Sortiert wird nach der ZAHL, nicht als Text. Sonst stuende P-10 vor P-2.
+//  - Gesucht wird auch nur ueber die Zahl: "7" findet P-7.
+//  - Bindestrich, Punkt und Leerzeichen sind beim Suchen egal: "p7" findet P-7.
+function personNorm(name) {
+  return String(name || "").toLowerCase().replace(/[\s\-_.]/g, "");
+}
+
+// Die P-Nummer, wenn der Name mit P und einer Zahl ANFAENGT, sonst null.
+// Streng am Anfang: ein Name wie "Top 3" darf nicht als Nummer 3 gelten.
+function personNummer(name) {
+  const m = /^\s*p[-_. ]?(\d+)/i.exec(String(name || ""));
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Vergleich fuer Personenlisten: P-Nummern aufsteigend, dann Namen ohne
+// Nummer alphabetisch. supaOrdnerLaden sortiert damit, also gilt die
+// Reihenfolge in JEDER Personenliste (Kombi-Bau und Mein Bereich).
+function personVergleich(a, b) {
+  const na = personNummer(a && a.name), nb = personNummer(b && b.name);
+  if (na !== null && nb !== null && na !== nb) return na - nb;
+  if (na !== null && nb === null) return -1;
+  if (na === null && nb !== null) return 1;
+  return String(a && a.name || "").localeCompare(String(b && b.name || ""), "de");
+}
+
+// Merkliste "zuletzt benutzte Personen" auf diesem Geraet.
+const PERSONEN_MERK = "personen_zuletzt";
+
+function personenZuletzt() {
+  try {
+    const r = JSON.parse(localStorage.getItem(PERSONEN_MERK) || "[]");
+    return Array.isArray(r) ? r : [];
+  } catch (e) { return []; }
+}
+
+// Reine Bequemlichkeits-Merkliste. Schlaegt das Schreiben fehl (voller
+// Geraetespeicher, privater Tab), ist nur die Reihenfolge wieder die
+// alte - es gehen KEINE Daten verloren. Deshalb bewusst ohne Meldung.
+function personGemerkt(ordnerId) {
+  if (!ordnerId) return;
+  try {
+    const r = personenZuletzt().filter(x => x !== ordnerId);
+    r.unshift(ordnerId);
+    localStorage.setItem(PERSONEN_MERK, JSON.stringify(r.slice(0, 20)));
+  } catch (e) { }
+}
+
+// Kennungen geloeschter Personen aus der Merkliste werfen, damit sie
+// sich nicht mit Leichen fuellt. Gibt die bereinigte Liste zurueck.
+function personenMerklisteBereinigen(liste) {
+  const da = new Set((liste || []).map(o => o.id));
+  const alt = personenZuletzt();
+  const neu = alt.filter(id => da.has(id));
+  if (neu.length !== alt.length) {
+    try { localStorage.setItem(PERSONEN_MERK, JSON.stringify(neu)); } catch (e) { }
+  }
+  return neu;
+}
+
+// Die "aktuellen" Personen zuerst: erst die, die auf diesem Geraet
+// zuletzt gewaehlt wurden, danach die aus den zuletzt gespeicherten
+// Scheinen (scheine = Liste mit .ordner, neueste zuerst, wie
+// supaScheineKurz sie liefert). Wer nie dran war, bleibt in der
+// Reihenfolge von personVergleich. Verknuepft wird ueber die Kennung,
+// nie ueber den Namen.
+function personenSortiert(liste, scheine) {
+  const rang = new Map();
+  let n = 0;
+  for (const id of personenZuletzt()) if (id && !rang.has(id)) rang.set(id, n++);
+  for (const s of (scheine || [])) if (s && s.ordner && !rang.has(s.ordner)) rang.set(s.ordner, n++);
+  return (liste || []).slice().sort((a, b) => {
+    const ra = rang.has(a.id) ? rang.get(a.id) : Infinity;
+    const rb = rang.has(b.id) ? rang.get(b.id) : Infinity;
+    if (ra !== rb) return ra - rb;
+    return personVergleich(a, b);
+  });
+}
+
 // ---------- Foto-Sätze ----------
 
 function aktiverSatzId() {

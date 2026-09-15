@@ -242,6 +242,7 @@ function baueAlles(nurRest) {
         id: "S" + marke + "-" + lfd + (ti ? "_t" + (ti + 1) : ""),
         kz: t.kz,
         art: "normal",
+        gebautAm: new Date().toISOString(),   // Karam: an jeder Karte Datum und Uhrzeit
         teil: ti ? ti + 1 : undefined,
         einsatz: t.einsatz,
         sicherheit: t.sicherheit || "geschaetzt",
@@ -464,6 +465,7 @@ function macheSchein(marke, nr, kz, gruppe, art) {
     id: "S" + marke + "-" + nr,
     kz: kz,
     art: art,                 // "normal" oder "niedrig"
+    gebautAm: new Date().toISOString(),   // Karam: an jeder Karte Datum und Uhrzeit
     wetten: gruppe.map(k => ({ id: k.id, optIdx: k.optIdx })),
     entfernt: []              // {id, grund, wann}
   };
@@ -618,6 +620,15 @@ function wetteRaus(scheinId, wettId, grund) {
   if (grund === "Anbieter hat die Wette nicht") {
     if (anbieterWeiterwandern(z, sch, wettId)) return;
     // Kein Anbieter mehr uebrig: dann doch heraus, unten weiter wie immer.
+  }
+
+  // Eine Einzelwette hat nur diese eine Wette. Sie herauszunehmen und
+  // Ersatz nachruecken zu lassen ergaebe eine andere Wette, die Karam
+  // nie angehakt hat. Deshalb: nichts tun und auf Loeschen verweisen.
+  if (sch.art === "eigen" && sch.wetten.length === 1) {
+    meldung("Das ist eine <b>Einzelwette</b> - sie hat nur diese eine Wette. " +
+      "Willst du sie weg haben, drück unten <b>Löschen</b>.", "warn");
+    return;
   }
 
   sch.entfernt.push({ id: wettId, grund: grund, wann: new Date().toISOString() });
@@ -997,6 +1008,10 @@ function zeichne_() {
     // still auf - das automatische Nachruecken nach dem Archivieren hat
     // also seit dem Umbau gar nicht mehr funktioniert.
     for (const sch of z.scheine) {
+      // Selbst gebaute Scheine (auch Einzelwetten) werden NICHT auf drei
+      // aufgefuellt: Karam hat genau diese Zeilen angehakt. Vorher wurde
+      // eine Einzelwette hier nach dem Archivieren still zum Dreier.
+      if (sch.art === "eigen") continue;
       while (sch.wetten.length < 3) {
         const suche = findeErsatz(z, sch.kz, sch.id, ERSATZ_NOTFALL_NUTZUNG);
         if (!suche.treffer) break;
@@ -1046,7 +1061,7 @@ function zeichne_() {
         ? '<div class="kern">Keine Kombination bei ' + textSicherK2(anbieterName(bauAnbieterFilter)) +
           " im Bau. Die Karte oben nochmal antippen zeigt wieder alle.</div>"
         : '<div class="kern">Noch nichts gebaut. Hak dir unten in der Tabelle die Wetten an, ' +
-          'wähl den Anbieter und drück <b>Kombination aus der Auswahl bauen</b>.</div>'));
+          'wähl den Anbieter und drück <b>Aus der Auswahl bauen</b>. Eine Zeile ergibt eine Einzelwette.</div>'));
 
   document.getElementById("niedrig").innerHTML =
     (niedrig.length ? niedrig.map(s => scheinHtml(s, z, gesetztJetzt)).join("") :
@@ -1070,6 +1085,15 @@ function anzeigeNr(z, nr) {
 // gesetzt ist die EINE Liste je Zeichnung (gesetzteEintraege). Fehlt sie,
 // holt schonGesetzt sie selbst - dann stimmt die Anzeige auch, es kostet
 // nur mehr.
+// "Kombination" oder "Einzelwette", je nachdem, wie viele Wetten auf dem
+// Schein stehen. Karam (15.09.2026): eine angehakte Zeile ergibt eine
+// Einzelwette. Bewusst NICHT "einzeln" genannt: s.einzeln, einzelnAktiv
+// und einzelnNaechste gehoeren zum Modus "Einer nach dem anderen"
+// (einzeln.js), der Dreier nacheinander vorschlaegt - etwas ganz anderes.
+function scheinWort(s) {
+  return (s && s.wetten && s.wetten.length === 1) ? "Einzelwette" : "Kombination";
+}
+
 function scheinHtml(s, z, gesetzt) {
   const mind = mindWert(z);
   // EXAKTE Kennung: ein zweiter Teil ist beim Anbieter eine eigene
@@ -1143,9 +1167,18 @@ function scheinHtml(s, z, gesetzt) {
     // (Z. ~1111), die genau diese Klasse erwarten, leben wieder.
     '<span class="s-wo"><span class="s-wo-name m-' + s.kz + '">' + anbieterName(s.kz) +
     '</span><span class="s-wo-mini">hier suchen</span></span>' +
-    "Kombination " + anzeigeNr(z, s.nr) +
+    scheinWort(s) + " " + anzeigeNr(z, s.nr) +
+    // Karam (15.09.2026): an JEDER Kombination Datum und Uhrzeit. Ist sie
+    // gespeichert, zaehlt der Speicher-Moment - das ist der Moment, der in
+    // der Buchhaltung steht. Vorher der Bau-Moment. Aeltere Karten ohne
+    // gebautAm zeigen nichts, statt etwas zu erfinden.
+    (imVerlauf && imVerlauf.zeit
+      ? ' <span class="s-wann mini" title="Gespeichert am">&#128337; gespeichert ' + wannText(imVerlauf.zeit) + "</span>"
+      : (s.gebautAm
+        ? ' <span class="s-wann mini" title="Gebaut am">&#128337; gebaut ' + wannText(s.gebautAm) + "</span>"
+        : "")) +
     (imVerlauf
-      ? ' <span class="s-drin" title="Diese Kombination ist gespeichert - du findest sie in Mein Bereich.">' +
+      ? ' <span class="s-drin" title="Diese ' + scheinWort(s) + ' ist gespeichert - du findest sie in Mein Bereich.">' +
         '&#10003; im Verlauf' + (imVerlauf.nummer ? ' als Nr. ' + imVerlauf.nummer : '') +
         (imVerlauf.einsatz ? ', ' + Number(imVerlauf.einsatz).toFixed(2) + ' &euro;' : '') +
         // Karam (14.09.2026): "bei wem hab ich das gespeichert?" Das muss
@@ -1163,9 +1196,14 @@ function scheinHtml(s, z, gesetzt) {
       : s.sicherheit === "geschaetzt"
         ? ' <span class="ausshot">Markt nur geschätzt - kurz prüfen</span>' : "") +
     (s.art === "niedrig" ? ' <span class="s-warn">Quoten unter der Mindestquote</span>' : "") +
-    (s.wetten.length !== 3 ? ' <span class="s-warn">nur ' + s.wetten.length +
+    // Die Dreier-Warnung gilt nur fuer gebaute Scheine. Ein selbst gebauter
+    // (auch die Einzelwette) sollte nie ein Dreier sein - "nur 1 Wetten,
+    // kein Dreier mehr" in Rot laese sich wie ein Fehler.
+    (s.wetten.length !== 3 && s.art !== "eigen" ? ' <span class="s-warn">nur ' + s.wetten.length +
       ' Wetten, kein Dreier mehr</span>' : "") +
-    '<span class="s-quote">' + s.wetten.length + "er, Gesamtquote laut Schein <b>" + rund2(gesamtRoh).toFixed(2) + "</b>" +
+    '<span class="s-quote">' + (s.wetten.length === 1
+      ? "Einzelwette, Quote laut Schein <b>"
+      : s.wetten.length + "er, Gesamtquote laut Schein <b>") + rund2(gesamtRoh).toFixed(2) + "</b>" +
     (alleFest ? ' <span class="mini gruen">alle Quoten selbst geprüft</span>'
               : ' <span class="mini">teils noch Foto-Quoten</span>') +
     "</span></div>" +
@@ -1197,13 +1235,13 @@ function scheinHtml(s, z, gesetzt) {
       // koennen - dieselbe gepruefte Loeschung wie im Panel, mit
       // Rueckfrage und Guthaben-Hinweis (verlaufEintragLoeschen).
       (imVerlauf
-        ? '<button title="Diese Kombination wieder aus dem Verlauf nehmen. ' +
+        ? '<button title="Diese ' + scheinWort(s) + ' wieder aus dem Verlauf nehmen. ' +
           'Die Wette beim Anbieter bleibt davon unberührt." ' +
           'onclick="verlaufEintragLoeschen(\'' + (imVerlauf.dbId || "") + '\',\'' +
           String(imVerlauf.zeit || "").replace(/'/g, "") + '\')">&#8617; aus dem Verlauf nehmen</button>'
         : "") +
       '<button onclick="scheinTeilen(\'' + s.id + '\')" title="Der Anbieter lässt nicht mehr zu? Gleiche Wetten zusätzlich bei einem weiteren Anbieter setzen.">&#10133; Rest bei weiterem Anbieter</button>' +
-      '<button class="knopfweg" title="Diese Kombination löschen" ' +
+      '<button class="knopfweg" title="Diese ' + scheinWort(s) + ' löschen" ' +
         'onclick="kombiLoeschen(\'' + s.id + '\')">&#128465; Löschen</button>' +
       '<label class="fotoknopf">&#128247; Foto vom Wettschein' +
         '<input type="file" accept="image/*" style="display:none" ' +
@@ -1218,6 +1256,7 @@ function scheinHtml(s, z, gesetzt) {
     (imVerlauf
       ? '<div class="s-wer mini">&#10003; Gespeichert' +
         (imVerlauf.nummer ? ' als <b>Nr. ' + imVerlauf.nummer + '</b>' : '') +
+        (imVerlauf.zeit ? ' am <b>' + wannText(imVerlauf.zeit) + '</b>' : '') +
         (imVerlauf.woher === "konto"
           ? ' ' + personLinkHtml(imVerlauf, true)
           : ' auf diesem Gerät (kein Konto)') +
@@ -1465,7 +1504,8 @@ function scheinTeilen(scheinId) {
     art: (s.art === "niedrig") ? "niedrig" : "normal",
     teil: teile.length + 1, einsatz: Math.max(0, rest),
     wetten: s.wetten.map(w => ({ id: w.id, optIdx: w.optIdx })),
-    entfernt: []
+    entfernt: [],
+    gebautAm: new Date().toISOString()    // die Kopie ist ein neuer Schein, also jetzt
   };
   const pos = z.scheine.indexOf(s);
   z.scheine.splice(pos + teile.length, 0, kopie);
@@ -1692,7 +1732,7 @@ function zeichneEigenbau() {
   box.innerHTML =
     '<div class="tb-leiste">' +
       '<label>Anbieter: <select id="eb_kz">' + anb + "</select></label> " +
-      '<button class="haupt" onclick="eigenbauAnlegen()">&#129513; Kombination aus der Auswahl bauen</button> ' +
+      '<button class="haupt" onclick="eigenbauAnlegen()">&#129513; Aus der Auswahl bauen</button> ' +
       '<span id="eb_zaehler" class="mini">nichts angehakt</span>' +
     "</div>" +
     '<div class="tabellenrand"><table class="tb-tafel"><thead><tr>' +
@@ -1727,7 +1767,7 @@ function ebZaehlen() {
   }
   feld.className = "mini" + (doppelt.size ? " tb-warnung" : "");
   feld.innerHTML = wahl.length
-    ? wahl.length + " angehakt" +
+    ? wahl.length + " angehakt" + (wahl.length === 1 ? " = Einzelwette" : " = Kombination") +
       (doppelt.size ? " - <b>" + textSicher([...doppelt].join(", ")) +
         "</b> steckt zweimal drin (gleiches Spiel, geht nicht in EINEN Schein)" : "")
     : "nichts angehakt";
@@ -1754,7 +1794,9 @@ function schonGesetztGleich(kz, wetten) {
 
 function eigenbauAnlegen() {
   const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
-  if (wahl.length < 2) { meldung("Bitte mindestens zwei Zeilen anhaken.", "warn"); return; }
+  // Karam (15.09.2026): eine angehakte Zeile ergibt eine Einzelwette,
+  // mehrere eine Kombination. Vorher war bei einer Zeile Schluss.
+  if (wahl.length < 1) { meldung("Bitte mindestens eine Zeile anhaken - eine ergibt eine Einzelwette.", "warn"); return; }
   const kennungen = new Set();
   const wetten = [];
   for (const v of wahl) {
@@ -1780,11 +1822,12 @@ function eigenbauAnlegen() {
   const z = liesZustand() || baueAlles();
   const nr = z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1;
   z.scheine.push({ id: "E" + Date.now(), nr: nr, kz: kz, art: "eigen",
-    wetten: wetten, entfernt: [] });
+    wetten: wetten, entfernt: [], gebautAm: new Date().toISOString() });
   speichereZustand(z);
   // anzeigeNr erst NACH dem Speichern: vorher steht der neue Schein noch
   // nicht in der Liste, ueber die gezaehlt wird.
-  meldung("<b>Kombination " + anzeigeNr(z, nr) + "</b> (" + wetten.length + " Wetten, " +
+  meldung("<b>" + (wetten.length === 1 ? "Einzelwette " : "Kombination ") + anzeigeNr(z, nr) + "</b> (" +
+    wetten.length + (wetten.length === 1 ? " Wette, " : " Wetten, ") +
     textSicher(anbieterName(kz)) + ") angelegt - oben Einsatz eintragen.", "gut");
   zeichne_();
 }
@@ -1820,12 +1863,12 @@ function kombiLoeschen(scheinId) {
   const schonDrin = weg.filter(x => gesetzt.some(e => e.scheinId === x.id));
 
   let frage = s.teil
-    ? "Teil " + s.teil + " von Kombination " + nr + " bei " + anbieterName(s.kz) +
+    ? "Teil " + s.teil + " von " + scheinWort(s) + " " + nr + " bei " + anbieterName(s.kz) +
       // "Die anderen 1 Teile" - Karam liest das am Handy, das darf nicht holpern.
       " löschen?\n\n" + (gruppe.length === 2
         ? "Der andere Teil bleibt stehen."
         : "Die anderen " + (gruppe.length - 1) + " Teile bleiben stehen.")
-    : "Kombination " + nr + " löschen?" +
+    : scheinWort(s) + " " + nr + " löschen?" +
       (gruppe.length > 1
         ? "\n\nEs fallen ALLE " + gruppe.length + " Teile weg (" +
           [...new Set(gruppe.map(x => anbieterName(x.kz)))].join(", ") + ")."
@@ -1857,7 +1900,7 @@ function kombiLoeschen(scheinId) {
     fotoLoeschen(x.id);
   }
 
-  meldung((s.teil ? "Teil " + s.teil + " von Kombination " : "Kombination ") + nr +
+  meldung((s.teil ? "Teil " + s.teil + " von " : "") + scheinWort(s) + " " + nr +
     " gelöscht" + (fotosWeg ? " (mit Foto)" : "") + ". Die Wetten sind wieder frei. " +
     "<b>Die Nummern der folgenden Kombinationen rücken um eins nach vorne.</b>", "gut");
 
@@ -2128,71 +2171,23 @@ function textSicher(t) {
 // klappt die volle Liste auf. Niemand wird weggeworfen - eine Person, die
 // man nicht mehr findet, waere schlimmer als eine lange Liste.
 const PERSONEN_OBEN = 5;
-const PERSONEN_MERK = "personen_zuletzt";
-
-// Karam (15.09.2026): "Jede Person beginnt mit P, Bindestrich und einer
-// Zahl. Manche haben auch NUR diese P und Zahl." Also "P-7", "P-12 Max"
-// oder blank "P-7". Daraus folgen drei Dinge:
-//  - Sortiert wird nach der ZAHL, nicht als Text. Sonst stuende P-10 vor P-2.
-//  - Gesucht wird auch nur ueber die Zahl: "7" findet P-7.
-//  - Bindestrich, Punkt und Leerzeichen sind beim Suchen egal: "p7" findet P-7.
-function personNorm(name) {
-  return String(name || "").toLowerCase().replace(/[\s\-_.]/g, "");
-}
-
-// Die P-Nummer, wenn der Name mit P und einer Zahl ANFAENGT, sonst null.
-// Streng am Anfang: ein Name wie "Top 3" darf nicht als Nummer 3 gelten.
-function personNummer(name) {
-  const m = /^\s*p[-_. ]?(\d+)/i.exec(String(name || ""));
-  return m ? parseInt(m[1], 10) : null;
-}
-
-function personenZuletzt() {
-  try {
-    const r = JSON.parse(localStorage.getItem(PERSONEN_MERK) || "[]");
-    return Array.isArray(r) ? r : [];
-  } catch (e) { return []; }
-}
-
-// Reine Bequemlichkeits-Merkliste. Schlaegt das Schreiben fehl (voller
-// Gearaetespeicher), ist nur die Reihenfolge wieder die alte - es gehen
-// KEINE Daten verloren. Deshalb hier bewusst ohne Meldung.
-function personGemerkt(ordnerId) {
-  if (!ordnerId) return;
-  try {
-    const r = personenZuletzt().filter(x => x !== ordnerId);
-    r.unshift(ordnerId);
-    localStorage.setItem(PERSONEN_MERK, JSON.stringify(r.slice(0, 20)));
-  } catch (e) { }
-}
-
-// Die "aktuellen" Personen: zuerst die, die auf diesem Geraet zuletzt
-// gewaehlt wurden, danach die aus den zuletzt gespeicherten Scheinen
-// (kontoScheine kommt schon neueste-zuerst aus der Datenbank). Wer nie
-// dran war, bleibt alphabetisch - genau wie bisher.
-// Verknuepft wird ueber die Kennung, nie ueber den Namen.
-function personenSortiert(liste) {
-  const rang = new Map();
-  let n = 0;
-  for (const id of personenZuletzt()) if (id && !rang.has(id)) rang.set(id, n++);
-  for (const s of kontoScheine) if (s && s.ordner && !rang.has(s.ordner)) rang.set(s.ordner, n++);
-  return liste.slice().sort((a, b) => {
-    const ra = rang.has(a.id) ? rang.get(a.id) : Infinity;
-    const rb = rang.has(b.id) ? rang.get(b.id) : Infinity;
-    if (ra !== rb) return ra - rb;
-    // Wer nie dran war, steht nach P-Nummer - P-2 vor P-10, nicht danach.
-    const na = personNummer(a.name), nb = personNummer(b.name);
-    if (na !== null && nb !== null && na !== nb) return na - nb;
-    if (na !== null && nb === null) return -1;
-    if (na === null && nb !== null) return 1;
-    return String(a.name).localeCompare(String(b.name), "de");
-  });
-}
+// Die Helfer personNorm, personNummer, personenZuletzt, personGemerkt und
+// personenSortiert liegen seit 15.09.2026 in logik.js, weil mein.js sie
+// auch braucht (Zuordnen, Anlegen). Hier bleibt nur, was der Kasten
+// selbst ist.
 
 async function ordnerWahlZeigen(scheinId, bereichId) {
   const box = document.getElementById("ordnerwahl_" + scheinId);
   if (!box) return;
   box.innerHTML = '<div class="ordnerpflicht mini">Personen werden geladen...</div>';
+  // Erst die eigenen Scheine abwarten: aus ihnen kommt "zuletzt benutzt".
+  // Ohne das Warten stuenden auf einem frischen Geraet P-1 bis P-5 oben,
+  // was richtig aussieht und falsch ist. Der Kasten sagt derweil
+  // "werden geladen", die Wartezeit ist also sichtbar.
+  try {
+    if (kontoLauf) await kontoLauf;
+    else if (!kontoGeladen && typeof kontoScheineLaden === "function") await kontoScheineLaden();
+  } catch (e) { }
   const liste = await supaOrdnerLaden(bereichId);
   // Ein Ladefehler ist NICHT dasselbe wie "keine Personen". Stand hier
   // vorher beides gleich da, und Karam haette eine Person neu angelegt,
@@ -2205,37 +2200,103 @@ async function ordnerWahlZeigen(scheinId, bereichId) {
       '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
     return;
   }
-  const sortiert = personenSortiert(liste);
+  personenMerklisteBereinigen(liste);
+  const sortiert = personenSortiert(liste, kontoScheine);
   const rest = sortiert.length - PERSONEN_OBEN;
   let knoepfe = "";
   sortiert.forEach((o, i) => {
     const oben = i < PERSONEN_OBEN;
     const nr = personNummer(o.name);
+    // Ein Name, der sich auf diesem Geraet nicht entschluesseln laesst,
+    // ist nicht waehlbar: Karam wuerde den Schein sonst einer Person
+    // zuordnen, deren Namen er gar nicht sieht.
+    const unlesbar = /^\[verschl/i.test(String(o.name || ""));
     knoepfe += '<button class="ordner-person" data-top="' + (oben ? "1" : "0") +
       '" data-i="' + i + '" data-nr="' + (nr === null ? "" : nr) +
       '" data-norm="' + textSicher(personNorm(o.name)) + '"' + (oben ? "" : " hidden") +
+      (unlesbar ? ' disabled title="Name auf diesem Geraet nicht lesbar - der Schluessel fehlt"' : "") +
       ' onclick="ordnerGewaehlt(\'' + scheinId + "','" + bereichId + "','" + o.id + '\')">' +
       textSicher(o.name) + "</button> ";
   });
   const suchzeile = rest > 0
-    ? '<input id="ordnersuche_' + scheinId + '" class="ordnersuche" placeholder="Person suchen..." ' +
-      'oninput="ordnerFiltern(\'' + scheinId + '\')"> ' +
+    ? '<input id="ordnersuche_' + scheinId + '" class="ordnersuche" placeholder="Person suchen - die Nummer reicht" ' +
+      'oninput="ordnerFiltern(\'' + scheinId + '\')" onkeydown="ordnerSucheTaste(event,\'' + scheinId + '\')"> ' +
       '<button id="ordneralle_' + scheinId + '" onclick="ordnerAlleZeigen(\'' + scheinId + '\')">alle ' +
       sortiert.length + " zeigen</button> "
     : "";
   box.innerHTML = '<div class="ordnerpflicht"><b>Bei wem hast du diesen Schein gesetzt?</b> ' +
     '<span class="mini">Jede Kombination gehört zu einer Person, damit du in Mein Bereich ' +
     "siehst, bei wem sie lief. Die Buchhaltung bleibt eine gemeinsame." +
-    (rest > 0 ? " Oben die zuletzt benutzten, die übrigen " + rest + " über die Suche." : "") +
+    (rest > 0 ? " Oben die fünf zuletzt benutzten, die übrigen " + rest + " über die Suche." : "") +
     "</span><br>" +
     (sortiert.length
       ? '<div id="ordnerliste_' + scheinId + '" class="ordnerliste">' + knoepfe + "</div>" +
         '<span id="ordnerleer_' + scheinId + '" class="mini" hidden>Keine Person gefunden. ' +
-        "Tippfehler? Sie ist nicht geloescht, nur nicht getroffen.</span>" + suchzeile
+        "Tippfehler? Sie ist nicht gelöscht, nur nicht getroffen. " +
+        '<button onclick="ordnerNeuZeigen(\'' + scheinId + '\', true)">als neue Person anlegen</button></span> ' +
+        suchzeile
       : '<span class="mini">Du hast noch keine Personen - leg gleich hier die erste an.</span> ') +
-    '<input id="neuordner_' + scheinId + '" placeholder="Neue Person, z. B. ein Name"> ' +
-    '<button class="haupt" onclick="ordnerNeuUndSpeichern(\'' + scheinId + "','" + bereichId + '\')">Anlegen und speichern</button> ' +
+    // "Neue Person" ist ein eigener Knopf. Das Eingabefeld erscheint erst
+    // auf Klick - vorher stand es dauerhaft direkt unter dem Suchfeld,
+    // beide sahen gleich aus, und ein Suchbegriff im falschen Feld haette
+    // eine Doppelperson angelegt.
+    '<button id="ordnerneuknopf_' + scheinId + '" onclick="ordnerNeuZeigen(\'' + scheinId + '\')">&#10133; Neue Person anlegen</button> ' +
+    '<span id="ordnerneu_' + scheinId + '" hidden>' +
+      '<input id="neuordner_' + scheinId + '" placeholder="Name der neuen Person, z. B. P-23" ' +
+      'onkeydown="ordnerNeuTaste(event,\'' + scheinId + "','" + bereichId + '\')"> ' +
+      '<button class="haupt" onclick="ordnerNeuUndSpeichern(\'' + scheinId + "','" + bereichId + '\')">Anlegen und speichern</button> ' +
+    "</span>" +
     '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
+  if (!sortiert.length) ordnerNeuZeigen(scheinId);
+  else {
+    const f = document.getElementById("ordnersuche_" + scheinId);
+    if (f) f.focus();
+  }
+}
+
+// Klappt das Feld fuer die neue Person auf. Kommt der Klick aus
+// "Keine Person gefunden", wandert der Suchtext gleich mit hinein -
+// Karam soll den Namen nicht ein zweites Mal tippen.
+function ordnerNeuZeigen(scheinId, ausSuche) {
+  const kasten = document.getElementById("ordnerneu_" + scheinId);
+  if (!kasten) return;
+  kasten.hidden = false;
+  const knopf = document.getElementById("ordnerneuknopf_" + scheinId);
+  if (knopf) knopf.hidden = true;
+  const feld = document.getElementById("neuordner_" + scheinId);
+  if (!feld) return;
+  if (ausSuche) {
+    const s = document.getElementById("ordnersuche_" + scheinId);
+    if (s && s.value.trim()) feld.value = s.value.trim();
+  }
+  feld.focus();
+}
+
+function ordnerNeuTaste(ev, scheinId, bereichId) {
+  if (ev.key !== "Enter") return;
+  ev.preventDefault();
+  ordnerNeuUndSpeichern(scheinId, bereichId);
+}
+
+// Enter im Suchfeld: ist genau EIN Treffer sichtbar, wird er gewaehlt.
+// Sind mehrere sichtbar, zaehlt nur ein exakter Treffer (genau diese
+// P-Nummer oder genau dieser Name). Sonst passiert nichts - lieber ein
+// Klick mehr als der falsche Name.
+function ordnerSucheTaste(ev, scheinId) {
+  if (ev.key !== "Enter") return;
+  ev.preventDefault();
+  const liste = document.getElementById("ordnerliste_" + scheinId);
+  if (!liste) return;
+  const sichtbar = Array.prototype.slice.call(liste.querySelectorAll("button.ordner-person"))
+    .filter(b => !b.hidden && !b.disabled);
+  if (sichtbar.length === 1) { sichtbar[0].click(); return; }
+  const feld = document.getElementById("ordnersuche_" + scheinId);
+  const q = personNorm(feld ? feld.value : "");
+  if (!q) return;
+  const nurZahl = /^\d+$/.test(q);
+  const genau = sichtbar.filter(b =>
+    (nurZahl && String(b.dataset.nr || "") === String(parseInt(q, 10))) || String(b.dataset.norm || "") === q);
+  if (genau.length === 1) genau[0].click();
 }
 
 // Gesucht wird im Namen, GEWAEHLT wird ueber die Kennung: zwei Personen
@@ -2367,11 +2428,8 @@ function zeichneVerlauf() {
   html += "<table><thead><tr><th>Wann</th><th>Anbieter</th><th>Wetten</th><th>Quote</th>" +
     "<th>Einsatz</th><th>Möglich</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   v.forEach((x, i) => {
-    const d = new Date(x.zeit);
     const foto = x.scheinId ? localStorage.getItem(fotoSchluessel(x.scheinId)) : null;
-    html += "<tr><td class='mini'>" + String(d.getDate()).padStart(2, "0") + "." +
-      String(d.getMonth() + 1).padStart(2, "0") + ". " + String(d.getHours()).padStart(2, "0") +
-      ":" + String(d.getMinutes()).padStart(2, "0") + "</td><td>" + textSicherK2(x.anbieter) + "</td>" +
+    html += "<tr><td class='mini'>" + wannText(x.zeit) + "</td><td>" + textSicherK2(x.anbieter) + "</td>" +
       "<td class='mini'>" + x.wetten.map(t =>
         textSicherK2(t.spiel) + " (" + textSicherK2(t.linie) + ")").join("<br>") +
       (foto ? '<div class="fotoname mini">' +

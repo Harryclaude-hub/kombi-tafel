@@ -160,7 +160,8 @@ function einzelnNaechste(ersteRunde) {
     // Auch hier nur eine interne Nummer - die feste kommt beim Speichern.
     nr: z.scheine.reduce((p, s) => Math.max(p, s.nr || 0), 0) + 1,
     id: "EZ" + Date.now(), kz: kz, art: "normal",
-    einzeln: true, entfernt: [], wetten: drei
+    einzeln: true, entfernt: [], wetten: drei,
+    gebautAm: new Date().toISOString()     // Karam: an jeder Karte Datum und Uhrzeit
   });
   speichereZustand(z);
   if (!ersteRunde) meldung("Naechste Kombination bei <b>" + anbieterName(kz) + "</b>.", "gut");

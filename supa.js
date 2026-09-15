@@ -640,7 +640,11 @@ async function supaOrdnerLaden(bereichId) {
   const liste = r.data || [];
   const key = await kryptoBereich(bereichId);
   for (const o of liste) o.name = await e2eAuf(key, o.name);
-  liste.sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+  // Nach P-Nummer (P-2 vor P-10), nicht als Text - Karams Personen heissen
+  // "P-7". personVergleich liegt in logik.js; auf einer Seite ohne logik.js
+  // bleibt die alte Textsortierung, statt dass das Laden abstuerzt.
+  if (typeof personVergleich === "function") liste.sort(personVergleich);
+  else liste.sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
   return mitFehler(liste, r);
 }
 

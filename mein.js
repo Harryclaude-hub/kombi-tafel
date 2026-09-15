@@ -29,11 +29,11 @@ function meldungM(text, art) {
   // jetzt immer dorthin gescrollt.
   try { box.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { }
 }
-function zeitM(iso) {
-  const d = new Date(iso);
-  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
-    ". " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-}
+// Das Zeitformat lebt seit 15.09.2026 nur noch in logik.js (wannText):
+// "15.09.2026 14:02", mit Jahr. Vorher stand es hier und an sieben
+// weiteren Stellen nachgebaut. Diese Huelle bleibt, damit die vielen
+// Aufrufer nicht umbenannt werden muessen.
+function zeitM(iso) { return wannText(iso); }
 
 // ---------- Start ----------
 
@@ -968,6 +968,9 @@ async function tuOrdnerAnlegen() {
     if (String(r.fehler).includes("Schlüssel")) pruefeSchluessel(true);
     return;
   }
+  // Eine frisch angelegte Person ist die aktuellste - im Kombi-Bau steht
+  // sie damit beim naechsten Speichern unter den ersten fuenf.
+  personGemerkt(r.ordner.id);
   meldungM('Person <b>' + textSicherM(r.ordner.name) + "</b> hinzugefuegt.", "gut");
   zeichneBereich();
 }
@@ -996,6 +999,9 @@ async function tuOrdnerLoeschen(id) {
 async function tuScheinOrdner(id, wert) {
   const r = await supaScheinAendern(id, { ordner: wert || null });
   if (r.error) { meldungM("Nicht zugeordnet: " + r.error.message, "warn"); return; }
+  // Auch eine Zuordnung hier zaehlt als "zuletzt benutzt" fuer die
+  // fuenf oben im Kombi-Bau - sonst kennt die Merkliste nur den Kombi-Bau.
+  if (wert) personGemerkt(wert);
   zeichneBereich();
 }
 
@@ -1490,10 +1496,7 @@ function standMarke(s) {
   return '<div class="st-mark st-offen">offen &middot; Ergebnis ~ ' + kasseZeit(e) + "</div>";
 }
 
-function kasseZeit(d) {
-  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
-    ". " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-}
+function kasseZeit(d) { return wannText(d); }   // ein Format, siehe zeitM
 
 // Was in Ansicht UND PDF gezeigt wird, je Person gemerkt (z. B. kein Neteller)
 const KASSE_BLOECKE = [["daten", "Personendaten"], ["statistik", "Statistik"], ["fluss", "Geldfluss"],
