@@ -240,6 +240,7 @@ gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b
 Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur, wenn ein
 Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
+<div id="personenimport"></div>
 <div id="personenkasse"></div>
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
@@ -1143,6 +1144,14 @@ async function zeichneBereich() {
   zeichneAnbieterKopf();
   zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
+  // Der Abgleich mit Karams Konten-Liste (personen-import.js, loeschbar).
+  // Faellt die Datei weg, bleibt der Kasten einfach leer.
+  if (typeof piPanelHtml === "function" && el("personenimport")) {
+    // Nur neu zeichnen, wenn der Kasten noch leer ist: sonst waere der
+    // eingefuegte Text nach jedem Zeichnen weg.
+    const k = el("personenimport");
+    if (!k.innerHTML) k.innerHTML = piPanelHtml();
+  }
   zeichnePersonenKasse(scheine);
   zeichnePruefung(scheine);
   const gefiltert = (ordnerFilter === "alle") ? scheine
@@ -2645,6 +2654,71 @@ async function tuGruppeStand(keyKodiert, wert) {
 // Das Kombi-Konto als HTML. einz/ausz/start und letzteBalance kommen
 // FERTIG aus zeichneBuchhaltung - hier wird nichts davon neu gesucht,
 // damit oben und hier nie zwei verschiedene Zahlen stehen koennen.
+// ---------- Fehlende Screenshots nachtragen ----------
+// Karam (16.09.2026): "Warum sind bei manchen Fotos keine Screenshots?
+// Ich weiss, dass das Screenshots waren. Such die Screenshots und tu sie
+// da hinzufuegen bei jeder Kombi, die da nicht gescheit da war."
+//
+// WO GESUCHT WIRD: im oertlichen Bildlager dieses Browsers (IndexedDB,
+// bildlager.js). Dort liegt jedes Bild unter der Kennung, die der
+// Kombi-Bau vergeben hat - die steht im Schein als daten.scheinId.
+// Beim Speichern ins Konto wird die oertliche Kopie geloescht; ist das
+// Speichern damals ohne Bild durchgelaufen, liegt das Bild noch da.
+//
+// Es wird NICHTS geraten: ein Bild wird nur dann nachgetragen, wenn es
+// unter genau dieser Kennung gefunden wird. Am Ende steht, wie viele
+// nachgetragen wurden und wie viele wirklich nirgends mehr sind.
+async function fotosNachtragen() {
+  if (typeof bildLagerHolen !== "function") {
+    meldungM("Das Bildlager dieses Browsers ist nicht da. Ohne es kann nichts gesucht werden.", "warn");
+    return;
+  }
+  const alle = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const fehlen = alle.filter(s => !s.foto);
+  if (!fehlen.length) {
+    meldungM("Bei allen " + alle.length + " Kombinationen ist ein Bild da. Nichts nachzutragen.", "gut");
+    return;
+  }
+  meldungM("Suche im Bildlager nach " + fehlen.length + " fehlenden Bildern...", "gut");
+
+  let getragen = 0, nichtGefunden = 0, unlesbar = 0;
+  const fehler = [], offen = [];
+  for (const s of fehlen) {
+    // Ein Bild, das NUR nicht entschluesselbar war, ist nicht verloren -
+    // es liegt in der Datenbank. Es hier zu ueberschreiben waere falsch.
+    if (s.fotoUnlesbar) { unlesbar++; continue; }
+    const kennung = (s.daten && s.daten.scheinId) ? s.daten.scheinId : null;
+    let satz = kennung ? await bildLagerHolen(kennung) : null;
+    // Zweiter Versuch unter der Datenbank-Kennung: aeltere Bilder liegen
+    // manchmal so da.
+    if (!satz || !satz.foto) satz = await bildLagerHolen(s.id);
+    if (!satz || !satz.foto || !String(satz.foto).startsWith("data:")) {
+      nichtGefunden++;
+      offen.push(s.nummer || "?");
+      continue;
+    }
+    const r = await supaScheinFotoNachtragen(aktiverBereich.id, s.id, satz.foto, satz.name);
+    if (r.error) { fehler.push("Nr. " + (s.nummer || "?") + ": " + r.error.message); continue; }
+    if (!r.data || !r.data.length) {
+      fehler.push("Nr. " + (s.nummer || "?") + ": nicht erlaubt (keine Zeile geaendert)");
+      continue;
+    }
+    s.foto = satz.foto;
+    s.foto_name = satz.name || "Wettschein";
+    getragen++;
+  }
+
+  let text = "<b>" + getragen + " Bild(er) nachgetragen.</b>";
+  if (unlesbar) text += " " + unlesbar + " Bild(er) liegen in der Datenbank, lassen sich auf " +
+    "diesem Gerät aber nicht entschlüsseln - die sind NICHT verloren, dort fehlt der Schlüssel.";
+  if (nichtGefunden) text += " Bei " + nichtGefunden + " Kombination(en) ist auch im Bildlager " +
+    "nichts: Nr. " + offen.slice(0, 20).join(", ") + (offen.length > 20 ? " und weitere" : "") +
+    ". Die wurden damals ohne Bild gespeichert.";
+  if (fehler.length) text += " <b>Nicht gespeichert:</b> " + fehler.slice(0, 5).join("; ");
+  meldungM(text, (getragen && !fehler.length) ? "gut" : "warn");
+  if (getragen) zeichneBereich();
+}
+
 // Wann wurde diese Gruppe gesetzt? Der frueheste Speicher-Moment ihrer
 // Teile, mit Datum UND Uhrzeit. Das ist eine ANDERE Zeit als "Spiele
 // laufen bis" daneben: die kommt aus den Anstosszeiten.
@@ -3044,7 +3118,10 @@ async function zeichneBuchhaltung() {
         "&#129513; Alle Kombinationen als Excel</button> " +
       '<button onclick="exFotos()" ' +
         'title="Alle gespeicherten Wettschein-Fotos, je Person ein Unterordner">' +
-        "&#128247; Alle Fotos als Ordner (ZIP)</button>" +
+        "&#128247; Alle Fotos als Ordner (ZIP)</button> " +
+      '<button onclick="fotosNachtragen()" ' +
+        'title="Sucht im Bildlager dieses Browsers nach Screenshots, die beim Speichern nicht mitgekommen sind">' +
+        "&#128269; Fehlende Screenshots suchen</button>" +
       '<div class="mini">Die Dateien entstehen auf diesem Gerät und gehen nirgends hin. ' +
         "Es kommt genau das hinein, was hier am Bildschirm steht.</div>" +
     "</div>" +

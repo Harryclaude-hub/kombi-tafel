@@ -4433,6 +4433,36 @@ body[data-seite="mein"] #buchhaltung .kk-doppbox {
   background: #fdf2f1; margin: 4px 0;
 }
 
+/* ---- 6g. Personen aus einer Liste abgleichen ---- */
+body[data-seite="mein"] .pi-kasten {
+  border: 1px solid #d3d9e4; border-left: 4px solid var(--kenn, #1a2c50);
+  border-radius: 12px; background: #fff; padding: 10px 14px; margin: 12px 0;
+}
+body[data-seite="mein"] .pi-kasten > summary { font-weight: bold; padding: 6px 0; }
+body[data-seite="mein"] .pi-kasten textarea {
+  width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12.5px;
+  border-radius: 8px; border: 1px solid #ccd3e0; padding: 8px;
+}
+body[data-seite="mein"] .pi-summe { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+body[data-seite="mein"] .pi-k {
+  padding: 6px 12px; border-radius: 10px; border: 1px solid #d3d9e4;
+  background: #f7f9fc; font-size: 13px;
+}
+body[data-seite="mein"] .pi-k.pi-da { border-color: #1a7a1a; background: #f1f8f1; }
+body[data-seite="mein"] .pi-k.pi-neu { border-color: #b35a00; background: #fff8ef; }
+body[data-seite="mein"] .pi-block {
+  border: 1px solid #d3d9e4; border-radius: 10px; padding: 10px 12px; margin: 8px 0;
+  background: #fafbfe;
+}
+body[data-seite="mein"] .pi-block.pi-gut { border-color: #1a7a1a; background: #f1f8f1; }
+body[data-seite="mein"] .pi-block.pi-warn { border-color: #b35a00; background: #fff8ef; }
+body[data-seite="mein"] .pi-liste { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+body[data-seite="mein"] .pi-chip {
+  padding: 2px 10px; border-radius: 999px; border: 1px solid #ccd3e0;
+  background: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+body[data-seite="mein"] .pi-chip.pi-chip-da { border-color: #1a7a1a; color: #0a5a0a; }
+
 /* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */
 body[data-seite="mein"] .tabellenrand { border-radius: 12px; }
 body[data-seite="mein"] .vf-schalter {

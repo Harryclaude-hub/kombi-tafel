@@ -431,6 +431,27 @@ async function supaScheinAendern(id, felder) {
   return await supa.from("kt_scheine").update(felder).eq("id", id).select("id");
 }
 
+// Ein Foto nachtragen, das beim Speichern nicht mitgekommen ist.
+// Karam (16.09.2026): "Warum sind bei manchen Fotos keine Screenshots?
+// Ich weiss, dass das Screenshots waren. Such die Screenshots und tu sie
+// da hinzufuegen." Die Bilder liegen noch im oertlichen Bildlager
+// (IndexedDB, bildlager.js) - von dort kommen sie hierher zurueck.
+//
+// WICHTIG: supaScheinAendern verschluesselt NICHT. Foto und Fotoname
+// muessen deshalb hier durch e2eZu, sonst laege der Screenshot offen in
+// der Datenbank. Ohne Schluessel wird gar nichts geschrieben.
+async function supaScheinFotoNachtragen(bereichId, id, foto, name) {
+  const key = await kryptoBereich(bereichId);
+  if (!key) return { error: { message: OHNE_SCHLUESSEL } };
+  if (!foto || !String(foto).startsWith("data:")) {
+    return { error: { message: "Das ist kein Bild." } };
+  }
+  return await supa.from("kt_scheine").update({
+    foto: await e2eZu(key, foto),
+    foto_name: await e2eZu(key, name || "Wettschein")
+  }).eq("id", id).select("id");
+}
+
 async function supaScheinLoeschen(id) {
   // select() macht die 0-Zeilen-Falle sichtbar (dieselbe Lektion wie bei
   // supaScheinAendern): ohne select kommt weder ein Fehler noch eine
