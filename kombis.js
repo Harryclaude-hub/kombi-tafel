@@ -2119,23 +2119,173 @@ function textSicher(t) {
   return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
 
+// Karam (15.09.2026): "wenn ich etwas in den Verlauf speichere, ist immer
+// alles durcheinander. Ich moechte, dass nur fuenf Personen angezeigt
+// werden, und zwar die aktuellen - und ein Feld, um Personen zu suchen."
+//
+// Oben stehen deshalb die fuenf zuletzt benutzten. Alle anderen sind
+// WEITER DA, nur eingeklappt: die Suche findet sie, und "alle zeigen"
+// klappt die volle Liste auf. Niemand wird weggeworfen - eine Person, die
+// man nicht mehr findet, waere schlimmer als eine lange Liste.
+const PERSONEN_OBEN = 5;
+const PERSONEN_MERK = "personen_zuletzt";
+
+// Karam (15.09.2026): "Jede Person beginnt mit P, Bindestrich und einer
+// Zahl. Manche haben auch NUR diese P und Zahl." Also "P-7", "P-12 Max"
+// oder blank "P-7". Daraus folgen drei Dinge:
+//  - Sortiert wird nach der ZAHL, nicht als Text. Sonst stuende P-10 vor P-2.
+//  - Gesucht wird auch nur ueber die Zahl: "7" findet P-7.
+//  - Bindestrich, Punkt und Leerzeichen sind beim Suchen egal: "p7" findet P-7.
+function personNorm(name) {
+  return String(name || "").toLowerCase().replace(/[\s\-_.]/g, "");
+}
+
+// Die P-Nummer, wenn der Name mit P und einer Zahl ANFAENGT, sonst null.
+// Streng am Anfang: ein Name wie "Top 3" darf nicht als Nummer 3 gelten.
+function personNummer(name) {
+  const m = /^\s*p[-_. ]?(\d+)/i.exec(String(name || ""));
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function personenZuletzt() {
+  try {
+    const r = JSON.parse(localStorage.getItem(PERSONEN_MERK) || "[]");
+    return Array.isArray(r) ? r : [];
+  } catch (e) { return []; }
+}
+
+// Reine Bequemlichkeits-Merkliste. Schlaegt das Schreiben fehl (voller
+// Gearaetespeicher), ist nur die Reihenfolge wieder die alte - es gehen
+// KEINE Daten verloren. Deshalb hier bewusst ohne Meldung.
+function personGemerkt(ordnerId) {
+  if (!ordnerId) return;
+  try {
+    const r = personenZuletzt().filter(x => x !== ordnerId);
+    r.unshift(ordnerId);
+    localStorage.setItem(PERSONEN_MERK, JSON.stringify(r.slice(0, 20)));
+  } catch (e) { }
+}
+
+// Die "aktuellen" Personen: zuerst die, die auf diesem Geraet zuletzt
+// gewaehlt wurden, danach die aus den zuletzt gespeicherten Scheinen
+// (kontoScheine kommt schon neueste-zuerst aus der Datenbank). Wer nie
+// dran war, bleibt alphabetisch - genau wie bisher.
+// Verknuepft wird ueber die Kennung, nie ueber den Namen.
+function personenSortiert(liste) {
+  const rang = new Map();
+  let n = 0;
+  for (const id of personenZuletzt()) if (id && !rang.has(id)) rang.set(id, n++);
+  for (const s of kontoScheine) if (s && s.ordner && !rang.has(s.ordner)) rang.set(s.ordner, n++);
+  return liste.slice().sort((a, b) => {
+    const ra = rang.has(a.id) ? rang.get(a.id) : Infinity;
+    const rb = rang.has(b.id) ? rang.get(b.id) : Infinity;
+    if (ra !== rb) return ra - rb;
+    // Wer nie dran war, steht nach P-Nummer - P-2 vor P-10, nicht danach.
+    const na = personNummer(a.name), nb = personNummer(b.name);
+    if (na !== null && nb !== null && na !== nb) return na - nb;
+    if (na !== null && nb === null) return -1;
+    if (na === null && nb !== null) return 1;
+    return String(a.name).localeCompare(String(b.name), "de");
+  });
+}
+
 async function ordnerWahlZeigen(scheinId, bereichId) {
   const box = document.getElementById("ordnerwahl_" + scheinId);
   if (!box) return;
   box.innerHTML = '<div class="ordnerpflicht mini">Personen werden geladen...</div>';
   const liste = await supaOrdnerLaden(bereichId);
-  let knoepfe = "";
-  for (const o of liste) {
-    knoepfe += '<button onclick="ordnerGewaehlt(\'' + scheinId + "','" + bereichId + "','" + o.id + '\')">' +
-      textSicher(o.name) + "</button> ";
+  // Ein Ladefehler ist NICHT dasselbe wie "keine Personen". Stand hier
+  // vorher beides gleich da, und Karam haette eine Person neu angelegt,
+  // die es laengst gibt - mitsamt getrenntem Guthaben.
+  if (liste && liste._fehler) {
+    box.innerHTML = '<div class="ordnerpflicht"><b>Die Personen konnten nicht geladen werden.</b> ' +
+      '<span class="mini">' + textSicher(liste._fehler) + " Leg jetzt bitte KEINE neue Person an - " +
+      "sie gibt es wahrscheinlich schon.</span><br>" +
+      '<button class="haupt" onclick="ordnerWahlZeigen(\'' + scheinId + "','" + bereichId + '\')">nochmal versuchen</button> ' +
+      '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
+    return;
   }
+  const sortiert = personenSortiert(liste);
+  const rest = sortiert.length - PERSONEN_OBEN;
+  let knoepfe = "";
+  sortiert.forEach((o, i) => {
+    const oben = i < PERSONEN_OBEN;
+    const nr = personNummer(o.name);
+    knoepfe += '<button class="ordner-person" data-top="' + (oben ? "1" : "0") +
+      '" data-i="' + i + '" data-nr="' + (nr === null ? "" : nr) +
+      '" data-norm="' + textSicher(personNorm(o.name)) + '"' + (oben ? "" : " hidden") +
+      ' onclick="ordnerGewaehlt(\'' + scheinId + "','" + bereichId + "','" + o.id + '\')">' +
+      textSicher(o.name) + "</button> ";
+  });
+  const suchzeile = rest > 0
+    ? '<input id="ordnersuche_' + scheinId + '" class="ordnersuche" placeholder="Person suchen..." ' +
+      'oninput="ordnerFiltern(\'' + scheinId + '\')"> ' +
+      '<button id="ordneralle_' + scheinId + '" onclick="ordnerAlleZeigen(\'' + scheinId + '\')">alle ' +
+      sortiert.length + " zeigen</button> "
+    : "";
   box.innerHTML = '<div class="ordnerpflicht"><b>Bei wem hast du diesen Schein gesetzt?</b> ' +
     '<span class="mini">Jede Kombination gehört zu einer Person, damit du in Mein Bereich ' +
-    "siehst, bei wem sie lief. Die Buchhaltung bleibt eine gemeinsame.</span><br>" +
-    (liste.length ? knoepfe : '<span class="mini">Du hast noch keine Personen - leg gleich hier die erste an.</span> ') +
+    "siehst, bei wem sie lief. Die Buchhaltung bleibt eine gemeinsame." +
+    (rest > 0 ? " Oben die zuletzt benutzten, die übrigen " + rest + " über die Suche." : "") +
+    "</span><br>" +
+    (sortiert.length
+      ? '<div id="ordnerliste_' + scheinId + '" class="ordnerliste">' + knoepfe + "</div>" +
+        '<span id="ordnerleer_' + scheinId + '" class="mini" hidden>Keine Person gefunden. ' +
+        "Tippfehler? Sie ist nicht geloescht, nur nicht getroffen.</span>" + suchzeile
+      : '<span class="mini">Du hast noch keine Personen - leg gleich hier die erste an.</span> ') +
     '<input id="neuordner_' + scheinId + '" placeholder="Neue Person, z. B. ein Name"> ' +
     '<button class="haupt" onclick="ordnerNeuUndSpeichern(\'' + scheinId + "','" + bereichId + '\')">Anlegen und speichern</button> ' +
     '<button onclick="ordnerWahlZu(\'' + scheinId + '\')">abbrechen</button></div>';
+}
+
+// Gesucht wird im Namen, GEWAEHLT wird ueber die Kennung: zwei Personen
+// duerfen gleich heissen, ohne dass etwas vertauscht wird.
+// Leeres Feld = wieder nur die fuenf aktuellen.
+//
+// Die Treffer werden sortiert, damit bei Karams P-Nummern das Richtige
+// oben steht. "7" soll P-7 bringen, nicht P-17:
+//   Rang 0  genau diese P-Nummer, oder der Name exakt getroffen
+//   Rang 1  Name faengt damit an  ("p1" -> P-12)
+//   Rang 2  kommt irgendwo vor    ("7"  -> P-17)
+function ordnerFiltern(scheinId) {
+  const liste = document.getElementById("ordnerliste_" + scheinId);
+  if (!liste) return;
+  const feld = document.getElementById("ordnersuche_" + scheinId);
+  const q = personNorm(feld ? feld.value : "");
+  const nurZahl = /^\d+$/.test(q);
+  const knoepfe = Array.prototype.slice.call(liste.querySelectorAll("button.ordner-person"));
+  const treffer = [];
+  for (const b of knoepfe) {
+    if (!q) { b.hidden = b.dataset.top !== "1"; continue; }
+    const norm = String(b.dataset.norm || "");
+    const nr = String(b.dataset.nr || "");
+    let rang = -1;
+    if (nurZahl && nr !== "" && nr === String(parseInt(q, 10))) rang = 0;
+    else if (norm === q) rang = 0;
+    else if (norm.indexOf(q) === 0) rang = 1;
+    else if (norm.indexOf(q) !== -1) rang = 2;
+    b.hidden = rang < 0;
+    if (rang >= 0) treffer.push({ b: b, rang: rang, i: Number(b.dataset.i) });
+  }
+  // Reihenfolge setzen. Ohne Suche zurueck in die urspruengliche.
+  const ordnung = q
+    ? treffer.sort((x, y) => x.rang - y.rang || x.i - y.i)
+    : knoepfe.map(b => ({ b: b, i: Number(b.dataset.i) })).sort((x, y) => x.i - y.i);
+  for (const t of ordnung) liste.appendChild(t.b);
+  // Nichts gefunden wird GESAGT - sonst sieht ein Tippfehler aus wie
+  // "die Person gibt es nicht" und sie wird ein zweites Mal angelegt.
+  const leer = document.getElementById("ordnerleer_" + scheinId);
+  if (leer) leer.hidden = !(q && treffer.length === 0);
+  const alle = document.getElementById("ordneralle_" + scheinId);
+  if (alle) alle.hidden = !!q;
+}
+
+function ordnerAlleZeigen(scheinId) {
+  const liste = document.getElementById("ordnerliste_" + scheinId);
+  if (!liste) return;
+  for (const b of liste.querySelectorAll("button.ordner-person")) b.hidden = false;
+  const alle = document.getElementById("ordneralle_" + scheinId);
+  if (alle) alle.hidden = true;
 }
 
 function ordnerWahlZu(scheinId) {
@@ -2144,6 +2294,8 @@ function ordnerWahlZu(scheinId) {
 }
 
 function ordnerGewaehlt(scheinId, bereichId, ordnerId) {
+  // Wer gerade dran war, steht beim naechsten Speichern oben.
+  personGemerkt(ordnerId);
   scheinInsKonto(scheinId, bereichId, ordnerId);
 }
 
@@ -2151,6 +2303,8 @@ async function ordnerNeuUndSpeichern(scheinId, bereichId) {
   const feld = document.getElementById("neuordner_" + scheinId);
   const r = await supaOrdnerAnlegen(bereichId, feld ? feld.value : "");
   if (r.fehler) { meldung("Person nicht hinzugefuegt: " + r.fehler, "warn"); return; }
+  // Die frisch angelegte Person ist die aktuellste, die es gibt.
+  personGemerkt(r.ordner.id);
   scheinInsKonto(scheinId, bereichId, r.ordner.id);
 }
 

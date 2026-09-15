@@ -454,6 +454,11 @@ button.freundknopf.aktiv { background: var(--blau); color: #fff; }
   padding: 10px 12px; margin-top: 8px; }
 .ordnerpflicht button { margin: 6px 6px 0 0; }
 .ordnerpflicht input { margin-top: 6px; }
+/* Personen-Auswahl beim Speichern (15.09.2026): nur Optik. Faellt dieser
+   Block weg, stehen die Knoepfe schlicht untereinander - Suche, die fuenf
+   aktuellen und "alle zeigen" arbeiten unveraendert weiter. */
+.ordnerliste { margin: 6px 0 2px 0; }
+.ordnersuche { min-width: 12em; }
 .ordnerfilter { margin: 4px 0 8px 0; }
 .ordnerfilter button { margin: 0 4px 4px 0; }
 .ordnerfilter button.aktiv { background: #1a2c50; color: #fff; border-color: #1a2c50; }
