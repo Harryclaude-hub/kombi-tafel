@@ -4127,10 +4127,11 @@ body[data-seite="mein"] #ordnerbox td,
 body[data-seite="mein"] #ordnerbilanz td,
 body[data-seite="mein"] #buchhaltung td {
   border-left: 0; border-right: 0; border-top: 0;
-  /* Karam (16.09.2026): "immer so ein bisschen dickere Linie zwischen den
-     einzelnen Werten, das muss leichter erkennbar sein." Deshalb 2px und
-     ein kraeftigerer Ton als die erste Fassung mit 1px #e6eaf1. */
-  border-bottom: 2px solid #ccd3e0;
+  /* Karam (16.09.2026), zweimal gesagt: "immer eine dickere Linie zwischen
+     den einzelnen Werten" und dann "ich will, dass sie klare, dicke
+     Durchstriche sind." Deshalb 2px in einem Ton, den man wirklich sieht
+     (#9aa6b8), nicht das blasse Grau der ersten Fassung. */
+  border-bottom: 2px solid #9aa6b8;
   padding: 8px 9px;
 }
 body[data-seite="mein"] #scheine_db th,
@@ -4247,10 +4248,24 @@ body[data-seite="mein"] #auswerten .aw-zeit.aktiv {
   background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
 }
 body[data-seite="mein"] #auswerten .aw-zeile { margin: 6px 0; }
+/* Zeitraum, Saetze und die zwei Uhrzeiten stehen NEBENEINANDER, nicht
+   untereinander. Wird der Platz eng, bricht die Reihe um, statt zu
+   quetschen. */
 body[data-seite="mein"] #auswerten .aw-spanne {
-  margin: 6px 0 2px; padding: 7px 12px; border-radius: 8px;
+  display: flex; flex-wrap: wrap; gap: 8px 22px;
+  margin: 6px 0 2px; padding: 9px 12px; border-radius: 8px;
   background: color-mix(in srgb, var(--kennhell, #eef1f7) 70%, #fff);
   color: #22314c; font-size: 13.5px;
+}
+body[data-seite="mein"] #auswerten .aw-sp { display: flex; flex-direction: column; }
+body[data-seite="mein"] #auswerten .aw-spt { font-size: 11px; color: #55627a; }
+body[data-seite="mein"] #auswerten .aw-spw { font-weight: bold; font-variant-numeric: tabular-nums; }
+
+/* Sortier-Knoepfe bei "Wer haelt gerade wie viel" */
+body[data-seite="mein"] .tag-filter { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 8px; }
+body[data-seite="mein"] .tag-filter .tag-sort { border-radius: 999px; }
+body[data-seite="mein"] .tag-filter .tag-sort.aktiv {
+  background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
 }
 /* Die laufende Nummer im Zeitraum: bewusst ruhig, damit sie die feste
    Scheinnummer daneben nicht verdraengt. */
@@ -4330,6 +4345,32 @@ body[data-seite="mein"] #auswerten .aw-karte.aw-unlesbar { border-left-color: #b
   body[data-seite="mein"] #auswerten .aw-tasten { min-width: 100%; }
   body[data-seite="mein"] #auswerten .aw-gruen,
   body[data-seite="mein"] #auswerten .aw-rot { min-height: 46px; }
+}
+
+/* ---- 6d. Kombi-Konto: Foto neben der Nummer, Tasten statt Menue ---- */
+body[data-seite="mein"] #buchhaltung .kk-nr { white-space: nowrap; }
+body[data-seite="mein"] #buchhaltung img.kk-foto {
+  float: none; display: block; max-width: 64px; max-height: 64px;
+  margin: 0 0 4px 0; border-radius: 8px; border: 1px solid #ccd3e0;
+}
+body[data-seite="mein"] #buchhaltung img.kk-foto.foto-gross {
+  max-width: 100%; max-height: none;
+}
+body[data-seite="mein"] #buchhaltung .kk-tasten {
+  display: flex; flex-direction: column; gap: 5px; min-width: 150px;
+}
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-gruen,
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-rot {
+  min-height: 34px; font-size: 13px; font-weight: bold; border-radius: 8px;
+}
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-gruen { border: 2px solid #1a7a1a; color: #0a5a0a; background: #f1f8f1; }
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-rot { border: 2px solid #a00000; color: #8a0f0f; background: #fdf2f1; }
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-gruen.aktiv { background: #1a7a1a; color: #fff; }
+body[data-seite="mein"] #buchhaltung .kk-tasten .aw-rot.aktiv { background: #a00000; color: #fff; }
+body[data-seite="mein"] #buchhaltung .kk-dopp { border-radius: 999px; padding: 1px 9px; font-size: 11.5px; }
+body[data-seite="mein"] #buchhaltung .kk-doppbox {
+  border: 2px solid #a00000; border-radius: 10px; padding: 10px 12px;
+  background: #fdf2f1; margin: 4px 0;
 }
 
 /* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */

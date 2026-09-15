@@ -890,6 +890,40 @@ function ordnerNameM(id) {
   return o ? o.name : null;
 }
 
+// ---------- Der Personen-Knopf ----------
+// Karam (16.09.2026): "Immer wenn in einer Tabelle die Personen angezeigt
+// werden - bei wem liegt gerade das Geld - moechte ich, dass das ein Knopf
+// ist, wo ich die Person anklicken kann. Und ich komme einfach auf die
+// Person."
+//
+// EINE Stelle fuer ALLE Tabellen: Tagesuebersicht, Buchhaltung,
+// Kombi-Konto, Personen-Liste, Auswerten. Wer den Sprung aendern will,
+// aendert ihn hier und nirgends sonst.
+function zuPersonM(ordnerId) {
+  if (typeof tuOrdnerFilter !== "function" || typeof mbBlockZeigen !== "function") return true;
+  tuOrdnerFilter(ordnerId || "ohne");
+  mbBlockZeigen("kombis");
+  const ziel = el("personenkasse") || el("scheine_titel") || el("ordnerbox");
+  if (ziel && ziel.scrollIntoView) { try { ziel.scrollIntoView({ block: "start" }); } catch (e) { } }
+  return false;                 // dem Link selbst nicht auch noch folgen
+}
+
+// Der Chip, der ueberall gleich aussieht. Ohne Person wird das
+// ausdruecklich gesagt und ist trotzdem anklickbar - Karam muss genau
+// dort hin, um sie zuzuordnen.
+function personKnopfM(ordnerId, zusatz) {
+  const name = ordnerId ? (ordnerNameM(ordnerId) || "Person") : "";
+  if (!ordnerId) {
+    return '<a class="s-person s-person-fehlt" href="mein.html?person=ohne" ' +
+      'onclick="return zuPersonM(\'\')" title="Kombinationen ohne Person ansehen und zuordnen">' +
+      "&#9888; ohne Person</a>";
+  }
+  return '<a class="s-person" href="mein.html?person=' + encodeURIComponent(ordnerId) + '" ' +
+    'onclick="return zuPersonM(\'' + ordnerId + '\')" ' +
+    'title="Alles von ' + textSicherM(name) + ' ansehen">&#128100; ' + textSicherM(name) +
+    (zusatz ? " " + zusatz : "") + "</a>";
+}
+
 function zeichneOrdnerBox(scheine) {
   const box = el("ordnerbox");
   if (!box) return;
@@ -2605,6 +2639,57 @@ async function tuGruppeStand(keyKodiert, wert) {
 // Das Kombi-Konto als HTML. einz/ausz/start und letzteBalance kommen
 // FERTIG aus zeichneBuchhaltung - hier wird nichts davon neu gesucht,
 // damit oben und hier nie zwei verschiedene Zahlen stehen koennen.
+// Das erste Foto einer Gruppe, klein neben der Nummer. Hat kein Teil ein
+// Foto, bleibt der Platz leer - kein Platzhalter, der die Zeile aufblaeht.
+function kkFotoHtml(x) {
+  const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  for (const id of (x.ids || [])) {
+    const s = liste.find(y => y.id === id);
+    if (s && s.foto && String(s.foto).startsWith("data:")) {
+      return '<img class="minifoto kk-foto" src="' + textSicherM(s.foto) +
+        '" alt="Wettschein" title="Antippen macht das Bild groß">';
+    }
+  }
+  return "";
+}
+
+// Karam (16.09.2026): "diese Teile sind doppelt gespeichert worden - kann
+// ich draufklicken, dann kommen die zwei Anzeigen, kann ich sehen, bei
+// welcher Person und wo die sind."
+function kkDoppelteZeigen(keyRoh) {
+  const key = decodeURIComponent(keyRoh);
+  const g = kkGruppen().find(x => x.key === key);
+  if (!g) { meldungM("Diese Gruppe gibt es nicht mehr. Seite neu laden.", "warn"); return; }
+  const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const teile = (g.ids || []).map(id => liste.find(y => y.id === id)).filter(Boolean);
+  const dopp = doppelteM(liste);
+  const zeile = el("kkd_" + (g.ids || [])[0]);
+  if (!zeile) return;
+  if (!zeile.hidden) { zeile.hidden = true; zeile.firstElementChild.innerHTML = ""; return; }
+  let h = '<div class="kk-doppbox"><b>&#9888; Diese Teile sind doppelt gespeichert</b>' +
+    '<div class="mini">Der erste Eintrag bleibt, die spaeteren koennen weg. Beide zaehlen ' +
+    "sonst mit vollem Einsatz mit und druecken den Gewinn.</div>" +
+    "<table><thead><tr><th>Nr.</th><th>Gespeichert am</th><th>Person</th><th>Anbieter</th>" +
+    "<th>Einsatz</th><th>Stand</th><th></th></tr></thead><tbody>";
+  for (const s of teile) {
+    const d = s.daten || {};
+    const istSpaeter = dopp[s.id] && dopp[s.id].spaeter;
+    h += "<tr" + (istSpaeter ? " class='doppelzeile'" : "") + ">" +
+      "<td><b>" + (s.nummer || "?") + "</b></td>" +
+      "<td class='mini'>" + (typeof wannText === "function" ? wannText(s.created_at) : "") + "</td>" +
+      "<td>" + personKnopfM(s.ordner) + "</td>" +
+      "<td>" + markeM(d.kz) + "</td>" +
+      "<td>" + Number(d.einsatz || 0).toFixed(2) + " &euro;</td>" +
+      "<td>" + textSicherM(s.stand) + "</td>" +
+      "<td class='mini'>" + (istSpaeter
+        ? "<b class='rot'>der spaetere - dieser ist zu viel</b>"
+        : "der erste, bleibt") + "</td></tr>";
+  }
+  h += "</tbody></table></div>";
+  zeile.firstElementChild.innerHTML = h;
+  zeile.hidden = false;
+}
+
 function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
   const w = kkWahlLesen();
   const alle = kkGruppen();
@@ -2750,10 +2835,20 @@ function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
       const key = encodeURIComponent(x.key);
       h += "<tr class='st-" + x.stand + "'>" +
         "<td class='mini'>" + zeitraum + "</td>" +
-        "<td>" + (x.nummern.length ? textSicherM(x.nummern.join(", ")) : "<span class='mini'>-</span>") + "</td>" +
-        "<td>" + (x.person ? textSicherM(ordnerNameM(x.person) || "?") : "<span class='mini'>ohne Person</span>") + "</td>" +
+        // Karam (16.09.2026): "bei den Kombis immer ein Mini-Foto neben
+        // der Nummer, das ich groesser machen kann." Antippen macht es
+        // gross (zeilen.js setzt .foto-gross).
+        "<td class='kk-nr'>" + kkFotoHtml(x) +
+          (x.nummern.length ? "<b>" + textSicherM(x.nummern.join(", ")) + "</b>"
+                            : "<span class='mini'>-</span>") + "</td>" +
+        "<td>" + personKnopfM(x.person) + "</td>" +
         "<td class='mini'>" + x.anbieter.map(kz => textSicherM(anbieterNameM(kz) || kz)).join(", ") + "</td>" +
-        "<td>" + x.teile + (x.doppelt ? " <span class='rot' title='doppelt gespeichert'>&#9888;</span>" : "") + "</td>" +
+        // Doppelte sind anklickbar: dann steht darunter, WELCHE Teile
+        // doppelt sind und bei wem. Vorher war es nur ein Ausrufezeichen.
+        "<td>" + x.teile + (x.doppelt
+          ? ' <button class="kk-dopp rot" title="Zeigen, welche Teile doppelt sind" ' +
+            "onclick=\"kkDoppelteZeigen('" + key + "')\">&#9888; " + x.doppelt + " doppelt</button>"
+          : "") + "</td>" +
         "<td><b>" + x.einsatz.toFixed(2) + " &euro;</b>" +
           (x.imSpiel && x.imSpiel !== x.einsatz
             ? "<div class='mini'>davon " + x.imSpiel.toFixed(2) + " &euro; noch im Spiel</div>" : "") + "</td>" +
@@ -2762,13 +2857,21 @@ function zeichneKombiKontoHtml(einz, ausz, start, letzteBalance, balanceDatum) {
         "<td class='" + (x.offen && !x.gewonnen && !x.verloren ? "" : (x.gewinn >= 0 ? "gruen" : "rot")) + "'>" +
           (x.offen && !x.gewonnen && !x.verloren ? "<span class='mini'>l&auml;uft noch</span>"
             : "<b>" + (x.gewinn >= 0 ? "+" : "") + x.gewinn.toFixed(2) + " &euro;</b>") + "</td>" +
-        "<td>" + (schreib
-          ? "<select onchange=\"tuGruppeStand('" + key + "', this.value)\">" +
-            '<option value="">' + textSicherM(x.stand) + "</option>" +
-            '<option value="gewonnen">alles gewonnen</option>' +
-            '<option value="verloren">alles verloren</option>' +
-            '<option value="offen">wieder offen</option></select>'
-          : textSicherM(x.stand)) + "</td></tr>";
+        // Karam (16.09.2026): "da will ich wirklich diesen Bereich haben,
+        // wo ich gewonnen, verloren, offen druecken kann, einfach als
+        // zwei Knoepfe." Kein aufklappendes Menue mehr.
+        "<td class='kk-tasten'>" + (schreib
+          ? '<button class="aw-gruen' + (x.stand === "gewonnen" ? " aktiv" : "") +
+              "\" onclick=\"tuGruppeStand('" + key + "', 'gewonnen')\">&#10003; gewonnen</button>" +
+            '<button class="aw-rot' + (x.stand === "verloren" ? " aktiv" : "") +
+              "\" onclick=\"tuGruppeStand('" + key + "', 'verloren')\">&#10007; verloren</button>" +
+            (x.stand !== "offen"
+              ? '<button class="aw-zurueck mini" onclick="tuGruppeStand(\'' + key +
+                "', 'offen')\">wieder offen</button>"
+              : "")
+          : textSicherM(x.stand)) + "</td></tr>" +
+        // Platz fuer die Doppelt-Aufloesung, wird erst auf Klick gefuellt
+        "<tr class='kk-doppzeile' id='kkd_" + x.ids[0] + "' hidden><td colspan='9'></td></tr>";
     }
     h += "</tbody></table></div>";
   } else {
@@ -2962,8 +3065,7 @@ async function zeichneBuchhaltung() {
   if (lage.anzahl) {
     html += '<div class="bb-wem"><div class="bb-abschnitt">Bei wem liegt das Geld gerade</div><ul class="bb-wemliste">';
     for (const p of bbPersonenOffen()) {
-      const name = p.id ? textSicherM(ordnerNameM(p.id) || "?") : "ohne Person";
-      html += '<li><span class="bb-wemname">' + name + "</span>" +
+      html += '<li><span class="bb-wemname">' + personKnopfM(p.id) + "</span>" +
         '<span class="bb-wemzahl">' + bbGeld(p.einsatz) + "</span>" +
         '<span class="bb-wemmini">' + p.n + (p.n === 1 ? " Kombination" : " Kombinationen") + "</span></li>";
     }
@@ -3969,24 +4071,72 @@ function tagAnbieterHtml(zeilen) {
 }
 
 // ---------- 3. Wer haelt gerade wie viel? ----------
+// Karam (16.09.2026): "bei wem liegt das Geld, auch eine Filtermoeglichkeit
+// haben, Kombi-Anzahl, Geldanzahl etc."
+// Die Wahl wird auf dem Geraet gemerkt, damit sie beim Tagwechsel bleibt.
+const TAG_SORT = "kt_tag_halter_sort";
+function tagHalterSort() {
+  try { return localStorage.getItem(TAG_SORT) || "haelt"; } catch (e) { return "haelt"; }
+}
+function tagHalterSortSetzen(wert) {
+  try { localStorage.setItem(TAG_SORT, wert); } catch (e) { }
+  zeichneTagesuebersicht();
+}
+function tagHalterNurMitGeld() {
+  try { return localStorage.getItem(TAG_SORT + "_nur") === "ja"; } catch (e) { return false; }
+}
+function tagHalterNurSetzen(an) {
+  try { localStorage.setItem(TAG_SORT + "_nur", an ? "ja" : "nein"); } catch (e) { }
+  zeichneTagesuebersicht();
+}
+
 function tagHalterHtml(zeilen) {
-  const mitGeld = zeilen.slice().sort((a, b) => b.haelt - a.haelt);
+  const wahl = tagHalterSort();
+  const nurMitGeld = tagHalterNurMitGeld();
+  const kombis = z => z.pr.anzahlKombis !== undefined ? z.pr.anzahlKombis
+    : (Array.isArray(kasseScheine) ? kasseScheine.filter(s => s.ordner === z.person.id).length : 0);
+  let mitGeld = zeilen.slice();
+  if (nurMitGeld) mitGeld = mitGeld.filter(z => Math.abs(z.haelt) > 0.004 || kombis(z) > 0);
+  const sortierer = {
+    haelt: (a, b) => b.haelt - a.haelt,
+    kombis: (a, b) => kombis(b) - kombis(a),
+    spiel: (a, b) => b.pr.imSpiel - a.pr.imSpiel,
+    bilanz: (a, b) => b.pr.bilanz - a.pr.bilanz,
+    name: (a, b) => (typeof personVergleich === "function")
+      ? personVergleich(a.person, b.person)
+      : String(a.person.name).localeCompare(String(b.person.name), "de"),
+  };
+  mitGeld.sort(sortierer[wahl] || sortierer.haelt);
+
+  const knopf = (w, t) => '<button class="tag-sort' + (wahl === w ? " aktiv" : "") +
+    '" onclick="tagHalterSortSetzen(\'' + w + '\')">' + t + "</button>";
   let html = '<div class="tag-teil"><h3>&#128188; Wer hält gerade wie viel</h3>' +
-    '<div class="tabellenrand"><table><thead><tr><th>Person</th><th>auf den Wegen</th>' +
-    '<th>bei den Anbietern</th><th>im Spiel</th><th>hält zusammen</th>' +
+    '<div class="tag-filter"><span class="mini">Sortieren nach:</span> ' +
+      knopf("haelt", "Geld") + knopf("kombis", "Kombi-Anzahl") + knopf("spiel", "Im Spiel") +
+      knopf("bilanz", "Unterm Strich") + knopf("name", "P-Nummer") +
+      ' <label class="mini"><input type="checkbox"' + (nurMitGeld ? " checked" : "") +
+      ' onchange="tagHalterNurSetzen(this.checked)"> nur wo etwas liegt</label>' +
+    "</div>" +
+    '<div class="tabellenrand"><table><thead><tr><th>Nr.</th><th>Person</th><th>Kombis</th>' +
+    '<th>auf den Wegen</th><th>bei den Anbietern</th><th>im Spiel</th><th>hält zusammen</th>' +
     '<th>unterm Strich</th></tr></thead><tbody>';
-  let g = { wege: 0, anb: 0, spiel: 0, haelt: 0, bilanz: 0 };
-  for (const z of mitGeld) {
+  let g = { n: 0, wege: 0, anb: 0, spiel: 0, haelt: 0, bilanz: 0 };
+  mitGeld.forEach((z, i) => {
+    const nK = kombis(z);
+    g.n += nK;
     g.wege += z.pr.aufWegen; g.anb += z.pr.beiAnbietern;
     g.spiel += z.pr.imSpiel; g.haelt += z.haelt; g.bilanz += z.pr.bilanz;
-    html += "<tr><td><b>" + textSicherM(z.person.name) + "</b>" +
+    html += "<tr><td class='mini'>" + (i + 1) + "/" + mitGeld.length + "</td>" +
+      "<td>" + personKnopfM(z.person.id) +
       (z.pr.probleme.length ? " <span class='mini e-ver'>&#9888; " + z.pr.probleme.length +
         " Hinweis" + (z.pr.probleme.length === 1 ? "" : "e") + "</span>" : "") + "</td>" +
+      "<td>" + nK + "</td>" +
       "<td>" + tagGeld(z.pr.aufWegen) + "</td><td>" + tagGeld(z.pr.beiAnbietern) + "</td>" +
       "<td>" + tagGeld(z.pr.imSpiel) + "</td><td><b>" + tagGeld(z.haelt) + "</b></td>" +
       "<td>" + tagGeldVz(z.pr.bilanz) + "</td></tr>";
-  }
-  html += "</tbody><tfoot><tr><td><b>Zusammen</b></td><td><b>" + tagGeld(g.wege) + "</b></td>" +
+  });
+  html += "</tbody><tfoot><tr><td></td><td><b>Zusammen</b></td><td><b>" + g.n + "</b></td>" +
+    "<td><b>" + tagGeld(g.wege) + "</b></td>" +
     "<td><b>" + tagGeld(g.anb) + "</b></td><td><b>" + tagGeld(g.spiel) + "</b></td>" +
     "<td><b>" + tagGeld(g.haelt) + "</b></td><td><b>" + tagGeldVz(g.bilanz) + "</b></td>" +
     "</tr></tfoot></table></div>";

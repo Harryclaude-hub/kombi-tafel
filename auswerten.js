@@ -151,7 +151,21 @@ function awKopfHtml(g, liste) {
       knopf("monat", "Dieser Monat") + knopf("vormonat", "Letzter Monat") +
       knopf("alles", "Die ganze Zeit") + knopf("eigen", "Eigener Zeitraum") +
     "</div>" +
-    '<div class="aw-spanne"><b>' + g.text + ":</b> " + g.spanne + "</div>" +
+    // Karam (16.09.2026): "bei dem Zeitraum sie nicht untereinander,
+    // sondern nebeneinander. Zeitraum, Saetze, Uhrzeit - und da mit der
+    // Uhrzeit, also wann es genau gesetzt wurde."
+    '<div class="aw-spanne">' +
+      '<span class="aw-sp"><span class="aw-spt">Zeitraum</span>' +
+        '<span class="aw-spw">' + g.spanne + "</span></span>" +
+      '<span class="aw-sp"><span class="aw-spt">Sätze</span>' +
+        '<span class="aw-spw">' + liste.length + "</span></span>" +
+      '<span class="aw-sp"><span class="aw-spt">Erster gesetzt</span>' +
+        '<span class="aw-spw">' + (liste.length && typeof wannText === "function"
+          ? wannText(liste[0].created_at) : "-") + "</span></span>" +
+      '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
+        '<span class="aw-spw">' + (liste.length && typeof wannText === "function"
+          ? wannText(liste[liste.length - 1].created_at) : "-") + "</span></span>" +
+    "</div>" +
     (z.art === "stichtag"
       ? '<div class="aw-zeile"><label>Stichtag (Stand deiner Excel-Liste): ' +
         '<input type="datetime-local" id="aw_stichtag" value="' + awStichtag() +
@@ -260,13 +274,11 @@ function awKarteHtml(s, lfd, gesamt) {
         // Verlauf kam. Mit Datum UND Uhrzeit.
         '<span class="aw-wann mini" title="Gesetzt und gespeichert am">&#128337; ' +
           (typeof wannText === "function" ? wannText(s.created_at) : "") + "</span> " +
-        (person
-          ? '<a class="s-person" href="mein.html?person=' + encodeURIComponent(s.ordner) +
-            '" onclick="return awZurPerson(\'' + s.ordner + '\')"' +
-            ' title="Alle Kombinationen von ' + textSicherM(person) + ' ansehen">&#128100; ' +
-            textSicherM(person) + "</a>"
-          : '<a class="s-person s-person-fehlt" href="mein.html?person=ohne"' +
-            ' onclick="return awZurPerson(\'\')">&#9888; ohne Person</a>') +
+        // Derselbe Personen-Knopf wie in allen anderen Tabellen
+        // (personKnopfM in mein.js) - nicht ein zweiter, der sich
+        // spaeter anders verhaelt.
+        (typeof personKnopfM === "function" ? personKnopfM(s.ordner)
+          : textSicherM(person || "ohne Person")) +
       "</div>" +
       '<div class="aw-spiele mini">' + spiele.join("<br>") + "</div>" +
       '<div class="aw-geld">' +
@@ -308,19 +320,11 @@ function awErgebnisHtml(s, zurueck, schreib) {
 }
 
 // ---------- Bedienen ----------
-// Karam (16.09.2026): "bei Personen immer die Moeglichkeit haben, auf die
-// Person zu klicken, dann gehe ich immer auf die Kombi bei der Person."
-// Ohne Neuladen: der Personen-Filter wird gesetzt und der Reiter
-// "Kombinationen und Personen" aufgemacht. Der Link bleibt trotzdem ein
-// echter Link (mein.html?person=...), damit "in neuem Tab oeffnen" und
-// ein Klick ohne Javascript weiter funktionieren.
+// Der Sprung zur Person liegt in mein.js (zuPersonM) und wird von ALLEN
+// Tabellen benutzt. Hier steht nur noch der alte Name, damit nichts ins
+// Leere laeuft, falls er irgendwo haengengeblieben ist.
 function awZurPerson(ordnerId) {
-  if (typeof tuOrdnerFilter !== "function" || typeof mbBlockZeigen !== "function") return true;
-  tuOrdnerFilter(ordnerId || "ohne");
-  mbBlockZeigen("kombis");
-  const ziel = el("scheine_titel") || el("ordnerbox");
-  if (ziel && ziel.scrollIntoView) { try { ziel.scrollIntoView({ block: "start" }); } catch (e) { } }
-  return false;                 // den Link selbst nicht auch noch folgen
+  return (typeof zuPersonM === "function") ? zuPersonM(ordnerId) : true;
 }
 
 function awZeitWaehlen(art) {
