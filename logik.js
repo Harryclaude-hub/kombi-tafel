@@ -76,9 +76,12 @@ function jetztText() {
 // einmal nachzubauen. NICHT zeitText() nehmen, die ist fuer Anstoss-
 // zeiten mit "?"-Logik und Zeitversatz.
 function wannText(wann) {
-  if (!wann) return "";
+  if (!wann) return "";                  // gar nichts da: bleibt leer
   const t = (wann instanceof Date) ? wann : new Date(wann);
-  if (isNaN(t.getTime())) return "";
+  // Da IST ein Zeitstempel, er laesst sich nur nicht lesen. Eine leere
+  // Zelle saehe aus wie "nie gespeichert" - das waere in der Buchhaltung
+  // die falsche Auskunft. Also sagen, dass etwas nicht stimmt.
+  if (isNaN(t.getTime())) return "Zeit unlesbar";
   return String(t.getDate()).padStart(2, "0") + "." + String(t.getMonth() + 1).padStart(2, "0") +
     "." + t.getFullYear() + " " + String(t.getHours()).padStart(2, "0") + ":" +
     String(t.getMinutes()).padStart(2, "0");

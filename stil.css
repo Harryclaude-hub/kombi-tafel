@@ -4224,6 +4224,17 @@ body[data-seite="mein"] #buchhaltung .bb-berichtschau {
   background: #fdfdfe;
 }
 
+/* ---- 6b. Die Export-Leiste in der Buchhaltung ---- */
+body[data-seite="mein"] #buchhaltung .bb-export {
+  border: 1px solid #d3d9e4;
+  border-left: 4px solid var(--kenn, #1a2c50);
+  border-radius: 10px;
+  background: #f7f9fc;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+}
+body[data-seite="mein"] #buchhaltung .bb-export .mini { margin-top: 6px; color: #55627a; }
+
 /* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */
 body[data-seite="mein"] .tabellenrand { border-radius: 12px; }
 body[data-seite="mein"] .vf-schalter {

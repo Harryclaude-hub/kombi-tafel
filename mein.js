@@ -2869,6 +2869,24 @@ async function zeichneBuchhaltung() {
 
   let html = '<details open class="bb-bericht"><summary>&#128202; Buchhaltung: der Bericht (anklicken)</summary>' +
     '<div class="inhalt">' +
+    // Karam (16.09.2026): "Ein Klick, und ich bekomme den aktuellen
+    // Zeitpunkt aller Kontostaende als Excel. Dafuer muss es einen Knopf
+    // geben, bei der Buchhaltung." Die Knoepfe rechnen NICHTS: sie
+    // schreiben nur auf, was direkt darunter am Bildschirm steht.
+    '<div class="bb-export">' +
+      '<b>Zum Mitnehmen:</b> ' +
+      '<button class="haupt" onclick="exKontostaende()" ' +
+        'title="Alle Kontostaende je Person und Anbieter, Stand von jetzt">' +
+        "&#128202; Kontostände als Excel</button> " +
+      '<button onclick="exKombinationen()" ' +
+        'title="Jede gespeicherte Kombination als eigene Zeile">' +
+        "&#129513; Alle Kombinationen als Excel</button> " +
+      '<button onclick="exFotos()" ' +
+        'title="Alle gespeicherten Wettschein-Fotos, je Person ein Unterordner">' +
+        "&#128247; Alle Fotos als Ordner (ZIP)</button>" +
+      '<div class="mini">Die Dateien entstehen auf diesem Gerät und gehen nirgends hin. ' +
+        "Es kommt genau das hinein, was hier am Bildschirm steht.</div>" +
+    "</div>" +
     '<div class="bb-kindsatz">' + kindSatz + "</div>" +
     '<div class="bb-urteil ' + urteilKlasse + '">' +
     '<div class="bb-urteilzahl">' + urteilZahl + "</div>" +
@@ -3816,7 +3834,23 @@ function zeichneTagesuebersicht() {
     return;
   }
 
-  // Einmal je Person rechnen - mit DERSELBEN Funktion wie die Personen-Kasse.
+  const zeilen = tagZeilen(tag);
+
+  html += tagBearbeitetHtml(zeilen, tag);
+  html += tagAnbieterHtml(zeilen);
+  html += tagHalterHtml(zeilen);
+  box.innerHTML = html;
+}
+
+// Eine Zeile je Person fuer EINEN Tag. Steht seit 16.09.2026 als eigene
+// Funktion da, weil der Excel-Export (export.js) genau dieselben Zeilen
+// braucht. Zwei Fassungen waeren die uebliche Falle: am Bildschirm
+// stuende eine andere Zahl als in der Datei, und niemand wuesste welche.
+// Gerechnet wird mit personPruefen - derselben Funktion wie die
+// Personen-Kasse.
+function tagZeilen(tag) {
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const personen = Array.isArray(ordnerListe) ? ordnerListe : [];
   const zeilen = [];
   for (const p of personen) {
     const pr = personPruefen(p.id, scheine);
@@ -3828,11 +3862,7 @@ function zeichneTagesuebersicht() {
     zeilen.push({ person: p, pr: pr, neu: neu, geaendert: geaendert, zahlungen: zahlungen,
       haelt: pr.aufWegen + pr.beiAnbietern + pr.imSpiel });
   }
-
-  html += tagBearbeitetHtml(zeilen, tag);
-  html += tagAnbieterHtml(zeilen);
-  html += tagHalterHtml(zeilen);
-  box.innerHTML = html;
+  return zeilen;
 }
 
 function tagKopfHtml(tag) {
@@ -3844,6 +3874,10 @@ function tagKopfHtml(tag) {
     '<input type="date" id="tag_datum" value="' + tag + '" onchange="zeichneTagesuebersicht()">' +
     '<button onclick="tagVerschieben(1)" title="Ein Tag vor">&#8594;</button>' +
     '<button class="haupt" onclick="tagDatumSetzen(&quot;' + heute + '&quot;)">Heute</button>' +
+    // Karam (16.09.2026): "die Tagesanzeige muss so aehnlich sein, ich
+    // will den Kontostand einfach als Excel da hinpacken."
+    '<button onclick="exTagesansicht()" title="Diesen Tag als Excel-Datei herunterladen">' +
+      "&#128202; Diesen Tag als Excel</button>" +
     (tag === heute ? '' : '<span class="mini tag-nichtheute">Du siehst einen anderen Tag als heute.</span>') +
     '</div></div>';
 }
