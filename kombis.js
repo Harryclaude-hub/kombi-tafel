@@ -1547,40 +1547,112 @@ function kombiFarbe(n) {
   return "hsl(" + ton + "," + (KOMBI_SATT[ton] || 62) + "%," + licht + "%)";
 }
 
-function kombiKarte(liste) {
+// liste  = woraus das Zeilenverzeichnis gebaut wird (Anzahl, Summe, Anbieter).
+// farbListe = wer eine FARBE bekommt. Fehlt sie, gilt liste.
+//
+// Warum zwei Listen: es gibt nur 27 unterscheidbare Farben (neun Toene mal
+// drei Helligkeiten). Faerbte man alle Kombinationen aller Ordner ein,
+// liefe die Palette um und zwei verschiedene Kombinationen saehen gleich
+// aus. Eine Farbe heisst deshalb: diese Kombination steht in der Liste
+// "Gesetzt" darunter, also im offenen Ordner. Was aus einem anderen
+// Ordner kommt, bleibt farblos, zaehlt aber mit und traegt sein
+// Anbieter-Zeichen. So bedeutet die Farbe immer noch genau eine Sache.
+function kombiKarte(liste, farbListe) {
   const eintraege = (liste || gesetzteEintraege()).slice()
     .sort((a, b) => String(a.zeit || "").localeCompare(String(b.zeit || "")));
   const farbe = {}, kzJe = {}, zeilen = {};
   let n = 0;
+  // Erst die Farben, streng in derselben Reihenfolge wie die Gesetzt-Liste
+  // sie vergibt. Sonst haette dieselbe Kombination oben und unten eine
+  // andere Farbe und waere als Wiedererkennung wertlos.
+  for (const e of (farbListe || eintraege).slice()
+      .sort((a, b) => String(a.zeit || "").localeCompare(String(b.zeit || "")))) {
+    const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
+    if (!(st in farbe)) { farbe[st] = kombiFarbe(n); n++; }
+  }
   for (const e of eintraege) {
     const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
-    if (!(st in farbe)) { farbe[st] = kombiFarbe(n); n++; kzJe[st] = []; }
+    if (!kzJe[st]) kzJe[st] = [];
     if (e.kz && kzJe[st].indexOf(e.kz) < 0) kzJe[st].push(e.kz);
     for (const t of (e.wetten || [])) {
       if (!t || !t.id) continue;      // Handeingaben (personkombi.js) haben keine Wetten-Kennung
+      // EIN Satz je Bein, in beide Verzeichnisse dasselbe Objekt. Die
+      // Anzahl und die Euro-Summe der Tabelle kommen genau hieraus, also
+      // koennen sie nie auseinanderlaufen.
+      const eintrag = { stamm: st, kz: e.kz, nummer: e.nummer,
+                        einsatz: Number(e.einsatz) || 0, zeit: e.zeit,
+                        stand: e.stand || "", finger: e.finger || "",
+                        satz: t.satz || e.satz || "" };
       const k = t.id + "|" + (t.linie || "");
-      (zeilen[k] = zeilen[k] || []).push({ stamm: st, kz: e.kz, nummer: e.nummer });
+      (zeilen[k] = zeilen[k] || []).push(eintrag);
     }
   }
   return { farbe: farbe, kzJe: kzJe, zeilen: zeilen, anzahl: n };
+}
+
+// Der Text hinter der Anzahl in der Spalte "gesetzt": jeder einzelne
+// Schein, der auf dieser Linie steht. Erfindet nichts - fehlt eine
+// Angabe, steht das da.
+function gesetztMalText(treffer) {
+  const zeilen = treffer.map(t => {
+    const teile = [t.nummer ? ("Nr. " + t.nummer) : "ohne Nummer"];
+    if (t.kz) teile.push(anbieterName(t.kz) || t.kz);
+    teile.push(t.einsatz ? (t.einsatz.toFixed(2) + " EUR") : "Einsatz unbekannt");
+    if (t.stand && t.stand !== "offen") teile.push(t.stand);
+    if (t.satz) teile.push(satzTitelVon(t.satz));
+    return teile.join(", ");
+  });
+  // Ein geteilter Schein liegt als zwei Eintraege vor (_t2, _m2). Die
+  // Zahl zaehlt SCHEINE, denn jeder ist beim Anbieter eine eigene Wette.
+  // Wie viele Kombinationen das sind, steht extra da - sonst liest sich
+  // "2x" wie zwei verschiedene Kombinationen.
+  const staemme = [];
+  for (const t of treffer) if (staemme.indexOf(t.stamm) < 0) staemme.push(t.stamm);
+  // Zwei Eintraege mit demselben Fingerabdruck sind vermutlich einmal
+  // doppelt gespeichert worden (das kennt Karam). Dann ist die Zahl hier
+  // zu hoch. Das muss dastehen, nicht stillschweigend verrechnet werden:
+  // bewusst doppelt setzen ist ein echter Fall.
+  const finger = {};
+  let doppeltVerdacht = 0;
+  for (const t of treffer) {
+    if (!t.finger) continue;
+    finger[t.finger] = (finger[t.finger] || 0) + 1;
+    if (finger[t.finger] === 2) doppeltVerdacht++;
+  }
+  const kopf = treffer.length + "x gesetzt" +
+    (staemme.length && staemme.length !== treffer.length
+      ? " (" + staemme.length + " Kombination" + (staemme.length === 1 ? "" : "en") +
+        ", geteilt auf mehrere Scheine)" : "") + ":";
+  return kopf + "\n" + zeilen.join("\n") +
+    (doppeltVerdacht ? "\nAchtung: davon sehen welche gleich aus - vielleicht " +
+      "doppelt gespeichert. Dann ist die Zahl zu hoch." : "");
 }
 
 // Welche gesetzten Kombinationen enthalten diese Tabellenzeile? Erst
 // zeilengenau (Kennung + Linie). Alte Eintraege ohne Linie, oder solche,
 // deren Linie zu keiner Zeile mehr passt (Wettentext nachtraeglich
 // geaendert), landen bei der ERSTEN Linie - lieber dort als nirgends.
+// ACHTUNG, hier stand ein stiller Fehler: frueher hiess es
+// "if (genau.length) return genau;". Hatte die erste Linie einen genauen
+// Treffer, kam der Notweg gar nicht mehr dran, und alles, was unter einer
+// nicht mehr passenden Linie liegt, fiel weg. Die Zeile meldete dann
+// "1x gesetzt", obwohl zwei Scheine draussen sind. Zu niedrig ist genau
+// die Richtung, die eine zweite Wette ausloest. Jetzt wird gesammelt.
 function zeilenTreffer(karte, w, i) {
-  const genau = karte.zeilen[w.id + "|" + optionName(w, i)] || [];
-  if (genau.length) return genau;
-  if (i !== 0) return [];
-  const alle = [];
+  const genau = (karte.zeilen[w.id + "|" + optionName(w, i)] || []).slice();
+  if (i !== 0) return genau;
+  // Nur an der ERSTEN Linie: alles einsammeln, was zu keiner heutigen
+  // Linie dieser Wette passt. Das sind Beine ohne Linie und Altbestand,
+  // dessen Linientext sich seither geaendert hat. Lieber an der ersten
+  // Zeile als nirgends.
   const linien = (w.o || []).map((_, j) => optionName(w, j));
   for (const k in karte.zeilen) {
     if (k.indexOf(w.id + "|") !== 0) continue;
     const linie = k.slice(w.id.length + 1);
-    if (!linie || linien.indexOf(linie) < 0) alle.push.apply(alle, karte.zeilen[k]);
+    if (linie && linien.indexOf(linie) >= 0) continue;
+    for (const e of karte.zeilen[k]) if (genau.indexOf(e) < 0) genau.push(e);
   }
-  return alle;
+  return genau;
 }
 
 // Inline-Stil fuer die Zeile: eine Farbe, oder ein harter Farbverlauf in
@@ -1588,7 +1660,10 @@ function zeilenTreffer(karte, w, i) {
 // tbody tr:nth-child(even)) jede Klassenregel schlagen wuerden.
 function hintergrundFuer(karte, treffer) {
   const staemme = [];
-  for (const t of treffer) if (staemme.indexOf(t.stamm) < 0) staemme.push(t.stamm);
+  // Nur Staemme MIT Farbe. Ein Stamm aus einem anderen Ordner hat keine
+  // (siehe kombiKarte); "background:undefined" waere sonst das Ergebnis.
+  for (const t of treffer)
+    if (karte.farbe[t.stamm] && staemme.indexOf(t.stamm) < 0) staemme.push(t.stamm);
   if (!staemme.length) return "";
   if (staemme.length === 1) return "background:" + karte.farbe[staemme[0]];
   const teil = 100 / staemme.length;
@@ -1627,6 +1702,10 @@ function zeichneGesetzte() {
   }
   // Farben IMMER ueber die ungefilterte Liste vergeben - sonst wechselt
   // jede Kombination beim Filtern ihre Farbe (Vergabe nach Reihenfolge).
+  // Und ueber ALLE Ordner, weil die Bau-Tabelle darueber genau dasselbe
+  // tut. Zwei verschiedene Farbskalen auf einer Seite hiessen: dieselbe
+  // Kombination haette oben eine andere Farbe als unten, und die Farbe
+  // waere als Wiedererkennung wertlos.
   const karte = kombiKarte(alle);
   let summe = 0, zeilen = "";
   for (const e of liste) {
@@ -1687,6 +1766,45 @@ let ebVon = "";            // "JJJJ-MM-TT" oder leer
 let ebBis = "";
 let ebNurOffen = true;     // nur Spiele, die noch nicht angepfiffen sind
 
+// Karam (16.09.2026): "Wenn ich ein Datum angebe, ist es unabhaengig vom
+// Ordner. Alles, was in jeder einzelnen Zeile ein Spiel zwischen diesem
+// Datum und diesem Datum hat, ist drinnen, unabhaengig vom Ordner. Auch
+// von alten Ordnern."
+// Sobald also eine der beiden Grenzen steht, sucht die Tabelle in ALLEN
+// Foto-Ordnern, nicht nur im offenen. Ohne Grenze bleibt alles wie zuvor.
+function ebZeitraumAn() { return !!(ebVon || ebBis); }
+
+// ---------- "Steht auch woanders" ----------
+// Dieselbe Partie kann in ZWEI Foto-Ordnern stehen und bekommt dort zwei
+// verschiedene Wetten-Kennungen (die Doppelt-Pruefung beim Einlesen sieht
+// immer nur den Ziel-Ordner, admin.js). Der Zaehler "schon dreimal
+// gesetzt" laeuft ueber die Kennung und saehe die zweite Zeile nicht.
+//
+// Darum dieser WEICHE Vergleich. Er ist ausdruecklich NUR ein Hinweis
+// neben der Zahl, nie die Zahl selbst: die harte Zahl bleibt die ueber
+// die Kennung, weil die immer stimmt.
+// Die Liga bleibt bewusst draussen. Sie kommt aus der Texterkennung und
+// bleibt oft leer (admin.js laesst sie weg, wenn die Foto-Zeile nur zwei
+// Textfelder hergibt). Waere sie im Schluessel, gaelte dieselbe Partie je
+// nach Foto als zwei verschiedene und der Hinweis bliebe genau dann aus,
+// wenn man ihn braucht.
+// Ohne Anpfiff-Tag gibt es KEINEN Schluessel: ueber Spielnamen allein
+// wird hier nichts behauptet.
+function ebTagVon(an) {
+  const t = String(an || "").trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : "";
+}
+
+function ebWeich(t) {
+  return String(t == null ? "" : t).toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function ebWeichSchluessel(spiel, an, linie) {
+  const tag = ebTagVon(an), s = ebWeich(spiel);
+  if (!tag || !s) return "";
+  return s + "@" + tag + "|" + ebWeich(linie);
+}
+
 // Drei Antworten, nicht zwei: true = zeigen, false = raus, null = ueber
 // den Abpfiff ist nichts bekannt. null darf NIE stillschweigend
 // verschwinden, sonst fehlt Karam eine Wette, die es sehr wohl gibt.
@@ -1727,7 +1845,8 @@ function ebAllesZeigen() {
 function zeichneEigenbau() {
   const box = document.getElementById("eigenbau");
   if (!box) return;
-  const roh = satzWetten();
+  // Ein gesetzter Zeitraum hebt die Ordnergrenze auf (siehe ebZeitraumAn).
+  const roh = ebZeitraumAn() ? WETTEN.slice() : satzWetten();
   if (!roh.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
   // Angehakte Zeilen werden NIE ausgeblendet. Sonst faellt eine Wette
   // aus der Auswahl, ohne dass jemand es merkt, und die gebaute
@@ -1743,34 +1862,78 @@ function zeichneEigenbau() {
     return true;
   });
   const ersatzMind = mindWert(liesZustand() || {});
-  // Im Alle-Modus bekommt jede Zeile eine Ordner-Spalte. Ohne sie saehen
-  // zwei gleich benannte Spiele aus verschiedenen Tagen identisch aus.
-  const alleOrdner = (aktiverSatzId() === SATZ_ALLE);
+  // Sobald mehr als ein Ordner in der Tabelle steht, bekommt jede Zeile
+  // eine Ordner-Spalte. Ohne sie saehen zwei gleich benannte Spiele aus
+  // verschiedenen Tagen identisch aus.
+  const alleOrdner = (aktiverSatzId() === SATZ_ALLE) || ebZeitraumAn();
 
-  // Wie viel steht schon auf welcher LINIE? Karam (03.09.): die Summe
-  // gehoert an die Zeile der Linie, die wirklich gesetzt wurde - nicht
-  // immer an die oberste Zeile der Wette. BEIDE Ablagen, dieser Ordner.
-  // Alte Eintraege ohne Linien-Angabe landen weiter bei der ersten Zeile.
-  const proLinie = {};
-  const gesetztListe = gesetzteEintraege();
+  // Was steht schon auf welcher LINIE? Karam (03.09.): die Summe gehoert
+  // an die Zeile der Linie, die wirklich gesetzt wurde - nicht immer an
+  // die oberste Zeile der Wette. Alte Eintraege ohne Linien-Angabe landen
+  // weiter bei der ersten Zeile (das macht zeilenTreffer).
+  //
+  // IMMER alle Ordner (SATZ_ALLE), auch wenn nur einer offen ist.
+  // Karam (16.09.2026): "Wie oft das gesetzt wurde, ist mir sehr wichtig,
+  // auch von alten Ordnern." Ein Zaehler, der einen Ordner uebersieht,
+  // sagt "noch nie gesetzt" - und dann setzt er sie ein zweites Mal.
+  //
+  // Anzahl UND Summe kommen aus derselben Liste (zeilenTreffer), damit
+  // sie nie auseinanderlaufen koennen.
+  const gesetztListe = gesetzteEintraege(SATZ_ALLE);
+  // Unlesbare Kombinationen haben gar keine Beine (gesetzteEintraege legt
+  // sie ausdruecklich mit wetten: [] ein, damit sie keine Summe
+  // verfaelschen). Sie koennen deshalb in KEINER Zeile mitzaehlen. Das
+  // muss dastehen, sonst liest Karam eine zu niedrige Zahl als Wahrheit.
+  const unlesbarZahl = gesetztListe.filter(e => e.unlesbar).length;
+  // Und der schlimmere Fall: das Konto ist gar nicht geladen. Dann kennt
+  // die Spalte nur den Geraetespeicher, steht ueberall leer - und leer
+  // heisst fuer Karam "noch nie gesetzt". Der Fusstext verspricht aber
+  // ALLE Ordner. Eine stille Luecke unter einer ausgesprochenen Zusage
+  // ist das Gefaehrlichste, was hier stehen kann.
+  const kontoFehlt = (typeof kontoGeladen !== "undefined") && !kontoGeladen && !!window.supa;
+  // Zaehlung und Anbieter-Zeichen ueber ALLE Ordner, Farben nur fuer die
+  // Kombinationen des offenen Ordners - genau die stehen unten in der
+  // Liste "Gesetzt", und nur dort hilft die Farbe beim Wiederfinden.
+  const karte = kombiKarte(gesetztListe, gesetzteEintraege());
+  // Zusaetzlich der weiche Schluessel (siehe ebWeichSchluessel): damit
+  // faellt auf, wenn dieselbe Partie ueber die Zeile eines ANDEREN
+  // Ordners schon gesetzt ist. Nur Hinweis, nie Zahl.
+  const weich = {};
   for (const e of gesetztListe)
     for (const t of (e.wetten || [])) {
-      const k = t.id + "|" + (t.linie || "");
-      proLinie[k] = (proLinie[k] || 0) + (Number(e.einsatz) || 0);
+      if (!t) continue;
+      // Kein "if (!t.id) continue" wie sonst: von Hand angelegte
+      // Kombinationen (personkombi.js) haben gar keine Wetten-Kennung und
+      // faellen sonst aus jeder Zaehlung heraus. Fuer den Hinweis reichen
+      // Spielname, Anpfiff und Linie.
+      // Den Anpfiff moeglichst von der WETTE nehmen, nicht vom Bein: das
+      // Bein hat die Zeit vom Tag des Setzens gespeichert. Wird sie
+      // spaeter korrigiert, haette die Zeile den neuen Tag und das Bein
+      // den alten, und der Hinweis bliebe genau dann aus.
+      const bw = t.id ? wetteNachId(t.id) : null;
+      const an = bw ? anstossFeld(bw) : (t.an || t.an_zeit);
+      const k = ebWeichSchluessel(t.spiel, an, t.linie);
+      if (!k) continue;
+      (weich[k] = weich[k] || []).push({ id: t.id ? String(t.id) : "", nummer: e.nummer,
+        kz: e.kz, einsatz: Number(e.einsatz) || 0, stand: e.stand || "",
+        finger: e.finger || "", stamm: e.stamm || "",
+        satz: t.satz || e.satz || "" });
     }
-  // Farbe je Kombination und Anbieter-Zeichen je Zeile (siehe kombiKarte)
-  const karte = kombiKarte(gesetztListe);
 
   let zeilen = "", offen = 0;
   for (const w of alle) {
     const vorbei = istVorbei(anstossFeld(w));
     const anzahl = Array.isArray(w.o) ? w.o.length : 0;
     for (let i = 0; i < anzahl; i++) {
-      // Die Summe DIESER Linie; Altbestand ohne Linie zaehlt zur ersten.
-      const gesetztH = (proLinie[w.id + "|" + optionName(w, i)] || 0) +
-        (i === 0 ? (proLinie[w.id + "|"] || 0) : 0);
       if (!vorbei) offen++;
       const treffer = zeilenTreffer(karte, w, i);
+      // Wie oft und wie viel auf GENAU DIESE Linie schon draussen ist.
+      const malH = treffer.length;
+      const gesetztH = treffer.reduce((s, t) => s + (Number(t.einsatz) || 0), 0);
+      // Dieselbe Partie, aber ueber die Zeile eines anderen Ordners.
+      const wk = ebWeichSchluessel(w.spiel, anstossFeld(w), optionName(w, i));
+      // Ohne Kennung (Handeingabe) kann es nicht dieselbe Zeile sein.
+      const anderswo = wk ? (weich[wk] || []).filter(x => !x.id || x.id !== String(w.id)) : [];
       const kzs = [];
       for (const t of treffer) if (t.kz && kzs.indexOf(t.kz) < 0) kzs.push(t.kz);
       const stil = hintergrundFuer(karte, treffer);
@@ -1789,7 +1952,17 @@ function zeichneEigenbau() {
         '<td class="tb-q">' + Number(w.o[i][1]).toFixed(2) + "</td>" +
         '<td class="tb-q tb-mind">' + mindFuer(w, i, ersatzMind).toFixed(2) +
           (w.o[i].length > 2 ? "" : '<span class="tb-ersatz">*</span>') + "</td>" +
-        '<td class="tb-gesetzt">' + (gesetztH ? gesetztH.toFixed(2) + " &euro;" : "") + "</td></tr>";
+        // Karam will die ANZAHL sehen: "die wurde schon dreimal gesetzt".
+        // Bei null bleibt die Zelle leer, es wird keine Null behauptet.
+        '<td class="tb-gesetzt"' + (malH ? ' title="' + textSicher(gesetztMalText(treffer)) + '"' : "") + ">" +
+          (malH ? '<b class="tb-mal">' + malH + "&times;</b>" +
+            (gesetztH ? " " + gesetztH.toFixed(2) + " &euro;" : "") : "") +
+          (anderswo.length ? '<span class="tb-anderswo" title="' +
+            textSicher(gesetztMalText(anderswo) +
+              "\nDasselbe Spiel zur selben Anstoßzeit, aber über die Zeile eines " +
+              "anderen Ordners. Nicht in der Zahl links mitgezählt.") + '">+' +
+            anderswo.length + " anderswo</span>" : "") +
+        "</td></tr>";
     }
   }
 
@@ -1813,7 +1986,14 @@ function zeichneEigenbau() {
       '<label><input type="checkbox" id="eb_nuroffen"' + (ebNurOffen ? " checked" : "") +
         ' onchange="ebFiltern()"> nur noch offene Spiele</label> ' +
       (gefiltert ? '<button onclick="ebAllesZeigen()">alles zeigen</button>' : "") +
-      (gefiltert ? '<span class="mini"> ' + ausZeit +
+      (kontoFehlt ? '<span class="mini warnton"> Die gesetzten Kombinationen aus dem Konto ' +
+        "konnten nicht geladen werden. Die Spalte &quot;gesetzt&quot; zeigt nur, was auf " +
+        "diesem Gerät liegt, und ist damit unvollständig.</span>" : "") +
+      (unlesbarZahl ? '<span class="mini warnton"> ' + unlesbarZahl +
+        (unlesbarZahl === 1 ? " Kombination ist" : " Kombinationen sind") +
+        " auf diesem Gerät nicht lesbar. Was darin steckt, fehlt in der Spalte " +
+        "&quot;gesetzt&quot; - die Zahlen dort können also zu niedrig sein.</span>" : "") +
+      (ausZeit ? '<span class="mini"> ' + ausZeit +
         (ausZeit === 1 ? " Spiel" : " Spiele") + " ausgeblendet</span>" : "") +
       (ohneZeit ? '<span class="mini warnton"> ' + ohneZeit +
         (ohneZeit === 1 ? " Spiel hat" : " Spiele haben") + " keine Anstoßzeit - " +
@@ -1821,18 +2001,35 @@ function zeichneEigenbau() {
     "</div>" +
     (alle.length ? "" : '<p class="mini warnton">In diesem Zeitraum liegt kein Spiel. ' +
       '<button onclick="ebAllesZeigen()">alles zeigen</button></p>') +
-    '<div class="tabellenrand"><table class="tb-tafel"><thead><tr>' +
+    // tb-mitordner sagt dem Stil, dass eine Spalte mehr dasteht. Ohne
+    // diese Kennung wuerde die Handy-Regel die Ordner-Spalte ausblenden
+    // statt der Liga - also genau die Spalte, die die Ordner unterscheidet.
+    '<div class="tabellenrand"><table class="tb-tafel' +
+      (alleOrdner ? " tb-mitordner" : "") + '"><thead><tr>' +
       '<th class="tb-marken" title="Bei welchen Anbietern diese Wette schon gesetzt ist">wo</th>' +
       "<th></th><th>Anstoß</th>" + (alleOrdner ? "<th>Ordner</th>" : "") +
       "<th>Liga</th><th>Spiel</th><th>Wette</th>" +
-      "<th>Quote</th><th>Mindest</th><th>gesetzt</th></tr></thead><tbody>" +
+      "<th>Quote</th><th>Mindest</th>" +
+      '<th title="Wie oft und wie viel auf diese Linie schon gesetzt wurde">gesetzt' +
+        (kontoFehlt ? '<br><span class="mini warnton">unvollständig</span>'
+                    : '<br><span class="mini">alle Ordner</span>') + "</th>" +
+      "</tr></thead><tbody>" +
       zeilen + "</tbody></table></div>" +
     '<p class="mini">' + offen + " Wettmöglichkeiten offen. Jede Linie eines Spiels steht als " +
       "eigene Zeile - du setzt nur eine davon. <b>Quote</b> ist die linke Spalte aus dem Foto, " +
       "<b>Mindest</b> die rechte. Ein <b>*</b> heißt: für diese Zeile stand im Foto keine " +
       "Mindestquote, es gilt der Ersatzwert " + ersatzMind.toFixed(2) + ". " +
-      "<b>gesetzt</b> ist die Summe, die auf GENAU DIESE Linie schon draußen ist " +
-      "(ältere Einträge ohne Linien-Angabe zählen zur ersten Zeile). " +
+      "<b>gesetzt</b> sagt, <b>wie oft</b> diese Linie schon gesetzt wurde und wie viel " +
+      "insgesamt darauf steht" +
+      (kontoFehlt ? " - <b>unvollständig, das Konto konnte nicht geladen werden</b>"
+                  : " - über ALLE Foto-Ordner, nicht nur über den offenen") +
+      " (ältere Einträge ohne Linien-Angabe zählen zur ersten Zeile). " +
+      "Der Betrag ist der <b>ganze Einsatz der Kombination</b> und steht deshalb an jedem " +
+      "ihrer Beine: die Spalte darf man nicht von oben nach unten addieren. " +
+      "Zeig mit der Maus darauf, dann stehen die einzelnen Scheine da. " +
+      "<b>+N anderswo</b> heißt: dasselbe Spiel zur selben Anstoßzeit steht auch in einem " +
+      "anderen Ordner und wurde dort gesetzt. Das ist ein Hinweis, keine Zahl - in der " +
+      "Zahl links steckt es nicht drin. " +
       "<b>wo</b> zeigt die Anbieter, bei denen die Wette in einer gesetzten Kombination steckt; " +
       "die Hintergrundfarbe ist die Farbe dieser Kombination (siehe Gesetzt), bei mehreren geteilt.</p>";
   ebZaehlen();
@@ -1871,7 +2068,11 @@ function schonGesetztGleich(kz, wetten) {
     return String(x.id) + ":" + (w ? optionName(w, x.optIdx) : "");
   }).sort().join("|");
   if (!soll) return null;
-  for (const e of gesetzteEintraege()) {
+  // SATZ_ALLE, nicht der offene Ordner. Seit die Tabelle bei gesetztem
+  // Zeitraum Zeilen aus allen Ordnern zeigt, kann dieselbe Kombination
+  // aus einem aelteren Ordner stammen. Wer hier nur den offenen Ordner
+  // liest, laesst sie ohne Rueckfrage ein zweites Mal entstehen.
+  for (const e of gesetzteEintraege(SATZ_ALLE)) {
     if (e.unlesbar || e.kz !== kz) continue;
     const ist = (e.wetten || []).map(t => String(t.id) + ":" + String(t.linie || "")).sort().join("|");
     if (ist && ist === soll) return e;
@@ -3809,8 +4010,12 @@ function eintragImOrdner(eigenerSatz, wetten, satz) {
 
 // Alle Kombinationen, die fuer DIESEN Ordner schon gesetzt sind -
 // aus beiden Ablagen, in einer Form.
-function gesetzteEintraege() {
-  const satz = aktiverSatzId();
+// satzWahl ist ein Ausnahmefall und bleibt fast immer leer: dann gilt der
+// offene Ordner. Wer SATZ_ALLE uebergibt, bekommt alles aus allen Ordnern,
+// ohne dass der offene Ordner sich aendert. Das braucht die Tabelle, damit
+// ein Zaehler "schon dreimal gesetzt" nie zu niedrig ist.
+function gesetzteEintraege(satzWahl) {
+  const satz = satzWahl || aktiverSatzId();
   // Im Modus "alle Ordner" darf hier NICHTS weggefiltert werden. Wuerde
   // gegen "__alle__" verglichen, faellt jeder gesetzte Schein heraus,
   // die Gesetzt-Liste saehe leer aus, schonGesetzt() meldete nichts -
@@ -3827,7 +4032,8 @@ function gesetzteEintraege() {
                  anbieter: e.anbieter, nummer: e.nummer, kz: e.kz,
                  quote: Number(e.quote) || 0, wetten: e.wetten || [],
                  moeglich: Number(e.moeglich) || 0, gebuehr: Number(e.gebuehr) || 0,
-                 zeit: e.zeit, satz: e.satz, woher: "geraet" };
+                 zeit: e.zeit, satz: e.satz, stand: e.stand || "offen",
+                 woher: "geraet" };
     // Ohne scheinId kein gemeinsamer Stamm - sonst faellt alles, was
     // keine hat, zu EINER Kombination zusammen und die Einsaetze werden
     // addiert.
@@ -3856,6 +4062,10 @@ function gesetzteEintraege() {
                  quote: Number(d.quote) || 0, wetten: d.wetten || [],
                  moeglich: Number(d.moeglich) || 0, gebuehr: Number(d.gebuehr) || 0,
                  zeit: x.created_at, dbId: x.id, satz: d.satz,
+                 // Gewonnen oder verloren? Nur fuer den Hinweistext an der
+                 // Zeile, damit "3x gesetzt" nicht wie "3x noch draussen"
+                 // aussieht. In keine Summe geht der Stand ein.
+                 stand: x.stand || d.stand || "offen",
                  ordner: x.ordner, woher: "konto" };
     // Uebernommene Alt-Scheine (tuImport) haben keine scheinId - jeder
     // bekommt seinen eigenen Stamm ueber die Datenbank-Kennung.

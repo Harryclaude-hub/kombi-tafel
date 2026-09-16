@@ -580,7 +580,16 @@ function optionName(w, optIdx) {
   }
   return roh || text;
 }
-function anbieterName(kz) { return ANBIETER.find(a => a.kz === kz).name; }
+// Ein unbekanntes Kuerzel darf hier nicht werfen. Diese Funktion laeuft
+// seit dem Zaehler in der Bau-Tabelle je ZEILE und je gesetztem Schein;
+// ein einziger Alteintrag mit einem entfernten Kuerzel haette die ganze
+// Tabelle leer gelassen. Leer heisst fuer Karam "noch nie gesetzt".
+// Ist das Kuerzel unbekannt, steht das rohe Kuerzel da. Es wird nichts
+// erfunden und nichts verschwiegen.
+function anbieterName(kz) {
+  const a = ANBIETER.find(x => x.kz === kz);
+  return a ? a.name : String(kz == null ? "" : kz);
+}
 
 // Bester aus den GETIPPTEN Quoten (echt gerechnet); null wenn nichts getippt
 function liveBester(w, optIdx) {

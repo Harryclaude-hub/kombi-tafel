@@ -68,10 +68,13 @@ function einzelnGesetztKarte() {
   // BEIDE Ablagen. liesVerlauf allein ist bei angemeldetem Nutzer leer -
   // dann waere Regel 2 ("nicht zweimal beim selben Anbieter") wirkungslos
   // und dieselbe Wette koennte zweimal beim selben Anbieter landen.
+  // ALLE Ordner (SATZ_ALLE), nicht nur der offene. Regel 2 soll auch
+  // dann greifen, wenn dieselbe Wette ueber die Zeile eines aelteren
+  // Ordners beim selben Anbieter schon draussen ist.
   let v = [];
   try {
     v = (typeof gesetzteEintraege === "function")
-      ? gesetzteEintraege()
+      ? gesetzteEintraege(typeof SATZ_ALLE === "string" ? SATZ_ALLE : undefined)
       : (liesVerlauf() || []);
   } catch (e) { v = []; }
   for (const e of v) {
