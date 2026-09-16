@@ -949,9 +949,16 @@ function obSortSetzen(wert) {
   try { localStorage.setItem(OB_SORT, wert); } catch (e) { }
   zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
 }
-let obAlleZeigen = false;
+// Karam (16.09.2026, Nachtrag): "Ich will jede einzelne Person haben.
+// Ich habe nur 10 angezeigt, das kann ja nicht sein."
+// Also stehen jetzt ALLE da. Das Kuerzen auf zehn bleibt als Knopf, wenn
+// es ihm doch zu viel wird - aber es ist nicht mehr die Vorgabe.
+const OB_KURZ = "kt_ob_kurz";
+function obAlleZeigenJetzt() {
+  try { return localStorage.getItem(OB_KURZ) !== "ja"; } catch (e) { return true; }
+}
 function obAlle(an) {
-  obAlleZeigen = !!an;
+  try { localStorage.setItem(OB_KURZ, an ? "nein" : "ja"); } catch (e) { }
   zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
 }
 function obSuchen(wert) {
@@ -1025,6 +1032,55 @@ function obIstGelesen(ordnerId, texte) {
   return obGelesenListe()[ordnerId] === obFingerabdruck(texte);
 }
 
+// ---------- Alles auf einmal stummschalten ----------
+// Karam (16.09.2026): "Es kann nicht sein, dass noch immer ueberall
+// Fehler sind. Einfach entfernen, all diese Fehleranzeigen. Und den
+// Button bei Personen hinzufuegen, alles auf gelesen markieren."
+//
+// Stummgeschaltet wird ALLES, auch die Rechenfehler - Karam hat das
+// ausdruecklich so verlangt. Damit daraus kein stiller Verlust wird,
+// gilt dreierlei:
+//  1. Gemerkt wird der Fingerabdruck der TEXTE. Aendert sich etwas oder
+//     kommt ein neuer Fehler dazu, meldet er sich wieder.
+//  2. Neben dem Knopf steht immer "Meldungen wieder anzeigen".
+//  3. In der geoeffneten Personen-Kasse stehen sie trotzdem, denn das
+//     ist die Stelle, an der man sie abarbeitet.
+const OB_STUMM = "kt_meldungen_stumm";
+function obStummListe() {
+  try { return JSON.parse(localStorage.getItem(OB_STUMM) || "{}") || {}; }
+  catch (e) { return {}; }
+}
+function obEtwasStumm() { return Object.keys(obStummListe()).length > 0; }
+
+function obAlleTexte(ordnerId, scheine) {
+  const p = personPruefen(ordnerId, scheine);
+  return (p.probleme || []).slice();
+}
+function obIstStumm(ordnerId, texte) {
+  return obStummListe()[ordnerId] === obFingerabdruck(texte);
+}
+function obAllesGelesen() {
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const liste = {};
+  let n = 0;
+  for (const o of (Array.isArray(ordnerListe) ? ordnerListe : [])) {
+    const texte = obAlleTexte(o.id, scheine);
+    if (!texte.length) continue;
+    liste[o.id] = obFingerabdruck(texte);
+    n += texte.length;
+  }
+  try { localStorage.setItem(OB_STUMM, JSON.stringify(liste)); } catch (e) { }
+  meldungM("<b>" + n + " Meldungen als gelesen markiert.</b> Sie kommen wieder, sobald sich " +
+    "etwas ändert oder eine neue dazukommt. In der geöffneten Personen-Kasse stehen sie " +
+    "weiterhin. Zurückholen: <b>Meldungen wieder anzeigen</b>.", "gut");
+  zeichneOrdnerBox(scheine);
+}
+function obWiederZeigen() {
+  try { localStorage.setItem(OB_STUMM, "{}"); } catch (e) { }
+  meldungM("Alle Meldungen werden wieder angezeigt.", "gut");
+  zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
+}
+
 function zeichneOrdnerBox(scheine) {
   const box = el("ordnerbox");
   if (!box) return;
@@ -1046,9 +1102,13 @@ function zeichneOrdnerBox(scheine) {
   // Die Leiste traegt nur noch "Alle" und "Ohne Person". Jede einzelne
   // Person steht jetzt als eigene Karte im Raster darunter - bei 27
   // Personen war die Leiste sonst laenger als der Bildschirm.
-  let irgendwoWarnung = false;
+  // Wie viele Meldungen gaebe es insgesamt, und wie viele sind noch laut?
+  let irgendwoWarnung = false, stummZahl = 0;
   for (const o of ordnerListe) {
-    if ((personPruefen(o.id, scheine).rechenfehler || []).length) irgendwoWarnung = true;
+    const pp = personPruefen(o.id, scheine);
+    const alle = (pp.probleme || []).length;
+    if (alle && !obIstStumm(o.id, pp.probleme || [])) stummZahl += alle;
+    if ((pp.rechenfehler || []).length && !obIstStumm(o.id, pp.probleme || [])) irgendwoWarnung = true;
   }
   const filter = '<div class="ordnerfilter">' +
     '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") +
@@ -1113,7 +1173,7 @@ function zeichneOrdnerBox(scheine) {
   }
   // Bei einer Suche wird NICHT gekuerzt: wer sucht, will den Treffer sehen.
   const gesamtTreffer = sichtbar.length;
-  const gekuerzt = !q && !obAlleZeigen && sichtbar.length > OB_WIEVIELE;
+  const gekuerzt = !q && !obAlleZeigenJetzt() && sichtbar.length > OB_WIEVIELE;
   if (gekuerzt) sichtbar = sichtbar.slice(0, OB_WIEVIELE);
 
   if (!ordnerListe.length) {
@@ -1130,9 +1190,19 @@ function zeichneOrdnerBox(scheine) {
       (gekuerzt
         ? ' <span class="mini">Es werden ' + OB_WIEVIELE + " von " + ordnerListe.length +
           ' gezeigt.</span> <button onclick="obAlle(true)">alle ' + ordnerListe.length + " zeigen</button>"
-        : (!q && obAlleZeigen && ordnerListe.length > OB_WIEVIELE
-          ? ' <button onclick="obAlle(false)">nur die ersten ' + OB_WIEVIELE + " zeigen</button>"
+        : (ordnerListe.length > OB_WIEVIELE
+          ? ' <span class="mini">alle ' + ordnerListe.length + " werden gezeigt</span> " +
+            '<button onclick="obAlle(false)">nur die ersten ' + OB_WIEVIELE + " zeigen</button>"
           : "")) +
+      // Karam: "Den Button bei Personen hinzufuegen, alles auf gelesen
+      // markieren - das heisst, bei fertig gehen diese Meldungen weg."
+      (stummZahl
+        ? ' <button class="ob-stumm" onclick="obAllesGelesen()">Alle ' + stummZahl +
+          " Meldungen als gelesen markieren</button>"
+        : "") +
+      (obEtwasStumm()
+        ? ' <button onclick="obWiederZeigen()">Meldungen wieder anzeigen</button>'
+        : "") +
       "</div>";
     if (q) verwalten += '<p class="mini">' + gesamtTreffer + " von " + ordnerListe.length +
       " Personen passen auf die Suche.</p>";
@@ -1146,11 +1216,14 @@ function zeichneOrdnerBox(scheine) {
       const p = personPruefen(o.id, scheine);
       // NUR echte Rechenfehler zeigen sich ungefragt. Alles andere ist
       // ein Hinweis und wartet hinter "N Hinweise".
-      const fehler = (p.rechenfehler || []).length;
       const fehlerSet = new Set(p.rechenfehler || []);
       const nurHinweise = (p.probleme || []).filter(t => !fehlerSet.has(t));
-      // Als gelesen markierte Hinweise bleiben weg, bis sie sich aendern.
-      const hinweise = obIstGelesen(o.id, nurHinweise) ? 0 : nurHinweise.length;
+      // Stummgeschaltet heisst: diese Person sagt gar nichts mehr, bis
+      // sich die Texte aendern. Sonst gilt weiter: Rechenfehler laut,
+      // blosse Hinweise hinter dem Knopf.
+      const stumm = obIstStumm(o.id, p.probleme || []);
+      const fehler = stumm ? 0 : (p.rechenfehler || []).length;
+      const hinweise = (stumm || obIstGelesen(o.id, nurHinweise)) ? 0 : nurHinweise.length;
       const gewinn = personGewinn(o.id, scheine);
       verwalten += '<div class="ob-karte' + (ordnerFilter === o.id ? " ob-offen" : "") +
           (fehler ? " ob-fehler" : "") + '">' +

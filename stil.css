@@ -4467,6 +4467,7 @@ body[data-seite="mein"] .ob-sort { border-radius: 999px; }
 body[data-seite="mein"] .ob-sort.aktiv {
   background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
 }
+body[data-seite="mein"] .ob-stumm { border-radius: 999px; }
 body[data-seite="mein"] .ob-karte {
   display: flex; flex-direction: column; gap: 7px;
   border: 1px solid #d3d9e4; border-left: 4px solid #ccd3e0;
