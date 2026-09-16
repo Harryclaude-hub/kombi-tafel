@@ -1675,12 +1675,77 @@ function zeichneGesetzte() {
 // muessen, sondern die ganze Tabelle sehen - jede Wettmoeglichkeit als
 // eigene Zeile, daneben BEIDE Quoten, und ganz rechts, wie viel auf diese
 // Wette schon gesetzt wurde. Anhaken, Anbieter waehlen, Kombi bauen.
+// ---------- Zeitraum-Filter der Tabelle (nur Anzeige) ----------
+// Karam (16.09.2026): "Ich kann mir aussuchen, welche Spiele ich suchen
+// moechte. Deren Abpfiffdatum ist mir wichtig. Ich will Spiele, die nur
+// ab diesem Datum bis diesem Datum abgepfiffen werden. Das kann halt nur
+// in die Zukunft reinschauen. Davon werden alle noch offenen oder noch
+// moeglichen Wetten angezeigt."
+// Er filtert NUR die Anzeige. satzWetten(), istVorbei() und liesAnstoss()
+// bleiben unangetastet, es wird nichts geloescht und nichts umgerechnet.
+let ebVon = "";            // "JJJJ-MM-TT" oder leer
+let ebBis = "";
+let ebNurOffen = true;     // nur Spiele, die noch nicht angepfiffen sind
+
+// Drei Antworten, nicht zwei: true = zeigen, false = raus, null = ueber
+// den Abpfiff ist nichts bekannt. null darf NIE stillschweigend
+// verschwinden, sonst fehlt Karam eine Wette, die es sehr wohl gibt.
+function ebZeitPasst(w) {
+  const an = anstossFeld(w);
+  if (ebNurOffen && istVorbei(an)) return false;
+  if (!ebVon && !ebBis) return true;
+  const e = abpfiffZeit(an);
+  if (!e) return null;
+  // Ein unlesbares Datumsfeld darf nicht heimlich alles wegfiltern:
+  // dann gilt diese Grenze schlicht nicht.
+  if (ebVon) {
+    const v = new Date(ebVon + "T00:00");
+    if (!isNaN(v.getTime()) && e < v) return false;
+  }
+  if (ebBis) {
+    const b = new Date(ebBis + "T23:59");
+    if (!isNaN(b.getTime()) && e > b) return false;
+  }
+  return true;
+}
+
+function ebFiltern() {
+  const v = document.getElementById("eb_von");
+  const b = document.getElementById("eb_bis");
+  const o = document.getElementById("eb_nuroffen");
+  if (v) ebVon = v.value;
+  if (b) ebBis = b.value;
+  if (o) ebNurOffen = o.checked;
+  zeichneEigenbau();          // NUR die Tabelle, nichts wird nachgeladen
+}
+
+function ebAllesZeigen() {
+  ebVon = ""; ebBis = ""; ebNurOffen = false;
+  zeichneEigenbau();
+}
+
 function zeichneEigenbau() {
   const box = document.getElementById("eigenbau");
   if (!box) return;
-  const alle = satzWetten();
-  if (!alle.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
+  const roh = satzWetten();
+  if (!roh.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
+  // Angehakte Zeilen werden NIE ausgeblendet. Sonst faellt eine Wette
+  // aus der Auswahl, ohne dass jemand es merkt, und die gebaute
+  // Kombination haette ein Bein weniger als gewollt.
+  const angehakt = new Set([...document.querySelectorAll(".eb-wahl:checked")]
+    .map(c => String(c.value).split("|")[0]));
+  let ausZeit = 0, ohneZeit = 0;
+  const alle = roh.filter(w => {
+    if (angehakt.has(String(w.id))) return true;
+    const p = ebZeitPasst(w);
+    if (p === null) { ohneZeit++; return true; }   // Resttopf: bleibt sichtbar
+    if (!p) { ausZeit++; return false; }
+    return true;
+  });
   const ersatzMind = mindWert(liesZustand() || {});
+  // Im Alle-Modus bekommt jede Zeile eine Ordner-Spalte. Ohne sie saehen
+  // zwei gleich benannte Spiele aus verschiedenen Tagen identisch aus.
+  const alleOrdner = (aktiverSatzId() === SATZ_ALLE);
 
   // Wie viel steht schon auf welcher LINIE? Karam (03.09.): die Summe
   // gehoert an die Zeile der Linie, die wirklich gesetzt wurde - nicht
@@ -1715,6 +1780,8 @@ function zeichneEigenbau() {
         '<td class="tb-wahl"><input type="checkbox" class="eb-wahl" value="' + w.id + "|" + i + '"' +
           (vorbei ? " disabled" : "") + ' onchange="ebZaehlen()"></td>' +
         '<td class="mini tb-zeit">' + (i ? "" : zeitText(anstossFeld(w))) + "</td>" +
+        (alleOrdner ? '<td class="mini tb-ordner">' +
+          (i ? "" : textSicher(satzTitelVon(w.satz))) + "</td>" : "") +
         '<td class="mini">' + (i ? "" : textSicher(w.liga)) + "</td>" +
         "<td>" + (i ? "" : "<b>" + textSicher(w.spiel) + "</b>") + "</td>" +
         '<td class="tb-wette">' + textSicher(optionName(w, i)) +
@@ -1729,15 +1796,35 @@ function zeichneEigenbau() {
   const anb = KT_ANBIETER_RANG.map(kz =>
     '<option value="' + kz + '">' + textSicher(anbieterName(kz)) + "</option>").join("");
 
+  const gefiltert = (ausZeit > 0) || ebVon || ebBis;
   box.innerHTML =
     '<div class="tb-leiste">' +
       '<label>Anbieter: <select id="eb_kz">' + anb + "</select></label> " +
       '<button class="haupt" onclick="eigenbauAnlegen()">&#129513; Aus der Auswahl bauen</button> ' +
       '<span id="eb_zaehler" class="mini">nichts angehakt</span>' +
     "</div>" +
+    // Zeitraum-Leiste: Abpfiff von / bis, dazu der Schalter "nur offene".
+    '<div class="tb-leiste tb-zeitraum">' +
+      "<b>Abpfiff</b> " +
+      '<label>von <input type="date" id="eb_von" value="' + textSicher(ebVon) +
+        '" onchange="ebFiltern()"></label> ' +
+      '<label>bis <input type="date" id="eb_bis" value="' + textSicher(ebBis) +
+        '" onchange="ebFiltern()"></label> ' +
+      '<label><input type="checkbox" id="eb_nuroffen"' + (ebNurOffen ? " checked" : "") +
+        ' onchange="ebFiltern()"> nur noch offene Spiele</label> ' +
+      (gefiltert ? '<button onclick="ebAllesZeigen()">alles zeigen</button>' : "") +
+      (gefiltert ? '<span class="mini"> ' + ausZeit +
+        (ausZeit === 1 ? " Spiel" : " Spiele") + " ausgeblendet</span>" : "") +
+      (ohneZeit ? '<span class="mini warnton"> ' + ohneZeit +
+        (ohneZeit === 1 ? " Spiel hat" : " Spiele haben") + " keine Anstoßzeit - " +
+        "sie bleiben stehen, weil über ihren Abpfiff niemand etwas sagen kann</span>" : "") +
+    "</div>" +
+    (alle.length ? "" : '<p class="mini warnton">In diesem Zeitraum liegt kein Spiel. ' +
+      '<button onclick="ebAllesZeigen()">alles zeigen</button></p>') +
     '<div class="tabellenrand"><table class="tb-tafel"><thead><tr>' +
       '<th class="tb-marken" title="Bei welchen Anbietern diese Wette schon gesetzt ist">wo</th>' +
-      "<th></th><th>Anstoß</th><th>Liga</th><th>Spiel</th><th>Wette</th>" +
+      "<th></th><th>Anstoß</th>" + (alleOrdner ? "<th>Ordner</th>" : "") +
+      "<th>Liga</th><th>Spiel</th><th>Wette</th>" +
       "<th>Quote</th><th>Mindest</th><th>gesetzt</th></tr></thead><tbody>" +
       zeilen + "</tbody></table></div>" +
     '<p class="mini">' + offen + " Wettmöglichkeiten offen. Jede Linie eines Spiels steht als " +
@@ -1959,13 +2046,24 @@ function baueVerlaufsEintrag(scheinId) {
     gesamt *= q.echt; gesamtRoh *= q.roh;
     return { id: w.id, spiel: w.spiel, wette: w.wette, linie: optionName(w, eintrag.optIdx),
              an: anstossFeld(w),
+             // Der Ordner JE WETTE. Im Modus "alle Ordner" kann eine
+             // Kombination Wetten aus mehreren Ordnern haben; ohne das
+             // faende die Ergebnis-Suche spaeter nichts, weil sie ueber
+             // Ordner UND Spiel geht (ergebnisFuer in ergebnisse.js).
+             satz: (typeof wettenSatz === "function") ? wettenSatz(w) : undefined,
              quote: rund2(q.echt), quelle: q.quelle, mind: mindFuer(w, eintrag.optIdx, null) };
   });
+  // Der Ordner des ganzen Scheins: im Normalfall der offene Ordner, im
+  // Modus "alle Ordner" der des ersten Beins. Niemals die Hilfskennung
+  // __alle__ - die waere in der Datenbank eine Luege.
+  const satzFuerSchein = (aktiverSatzId() === SATZ_ALLE)
+    ? ((wetten[0] && wetten[0].satz) || "")
+    : aktiverSatzId();
   // HIER entsteht die feste Nummer, und nur hier: eine Kombination, die
   // wirklich gesetzt wird, bekommt eine, die es nie wieder gibt. Blosses
   // Bauen und Mischen verbraucht keine.
   const eintrag = {
-    zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz, satz: aktiverSatzId(),
+    zeit: new Date().toISOString(), scheinId: scheinId, kz: s.kz, satz: satzFuerSchein,
     nummer: nrNaechste(),
     anbieter: anbieterName(s.kz), einsatz: einsatz, quote: rund2(gesamt),
     moeglich: rund2(einsatz * gesamt), wetten: wetten, stand: "offen", notiz: ""
@@ -3692,22 +3790,44 @@ function kontoScheineLaden() {
   return kontoLauf;
 }
 
+// Gehoert eine gesetzte Kombination in die Ansicht DIESES Ordners?
+// Ja, wenn sie selbst dazu gezaehlt wird ODER auch nur EIN Bein aus
+// diesem Ordner stammt.
+// Warum das zweite: seit dem Modus "alle Ordner" kann eine Kombination
+// Beine aus zwei Tagen haben. Gespeichert wird sie unter dem Ordner des
+// ersten Beins. Ginge es nur danach, saehe das Bein aus dem anderen
+// Ordner dort ungesetzt aus - und Karam setzt es ein zweites Mal.
+// Fuer jede Kombination aus EINEM Ordner (also alles, was es bisher
+// gibt) aendert diese Regel nichts: alle Beine haben denselben Ordner.
+function eintragImOrdner(eigenerSatz, wetten, satz) {
+  // Altbestand ohne Ordner gehoerte zum damals einzigen: ueberall zeigen.
+  if (!eigenerSatz) return true;
+  if (eigenerSatz === satz) return true;
+  for (const t of (wetten || [])) if (t && t.satz === satz) return true;
+  return false;
+}
+
 // Alle Kombinationen, die fuer DIESEN Ordner schon gesetzt sind -
 // aus beiden Ablagen, in einer Form.
 function gesetzteEintraege() {
   const satz = aktiverSatzId();
+  // Im Modus "alle Ordner" darf hier NICHTS weggefiltert werden. Wuerde
+  // gegen "__alle__" verglichen, faellt jeder gesetzte Schein heraus,
+  // die Gesetzt-Liste saehe leer aus, schonGesetzt() meldete nichts -
+  // und dieselbe Kombination wuerde ein zweites Mal gesetzt.
+  const alleOrdner = (satz === SATZ_ALLE);
   const raus = [];
   let oertlich = [];
   try { oertlich = liesVerlauf() || []; } catch (e) { oertlich = []; }
   for (const e of oertlich) {
     // Alte Eintraege ohne satz gehoerten zum damals einzigen Ordner:
     // lieber mitzaehlen als eine gesetzte Kombination uebersehen.
-    if (e.satz && e.satz !== satz) continue;
+    if (!alleOrdner && !eintragImOrdner(e.satz, e.wetten, satz)) continue;
     const eG = { scheinId: e.scheinId, einsatz: Number(e.einsatz) || 0,
                  anbieter: e.anbieter, nummer: e.nummer, kz: e.kz,
                  quote: Number(e.quote) || 0, wetten: e.wetten || [],
                  moeglich: Number(e.moeglich) || 0, gebuehr: Number(e.gebuehr) || 0,
-                 zeit: e.zeit, woher: "geraet" };
+                 zeit: e.zeit, satz: e.satz, woher: "geraet" };
     // Ohne scheinId kein gemeinsamer Stamm - sonst faellt alles, was
     // keine hat, zu EINER Kombination zusammen und die Einsaetze werden
     // addiert.
@@ -3730,12 +3850,12 @@ function gesetzteEintraege() {
                   dbId: x.id, ordner: x.ordner, unlesbar: true, woher: "konto" });
       continue;
     }
-    if (d.satz && d.satz !== satz) continue;
+    if (!alleOrdner && !eintragImOrdner(d.satz, d.wetten, satz)) continue;
     const eK = { scheinId: d.scheinId, einsatz: Number(d.einsatz) || 0,
                  anbieter: d.anbieter, nummer: x.nummer || d.nummer, kz: d.kz,
                  quote: Number(d.quote) || 0, wetten: d.wetten || [],
                  moeglich: Number(d.moeglich) || 0, gebuehr: Number(d.gebuehr) || 0,
-                 zeit: x.created_at, dbId: x.id,
+                 zeit: x.created_at, dbId: x.id, satz: d.satz,
                  ordner: x.ordner, woher: "konto" };
     // Uebernommene Alt-Scheine (tuImport) haben keine scheinId - jeder
     // bekommt seinen eigenen Stamm ueber die Datenbank-Kennung.
@@ -4004,12 +4124,27 @@ async function zeichneGesetzteAusgaenge(liste) {
     if (typeof supaErgebnisseLaden !== "function" || typeof kombiAuswerten !== "function") return;
     if (!liste || !liste.length) return;
     const satz = aktiverSatzId();
-    const ergListe = await supaErgebnisseLaden([satz]);
+    // Im Alle-Modus stammen die Beine aus verschiedenen Ordnern. Mit
+    // "__alle__" kaeme gar nichts zurueck und jede Kombination saehe
+    // offen aus, obwohl sie laengst entschieden ist.
+    const ergListe = await supaErgebnisseLaden(
+      satz === SATZ_ALLE ? SAETZE.map(s => s.id) : [satz]);
     if (!ergListe.length) return;
-    const karte = {};
-    for (const z of ergListe) karte[z.spiel] = { heim: z.heim, gast: z.gast,
-      htHeim: z.ht_heim, htGast: z.ht_gast, karten: z.karten, ecken: z.ecken,
-      sonder: z.sonder || {}, stand: z.stand };
+    // Zwei Schluessel: einmal streng je Ordner, einmal nur nach dem
+    // Spielnamen. Der Name-Schluessel gilt NUR, solange der Name in genau
+    // einem Ordner vorkommt. Kommt er in zweien vor, bleibt er leer -
+    // lieber "laeuft noch" als das Ergebnis des falschen Tages.
+    const karte = {}, nachName = {}, mehrdeutig = {};
+    for (const z of ergListe) {
+      const erg = { heim: z.heim, gast: z.gast,
+        htHeim: z.ht_heim, htGast: z.ht_gast, karten: z.karten, ecken: z.ecken,
+        sonder: z.sonder || {}, stand: z.stand };
+      karte[z.satz + "|" + z.spiel] = erg;
+      if (nachName[z.spiel] !== undefined) mehrdeutig[z.spiel] = true;
+      else nachName[z.spiel] = erg;
+    }
+    const ergSuche = (satzId, spiel) => karte[satzId + "|" + spiel] ||
+      (mehrdeutig[spiel] ? null : (nachName[spiel] || null));
     const zeichen = { gewonnen: "&#10004;", halbgewonnen: "&#10004;&#189;",
       push: "&#8617;", abgesagt: "&#8617;", halbverloren: "&#10008;&#189;",
       verloren: "&#10008;", offen: "&#183;", unklar: "?" };
@@ -4018,7 +4153,8 @@ async function zeichneGesetzteAusgaenge(liste) {
       const zeile = document.querySelector('#gesetzteliste tr[data-erg="' + i + '"]');
       const e = liste[i];
       if (!zeile || !e.wetten || !e.wetten.length) continue;
-      const a = kombiAuswerten(e.wetten, e.einsatz, (w) => karte[w.spiel] || null);
+      const a = kombiAuswerten(e.wetten, e.einsatz,
+        (w) => ergSuche(w.satz || e.satz || satz, w.spiel));
       if (a.stand === "gewonnen") gew++; else if (a.stand === "verloren") ver++;
       const zelle = zeile.querySelector(".gs-wetten");
       if (zelle && !zelle.querySelector(".gs-ausgang")) {

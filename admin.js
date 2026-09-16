@@ -28,6 +28,10 @@ function zeitA(iso) {
 
 let adminIch = null;
 
+// Wie viele Ordner der Admin-Bereich voll ausklappt. Der Rest steht als
+// Einzeiler darunter und vollstaendig auf ordner.html.
+const ADM_ORDNER_OBEN = 5;
+
 async function startAdmin() {
   const ziel = elA("admininhalt");
   if (!window.supa) {
@@ -47,6 +51,20 @@ async function startAdmin() {
     return;
   }
   adminIch = u;
+  // ordner.html setzt window.ADM_NUR_ORDNER = true. Dann ist dieselbe
+  // Werkstatt zu sehen, nur ohne Kuerzung und ohne Userliste. Die Logik
+  // steht weiter genau hier, die zweite Seite ist nur ein zweiter Eingang.
+  if (window.ADM_NUR_ORDNER) {
+    ziel.innerHTML = `
+<h2>&#128193; Alle Ordner der Homebase</h2>
+<p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..."
+  size="40" oninput="satzSuche(this.value)"></p>
+<p class="mini"><a href="admin.html"><b>&#8592; zurück zum Admin-Bereich</b></a></p>
+<div id="adm_ordner"><p class="mini">Lädt...</p></div>`;
+    await zeichneOrdner();
+    admZuHash();
+    return;
+  }
   ziel.innerHTML = `
 <h2>&#128193; Ordner der Homebase</h2>
 <p class="mini">Der ganze Ablauf an einem Ort: <b>Ordner anlegen</b> (oder Fotos hochladen -
@@ -99,8 +117,17 @@ async function zeichneOrdner() {
   }
   const wetten = await supaWettenLaden();
   const offen = localStorage.getItem("kt_satz");
+  // Karam (16.09.2026): "Es werden nur die ersten fuenf angezeigt und
+  // danach gibt es einen Button, wenn man draufklickt, kommt man auf eine
+  // eigene Page, wo die alle drauf sind."
+  // Die uebrigen verschwinden NICHT: sie stehen darunter als Einzeiler,
+  // jeder mit data-such. Sonst suchte Karam einen Ordner, faende nichts
+  // und hielte ihn fuer geloescht.
+  const alleZeigen = !!window.ADM_NUR_ORDNER;
+  const voll = alleZeigen ? saetze : saetze.slice(0, ADM_ORDNER_OBEN);
+  const rest = alleZeigen ? [] : saetze.slice(ADM_ORDNER_OBEN);
   let html = "";
-  for (const s of saetze) {
+  for (const s of voll) {
     const meine = wetten.filter(w => w.satz === s.id);
     const fotos = uploads.filter(u => u.satz_datum === s.id);
     const wartet = fotos.filter(u => u.status === "wartet").length;
@@ -138,7 +165,36 @@ async function zeichneOrdner() {
         : '<p class="mini">Noch keine Wetten - Fotos einlesen oder von Hand anlegen.</p>') +
       "</div></details>";
   }
+  if (rest.length) {
+    html += '<div class="restordner"><b>' + rest.length + " weitere Ordner</b> " +
+      '<span class="mini">(hier nur als Zeile, zum Bearbeiten auf die eigene Seite)</span>';
+    for (const s of rest) {
+      const meine = wetten.filter(w => w.satz === s.id);
+      const fotos = uploads.filter(u => u.satz_datum === s.id);
+      html += '<a class="restzeile" data-such="' +
+        sicherA((s.titel + " " + s.id).toLowerCase()) + '" href="ordner.html#satzdetails_' +
+        encodeURIComponent(s.id) + '">&#128193; ' + sicherA(s.titel) +
+        (offen === s.id ? ' <span class="fertigbadge">offener Ordner</span>' : "") +
+        ' <span class="mini">' + meine.length + " Wetten, " + fotos.length + " Fotos</span></a>";
+    }
+    html += "</div>";
+  }
+  if (!alleZeigen) {
+    html += '<p><a href="ordner.html"><button class="haupt">&#128193; Alle ' +
+      saetze.length + " Ordner auf einer eigenen Seite</button></a></p>";
+  }
   box.innerHTML = html;
+}
+
+// Kommt man mit ordner.html#satzdetails_2026-09-15 an, klappt genau
+// dieser Ordner auf und die Seite springt hin.
+function admZuHash() {
+  const h = decodeURIComponent(String(location.hash || "").slice(1));
+  if (!h) return;
+  const el2 = document.getElementById(h);
+  if (!el2) return;
+  el2.open = true;
+  el2.scrollIntoView();
 }
 
 function wettenZeileHtml(w) {

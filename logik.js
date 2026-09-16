@@ -61,6 +61,24 @@ function istVorbei(an) {
   return new Date() > a.zeit;
 }
 
+// Der Abpfiff EINER Wette: Anstoss plus Spieldauer-Puffer.
+// Diese Zahl stand bisher nur an einer einzigen Stelle im ganzen Projekt
+// (mein.js, scheinEnde). Karam will im Kombi-Bau nach dem ABPFIFFDATUM
+// filtern - dieselbe Zahl darf nicht zweimal im Code stehen, sonst
+// weichen zwei Ansichten irgendwann um Stunden voneinander ab.
+// Rueckgabe null heisst: ueber diesen Abpfiff kann NIEMAND etwas sagen.
+const ABPFIFF_PUFFER_STUNDEN = 3;
+
+function abpfiffZeit(an) {
+  const a = liesAnstoss(an);
+  if (a.fehlt) return null;
+  const e = new Date(a.zeit);
+  if (isNaN(e.getTime())) return null;
+  if (a.unklar) e.setHours(23, 59);      // Uhrzeit unbekannt: Tagesende
+  e.setHours(e.getHours() + ABPFIFF_PUFFER_STUNDEN);
+  return e;
+}
+
 function jetztText() {
   const t = new Date();
   return String(t.getDate()).padStart(2, "0") + "." + String(t.getMonth() + 1).padStart(2, "0") +
@@ -197,16 +215,45 @@ function personenSortiert(liste, scheine) {
 
 // ---------- Foto-Sätze ----------
 
+// Karam (16.09.2026): "Ich will, dass es eine Uebersicht gibt ueber ALLE
+// Ordner. Das heisst, jede Kombi wird da eingelesen."
+// Dafuer gibt es die Kennung SATZ_ALLE. Sie steht an derselben Stelle wie
+// eine echte Satz-Kennung, ist aber keine: satzWetten() gibt dann alles.
+// Die Wetten ALLER Ordner sind ohnehin schon geladen (supaWettenLaden holt
+// kt_wetten ungefiltert), es wurde bisher nur gefiltert.
+const SATZ_ALLE = "__alle__";
+
+function alleOrdnerAn() {
+  try { return localStorage.getItem("kt_satz") === SATZ_ALLE; } catch (e) { return false; }
+}
+
 function aktiverSatzId() {
   if (!SAETZE.length) return null;       // noch kein Ordner eingelesen
   const gespeichert = localStorage.getItem("kt_satz");
+  if (gespeichert === SATZ_ALLE) return SATZ_ALLE;
   if (gespeichert && SAETZE.some(x => x.id === gespeichert)) return gespeichert;
   return SAETZE[SAETZE.length - 1].id;   // Standard: der neueste Satz
 }
 
 function satzWetten() {
   const id = aktiverSatzId();
+  if (id === SATZ_ALLE) return WETTEN.slice();
   return WETTEN.filter(w => w.satz === id);
+}
+
+// Zu welchem Ordner gehoert DIESE Wette? Im Modus "alle Ordner" kann eine
+// Kombination Wetten aus mehreren Ordnern haben - dann braucht jede ihren
+// eigenen Satz, sonst findet die Ergebnis-Suche spaeter nichts.
+function wettenSatz(w) {
+  return (w && w.satz) ? w.satz : aktiverSatzId();
+}
+
+// Der Titel eines Ordners. Unbekannt heisst unbekannt - hier darf kein
+// Ersatztitel entstehen, sonst stuende eine Wette unter einem Ordner,
+// zu dem sie nie gehoert hat.
+function satzTitelVon(id) {
+  const s = SAETZE.find(x => x.id === id);
+  return s ? s.titel : (id ? ("Ordner " + id) : "ohne Ordner");
 }
 
 function satzWaehlen(id) {
@@ -253,9 +300,13 @@ function zeichneOrdnerLeiste() {
       "der Ordner hier für alle.</div></div>";
     return;
   }
-  const satz = SAETZE.find(x => x.id === id) || SAETZE[SAETZE.length - 1];
+  const alle = (id === SATZ_ALLE);
+  // Im Alle-Modus gibt es keinen einzelnen Satz. Ohne diese Abfrage wuerde
+  // hier der Titel des letzten Ordners stehen - eine stille Luege.
+  const satz = alle ? null : (SAETZE.find(x => x.id === id) || SAETZE[SAETZE.length - 1]);
+  const titel = alle ? ("ALLE Ordner zusammen (" + SAETZE.length + ")") : satz.titel;
   const deko = satzDeko(id);
-  const farbe = deko.farbe || "#1a2c50";
+  const farbe = deko.farbe || (alle ? "#7a4a00" : "#1a2c50");
   const emoji = deko.emoji || "";
   const anzahl = satzWetten().length;
   const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w))).length;
@@ -263,7 +314,7 @@ function zeichneOrdnerLeiste() {
   let html = '<div class="ordnerkarte" style="border-color:' + farbe + '">' +
     '<div class="ordnerkopf" style="background:' + farbe + '">' +
     (emoji ? '<span class="ordneremoji">' + emoji + "</span> " : "") +
-    "&#128193; Offener Ordner: <b>" + satz.titel + "</b>" +
+    "&#128193; " + (alle ? "Ansicht: " : "Offener Ordner: ") + "<b>" + titel + "</b>" +
     '<span class="ordnerzahl">' + anzahl + " Wetten, " + offen + " offen</span></div>" +
     '<div class="ordnerknoepfe">' +
     '<a class="ordnerknopf" href="admin.html" id="fotoadminknopf" style="display:none">Neue Fotos hochladen</a>' +
@@ -299,7 +350,13 @@ function zeichneOrdnerLeiste() {
       (SAETZE.length > 5
         ? ' <input id="ordner_suche" placeholder="Datum filtern, z. B. 2026-09" ' +
           'oninput="zeichneOrdnerLeiste()" style="width:180px">' : "") +
-      '<div class="ordnerliste">';
+      '<div class="ordnerliste">' +
+      // Karam (16.09.2026): "Ich will, dass es eine Uebersicht gibt ueber
+      // alle Ordner, jede Kombi wird da eingelesen."
+      '<button class="ordnerwahl' + (id === SATZ_ALLE ? " aktiv" : "") +
+        '" style="border-color:#8a5a00" onclick="satzWaehlen(\'' + SATZ_ALLE + '\')">' +
+        "&#128193; ALLE Ordner zusammen (" + WETTEN.length + " Wetten)" +
+        (id === SATZ_ALLE ? " (offen)" : "") + "</button>";
     const filter = (document.getElementById("ordner_suche") || { value: "" }).value.trim();
     for (const x of SAETZE.slice().reverse()) {
       if (filter && !x.id.includes(filter) && !x.titel.includes(filter)) continue;

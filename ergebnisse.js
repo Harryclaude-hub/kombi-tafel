@@ -50,8 +50,11 @@ function ergebnisFuer(satz, spiel) {
 
 function scheinDurchrechnen(s) {
   const d = s.daten || {};
+  // Der Ordner kommt zuerst von der WETTE: seit dem Modus "alle Ordner"
+  // kann eine Kombination Beine aus mehreren Ordnern haben. Erst danach
+  // der Ordner des Scheins, wie bei allen aelteren Eintraegen.
   return kombiAuswerten(d.wetten || [], d.einsatz, (w) =>
-    ergebnisFuer(d.satz || "", w.spiel));
+    ergebnisFuer(w.satz || d.satz || "", w.spiel));
 }
 
 // ---------- Der Lauf: alles Offene pruefen, Entschiedenes verbuchen ----------

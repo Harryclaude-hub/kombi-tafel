@@ -1829,12 +1829,10 @@ function scheinEnde(s) {
       if (!w) return null;                      // Zeit unbekannt: nicht werten
       an = anstossFeld(w);
     }
-    const a = liesAnstoss(an);
-    if (a.fehlt) return null;                   // Zeit unbekannt: nicht werten
-    const e = new Date(a.zeit);
-    if (isNaN(e.getTime())) return null;
-    if (a.unklar) e.setHours(23, 59);
-    e.setHours(e.getHours() + 3);
+    // Der Puffer selbst steht in logik.js (abpfiffZeit), damit der
+    // Kombi-Bau und Mein Bereich denselben Abpfiff rechnen.
+    const e = abpfiffZeit(an);
+    if (!e) return null;                        // Zeit unbekannt: nicht werten
     if (!ende || e > ende) ende = e;
   }
   return ende;

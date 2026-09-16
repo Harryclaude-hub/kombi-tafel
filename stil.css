@@ -4624,3 +4624,31 @@ body[data-seite="mein"] #pi_meine textarea {
   width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px;
   border-radius: 8px; border: 1px solid #ccd3e0; padding: 8px; margin-top: 6px;
 }
+
+/* ============================================================
+   ORDNER-UEBERSICHT UND ZEITRAUM (Design-Schicht, KOMPLETT LOESCHBAR)
+   Faellt dieser Block weg, stehen die Zeitraum-Felder, die Ordner-Spalte
+   und die Rest-Ordnerzeilen schlicht untereinander. Alles bleibt
+   bedienbar, lesbar und rechnet genauso.
+   Bis zur Marke ENDE ORDNER-UEBERSICHT loeschen.
+   ============================================================ */
+
+/* Die zweite Leiste ueber der Tabelle: Abpfiff von/bis */
+.tb-zeitraum { border-top: 1px dashed #ccd3e0; padding-top: 6px; font-size: 13px; }
+.tb-zeitraum input[type="date"] {
+  padding: 3px 5px; border: 1px solid #ccd3e0; border-radius: 6px;
+}
+.warnton { color: #7a4a00; }
+
+/* Die Ordner-Spalte, die es nur im Modus "alle Ordner" gibt */
+.tb-ordner { white-space: nowrap; color: #55606f; }
+
+/* Die uebrigen Ordner im Admin-Bereich: eine Zeile je Ordner */
+.restordner { margin: 10px 0; }
+.restzeile {
+  display: block; padding: 6px 10px; margin-top: 4px; text-decoration: none;
+  border: 1px solid #ccd3e0; border-radius: 10px; background: #fff; color: inherit;
+}
+.restzeile:hover { border-color: #1a2c50; }
+
+/* ---- ENDE ORDNER-UEBERSICHT ---- */
