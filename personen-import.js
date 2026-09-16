@@ -38,6 +38,12 @@ function piPanelHtml() {
     "<code>P-Nummer &nbsp; Anbieter &nbsp; Eingezahlt &nbsp; Aktuell &nbsp; Notiz</code><br>" +
     "Es reicht auch die reine P-Nummer je Zeile. <b>Jede P-Nummer wird angelegt, auch die mit null.</b></p>" +
     '<textarea id="pi_text" rows="8" placeholder="P-494&#9;Stake&#9;1000&#9;1440,77&#10;P-525&#9;Stake&#9;0&#9;0"></textarea>' +
+    // Karam soll nicht tippen muessen: die Datei laden reicht.
+    '<p><label class="fotoknopf">&#128193; Liste aus Datei laden' +
+      '<input type="file" accept=".txt,.csv,.tsv,text/plain" style="display:none" ' +
+      'onchange="piDateiLaden(this)"></label> ' +
+      '<span class="mini">Eine Textdatei mit einer Zeile je Konto, Spalten durch Tabulator ' +
+      "oder Strichpunkt getrennt. Aus Excel: Speichern unter, Textdatei.</span></p>" +
     '<p><button class="haupt" onclick="piVergleichen()">Vergleichen</button> ' +
     '<button onclick="piLeeren()">Feld leeren</button></p>' +
     '<div id="pi_ergebnis"></div>' +
@@ -82,6 +88,30 @@ function piLesen(text) {
   return raus;
 }
 
+// Eine Textdatei ins Feld laden. Scheitert das Lesen, wird das GESAGT -
+// ein leeres Feld saehe aus wie "Datei war leer".
+function piDateiLaden(input) {
+  const datei = input.files && input.files[0];
+  if (!datei) return;
+  const leer = () => { try { input.value = ""; } catch (e) { } };
+  const leser = new FileReader();
+  leser.onerror = () => {
+    leer();
+    meldungM("Diese Datei liess sich nicht lesen (" + textSicherM(datei.name) + ").", "warn");
+  };
+  leser.onload = ev => {
+    leer();
+    const feld = el("pi_text");
+    if (!feld) return;
+    feld.value = String(ev.target.result || "");
+    const zeilen = feld.value.split(/\r?\n/).filter(x => x.trim()).length;
+    meldungM("<b>" + textSicherM(datei.name) + "</b> geladen, " + zeilen +
+      " Zeilen. Jetzt auf <b>Vergleichen</b> drücken.", "gut");
+    piVergleichen();
+  };
+  leser.readAsText(datei, "utf-8");
+}
+
 function piLeeren() {
   const f = el("pi_text");
   if (f) f.value = "";
@@ -104,9 +134,17 @@ function piVergleichen() {
   // Verglichen wird ueber die P-NUMMER, nicht ueber den Namen: "P-7" und
   // "P-7 Max" sind dieselbe Person, "Max" allein waere eine andere.
   const nachNummer = new Map();
+  // Dieselbe P-Nummer zweimal in der Tafel ist ein echtes Problem: das
+  // Geld landet dann auf der einen Karte und die Scheine haengen an der
+  // anderen. Deshalb wird es gezaehlt und gemeldet, nicht verschwiegen.
+  const doppelt = new Map();
   for (const o of da) {
     const n = (typeof personNummer === "function") ? personNummer(o.name) : null;
-    if (n !== null && !nachNummer.has(n)) nachNummer.set(n, o);
+    if (n === null) continue;
+    if (nachNummer.has(n)) {
+      if (!doppelt.has(n)) doppelt.set(n, [nachNummer.get(n)]);
+      doppelt.get(n).push(o);
+    } else nachNummer.set(n, o);
   }
   const vorhanden = [], fehlt = [], ohneNummer = [], unbekannterAnbieter = [];
   const gesehen = new Set();
@@ -126,7 +164,18 @@ function piVergleichen() {
   piPlan = { vorhanden: vorhanden, fehlt: fehlt, ohneNummer: ohneNummer,
     unbekannterAnbieter: unbekannterAnbieter, nurInTafel: nurInTafel };
 
-  let h = '<div class="pi-summe">' +
+  let h = "";
+  if (doppelt.size) {
+    h += '<div class="pi-block pi-warn"><b>&#9888; ' + doppelt.size +
+      " P-Nummer(n) gibt es in der Tafel ZWEIMAL.</b> Das muss weg, bevor Kontostände " +
+      "eingetragen werden: sonst hängen die Scheine an der einen Karte und das Geld an der " +
+      "anderen.<div class=\"pi-liste\">" +
+      [...doppelt.entries()].map(([n, liste]) =>
+        '<span class="pi-chip">P-' + n + " (" + liste.length + "&times;)</span>").join(" ") +
+      '</div><p class="mini">Die leere Karte kannst du oben bei den Personen löschen, ' +
+      "der Löschen-Knopf erscheint nur, wenn nichts daran hängt.</p></div>";
+  }
+  h += '<div class="pi-summe">' +
     '<span class="pi-k"><b>' + piZeilen.length + "</b> Zeilen eingefügt</span>" +
     '<span class="pi-k"><b>' + gesehen.size + "</b> verschiedene P-Nummern</span>" +
     '<span class="pi-k pi-da"><b>' + vorhanden.length + "</b> schon da</span>" +
