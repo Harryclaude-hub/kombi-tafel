@@ -935,6 +935,25 @@ function personKnopfM(ordnerId, zusatz) {
 // localStorage: eine Suche soll beim naechsten Oeffnen weg sein, sonst
 // fehlen Personen und niemand weiss warum.
 let obSuche = "";
+
+// Karam (16.09.2026): "Die Personenanzeige wird zu gross. Zeig gleichzeitig
+// nur 10 Personen, die letzten 10 die man geoeffnet hat oder die mit dem
+// meisten Geld - das kann ich filtern. Und ich will nach links und rechts
+// scrollen, nicht nach unten."
+const OB_WIEVIELE = 10;
+const OB_SORT = "kt_ob_sort";
+function obSort() {
+  try { return localStorage.getItem(OB_SORT) || "zuletzt"; } catch (e) { return "zuletzt"; }
+}
+function obSortSetzen(wert) {
+  try { localStorage.setItem(OB_SORT, wert); } catch (e) { }
+  zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
+}
+let obAlleZeigen = false;
+function obAlle(an) {
+  obAlleZeigen = !!an;
+  zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
+}
 function obSuchen(wert) {
   obSuche = String(wert || "");
   // NUR den Personen-Kasten neu zeichnen, NICHT zeichneBereich().
@@ -1058,7 +1077,7 @@ function zeichneOrdnerBox(scheine) {
   // Logik wie im Kombi-Bau, damit "7" auch hier P-7 findet.
   const q = (typeof personNorm === "function") ? personNorm(obSuche) : String(obSuche || "").toLowerCase();
   const nurZahl = /^\d+$/.test(q);
-  const sichtbar = ordnerListe.filter(o => {
+  let sichtbar = ordnerListe.filter(o => {
     if (!q) return true;
     const norm = (typeof personNorm === "function") ? personNorm(o.name) : String(o.name).toLowerCase();
     const nr = (typeof personNummer === "function") ? personNummer(o.name) : null;
@@ -1066,14 +1085,60 @@ function zeichneOrdnerBox(scheine) {
     return norm.indexOf(q) !== -1;
   });
 
+  // Sortieren: zuletzt geoeffnet, meistes Geld oder nach P-Nummer.
+  // "zuletzt geoeffnet" kommt aus personenZuletzt() in logik.js - derselben
+  // Merkliste, die auch der Kombi-Bau benutzt. Kein zweites Gedaechtnis.
+  const wahl = obSort();
+  const geld = {};
+  for (const o of ordnerListe) {
+    const pr = personPruefen(o.id, scheine);
+    geld[o.id] = pr.aufWegen + pr.beiAnbietern + pr.imSpiel;
+  }
+  if (wahl === "geld") {
+    sichtbar.sort((a, b) => geld[b.id] - geld[a.id]);
+  } else if (wahl === "nummer") {
+    if (typeof personVergleich === "function") sichtbar.sort(personVergleich);
+  } else {
+    const rang = new Map();
+    let i = 0;
+    for (const id of (typeof personenZuletzt === "function" ? personenZuletzt() : [])) {
+      if (!rang.has(id)) rang.set(id, i++);
+    }
+    sichtbar.sort((a, b) => {
+      const ra = rang.has(a.id) ? rang.get(a.id) : Infinity;
+      const rb = rang.has(b.id) ? rang.get(b.id) : Infinity;
+      if (ra !== rb) return ra - rb;
+      return geld[b.id] - geld[a.id];      // noch nie geoeffnet: meistes Geld zuerst
+    });
+  }
+  // Bei einer Suche wird NICHT gekuerzt: wer sucht, will den Treffer sehen.
+  const gesamtTreffer = sichtbar.length;
+  const gekuerzt = !q && !obAlleZeigen && sichtbar.length > OB_WIEVIELE;
+  if (gekuerzt) sichtbar = sichtbar.slice(0, OB_WIEVIELE);
+
   if (!ordnerListe.length) {
     verwalten += '<p class="mini">Noch keine Person angelegt.</p>';
   } else if (!sichtbar.length) {
     verwalten += '<p class="mini">Keine Person gefunden. Tippfehler? Sie ist nicht gelöscht, ' +
       "nur nicht getroffen.</p>";
   } else {
-    if (q) verwalten += '<p class="mini">' + sichtbar.length + " von " + ordnerListe.length +
+    const sknopf = (w, t) => '<button class="ob-sort' + (obSort() === w ? " aktiv" : "") +
+      '" onclick="obSortSetzen(\'' + w + '\')">' + t + "</button>";
+    verwalten += '<div class="ob-sortzeile"><span class="mini">Reihenfolge:</span> ' +
+      sknopf("zuletzt", "Zuletzt geöffnet") + sknopf("geld", "Meistes Geld") +
+      sknopf("nummer", "P-Nummer") +
+      (gekuerzt
+        ? ' <span class="mini">Es werden ' + OB_WIEVIELE + " von " + ordnerListe.length +
+          ' gezeigt.</span> <button onclick="obAlle(true)">alle ' + ordnerListe.length + " zeigen</button>"
+        : (!q && obAlleZeigen && ordnerListe.length > OB_WIEVIELE
+          ? ' <button onclick="obAlle(false)">nur die ersten ' + OB_WIEVIELE + " zeigen</button>"
+          : "")) +
+      "</div>";
+    if (q) verwalten += '<p class="mini">' + gesamtTreffer + " von " + ordnerListe.length +
       " Personen passen auf die Suche.</p>";
+    // Seitlich scrollen statt nach unten wachsen: Karams ausdruecklicher
+    // Wunsch. Deshalb eine Reihe, die quer laeuft, nicht ein Block, der
+    // immer laenger wird.
     verwalten += '<div class="ob-raster">';
     sichtbar.forEach((o, i) => {
       const n = zahl[o.id] || 0;
@@ -1150,6 +1215,11 @@ function zeichneOrdnerBox(scheine) {
 
 function tuOrdnerFilter(wert) {
   ordnerFilter = wert;
+  // Wer geoeffnet wird, steht beim naechsten Mal vorne in "zuletzt
+  // geoeffnet". Dieselbe Merkliste wie im Kombi-Bau (logik.js).
+  if (wert && wert !== "alle" && wert !== "ohne" && typeof personGemerkt === "function") {
+    personGemerkt(wert);
+  }
   zeichneBereich();
 }
 

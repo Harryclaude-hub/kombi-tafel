@@ -4445,10 +4445,27 @@ body[data-seite="mein"] .ob-kopf {
 body[data-seite="mein"] .ob-suche { min-width: 15em; }
 body[data-seite="mein"] .ob-neu { display: inline-flex; gap: 6px; margin-left: auto; }
 
+/* Karam (16.09.2026): "dass ich bei Personen nach links oder nach rechts
+   scrollen kann, nicht dass es nach unten geht unnoetig."
+   Deshalb EINE Reihe, die quer laeuft. Die Karten behalten ihre Breite
+   und schrumpfen nicht, sonst waeren sie bei zehn Stueck fingerbreit. */
 body[data-seite="mein"] .ob-raster {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-  gap: 10px; margin: 8px 0;
+  display: flex; gap: 10px; margin: 8px 0;
   align-items: stretch;
+  overflow-x: auto; overflow-y: hidden;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+body[data-seite="mein"] .ob-raster > .ob-karte {
+  flex: 0 0 215px; scroll-snap-align: start;
+}
+body[data-seite="mein"] .ob-sortzeile {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 6px;
+}
+body[data-seite="mein"] .ob-sort { border-radius: 999px; }
+body[data-seite="mein"] .ob-sort.aktiv {
+  background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
 }
 body[data-seite="mein"] .ob-karte {
   display: flex; flex-direction: column; gap: 7px;
@@ -4503,7 +4520,10 @@ body[data-seite="mein"] .kassenhinweise { margin: 8px 0; }
 
 @media (max-width: 700px) {
   /* Am Handy zwei je Zeile: eine waere Scrollen ohne Ende, vier zu eng. */
-  body[data-seite="mein"] .ob-raster { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  /* Am Handy laeuft die Reihe genauso quer, nur mit schmaleren Karten.
+     grid-template-columns waere hier wirkungslos: die Reihe ist flex. */
+  body[data-seite="mein"] .ob-raster { gap: 8px; }
+  body[data-seite="mein"] .ob-raster > .ob-karte { flex: 0 0 165px; }
   body[data-seite="mein"] .ob-karte { padding: 8px 10px; }
   body[data-seite="mein"] .ob-zahlen { grid-template-columns: 1fr; }
   body[data-seite="mein"] .ob-neu { margin-left: 0; }
@@ -4548,6 +4568,8 @@ body[data-seite="mein"] .pi-chip {
   background: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
 }
 body[data-seite="mein"] .pi-chip.pi-chip-da { border-color: #1a7a1a; color: #0a5a0a; }
+body[data-seite="mein"] .pi-kasten h4 { margin: 16px 0 6px; padding-top: 12px; border-top: 2px solid #d3d9e4; }
+body[data-seite="mein"] .pi-zeile { margin: 6px 0 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 /* ---- 7. Kleinkram, der die Karten ruhiger macht ---- */
 body[data-seite="mein"] .tabellenrand { border-radius: 12px; }
