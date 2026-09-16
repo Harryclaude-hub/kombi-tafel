@@ -4433,6 +4433,92 @@ body[data-seite="mein"] #buchhaltung .kk-doppbox {
   background: #fdf2f1; margin: 4px 0;
 }
 
+/* ---- 6h. Personen als Raster, 4 bis 5 je Zeile ----
+   Karam (16.09.2026): "Jeder Name hat einen Bereich, wirklich wie bei
+   einer Tabelle, nicht alles ineinander verrutscht. Symmetrisch, pro
+   Zeile 4 bis 5 Personen."
+   minmax(215px, 1fr) ergibt auf einem breiten Schirm vier bis fuenf
+   Karten je Zeile und bricht von selbst um, statt zu quetschen. */
+body[data-seite="mein"] .ob-kopf {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 12px;
+}
+body[data-seite="mein"] .ob-suche { min-width: 15em; }
+body[data-seite="mein"] .ob-neu { display: inline-flex; gap: 6px; margin-left: auto; }
+
+body[data-seite="mein"] .ob-raster {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 10px; margin: 8px 0;
+  align-items: stretch;
+}
+body[data-seite="mein"] .ob-karte {
+  display: flex; flex-direction: column; gap: 7px;
+  border: 1px solid #d3d9e4; border-left: 4px solid #ccd3e0;
+  border-radius: 12px; background: #fff; padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(15, 25, 40, .08);
+}
+body[data-seite="mein"] .ob-karte.ob-offen { border-left-color: var(--kenn, #1a2c50); background: #fdfbf6; }
+body[data-seite="mein"] .ob-karte.ob-fehler { border-left-color: #a00000; }
+body[data-seite="mein"] .ob-zeile1 { display: flex; align-items: center; gap: 6px; }
+body[data-seite="mein"] .ob-lfd {
+  min-width: 24px; text-align: center; padding: 1px 6px; border-radius: 999px;
+  background: #eef1f7; border: 1px solid #d3d9e4; color: #55627a;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+}
+body[data-seite="mein"] .ob-name {
+  flex: 1 1 auto; text-align: left; font-weight: bold; font-size: 14px;
+  border-radius: 8px; padding: 6px 10px; min-height: 34px;
+  background: var(--kenn, #1a2c50); color: #fff; border: 1px solid var(--kenn, #1a2c50);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body[data-seite="mein"] .ob-name:hover { filter: brightness(1.15); }
+
+/* Die Zahlen stehen in einem festen Raster, damit sie in JEDER Karte an
+   derselben Stelle stehen - das war Karams Punkt mit "symmetrisch". */
+body[data-seite="mein"] .ob-zahlen {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+body[data-seite="mein"] .ob-zahlen > span { display: flex; justify-content: space-between; gap: 6px; }
+body[data-seite="mein"] .ob-t { color: #55627a; }
+body[data-seite="mein"] .ob-marken { display: flex; flex-wrap: wrap; gap: 4px; min-height: 4px; }
+body[data-seite="mein"] .ob-hinweis {
+  border-radius: 999px; padding: 1px 9px; font-size: 11px;
+  border: 1px solid #ccd3e0; background: #f7f9fc; color: #55627a;
+}
+/* Die Karte endet mit einer schmalen Zeile: nur der Stift. Erst auf
+   Klick klappt das Umbenennen auf - so bleiben alle Karten gleich hoch. */
+body[data-seite="mein"] .ob-tasten {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  margin-top: auto; padding-top: 4px;
+}
+body[data-seite="mein"] .ob-tasten button { font-size: 11.5px; padding: 3px 9px; min-height: 28px; }
+body[data-seite="mein"] .ob-stift { border-radius: 8px; }
+body[data-seite="mein"] .ob-bearb { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+/* MUSS dastehen: display:flex ueberstimmt sonst das hidden-Merkmal, und
+   das Umbenennen-Feld stuende in jeder Karte offen. Genau das ist beim
+   ersten Versuch passiert. */
+body[data-seite="mein"] .ob-bearb[hidden] { display: none; }
+body[data-seite="mein"] .ob-bearb input { font-size: 11.5px; padding: 3px 6px; flex: 1 1 100%; }
+body[data-seite="mein"] .kassenhinweise { margin: 8px 0; }
+
+@media (max-width: 700px) {
+  /* Am Handy zwei je Zeile: eine waere Scrollen ohne Ende, vier zu eng. */
+  body[data-seite="mein"] .ob-raster { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  body[data-seite="mein"] .ob-karte { padding: 8px 10px; }
+  body[data-seite="mein"] .ob-zahlen { grid-template-columns: 1fr; }
+  body[data-seite="mein"] .ob-neu { margin-left: 0; }
+}
+
+/* Der kleine Foto-Knopf in den Tabellenzeilen */
+body[data-seite="mein"] label.fotoknopf.fotoknopf-klein {
+  display: inline-block; font-size: 11.5px; padding: 3px 9px; min-height: 28px;
+  border-radius: 8px; border: 1px solid #33404d; background: #fbfcfd; cursor: pointer;
+}
+body[data-seite="mein"] label.fotoknopf.fotoknopf-klein:hover { background: #eef1f7; }
+body[data-seite="mein"] #auswerten label.fotoknopf.fotoknopf-klein {
+  display: block; margin-top: 6px; text-align: center;
+}
+
 /* ---- 6g. Personen aus einer Liste abgleichen ---- */
 body[data-seite="mein"] .pi-kasten {
   border: 1px solid #d3d9e4; border-left: 4px solid var(--kenn, #1a2c50);

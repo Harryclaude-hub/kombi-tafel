@@ -276,6 +276,9 @@ function awKarteHtml(s, lfd, gesamt) {
         : (s.fotoUnlesbar
           ? '<div class="aw-keinbild aw-fotokaputt mini">Foto da,<br>nicht lesbar</div>'
           : '<div class="aw-keinbild mini">kein Foto</div>')) +
+      // Karam: "bei den Kombis immer so einen kleinen Button, Foto
+      // hinzufuegen." Auch hier, direkt unter dem Platz fuers Bild.
+      (typeof fotoKnopfHtml === "function" ? fotoKnopfHtml(s.id, true) : "") +
     "</div>" +
     '<div class="aw-text">' +
       '<div class="aw-zeile1">' +

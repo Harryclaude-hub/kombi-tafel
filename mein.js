@@ -931,6 +931,81 @@ function personKnopfM(ordnerId, zusatz) {
     (zusatz ? " " + zusatz : "") + "</a>";
 }
 
+// Was steht gerade im Suchfeld der Personen? Absichtlich NICHT im
+// localStorage: eine Suche soll beim naechsten Oeffnen weg sein, sonst
+// fehlen Personen und niemand weiss warum.
+let obSuche = "";
+function obSuchen(wert) {
+  obSuche = String(wert || "");
+  // NUR den Personen-Kasten neu zeichnen, NICHT zeichneBereich().
+  // zeichneBereich laedt alles frisch aus Supabase und entschluesselt
+  // dabei jedes Wettschein-Foto - bei jedem einzelnen Tastendruck. Das
+  // war der erste Entwurf und haette die Suche unbenutzbar gemacht.
+  zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
+  // Der Fokus muss zurueck ins Feld, sonst kann man nicht weitertippen.
+  const f = el("ob_suche");
+  if (f) { f.focus(); try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) { } }
+}
+
+// Umbenennen und Loeschen einer Person aufklappen. Bleibt zu, solange
+// niemand es braucht - sonst ist jede Karte doppelt so hoch.
+function obBearbeiten(ordnerId) {
+  const k = el("ob_b_" + ordnerId);
+  if (!k) return;
+  k.hidden = !k.hidden;
+  if (!k.hidden) {
+    const f = el("ob_neu_" + ordnerId);
+    if (f && f.focus) f.focus();
+  }
+}
+
+// Die Hinweise einer Person auf Verlangen zeigen, mit "als gelesen"
+// dahinter. Karam (16.09.2026): "Ich will, dass diese ganzen Anmerkungen
+// verschwinden, solange es kein mathematischer Fehler ist. Und mir einen
+// Button hinzufuegst als gelesen markieren."
+function obHinweise(ordnerId) {
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const p = personPruefen(ordnerId, scheine);
+  const fehler = new Set(p.rechenfehler || []);
+  const nur = (p.probleme || []).filter(t => !fehler.has(t));
+  if (!nur.length) { meldungM("Keine Hinweise mehr bei dieser Person.", "gut"); return; }
+  const name = ordnerNameM(ordnerId) || "dieser Person";
+  meldungM("<b>Hinweise bei " + textSicherM(name) + ":</b><ul>" +
+    nur.map(t => "<li>" + t + "</li>").join("") + "</ul>" +
+    '<button onclick="obGelesen(\'' + ordnerId + '\')">Als gelesen markieren</button>', "gut");
+}
+
+// Als gelesen: die Hinweise verschwinden, bis sie sich AENDERN. Gemerkt
+// wird ein Fingerabdruck des Textes, nicht nur "irgendwann weggeklickt" -
+// sonst bliebe ein NEUER Hinweis fuer immer unsichtbar.
+const OB_GELESEN = "kt_hinweise_gelesen";
+function obGelesenListe() {
+  try { return JSON.parse(localStorage.getItem(OB_GELESEN) || "{}") || {}; }
+  catch (e) { return {}; }
+}
+function obFingerabdruck(texte) {
+  let h = 0;
+  const s = texte.join("|");
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+  return String(h);
+}
+function obGelesen(ordnerId) {
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const p = personPruefen(ordnerId, scheine);
+  const fehler = new Set(p.rechenfehler || []);
+  const nur = (p.probleme || []).filter(t => !fehler.has(t));
+  const liste = obGelesenListe();
+  liste[ordnerId] = obFingerabdruck(nur);
+  try { localStorage.setItem(OB_GELESEN, JSON.stringify(liste)); } catch (e) { }
+  meldungM("Als gelesen markiert. Sie kommen wieder, wenn sich etwas ändert.", "gut");
+  // Auch hier reicht der Personen-Kasten: alles neu zu laden waere
+  // dieselbe Falle wie bei der Suche.
+  zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
+}
+function obIstGelesen(ordnerId, texte) {
+  return obGelesenListe()[ordnerId] === obFingerabdruck(texte);
+}
+
 function zeichneOrdnerBox(scheine) {
   const box = el("ordnerbox");
   if (!box) return;
@@ -949,54 +1024,109 @@ function zeichneOrdnerBox(scheine) {
   }
   const schreib = darfSchreiben();
 
-  let filter = '<div class="ordnerfilter">' +
-    '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'alle\')">Alle (' + scheine.length + ")</button> ";
+  // Die Leiste traegt nur noch "Alle" und "Ohne Person". Jede einzelne
+  // Person steht jetzt als eigene Karte im Raster darunter - bei 27
+  // Personen war die Leiste sonst laenger als der Bildschirm.
   let irgendwoWarnung = false;
   for (const o of ordnerListe) {
-    const warn = personPruefen(o.id, scheine).probleme.length > 0;
-    if (warn) irgendwoWarnung = true;
-    filter += '<button class="' + (ordnerFilter === o.id ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'' + o.id + '\')">' +
-      textSicherM(o.name) + " (" + (zahl[o.id] || 0) + ")" +
-      (wartend[o.id] ? ' <span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "") +
-      (warn ? ' <span class="warnbadge">!</span>' : "") + "</button> ";
+    if ((personPruefen(o.id, scheine).rechenfehler || []).length) irgendwoWarnung = true;
   }
-  filter += '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") + '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")" +
-    (ohneWartend ? ' <span class="fertigbadge">' + ohneWartend + ' fertig</span>' : "") + "</button></div>";
+  const filter = '<div class="ordnerfilter">' +
+    '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") +
+      '" onclick="tuOrdnerFilter(\'alle\')">Alle Kombinationen (' + scheine.length + ")</button> " +
+    '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") +
+      '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")" +
+    (ohneWartend ? ' <span class="fertigbadge">' + ohneWartend + " fertig</span>" : "") +
+    "</button></div>";
 
-  // Klare Personen-Uebersicht: eine Zeile je Person, alles auf einen Blick
-  let verwalten = "";
-  if (schreib) {
-    verwalten = '<p><input id="ordner_neu" placeholder="Neue Person, z. B. ein Name"> ' +
-      '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufügen</button></p>';
-  }
-  if (ordnerListe.length) {
-    verwalten += "<table><thead><tr><th>Person</th><th>Kombis</th><th>Einsatz gesamt</th>" +
-      "<th>fertig</th><th>Erhalten</th><th>Eingezahlt</th><th>Gewonnen</th><th></th></tr></thead><tbody>";
-    for (const o of ordnerListe) {
+  // ---- Personen als Raster, 4 bis 5 je Zeile ----
+  // Karam (16.09.2026): "Bei der Personenanzeige will ich, dass jeder Name
+  // einen Bereich hat, wirklich wie bei einer Tabelle, nicht alles
+  // ineinander verrutscht. Symmetrisch, pro Zeile 4 bis 5 Personen."
+  // Dazu eine Suchleiste, weil es jetzt viele Personen sind.
+  let verwalten = '<div class="ob-kopf">' +
+    '<input id="ob_suche" class="ob-suche" placeholder="Person suchen - die Nummer reicht" ' +
+      'value="' + textSicherM(obSuche) + '" oninput="obSuchen(this.value)">' +
+    (obSuche ? '<button onclick="obSuchen(\'\')">Suche löschen</button>' : "") +
+    (schreib
+      ? '<span class="ob-neu"><input id="ordner_neu" placeholder="Neue Person, z. B. P-23"> ' +
+        '<button class="haupt" onclick="tuOrdnerAnlegen()">Person hinzufügen</button></span>'
+      : "") +
+    "</div>";
+
+  // Gesucht wird ueber personNorm/personNummer aus logik.js - dieselbe
+  // Logik wie im Kombi-Bau, damit "7" auch hier P-7 findet.
+  const q = (typeof personNorm === "function") ? personNorm(obSuche) : String(obSuche || "").toLowerCase();
+  const nurZahl = /^\d+$/.test(q);
+  const sichtbar = ordnerListe.filter(o => {
+    if (!q) return true;
+    const norm = (typeof personNorm === "function") ? personNorm(o.name) : String(o.name).toLowerCase();
+    const nr = (typeof personNummer === "function") ? personNummer(o.name) : null;
+    if (nurZahl && nr !== null && String(nr) === String(parseInt(q, 10))) return true;
+    return norm.indexOf(q) !== -1;
+  });
+
+  if (!ordnerListe.length) {
+    verwalten += '<p class="mini">Noch keine Person angelegt.</p>';
+  } else if (!sichtbar.length) {
+    verwalten += '<p class="mini">Keine Person gefunden. Tippfehler? Sie ist nicht gelöscht, ' +
+      "nur nicht getroffen.</p>";
+  } else {
+    if (q) verwalten += '<p class="mini">' + sichtbar.length + " von " + ordnerListe.length +
+      " Personen passen auf die Suche.</p>";
+    verwalten += '<div class="ob-raster">';
+    sichtbar.forEach((o, i) => {
       const n = zahl[o.id] || 0;
       const kasseN = personBuchungen.filter(b => b.ordner === o.id).length;
       const p = personPruefen(o.id, scheine);
-      const warn = p.probleme.length > 0;
-      let tasten = '<button onclick="tuOrdnerFilter(\'' + o.id + '\')">öffnen</button>';
-      if (schreib) {
-        tasten += ' <button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">umbenennen</button>' +
-          ((n === 0 && kasseN === 0)
-            ? ' <button onclick="tuOrdnerLoeschen(\'' + o.id + '\')">löschen</button>'
-            : ' <span class="mini">löschen erst wenn leer</span>');
-      }
-      verwalten += "<tr" + (ordnerFilter === o.id ? " class='fertigzeile'" : "") + "><td>" +
-        (schreib ? '<input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '" size="16">'
-                 : "<b>" + textSicherM(o.name) + "</b>") + "</td>" +
-        "<td>" + n + "</td>" +
-        "<td>" + personEinsatz(o.id, scheine).toFixed(2) + " &euro;</td>" +
-        "<td>" + (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + ' fertig</span>' : "-") + "</td>" +
-        "<td>" + p.erhaltengesamt.toFixed(2) + " &euro;</td>" +
-        "<td>" + p.eingesamt.toFixed(2) + " &euro;" +
-          (warn ? ' <span class="warnbadge">!</span>' : "") + "</td>" +
-        "<td>" + personGewinn(o.id, scheine).toFixed(2) + " &euro;</td>" +
-        "<td>" + tasten + "</td></tr>";
-    }
-    verwalten += "</tbody></table>";
+      // NUR echte Rechenfehler zeigen sich ungefragt. Alles andere ist
+      // ein Hinweis und wartet hinter "N Hinweise".
+      const fehler = (p.rechenfehler || []).length;
+      const fehlerSet = new Set(p.rechenfehler || []);
+      const nurHinweise = (p.probleme || []).filter(t => !fehlerSet.has(t));
+      // Als gelesen markierte Hinweise bleiben weg, bis sie sich aendern.
+      const hinweise = obIstGelesen(o.id, nurHinweise) ? 0 : nurHinweise.length;
+      const gewinn = personGewinn(o.id, scheine);
+      verwalten += '<div class="ob-karte' + (ordnerFilter === o.id ? " ob-offen" : "") +
+          (fehler ? " ob-fehler" : "") + '">' +
+        '<div class="ob-zeile1">' +
+          '<span class="ob-lfd">' + (i + 1) + "</span>" +
+          '<button class="ob-name" onclick="tuOrdnerFilter(\'' + o.id + '\')" ' +
+            'title="Alles von ' + textSicherM(o.name) + ' ansehen">' + textSicherM(o.name) + "</button>" +
+        "</div>" +
+        '<div class="ob-zahlen">' +
+          '<span><span class="ob-t">Kombis</span><b>' + n + "</b></span>" +
+          '<span><span class="ob-t">Einsatz</span><b>' + personEinsatz(o.id, scheine).toFixed(2) + "</b></span>" +
+          '<span><span class="ob-t">Erhalten</span><b>' + p.erhaltengesamt.toFixed(2) + "</b></span>" +
+          '<span><span class="ob-t">Eingezahlt</span><b>' + p.eingesamt.toFixed(2) + "</b></span>" +
+          '<span><span class="ob-t">Gewinn</span><b class="' + (gewinn >= 0 ? "e-gew" : "e-ver") +
+            '">' + gewinn.toFixed(2) + "</b></span>" +
+        "</div>" +
+        '<div class="ob-marken">' +
+          (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + " fertig</span>" : "") +
+          (fehler ? '<span class="warnbadge">&#9888; ' + fehler + " Rechenfehler</span>" : "") +
+          (hinweise ? '<button class="ob-hinweis" onclick="obHinweise(\'' + o.id + '\')">' +
+            hinweise + " Hinweis" + (hinweise === 1 ? "" : "e") + "</button>" : "") +
+        "</div>" +
+        // Umbenennen und Loeschen stecken hinter einem kleinen Knopf.
+        // Stuenden das Eingabefeld und beide Knoepfe offen da, waere jede
+        // Karte doppelt so hoch - und genau das wollte Karam nicht
+        // ("nicht alles ineinander verrutscht, symmetrisch").
+        (schreib
+          ? '<div class="ob-tasten">' +
+            '<button class="ob-stift" onclick="obBearbeiten(\'' + o.id + '\')" ' +
+              'title="Namen ändern oder löschen">&#9999;&#65039;</button>' +
+            '<span class="ob-bearb" id="ob_b_' + o.id + '" hidden>' +
+              '<input id="ob_neu_' + o.id + '" value="' + textSicherM(o.name) + '" size="10">' +
+              '<button onclick="tuOrdnerUmbenennen(\'' + o.id + '\')">speichern</button>' +
+              ((n === 0 && kasseN === 0)
+                ? '<button class="knopfweg" onclick="tuOrdnerLoeschen(\'' + o.id + '\')">löschen</button>'
+                : '<span class="mini">löschen erst wenn leer</span>') +
+            "</span></div>"
+          : "") +
+        "</div>";
+    });
+    verwalten += "</div>";
   }
   const wartendGesamt = Object.values(wartend).reduce((p, x) => p + x, 0) + ohneWartend;
   // Erinnerung aufs Gerät: fertige Scheine warten auf dein Ergebnis
@@ -1011,8 +1141,9 @@ function zeichneOrdnerBox(scheine) {
   box.innerHTML = filter + verwalten +
     (wartendGesamt ? '<p class="mini"><b>fertig</b> heisst: alle Spiele dieses Scheins sind aus - ' +
       "bitte Person anklicken und unten <b>gewonnen oder verloren</b> eintragen, dann stimmt das Geld.</p>" : "") +
-    (irgendwoWarnung ? '<p class="mini rot"><b>Ein rotes ! heisst:</b> die Personen-Kasse dieser Person ' +
-      "geht sich nicht aus. Person anklicken und nachsehen.</p>" : "") +
+    (irgendwoWarnung ? '<p class="mini rot"><b>Rechenfehler heisst:</b> die Personen-Kasse dieser ' +
+      "Person geht sich nicht aus. Person anklicken und nachsehen. Alles andere sind nur " +
+      "Hinweise und stehen hinter dem Knopf daneben.</p>" : "") +
     (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
       " ohne Person</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
 }
@@ -1310,6 +1441,11 @@ function zeichneScheineDb(scheine) {
         : "<span class='mini'>" + textSicherM(s.notiz || "") + "</span>") + "</td>" +
       "<td>" + (aktiverBereich.rolle !== "ich"
         ? "<button onclick=\"tuKopieren('" + s.id + "')\">zu mir kopieren</button> " : "") +
+        // Der Foto-Knopf steht in der LETZTEN Spalte. Das ist Absicht:
+        // die Handy-Aufschriften in stil.css haengen an der Spaltenfolge
+        // (td:nth-child(n)::before), eine neue Spalte wuerde sie alle
+        // verschieben. Hier kommt nur ein Knopf dazu.
+        fotoKnopfHtml(s.id, true) + " " +
         (schreib ? "<button title='Bearbeiten: Foto, Quoten je Wette, Datum, Nummer' " +
           "onclick=\"pkBearbeiten('" + (s.ordner || "") + "','" + s.id + "')\">&#9999;&#65039;</button> " : "") +
         (schreib ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
@@ -1466,7 +1602,12 @@ function personPruefen(ordnerId, scheine) {
     else if (b.art === "zum_anbieter") { wege[b.weg].hin += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].einge += betrag; }
     else { wege[b.weg].zurueck += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].geholt += betrag; }
   }
-  const probleme = [];
+  // Karam (16.09.2026): "Ich will, dass diese ganzen Anmerkungen bei der
+  // Person verschwinden, solange es kein mathematischer Fehler ist."
+  // Deshalb zwei Listen: probleme sind ALLE Hinweise (wie bisher, damit
+  // nichts verlorengeht), rechenfehler nur die, bei denen etwas WIRKLICH
+  // nicht aufgeht. Nur die zweite Liste wird ungefragt angezeigt.
+  const probleme = [], rechenfehler = [];
   for (const s of meine) {
     const a = anbieter[s.daten.kz];
     if (!a) continue;
@@ -1492,15 +1633,23 @@ function personPruefen(ordnerId, scheine) {
   for (const [w, nameW] of KASSE_WEGE) {
     const x = wege[w];
     x.stand = x.erhalten - x.hin + x.zurueck - (x.raus || 0) + (x.korrektur || 0);
-    if (x.stand < -0.004) probleme.push(nameW + " ist im Minus (" + x.stand.toFixed(2) +
-      " Euro): mehr weitergezahlt als erhalten. Buchung vergessen oder falsch eingetragen.");
+    if (x.stand < -0.004) {
+      const t = nameW + " ist im Minus (" + x.stand.toFixed(2) +
+        " Euro): mehr weitergezahlt als erhalten. Buchung vergessen oder falsch eingetragen.";
+      probleme.push(t);
+      rechenfehler.push(t);          // geht sich nicht aus: echter Rechenfehler
+    }
   }
   for (const [kz, nameA] of KASSE_ANBIETER) {
     const a = anbieter[kz];
     a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen + (a.korrektur || 0);
-    if (a.guthaben < -0.004) probleme.push("Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
-      a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurückgeholt als eingezahlt und gewonnen. " +
-      "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehört zu einer anderen Person.");
+    if (a.guthaben < -0.004) {
+      const t = "Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
+        a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurückgeholt als eingezahlt und gewonnen. " +
+        "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehört zu einer anderen Person.";
+      probleme.push(t);
+      rechenfehler.push(t);          // geht sich nicht aus: echter Rechenfehler
+    }
   }
   const eingesamt = buch.filter(b => b.art === "zum_anbieter").reduce((p, b) => p + Number(b.betrag), 0);
   const erhaltengesamt = buch.filter(b => b.art === "erhalten").reduce((p, b) => p + Number(b.betrag), 0);
@@ -1514,7 +1663,8 @@ function personPruefen(ordnerId, scheine) {
   const korrekturGesamt =
     Object.values(wege).reduce((p, x) => p + (x.korrektur || 0), 0) +
     Object.values(anbieter).reduce((p, x) => p + (x.korrektur || 0), 0);
-  return { wege: wege, anbieter: anbieter, probleme: probleme, buch: buch,
+  return { wege: wege, anbieter: anbieter, probleme: probleme,
+    rechenfehler: rechenfehler, buch: buch,
     eingesamt: eingesamt, erhaltengesamt: erhaltengesamt, ausgezahlt: ausgezahlt,
     aufWegen: aufWegen, beiAnbietern: beiAnbietern, imSpiel: imSpiel,
     korrekturGesamt: korrekturGesamt,
@@ -1708,9 +1858,21 @@ function zeichnePersonenKasse(scheine) {
     html += '<div class="fertighinweis"><b>' + wartendHier + " Schein" + (wartendHier === 1 ? "" : "e") +
       " fertig:</b> bitte unten <b>gewonnen/verloren</b> eintragen.</div>";
   }
-  if (p.probleme.length) {
-    html += '<div class="kassenwarnung"><b>Das macht so keinen Sinn - bitte prüfen:</b><ul>' +
-      p.probleme.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
+  // In der geoeffneten Personen-Kasse stehen die Rechenfehler laut und
+  // die blossen Hinweise leise darunter. Karam wollte die Hinweise nicht
+  // mehr ungefragt sehen, aber verschwinden duerfen sie hier nicht: das
+  // ist die Stelle, an der man sie abarbeitet.
+  const fehlerSet2 = new Set(p.rechenfehler || []);
+  const nurHinweise2 = (p.probleme || []).filter(t => !fehlerSet2.has(t));
+  if ((p.rechenfehler || []).length) {
+    html += '<div class="kassenwarnung"><b>Das geht sich nicht aus - bitte prüfen:</b><ul>' +
+      p.rechenfehler.map(t => "<li>" + t + "</li>").join("") + "</ul></div>";
+  }
+  if (nurHinweise2.length) {
+    html += '<details class="kassenhinweise"><summary>' + nurHinweise2.length + " Hinweis" +
+      (nurHinweise2.length === 1 ? "" : "e") + " (kein Rechenfehler)</summary><ul>" +
+      nurHinweise2.map(t => "<li>" + t + "</li>").join("") + "</ul>" +
+      '<button onclick="obGelesen(\'' + person.id + '\')">Als gelesen markieren</button></details>';
   }
 
   // ---------- Was möchtest du sehen? ----------
@@ -2654,6 +2816,73 @@ async function tuGruppeStand(keyKodiert, wert) {
 // Das Kombi-Konto als HTML. einz/ausz/start und letzteBalance kommen
 // FERTIG aus zeichneBuchhaltung - hier wird nichts davon neu gesucht,
 // damit oben und hier nie zwei verschiedene Zahlen stehen koennen.
+// ---------- Foto an eine gespeicherte Kombination haengen ----------
+// Karam (16.09.2026): "Kannst du bitte bei den Kombis immer so einen
+// kleinen Button hinzufuegen, der heisst Foto hinzufuegen - wenn ich bei
+// der Buchhaltung oder bei Kombi und Personen bin."
+//
+// Verkleinert wie im Kombi-Bau (fotoHochladen in kombis.js): hoechstens
+// 1400 Punkte breit, JPEG mit 0,82. Dieselben Werte, damit nicht zwei
+// verschiedene Bildgroessen entstehen.
+const FOTO_MAX_BREIT = 1400;
+const FOTO_GUETE = 0.82;
+
+function fotoKnopfHtml(scheinId, klein) {
+  if (!darfSchreiben()) return "";
+  return '<label class="fotoknopf' + (klein ? " fotoknopf-klein" : "") +
+    '" title="Einen Screenshot zu dieser Kombination hinzufügen">&#128247; Foto' +
+    '<input type="file" accept="image/*" style="display:none" ' +
+    'onchange="fotoAnhaengenM(\'' + scheinId + '\', this)"></label>';
+}
+
+function fotoAnhaengenM(scheinId, input) {
+  const datei = input.files && input.files[0];
+  if (!datei) return;
+  // Das Feld sofort leeren, sonst loest dieselbe Datei beim naechsten Mal
+  // gar kein "change" mehr aus - und es passiert scheinbar nichts.
+  const feldLeeren = () => { try { input.value = ""; } catch (e) { } };
+  meldungM("Foto wird gelesen...", "gut");
+  const leser = new FileReader();
+  leser.onerror = () => {
+    feldLeeren();
+    meldungM("Diese Datei liess sich nicht lesen (" + textSicherM(datei.name) + ").", "warn");
+  };
+  leser.onload = ev => {
+    const bild = new Image();
+    bild.onerror = () => {
+      feldLeeren();
+      meldungM("Dieses Bildformat kann der Browser nicht öffnen (" + textSicherM(datei.name) +
+        "). Das passiert vor allem bei <b>HEIC</b> vom iPhone. Nimm einen Screenshot als " +
+        "JPG oder PNG.", "warn");
+    };
+    bild.onload = async () => {
+      feldLeeren();
+      try {
+        const faktor = Math.min(1, FOTO_MAX_BREIT / bild.width);
+        const c = document.createElement("canvas");
+        c.width = Math.round(bild.width * faktor);
+        c.height = Math.round(bild.height * faktor);
+        c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+        const daten = c.toDataURL("image/jpeg", FOTO_GUETE);
+        const r = await supaScheinFotoNachtragen(aktiverBereich.id, scheinId, daten, datei.name);
+        if (r.error) { meldungM("Foto nicht gespeichert: " + r.error.message, "warn"); return; }
+        if (!r.data || !r.data.length) {
+          meldungM("Foto nicht gespeichert: nicht erlaubt (keine Zeile geändert).", "warn");
+          return;
+        }
+        const s = (kasseScheine || []).find(x => x.id === scheinId);
+        if (s) { s.foto = daten; s.foto_name = datei.name; s.fotoUnlesbar = false; }
+        meldungM("Foto gespeichert" + (s && s.nummer ? " bei Nr. " + s.nummer : "") + ".", "gut");
+        zeichneBereich();
+      } catch (e) {
+        meldungM("Foto nicht gespeichert: " + (e && e.message ? e.message : "unbekannter Fehler"), "warn");
+      }
+    };
+    bild.src = ev.target.result;
+  };
+  leser.readAsDataURL(datei);
+}
+
 // ---------- Fehlende Screenshots nachtragen ----------
 // Karam (16.09.2026): "Warum sind bei manchen Fotos keine Screenshots?
 // Ich weiss, dass das Screenshots waren. Such die Screenshots und tu sie
@@ -4243,8 +4472,11 @@ function tagHalterHtml(zeilen) {
     g.spiel += z.pr.imSpiel; g.haelt += z.haelt; g.bilanz += z.pr.bilanz;
     html += "<tr><td class='mini'>" + (i + 1) + "/" + mitGeld.length + "</td>" +
       "<td>" + personKnopfM(z.person.id) +
-      (z.pr.probleme.length ? " <span class='mini e-ver'>&#9888; " + z.pr.probleme.length +
-        " Hinweis" + (z.pr.probleme.length === 1 ? "" : "e") + "</span>" : "") + "</td>" +
+      // Nur echte Rechenfehler stehen hier. Blosse Hinweise haben in der
+      // Tagesuebersicht nichts verloren, die stehen beim Personen-Kasten.
+      ((z.pr.rechenfehler || []).length
+        ? " <span class='mini e-ver'>&#9888; " + z.pr.rechenfehler.length + " Rechenfehler</span>"
+        : "") + "</td>" +
       "<td>" + nK + "</td>" +
       "<td>" + tagGeld(z.pr.aufWegen) + "</td><td>" + tagGeld(z.pr.beiAnbietern) + "</td>" +
       "<td>" + tagGeld(z.pr.imSpiel) + "</td><td><b>" + tagGeld(z.haelt) + "</b></td>" +
