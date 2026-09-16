@@ -45,7 +45,13 @@ function piPanelHtml() {
       '<span class="mini">Eine Textdatei mit einer Zeile je Konto, Spalten durch Tabulator ' +
       "oder Strichpunkt getrennt. Aus Excel: Speichern unter, Textdatei.</span></p>" +
     '<p><button class="haupt" onclick="piVergleichen()">Vergleichen</button> ' +
-    '<button onclick="piLeeren()">Feld leeren</button></p>' +
+    '<button onclick="piLeeren()">Feld leeren</button> ' +
+    // Die Namen der vorhandenen Personen liegen verschluesselt in der
+    // Datenbank. NUR dieser Browser kann sie lesen. Dieser Knopf legt
+    // sie als Text hin, damit Karam sie weitergeben kann - ohne ihn geht
+    // von aussen keine Zuordnung, und eine geratene waere ein Geldfehler.
+    '<button onclick="piMeineListe()">&#128203; Meine Personen als Text</button></p>' +
+    '<div id="pi_meine"></div>' +
     '<div id="pi_ergebnis"></div>' +
     // Zweiter Schritt: die Kontostaende. Getrennt, weil das GELD ist -
     // erst Personen anlegen, dann ansehen, dann eintragen.
@@ -86,6 +92,66 @@ function piLesen(text) {
     });
   }
   return raus;
+}
+
+// Die vorhandenen Personen als Text: Kennung, Name, Anzahl Scheine.
+// Der Name steht nur HIER lesbar da - in der Datenbank ist er
+// verschluesselt. Ohne diese Liste kann von aussen niemand sagen, welche
+// Karte welche P-Nummer ist.
+function piMeineListe() {
+  const ziel = el("pi_meine");
+  if (!ziel) return;
+  const da = Array.isArray(ordnerListe) ? ordnerListe : [];
+  if (!da.length) {
+    ziel.innerHTML = '<p class="mini">Es ist noch keine Person angelegt.</p>';
+    return;
+  }
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const zeilen = ["Kennung\tName\tScheine"];
+  for (const o of da) {
+    const n = scheine.filter(s => s.ordner === o.id).length;
+    zeilen.push(o.id + "\t" + String(o.name || "").replace(/\t/g, " ") + "\t" + n);
+  }
+  const text = zeilen.join("\n");
+  ziel.innerHTML = '<div class="pi-block"><b>' + da.length + " Personen in deiner Tafel.</b> " +
+    '<span class="mini">Diese Namen stehen in der Datenbank verschlüsselt - lesbar sind sie ' +
+    "nur hier in deinem Browser.</span>" +
+    '<textarea id="pi_meine_text" rows="8" readonly>' + textSicherM(text) + "</textarea>" +
+    '<p><button onclick="piMeineKopieren()">In die Zwischenablage</button> ' +
+    '<button onclick="piMeineDatei()">Als Datei speichern</button></p></div>';
+}
+
+function piMeineKopieren() {
+  const f = el("pi_meine_text");
+  if (!f) return;
+  try {
+    f.select();
+    // Zuerst der neue Weg, sonst der alte - auf einem Handy ohne
+    // Berechtigung scheitert der neue still.
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(f.value).then(
+        () => meldungM("Liste kopiert.", "gut"),
+        () => meldungM("Kopieren ging nicht. Markier den Text und nimm Strg und C.", "warn"));
+    } else {
+      meldungM(document.execCommand("copy")
+        ? "Liste kopiert." : "Kopieren ging nicht. Markier den Text und nimm Strg und C.",
+        "gut");
+    }
+  } catch (e) {
+    meldungM("Kopieren ging nicht: markier den Text und nimm Strg und C.", "warn");
+  }
+}
+
+function piMeineDatei() {
+  const f = el("pi_meine_text");
+  if (!f) return;
+  if (typeof exSpeichern !== "function") {
+    meldungM("Zum Speichern fehlt export.js. Markier den Text und kopier ihn von Hand.", "warn");
+    return;
+  }
+  exSpeichern(new Blob([f.value], { type: "text/plain;charset=utf-8" }),
+    "Meine_Personen_" + (typeof exHeute === "function" ? exHeute() : "liste") + ".txt");
+  meldungM("Als Datei gespeichert.", "gut");
 }
 
 // Eine Textdatei ins Feld laden. Scheitert das Lesen, wird das GESAGT -

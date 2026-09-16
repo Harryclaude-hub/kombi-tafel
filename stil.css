@@ -4618,3 +4618,9 @@ body[data-seite="mein"] .bilanzordner { border-radius: 12px; }
 
 }
 /* ---- ENDE MEIN BEREICH RUNDER ---- */
+
+/* Die Textliste der eigenen Personen (loeschbar, nur Optik) */
+body[data-seite="mein"] #pi_meine textarea {
+  width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px;
+  border-radius: 8px; border: 1px solid #ccd3e0; padding: 8px; margin-top: 6px;
+}
