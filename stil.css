@@ -5305,3 +5305,44 @@ button.haupt { box-shadow: var(--g-tiefe-1), inset 0 1px 0 rgba(255, 255, 255, .
 
 }
 /* ---- ENDE GLANZ ---- */
+
+/* ============================================================
+   GESETZT-LISTE: HELL UND GRAU (Design-Schicht, KOMPLETT LOESCHBAR)
+   Karam (16.09.2026): "Die Wetten dieser Kombi, die in dieser Liste
+   sind, sind hell, der Rest ist grau. Und ich will sehen, in welchem
+   Ordner die andere Wette ist."
+   Faellt dieser Block weg, stehen alle Wetten gleich da. Der
+   Ordnername bleibt trotzdem sichtbar, er steht im Text, nicht in der
+   Farbe. Bis zur Marke ENDE HELL UND GRAU loeschen.
+   ============================================================ */
+@media screen {
+
+/* Die Wette, die gerade auch in der Tabelle oben steht. */
+.gs-tafel .gs-bein { display: inline-block; }
+.gs-tafel .gs-drin { font-weight: 600; }
+
+/* Die Wette aus einem anderen Ordner: zurueckgenommen, aber NICHT
+   unlesbar. #5f6672 auf Weiss sind 5,7:1, auf der Kombi-Farbe der Zeile
+   immer noch deutlich ueber der Schwelle. Kein opacity: das wuerde auch
+   den Ordnernamen mit ausbleichen, und genau den soll er lesen. */
+.gs-tafel .gs-weg { color: #5f6672; }
+
+/* Der Ordner dahinter. Eigene Zeile am Handy, sonst in derselben. */
+.gs-tafel .gs-ordner {
+  font-size: .85em; font-weight: 600; white-space: nowrap;
+  padding: 0 6px; margin-left: 4px;
+  border: 1px solid #8c94a6; border-radius: 999px;
+  background: rgba(255, 255, 255, .55);
+}
+@media (max-width: 700px) {
+  .gs-tafel .gs-ordner { display: inline-block; margin: 2px 0 0 0; }
+}
+
+}
+/* ---- ENDE HELL UND GRAU ---- */
+
+/* Der Knopf "alle Bilder kopieren" (Design-Schicht, loeschbar) */
+@media screen {
+  .bilderleiste { margin: 8px 0 12px; }
+  .bilderleiste #bk_knopf:disabled { cursor: progress; }
+}

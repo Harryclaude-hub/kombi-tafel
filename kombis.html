@@ -14,8 +14,8 @@
      und randlos. Die Fassungsnummer muss dranbleiben: iOS merkt
      sich das Symbol nach der Adresse und wuerde sonst ewig das
      leere behalten. -->
-<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260916o">
-<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260916o">
+<link rel="apple-touch-icon" sizes="180x180" href="logo-180.png?v=20260916p">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png?v=20260916p">
 <!-- OHNE DIESE ZEILE oeffnet das iPhone das Symbol vom Home-Bildschirm nur
      als gewoehnlichen Safari-Tab. Dann meldet sich die Seite nicht als App,
      und Apple laesst KEINE Benachrichtigungen zu - genau der Grund, warum
@@ -25,13 +25,23 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kombi-Tafel">
 <meta name="theme-color" content="#1a2c50">
-<link rel="stylesheet" href="stil.css?v=20260916o">
+<link rel="stylesheet" href="stil.css?v=20260916p">
 </head>
 <body data-seite="bau">
 
 <h1>Kombi-Bau</h1>
 <div class="navleiste"><img src="logo.svg" class="logo" alt="Kombi-Tafel"><a href="original.html" class="navknopf">Original-Tabelle</a><a href="kombis.html" class="navknopf aktiv">Kombi-Bau</a><a href="schule.html" class="navknopf">Handbuch</a><a href="hilfe.html" class="navknopf">Erklärungen</a><a href="mein.html" class="navknopf">Mein Bereich</a><a href="#" class="navknopf glocke" id="nav_freunde" title="Freunde">&#128101; Freunde</a><a href="mein.html" class="navknopf glocke" id="nav_nachrichten" title="Nachrichten">&#128172;<span class="badge" style="display:none"></span></a></div>
 <div class="unter">Baut aus den noch offenen Wetten fertige 3er-Scheine.</div>
+<!-- Fuellt bilderkopie.js. Faellt die Datei weg, bleibt hier ein leerer
+     Kasten und sonst aendert sich nichts. -->
+<div id="bilderleiste" class="bilderleiste">
+  <!-- Karam (16.09.2026): "Ich kann Kombis erfinden: Einsatz,
+       Multiplikator und Gewinn, ohne Foto." Das Formular dafuer steht
+       in Mein Bereich bei der Person (personkombi.js) - dort gehoert es
+       hin, weil die Kombination zu einer Person zaehlt. Hier steht nur
+       der kurze Weg dorthin, damit man ihn nicht suchen muss. -->
+  <a class="ordnerknopf" href="mein.html?kombivonhand=1">&#9997;&#65039; Kombi von Hand eintragen</a>
+</div>
 
 <div id="panel" class="panel"></div>
 
@@ -123,30 +133,31 @@ Alle Angaben ohne Gewaehr, Quoten ändern sich laufend: vor dem Setzen in der Ap
 <!-- scheinlesen.js wird nicht mehr geladen: das Foto wird nur noch
      mitgenommen, nicht mehr ausgelesen. Die Datei bleibt im Ordner
      liegen, falls das je wieder gebraucht wird. -->
-<script src="krypto.js?v=20260916o"></script>
-<script src="medien.js?v=20260916o"></script>
-<script src="anruf-server.js?v=20260916o"></script>
-<script src="anruf.js?v=20260916o"></script>
-<script src="bildlager.js?v=20260916o"></script>
-<script src="supa.js?v=20260916o"></script>
-<script src="benachrichtigung.js?v=20260916o"></script>
-<script src="satzdaten.js?v=20260916o"></script>
-<script src="profil.js?v=20260916o"></script>
-<script src="anhang.js?v=20260916o"></script>
-<script src="glocke.js?v=20260916o"></script>
-<script src="daten.js?v=20260916o"></script>
-<script src="roh.js?v=20260916o"></script>
-<script src="recherche.js?v=20260916o"></script>
-<script src="logik.js?v=20260916o"></script>
-<script src="auswertung.js?v=20260916o"></script>
-<script src="verteiler.js?v=20260916o"></script>
-<script src="einzeln.js?v=20260916o"></script>
-<script src="kombis.js?v=20260916o"></script>
-<script src="ausschnitt.js?v=20260916o"></script>
-<script src="handy.js?v=20260916o"></script>
-<script src="leiste.js?v=20260916o"></script>
-<script src="logoknopf.js?v=20260916o"></script>
-<script src="chatmodus.js?v=20260916o"></script>
+<script src="krypto.js?v=20260916p"></script>
+<script src="medien.js?v=20260916p"></script>
+<script src="anruf-server.js?v=20260916p"></script>
+<script src="anruf.js?v=20260916p"></script>
+<script src="bildlager.js?v=20260916p"></script>
+<script src="supa.js?v=20260916p"></script>
+<script src="benachrichtigung.js?v=20260916p"></script>
+<script src="satzdaten.js?v=20260916p"></script>
+<script src="profil.js?v=20260916p"></script>
+<script src="anhang.js?v=20260916p"></script>
+<script src="glocke.js?v=20260916p"></script>
+<script src="daten.js?v=20260916p"></script>
+<script src="roh.js?v=20260916p"></script>
+<script src="recherche.js?v=20260916p"></script>
+<script src="logik.js?v=20260916p"></script>
+<script src="auswertung.js?v=20260916p"></script>
+<script src="verteiler.js?v=20260916p"></script>
+<script src="einzeln.js?v=20260916p"></script>
+<script src="kombis.js?v=20260916p"></script>
+<script src="bilderkopie.js?v=20260916p"></script>
+<script src="ausschnitt.js?v=20260916p"></script>
+<script src="handy.js?v=20260916p"></script>
+<script src="leiste.js?v=20260916p"></script>
+<script src="logoknopf.js?v=20260916p"></script>
+<script src="chatmodus.js?v=20260916p"></script>
 <script>
 // Einmal nachsehen, was schon gesetzt ist. Muss NACH kombis.js und
 // supa.js stehen, sonst gibt es die Funktionen noch nicht.
@@ -154,6 +165,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (typeof kontoScheineLaden === "function") kontoScheineLaden();
 });
 </script>
-<script src="zeilen.js?v=20260916o"></script>
+<script src="zeilen.js?v=20260916p"></script>
 </body>
 </html>

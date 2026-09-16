@@ -1683,21 +1683,66 @@ function anbieterZeichen(kz) {
 // gesetzt wurden, aber nix Leeres. Und dann seh ich auch, welche Personen."
 // Quelle ist gesetzteEintraege() - BEIDE Ablagen, nur der aktive Ordner.
 // liesVerlauf() allein waere bei angemeldetem Nutzer leer.
+// Karam (16.09.2026): "Mir ist wichtig, dass immer die Kombis angezeigt
+// werden, die eine dieser Wetten enthalten, die gerade in der Liste sind.
+// Wenn ich mal in einem Ordner setze und mal in einem Zeitraum, moechte
+// ich, dass immer die Kombis da sind, wo mindestens eine Wette aus dieser
+// Liste dabei ist. Die Wetten dieser Kombi, die in der Liste sind, sind
+// hell, der Rest ist grau. Und ich will sehen, in welchem Ordner die
+// andere Wette ist."
+//
+// gsNurPassende = true ist der Normalfall. Der Knopf "alle zeigen" haengt
+// daran; ausgeblendet wird NIE stillschweigend, die Zahl steht immer da.
+let gsNurPassende = true;
+function gsAlleZeigen() { gsNurPassende = false; zeichneGesetzte(); }
+function gsNurPassendeZeigen() { gsNurPassende = true; zeichneGesetzte(); }
+
+// Zu welchem Ordner gehoert dieses Bein? Erst das Bein selbst (seit
+// 16.09. traegt es seinen Ordner mit), sonst die Wette nachschlagen.
+// Nichts erfinden: ohne Fund bleibt es leer.
+function gsBeinOrdner(t, e) {
+  if (t && t.satz) return t.satz;
+  const w = (t && t.id && typeof wetteNachId === "function") ? wetteNachId(t.id) : null;
+  if (w && w.satz) return w.satz;
+  return (e && e.satz) || "";
+}
+
 function zeichneGesetzte() {
   const box = document.getElementById("gesetzteliste");
   if (!box) return;
-  const alle = gesetzteEintraege()
+  // ALLE Ordner. Eine Kombination, deren eine Haelfte aus einem aelteren
+  // Ordner stammt, soll hier auftauchen, sobald die andere Haelfte in der
+  // Tabelle steht.
+  const ausAllen = gesetzteEintraege(SATZ_ALLE)
     .slice()
     .sort((a, b) => String(b.zeit || "").localeCompare(String(a.zeit || "")));
+  const sichtIds = ebSichtbareIds();
+  // Passt diese Kombination zu dem, was gerade in der Tabelle steht?
+  // Unlesbare und von Hand angelegte Kombinationen haben keine Wetten-
+  // Kennung und koennen deshalb NIE passen. Die bleiben immer stehen,
+  // sonst verschwaende ausgerechnet das, was niemand nachpruefen kann.
+  const passt = (e) => {
+    if (e.unlesbar) return true;
+    const mitId = (e.wetten || []).filter(t => t && t.id);
+    if (!mitId.length) return true;
+    return mitId.some(t => sichtIds.has(String(t.id)));
+  };
+  const alle = gsNurPassende ? ausAllen.filter(passt) : ausAllen;
+  const wegGefiltert = ausAllen.length - alle.length;
   // Anbieter-Filter von den Karten oben: nur die Anzeige. Unlesbare
   // Eintraege bleiben IMMER sichtbar - sie duerfen nie verschwinden.
   const liste = (typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
     ? alle.filter(e => e.unlesbar || e.kz === bauAnbieterFilter) : alle;
   if (!liste.length) {
     box.innerHTML = '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
-      ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist in diesem Ordner nichts gesetzt (" +
+      ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist hier nichts gesetzt (" +
         alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt alle)."
-      : "In diesem Ordner ist noch nichts gesetzt.") + "</p>";
+      : (wegGefiltert
+        ? "Zu den Wetten, die gerade in der Tabelle stehen, gibt es noch keine gesetzte " +
+          "Kombination. <b>" + wegGefiltert + "</b> andere sind ausgeblendet."
+        : "Es ist noch nichts gesetzt.")) +
+      (wegGefiltert ? ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length +
+        " zeigen</button>" : "") + "</p>";
     return;
   }
   // Farben IMMER ueber die ungefilterte Liste vergeben - sonst wechselt
@@ -1714,13 +1759,24 @@ function zeichneGesetzte() {
     const stil = karte.farbe[st] ? ' style="background:' + karte.farbe[st] + '"' : "";
     if (e.unlesbar) {
       zeilen += '<tr class="gs-unlesbar"><td>' + (e.nummer || "?") + "</td>" +
-        '<td colspan="5">Kombination liegt im Konto, ist auf diesem Gerät aber ' +
+        '<td colspan="6">Kombination liegt im Konto, ist auf diesem Gerät aber ' +
         "nicht lesbar (Schlüssel fehlt). Sie zählt trotzdem als gesetzt.</td></tr>";
       continue;
     }
-    const wetten = (e.wetten || []).map(w =>
-      textSicher(w.spiel || "") + (w.linie ? ' <span class="mini">' + textSicher(w.linie) + "</span>" : "")
-    ).join("<br>");
+    // Jede Wette der Kombination. Die, die gerade in der Tabelle steht,
+    // bleibt hell. Die anderen werden zurueckgenommen und sagen dazu,
+    // aus welchem Ordner sie kommen - das ist der ganze Punkt.
+    const wetten = (e.wetten || []).map(w => {
+      const drin = w && w.id && sichtIds.has(String(w.id));
+      const ordner = drin ? "" : gsBeinOrdner(w, e);
+      const text = textSicher(w.spiel || "") +
+        (w.linie ? ' <span class="mini">' + textSicher(w.linie) + "</span>" : "");
+      if (drin) return '<span class="gs-bein gs-drin">' + text + "</span>";
+      return '<span class="gs-bein gs-weg">' + text +
+        (ordner ? ' <span class="gs-ordner">' +
+          textSicher(typeof satzTitelVon === "function" ? satzTitelVon(ordner) : ordner) +
+          "</span>" : ' <span class="gs-ordner">Ordner unbekannt</span>') + "</span>";
+    }).join("<br>");
     const person = personName(e.ordner);
     // Moeglicher Gewinn: was Karam an der Karte eingetragen hat (so wie der
     // Anbieter ihn zeigt), sonst die Schaetzung Einsatz x Quote.
@@ -1742,9 +1798,19 @@ function zeichneGesetzte() {
       "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
     "</tbody></table></div>" +
     '<p class="mini"><b>' + liste.length + " gesetzt</b>, zusammen <b>" +
-      summe.toFixed(2) + " &euro;</b> in diesem Ordner" +
-      (liste.length !== alle.length ? " (gefiltert: " + (alle.length - liste.length) +
-        " bei anderen Anbietern ausgeblendet)" : "") + ". " +
+      summe.toFixed(2) + " &euro;</b>" +
+      (gsNurPassende
+        ? ". Gezeigt wird jede Kombination, in der mindestens eine Wette aus der Tabelle " +
+          "oben steckt. <b>Helle</b> Wetten stehen in der Tabelle, <b>graue</b> kommen aus " +
+          "einem anderen Ordner - der steht dahinter."
+        : ". Gezeigt wird ALLES aus allen Ordnern.") +
+      (wegGefiltert
+        ? " <b>" + wegGefiltert + "</b> weitere passen zu keiner Wette aus der Tabelle." +
+          ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length + " zeigen</button>"
+        : (gsNurPassende ? "" :
+          ' <button onclick="gsNurPassendeZeigen()">nur die passenden zeigen</button>')) +
+      (liste.length !== alle.length ? " (dazu " + (alle.length - liste.length) +
+        " bei anderen Anbietern ausgeblendet)" : "") + " " +
       '<span id="gs_stand_summe"></span></p>';
   zeichneGesetzteAusgaenge(liste);
 }
@@ -1834,33 +1900,59 @@ function ebFiltern() {
   if (v) ebVon = v.value;
   if (b) ebBis = b.value;
   if (o) ebNurOffen = o.checked;
-  zeichneEigenbau();          // NUR die Tabelle, nichts wird nachgeladen
+  // Beide: die Gesetzt-Liste haengt seit heute daran, WELCHE Wetten in
+  // der Tabelle stehen. Zeichnete man nur die Tabelle, zeigte die Liste
+  // darunter weiter den alten Zeitraum - zwei Wahrheiten auf einer Seite.
+  zeichneEigenbau();          // nichts wird nachgeladen, nur neu gezeichnet
+  zeichneGesetzte();
 }
 
 function ebAllesZeigen() {
   ebVon = ""; ebBis = ""; ebNurOffen = false;
   zeichneEigenbau();
+  zeichneGesetzte();
 }
 
-function zeichneEigenbau() {
-  const box = document.getElementById("eigenbau");
-  if (!box) return;
+// WELCHE WETTEN STEHEN GERADE IN DER GROSSEN TABELLE?
+// Genau EINE Stelle beantwortet das. Die Tabelle selbst fragt hier, und
+// die Gesetzt-Liste darunter fragt hier ebenfalls - sonst zeigten die
+// beiden Listen auf einer Seite verschiedene Mengen, ohne dass es
+// jemandem auffiele.
+function ebSichtbareWetten() {
   // Ein gesetzter Zeitraum hebt die Ordnergrenze auf (siehe ebZeitraumAn).
   const roh = ebZeitraumAn() ? WETTEN.slice() : satzWetten();
-  if (!roh.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
   // Angehakte Zeilen werden NIE ausgeblendet. Sonst faellt eine Wette
   // aus der Auswahl, ohne dass jemand es merkt, und die gebaute
   // Kombination haette ein Bein weniger als gewollt.
   const angehakt = new Set([...document.querySelectorAll(".eb-wahl:checked")]
     .map(c => String(c.value).split("|")[0]));
   let ausZeit = 0, ohneZeit = 0;
-  const alle = roh.filter(w => {
+  const liste = roh.filter(w => {
     if (angehakt.has(String(w.id))) return true;
     const p = ebZeitPasst(w);
     if (p === null) { ohneZeit++; return true; }   // Resttopf: bleibt sichtbar
     if (!p) { ausZeit++; return false; }
     return true;
   });
+  return { roh: roh, liste: liste, ausZeit: ausZeit, ohneZeit: ohneZeit };
+}
+
+// Die Kennungen davon, als Menge. Die Gesetzt-Liste fragt damit je Bein:
+// "steckst du in dem, was Karam gerade vor sich hat?"
+function ebSichtbareIds() {
+  const m = new Set();
+  for (const w of ebSichtbareWetten().liste) m.add(String(w.id));
+  return m;
+}
+
+function zeichneEigenbau() {
+  const box = document.getElementById("eigenbau");
+  if (!box) return;
+  const sicht = ebSichtbareWetten();
+  const roh = sicht.roh;
+  if (!roh.length) { box.innerHTML = '<p class="mini">Keine Wetten im Ordner.</p>'; return; }
+  const alle = sicht.liste;
+  const ausZeit = sicht.ausZeit, ohneZeit = sicht.ohneZeit;
   const ersatzMind = mindWert(liesZustand() || {});
   // Sobald mehr als ein Ordner in der Tabelle steht, bekommt jede Zeile
   // eine Ordner-Spalte. Ohne sie saehen zwei gleich benannte Spiele aus

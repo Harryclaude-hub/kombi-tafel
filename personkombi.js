@@ -27,6 +27,11 @@ let pkStand = null;
 
 const PK_LEER = () => ({
   zeit: "", kz: "st", einsatz: "", quote: "", quoteHand: false,
+  // Karam (16.09.2026): "Ich kann Kombis erfinden: Einsatz,
+  // Multiplikator und Gewinn. Ohne dass ich wirklich ein Foto
+  // hinzufuege." Der Gewinn ist also ein EIGENES Feld und nicht mehr
+  // nur Einsatz mal Quote. Leer heisst: weiter rechnen wie bisher.
+  gewinn: "", gewinnHand: false,
   stand: "offen", nummer: "", notiz: "",
   wetten: [pkZeileLeer(), pkZeileLeer(), pkZeileLeer()],
   foto: null, fotoName: "", fotoWeg: false
@@ -174,6 +179,14 @@ function pkFormularHtml(ordnerId) {
       '<label>Gesamtquote<br><input class="pkkurz" id="pk_quote" value="' +
         textSicherM(s.quoteHand ? s.quote : (gesamt ? gesamt.toFixed(2) : "")) +
         '" inputmode="decimal" oninput="pkMerken(true); pkRechnen()"></label>' +
+      // Der Gewinn von Hand. Leer heisst: Einsatz mal Quote, so wie
+      // bisher. Steht etwas drin, gilt DAS - der Anbieter zeigt oft
+      // einen anderen Betrag, als die reine Multiplikation ergibt.
+      '<label>Gewinn <span class="mini">(leer = Einsatz mal Quote)</span><br>' +
+        '<input class="pkkurz" id="pk_gewinn" value="' + textSicherM(s.gewinn) +
+        '" inputmode="decimal" placeholder="' +
+        (einsatz && quote ? pkRund2(einsatz * quote).toFixed(2) : "0,00") +
+        '" oninput="pkMerken(false, true); pkRechnen()"> &euro;</label>' +
     "</div>" +
     '<p class="mini" id="pk_rechnung">' + pkRechnungText(gesamt, quote, einsatz) + "</p>" +
 
@@ -193,18 +206,36 @@ function pkFormularHtml(ordnerId) {
     "</div>";
 }
 
+// Der eine Ort, an dem der moegliche Gewinn entsteht. Steht im Feld
+// etwas, gilt das; sonst Einsatz mal Quote. pkRechnungText und
+// pkSpeichern fragen beide hier, damit auf dem Schirm nie eine andere
+// Zahl steht als die, die gespeichert wird.
+function pkGewinnWert(stand, einsatz, quote) {
+  const getippt = pkZahl(stand && stand.gewinn);
+  if (getippt > 0) return pkRund2(getippt);
+  return pkRund2(einsatz * quote);
+}
+
 function pkRechnungText(gesamt, quote, einsatz) {
-  const moeglich = pkRund2(einsatz * quote);
+  const getippt = pkZahl(pkStand && pkStand.gewinn);
+  const gerechnet = pkRund2(einsatz * quote);
+  const moeglich = pkGewinnWert(pkStand, einsatz, quote);
   return "Aus den Einzelquoten: <b>" + (gesamt ? gesamt.toFixed(2) : "-") + "</b>. " +
     "Gerechnet wird mit <b>" + (quote ? quote.toFixed(2) : "-") + "</b>. " +
-    "Möglicher Gewinn: <b>" + moeglich.toFixed(2) + " &euro;</b>." +
+    "Möglicher Gewinn: <b>" + moeglich.toFixed(2) + " &euro;</b>" +
+    (getippt > 0 ? " (von dir eingetragen)" : "") + "." +
+    // Weicht der eingetragene Gewinn stark von der Rechnung ab, wird das
+    // gesagt. Verboten ist es nicht: der Anbieter rechnet oft anders.
+    (getippt > 0 && gerechnet > 0 && Math.abs(getippt - gerechnet) > Math.max(0.02, gerechnet * 0.02)
+      ? ' <span class="warnton">Einsatz mal Quote wären ' + gerechnet.toFixed(2) +
+        " &euro;. Gespeichert wird dein Wert.</span>" : "") +
     (gesamt && quote && Math.abs(gesamt - quote) > 0.005
       ? ' <span class="rot">Die Gesamtquote weicht von den Einzelquoten ab - gewollt?</span>' : "");
 }
 
 // Alles aus den Feldern in pkStand uebernehmen. Wird bei jedem Tippen
 // gerufen, damit ein Neuzeichnen von aussen nichts verliert.
-function pkMerken(quoteVonHand) {
+function pkMerken(quoteVonHand, gewinnVonHand) {
   if (!pkStand) return;
   // Fehlt ein Feld auf dem Schirm, bleibt der bisherige Wert stehen.
   // Frueher stand hier ein "" als Ersatz - dann haette ein Aufruf ohne
@@ -218,6 +249,8 @@ function pkMerken(quoteVonHand) {
   pkStand.notiz = w("pk_notiz", pkStand.notiz);
   if (quoteVonHand) pkStand.quoteHand = true;
   if (pkStand.quoteHand) pkStand.quote = w("pk_quote", pkStand.quote);
+  if (gewinnVonHand) pkStand.gewinnHand = true;
+  pkStand.gewinn = w("pk_gewinn", pkStand.gewinn);
   pkStand.wetten.forEach((z, i) => {
     z.spiel = w("pk_spiel_" + i, z.spiel);
     z.wette = w("pk_wette_" + i, z.wette);
@@ -310,14 +343,30 @@ async function pkSpeichern() {
       quelle: "hand"
     }));
 
+  // Karam (16.09.2026): "Einfach irgendwas, was ich mal gesetzt habe, nur
+  // damit man weiss: okay, das wurde gesetzt. Es gibt halt keinen
+  // Nachweis dazu."
+  // GAR KEINE Wette ist deshalb erlaubt. Das ist dann eine Kombination
+  // OHNE Nachweis: sie zaehlt beim Geld voll mit, faellt aber aus jeder
+  // Mechanik heraus (kein Ergebnis-Abgleich, kein Termin, keine
+  // Doppelt-Erkennung). Das steht unten in der Rueckfrage, damit es
+  // niemanden spaeter ueberrascht.
+  // Halb ausgefuellte Wetten bleiben verboten: eine Wette ohne Spiel
+  // oder ohne Quote ist keine Angabe, sondern ein Versehen.
+  const ohneNachweis = !wetten.length;
   const fehlt = [];
-  if (!wetten.length) fehlt.push("mindestens eine Wette mit Spiel oder Wettart");
-  if (wetten.some(w => !w.spiel)) fehlt.push("bei jeder Wette ein Spiel");
-  if (wetten.some(w => !(w.quote > 1))) fehlt.push("bei jeder Wette eine Quote über 1");
+  if (wetten.length && wetten.some(w => !w.spiel)) fehlt.push("bei jeder Wette ein Spiel");
+  if (wetten.length && wetten.some(w => !(w.quote > 1))) fehlt.push("bei jeder Wette eine Quote über 1");
   const einsatz = pkRund2(pkZahl(s.einsatz));
   if (!(einsatz > 0)) fehlt.push("einen Einsatz über 0");
   const quote = pkRund2(pkZahl(s.quote) || pkGesamtquote(s.wetten));
   if (!(quote > 1)) fehlt.push("eine Gesamtquote über 1");
+  // Ohne Anbieter faellt der Einsatz in personPruefen lautlos aus der
+  // Rechnung der Person heraus (die Schleife springt bei unbekanntem
+  // Kuerzel mit continue weiter). Deshalb hier geprueft, nicht dort.
+  if (!s.kz || (typeof anbieterName === "function" && !anbieterName(s.kz))) {
+    fehlt.push("einen Anbieter");
+  }
   if (fehlt.length) {
     meldungM("So nicht gespeichert - es fehlt noch: " + textSicherM(fehlt.join(", ")) +
       ". Lieber nichts als eine halbe Kombination.", "warn");
@@ -326,7 +375,7 @@ async function pkSpeichern() {
 
   const zeit = s.zeit ? new Date(s.zeit) : new Date();
   if (isNaN(zeit)) { meldungM("Das Datum der Kombination ist nicht lesbar.", "warn"); return; }
-  const moeglich = pkRund2(einsatz * quote);
+  const moeglich = pkGewinnWert(s, einsatz, quote);
   const nummer = s.nummer.trim() === "" ? null : parseInt(s.nummer, 10);
   if (nummer !== null && !isFinite(nummer)) { meldungM("Die Scheinnummer ist keine Zahl.", "warn"); return; }
 
@@ -346,14 +395,27 @@ async function pkSpeichern() {
   const neu = !pkOffen.scheinId;
   const uebersicht =
     (typeof anbieterName === "function" ? anbieterName(s.kz) : s.kz) + "\n" +
-    wetten.map(w => "   " + w.spiel + " - " + (w.linie || "?") + " - " + w.quote.toFixed(2)).join("\n") +
+    (ohneNachweis
+      ? "   (keine einzelne Wette eingetragen)"
+      : wetten.map(w => "   " + w.spiel + " - " + (w.linie || "?") + " - " + w.quote.toFixed(2)).join("\n")) +
     "\n\n   Einsatz:  " + einsatz.toFixed(2) + " Euro\n" +
     "   Quote:    " + quote.toFixed(2) + "\n" +
     "   Möglich:  " + moeglich.toFixed(2) + " Euro\n" +
     "   Stand:    " + s.stand;
 
+  // Was eine Kombination ohne Wetten NICHT kann. Das gehoert in die
+  // Rueckfrage und nicht in eine Fussnote: sie zaehlt beim Geld voll
+  // mit, aber kein Automat kuemmert sich je wieder um sie.
+  const ohneText = ohneNachweis
+    ? "\n\nACHTUNG, diese Kombination hat KEINE einzelne Wette:\n" +
+      "   - sie zählt beim Geld voll mit (Einsatz, Gewinn, Kontostand)\n" +
+      "   - aber sie wird NIE automatisch ausgewertet\n" +
+      "   - gewonnen oder verloren musst du selbst eintragen\n" +
+      "   - die Doppelt-Erkennung sieht sie nicht"
+    : "";
+
   if (neu) {
-    if (!confirm("Diese Kombination bei der Person anlegen?\n\n" + uebersicht +
+    if (!confirm("Diese Kombination bei der Person anlegen?\n\n" + uebersicht + ohneText +
         "\n\nSie zählt ab sofort in Konto, Personenkasse und Buchhaltung mit.")) return;
     const daten = {
       zeit: zeit.toISOString(),
@@ -362,7 +424,12 @@ async function pkSpeichern() {
       anbieter: (typeof anbieterName === "function" ? anbieterName(s.kz) : s.kz),
       einsatz: einsatz, quote: quote, moeglich: moeglich,
       wetten: wetten, stand: s.stand, notiz: s.notiz || "",
-      handeingabe: true
+      handeingabe: true,
+      // Ausdruecklich vermerkt, nicht aus "wetten ist leer" erschlossen.
+      // Die Selbstpruefung in Mein Bereich meldet einen Schein ohne
+      // Wetten sonst als Fehler, und das waere hier ein Fehlalarm: es
+      // ist genau das, was Karam wollte.
+      ohneNachweis: ohneNachweis
     };
     const r = await supaScheinAnlegen(aktiverBereich.id, daten, s.foto, s.foto ? s.fotoName : null,
       pkOffen.ordnerId, nummer);

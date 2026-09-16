@@ -3844,6 +3844,29 @@ async function tuChatVideo() {
 
 document.addEventListener("DOMContentLoaded", startMein);
 
+// Kommt man ueber den Knopf "Kombi von Hand eintragen" aus dem Kombi-Bau
+// (mein.html?kombivonhand=1), steht hier der Wegweiser. Das Formular
+// selbst haengt an einer PERSON, und die muss zuerst gewaehlt sein -
+// deshalb wird hier nichts aufgemacht, sondern gesagt, was als
+// naechstes zu tun ist, und der Personen-Kasten in den Blick geholt.
+// Ein Formular ohne Person waere eine Kombination, die zu niemandem
+// gehoert; die faende Karam spaeter nicht wieder.
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    if (new URLSearchParams(location.search).get("kombivonhand") !== "1") return;
+  } catch (e) { return; }
+  setTimeout(() => {
+    const box = document.getElementById("ordnerbox");
+    if (box) box.scrollIntoView({ block: "center" });
+    if (typeof meldungM === "function") {
+      meldungM("<b>Kombi von Hand eintragen:</b> oben die <b>Person</b> anklicken, " +
+        "dann steht bei ihr der Knopf <b>Alte Kombination von Hand nachtragen</b>. " +
+        "Einsatz, Quote und Gewinn reichen, ein Foto ist freiwillig, und du kannst " +
+        "die Wetten auch ganz weglassen.", "gut");
+    }
+  }, 1200);
+});
+
 
 // ============================================================
 // NACHRECHNEN: der Zusammenhang zwischen einer Kombination, ihren
@@ -3906,6 +3929,14 @@ function pruefAlles(scheine) {
     const d = s.daten || {};
     const wetten = d.wetten || [];
     if (!wetten.length) {
+      // Eine von Hand erfundene Kombination OHNE Nachweis ist genau so
+      // gewollt (Karam am 16.09.2026): "einfach irgendwas, was ich mal
+      // gesetzt habe, nur damit man weiss, das wurde gesetzt. Es gibt
+      // halt keinen Nachweis dazu." Das als Fehler zu melden waere ein
+      // Fehlalarm, und Fehlalarme nimmt man nach drei Malen nicht mehr
+      // ernst. Bei jedem ANDEREN Schein ohne Wetten bleibt es ein
+      // Fehler: dort ist wirklich etwas verloren gegangen.
+      if (d.ohneNachweis) continue;
       add("fehler", "Rechnung", "Eine Kombination bei <b>" + textSicherM(d.anbieter || d.kz || "?") +
         "</b> hat gar keine Wetten gespeichert.");
       continue;
