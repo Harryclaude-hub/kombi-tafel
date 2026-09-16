@@ -5346,3 +5346,67 @@ button.haupt { box-shadow: var(--g-tiefe-1), inset 0 1px 0 rgba(255, 255, 255, .
   .bilderleiste { margin: 8px 0 12px; }
   .bilderleiste #bk_knopf:disabled { cursor: progress; }
 }
+
+/* Der Stand-Text im Bilder-Knopf (Design-Schicht, loeschbar) */
+@media screen {
+  .bilderleiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .bilderleiste .bk-stand { font-size: 14px; }
+}
+
+/* ============================================================
+   AUSWERTEN: PERSONEN- UND ANBIETERFILTER (Design-Schicht, LOESCHBAR)
+   Karam (16.09.2026): "Ganz rechts muss Personenfilter kommen und
+   Anbieterfilter." Faellt dieser Block weg, stehen die Filterknoepfe
+   schlicht untereinander unter den Kacheln und arbeiten unveraendert.
+   Bis zur Marke ENDE AUSWERT-FILTER loeschen.
+   ============================================================ */
+@media screen {
+
+body[data-seite="mein"] .aw-oben {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+}
+body[data-seite="mein"] .aw-oben > .aw-summe { flex: 1 1 420px; }
+body[data-seite="mein"] .aw-filter {
+  flex: 1 1 300px; min-width: 260px;
+  display: flex; flex-direction: column; gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--kenn, #1a2c50) 45%, #fff);
+  border-radius: var(--g-rund, 12px); background: #fff;
+  padding: 10px 12px;
+  box-shadow: var(--g-tiefe-1, 0 1px 2px rgba(16, 28, 48, .06));
+}
+body[data-seite="mein"] .aw-ftitel { font-weight: 700; font-size: 13.5px; }
+body[data-seite="mein"] .aw-fzahl {
+  font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  background: var(--kenn, #1a2c50); color: #fff;
+}
+/* Die Knoepfe laufen quer weiter, statt den Kasten in die Hoehe zu
+   ziehen: bei 27 Personen waere er sonst laenger als der Bildschirm. */
+body[data-seite="mein"] .aw-fchips {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;
+  max-height: 128px; overflow-y: auto;
+}
+body[data-seite="mein"] .aw-chip {
+  min-height: 30px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+body[data-seite="mein"] .aw-chip.aktiv {
+  background: var(--kenn, #1a2c50); color: #fff; border-color: var(--kenn, #1a2c50);
+}
+body[data-seite="mein"] .aw-chipz {
+  font-size: 11px; font-weight: 700; opacity: .75; margin-left: 3px;
+  font-variant-numeric: tabular-nums;
+}
+/* Gewaehlt, kommt im Zeitraum aber nicht vor: gestrichelt, damit man
+   sieht, warum die Liste leer bleibt. */
+body[data-seite="mein"] .aw-chip.aw-chipweg { border-style: dashed; }
+body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-top: 6px; }
+
+@media (max-width: 700px) {
+  body[data-seite="mein"] .aw-oben > .aw-summe,
+  body[data-seite="mein"] .aw-filter { flex: 1 1 100%; }
+  body[data-seite="mein"] .aw-fchips { max-height: 150px; }
+  body[data-seite="mein"] .aw-chip { min-height: 36px; font-size: 13px; }
+}
+
+}
+/* ---- ENDE AUSWERT-FILTER ---- */

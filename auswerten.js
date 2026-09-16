@@ -26,6 +26,14 @@
 const AW_ZEITRAUM = "kt_aw_zeitraum";     // zuletzt gewaehlter Zeitraum
 const AW_STICHTAG = "kt_aw_stichtag";     // Stand der letzten Excel-Liste
 const AW_NUR_OFFEN = "kt_aw_nur_offen";
+// Karam (16.09.2026): "Beim Auswerten moechte ich, dass ich Personen
+// filtern kann, ganz rechts muss Personenfilter kommen und
+// Anbieterfilter - ich kann mir die Anbieter auch aussuchen."
+// Beide sind MEHRFACHWAHL. Eine leere Liste heisst ausdruecklich
+// "alle", nicht "keine": so ist der Anfangszustand nie eine
+// versehentlich leere Auswertung.
+const AW_PERSONEN = "kt_aw_personen";
+const AW_ANBIETER = "kt_aw_anbieter";
 
 // Karams Konten-Uebersicht hatte den Stand Montag, 14.09.2026 18:00.
 // Alles, was danach gespielt wurde, fehlt dort und muss dazugerechnet
@@ -45,6 +53,46 @@ function awZeitraum() {
 }
 function awZeitraumSetzen(z) {
   try { localStorage.setItem(AW_ZEITRAUM, JSON.stringify(z)); } catch (e) { }
+}
+
+// ---------- Personen- und Anbieterfilter ----------
+// Eine leere Liste heisst IMMER "alle". Damit kann kein Zustand
+// entstehen, in dem nichts mehr angezeigt wird und niemand weiss warum.
+function awListeLesen(schluessel) {
+  try {
+    const v = JSON.parse(localStorage.getItem(schluessel) || "[]");
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch (e) { return []; }
+}
+function awListeSchreiben(schluessel, liste) {
+  try { localStorage.setItem(schluessel, JSON.stringify(liste)); } catch (e) { }
+}
+function awPersonenFilter() { return awListeLesen(AW_PERSONEN); }
+function awAnbieterFilter() { return awListeLesen(AW_ANBIETER); }
+
+// Ein Eintrag um: drin wird raus, raus wird drin.
+function awUmschalten(schluessel, wert) {
+  const liste = awListeLesen(schluessel);
+  const i = liste.indexOf(String(wert));
+  if (i >= 0) liste.splice(i, 1); else liste.push(String(wert));
+  awListeSchreiben(schluessel, liste);
+  if (typeof zeichneBereich === "function") zeichneBereich();
+}
+function awPersonUm(id) { awUmschalten(AW_PERSONEN, id == null ? "" : id); }
+function awAnbieterUm(kz) { awUmschalten(AW_ANBIETER, kz == null ? "" : kz); }
+function awPersonenAlle() { awListeSchreiben(AW_PERSONEN, []); if (typeof zeichneBereich === "function") zeichneBereich(); }
+function awAnbieterAlle() { awListeSchreiben(AW_ANBIETER, []); if (typeof zeichneBereich === "function") zeichneBereich(); }
+function awFilterAlle() {
+  awListeSchreiben(AW_PERSONEN, []);
+  awListeSchreiben(AW_ANBIETER, []);
+  if (typeof zeichneBereich === "function") zeichneBereich();
+}
+
+// Die beiden Merkmale eines Scheins, immer auf dieselbe Art gelesen.
+function awPersonVon(s) { return s && s.ordner ? String(s.ordner) : ""; }
+function awAnbieterVon(s) {
+  const d = (s && s.daten) || {};
+  return d.kz ? String(d.kz) : "";
 }
 
 function awTagText(d) {
@@ -107,18 +155,39 @@ function awGrenzen() {
 // Welche Scheine gehoeren in den Zeitraum? Gerechnet wird ueber
 // created_at, also den Moment des Speicherns - derselbe Zeitpunkt, den
 // die Buchhaltung und die Tagesansicht benutzen.
-function awScheine() {
+// Drei Stufen, und jede hat genau eine Aufgabe. Die Summenzeile und die
+// Liste greifen auf verschiedene Stufen zu; stuende das Filtern an zwei
+// Stellen, zeigten Summe und Liste irgendwann verschiedene Mengen.
+//   awImZeitraum  nur die Zeit
+//   awGefiltert   dazu Person und Anbieter   -> die Summen rechnen hiermit
+//   awScheine     dazu "nur die offenen"     -> die Liste zeigt das
+function awImZeitraum() {
   const alle = Array.isArray(kasseScheine) ? kasseScheine : [];
   const g = awGrenzen();
-  const nurOffen = awNurOffen();
   return alle.filter(s => {
-    if (nurOffen && s.stand !== "offen") return false;
     const t = new Date(s.created_at);
     if (isNaN(t.getTime())) return true;      // Zeit unlesbar: lieber zeigen als verschweigen
     if (g.von && t < g.von) return false;
     if (g.bis && t > g.bis) return false;
     return true;
-  }).sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  });
+}
+
+function awGefiltert() {
+  const personen = awPersonenFilter();
+  const anbieter = awAnbieterFilter();
+  return awImZeitraum().filter(s => {
+    if (personen.length && personen.indexOf(awPersonVon(s)) < 0) return false;
+    if (anbieter.length && anbieter.indexOf(awAnbieterVon(s)) < 0) return false;
+    return true;
+  });
+}
+
+function awScheine() {
+  const nurOffen = awNurOffen();
+  return awGefiltert()
+    .filter(s => !nurOffen || s.stand === "offen")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
 }
 
 function awPersonName(id) {
@@ -147,6 +216,75 @@ function zeichneAuswerten() {
   const liste = awScheine();
   box.innerHTML = awKopfHtml(g, liste) +
     '<div id="aw_liste">' + awListeHtml(liste) + "</div>";
+}
+
+// ---------- Die beiden Filterkaesten rechts ----------
+// Gezeigt wird IMMER nur, was im Zeitraum wirklich vorkommt, mit der
+// Anzahl dahinter. So kann man nichts anwaehlen, das ohnehin leer ist,
+// und sieht auf einen Blick, wo die Kombinationen liegen.
+// Eine Auswahl, die es im Zeitraum nicht mehr gibt, bleibt trotzdem
+// stehen und wird gezeigt - sonst waere sie still verschwunden und
+// Karam suchte, warum die Liste leer ist.
+function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
+  const aus = gewaehlt.length === 0;
+  let h = '<div class="aw-fgruppe"><div class="aw-ftitel">' + titel +
+    (aus ? ' <span class="mini">(alle)</span>'
+         : ' <span class="aw-fzahl">' + gewaehlt.length + " gewählt</span>") + "</div>" +
+    '<div class="aw-fchips">' +
+    '<button class="aw-chip' + (aus ? " aktiv" : "") + '" onclick="' + alleFn + '()">alle</button>';
+  for (const e of eintraege) {
+    const an = gewaehlt.indexOf(e.wert) >= 0;
+    h += '<button class="aw-chip' + (an ? " aktiv" : "") + (e.fehlt ? " aw-chipweg" : "") +
+      '" onclick="' + umFn + '(' + JSON.stringify(e.wert) + ')" title="' +
+      (e.fehlt ? "gewählt, kommt in diesem Zeitraum aber nicht vor"
+               : e.zahl + " Kombination(en) in diesem Zeitraum") + '">' +
+      textSicherM(e.text) + ' <span class="aw-chipz">' + e.zahl + "</span></button>";
+  }
+  if (!eintraege.length) h += '<span class="mini">' + leerText + "</span>";
+  return h + "</div></div>";
+}
+
+function awFilterHtml(imZeitraum) {
+  // Zaehlen, was es gibt.
+  const zaehlP = {}, zaehlA = {};
+  for (const s of imZeitraum) {
+    const p = awPersonVon(s), a = awAnbieterVon(s);
+    zaehlP[p] = (zaehlP[p] || 0) + 1;
+    zaehlA[a] = (zaehlA[a] || 0) + 1;
+  }
+  const gewP = awPersonenFilter(), gewA = awAnbieterFilter();
+  // Gewaehltes, das im Zeitraum nicht vorkommt, trotzdem aufnehmen.
+  for (const p of gewP) if (!(p in zaehlP)) zaehlP[p] = 0;
+  for (const a of gewA) if (!(a in zaehlA)) zaehlA[a] = 0;
+
+  const personen = Object.keys(zaehlP).map(p => ({
+    wert: p,
+    text: p ? (awPersonName(p) || "Person " + String(p).slice(0, 6)) : "keine Person",
+    zahl: zaehlP[p],
+    fehlt: zaehlP[p] === 0
+  })).sort((a, b) => b.zahl - a.zahl ||
+    (typeof personVergleich === "function" ? personVergleich(a.text, b.text)
+                                           : a.text.localeCompare(b.text)));
+
+  const anbieter = Object.keys(zaehlA).map(a => ({
+    wert: a,
+    text: a ? ((typeof anbieterName === "function" && anbieterName(a)) || a) : "ohne Anbieter",
+    zahl: zaehlA[a],
+    fehlt: zaehlA[a] === 0
+  })).sort((a, b) => b.zahl - a.zahl || a.text.localeCompare(b.text));
+
+  const etwasAn = gewP.length || gewA.length;
+  return '<div class="aw-filter">' +
+    awFilterGruppe("&#128100; Person", personen, gewP, "awPersonUm", "awPersonenAlle",
+      "In diesem Zeitraum liegt keine Kombination.") +
+    awFilterGruppe("&#127978; Anbieter", anbieter, gewA, "awAnbieterUm", "awAnbieterAlle",
+      "In diesem Zeitraum liegt keine Kombination.") +
+    (etwasAn
+      ? '<div class="aw-fhinweis mini"><b>Gefiltert.</b> Die Zahlen oben und die Liste ' +
+        "unten zeigen nur die gewählten. " +
+        '<button onclick="awFilterAlle()">Filter ganz weg</button></div>'
+      : "") +
+    "</div>";
 }
 
 function awKopfHtml(g, liste) {
@@ -193,7 +331,11 @@ function awKopfHtml(g, liste) {
       : "") +
     '<div class="aw-zeile"><label><input type="checkbox"' + (awNurOffen() ? " checked" : "") +
       ' onchange="awNurOffenSetzen(this.checked)"> nur die noch offenen zeigen</label></div>' +
-    awSummeHtml(liste, g);
+    // Karam wollte die beiden Filter "ganz rechts". Sie stehen deshalb
+    // in derselben Zeile wie die Summenkacheln, rechts davon; am Handy
+    // rutschen sie darunter.
+    '<div class="aw-oben">' + awSummeHtml(liste, g) +
+      awFilterHtml(awImZeitraum()) + "</div>";
 }
 
 // Die Summenzeile: Umsatz und Gewinn fuer den Zeitraum.
@@ -202,14 +344,11 @@ function awKopfHtml(g, liste) {
 // Wuerde man sie als Verlust rechnen, saehe jeder Tag zuerst schrecklich
 // aus und waere es nicht.
 function awSummeHtml(liste, g) {
-  const alle = Array.isArray(kasseScheine) ? kasseScheine : [];
-  const imZeitraum = alle.filter(s => {
-    const t = new Date(s.created_at);
-    if (isNaN(t.getTime())) return true;
-    if (g.von && t < g.von) return false;
-    if (g.bis && t > g.bis) return false;
-    return true;
-  });
+  // Dieselbe Menge wie die Liste darunter, nur ohne "nur die offenen":
+  // die Kacheln sollen ja gerade zeigen, wie viele offen, gewonnen und
+  // verloren sind. Person und Anbieter wirken aber sehr wohl - sonst
+  // stuende ueber einer gefilterten Liste eine ungefilterte Summe.
+  const imZeitraum = awGefiltert();
   let umsatz = 0, zurueck = 0, offenEinsatz = 0, nOffen = 0, nGew = 0, nVer = 0, unlesbar = 0;
   for (const s of imZeitraum) {
     const d = s.daten || {};
@@ -239,8 +378,16 @@ function awSummeHtml(liste, g) {
 
 function awListeHtml(liste) {
   if (!liste.length) {
-    return '<p class="mini">In diesem Zeitraum ist nichts auszuwerten. ' +
-      "Nimm einen anderen Zeitraum, oder nimm den Haken bei \"nur die noch offenen\" weg.</p>";
+    // Warum leer? Wenn ein Filter gesetzt ist, ist DAS fast immer der
+    // Grund. Das gehoert dazugesagt, sonst sucht man am falschen Ende.
+    const gefiltert = awPersonenFilter().length + awAnbieterFilter().length;
+    return '<p class="mini">Hier ist nichts auszuwerten. ' +
+      (gefiltert
+        ? "Es ist ein <b>Filter</b> gesetzt (" + gefiltert + " Auswahl" +
+          (gefiltert === 1 ? "" : "en") + " rechts oben). " +
+          '<button onclick="awFilterAlle()">Filter ganz weg</button> '
+        : "") +
+      "Sonst: anderen Zeitraum nehmen, oder den Haken bei \"nur die noch offenen\" weg.</p>";
   }
   // Karam (16.09.2026): "eine Nummerierung, die erste ist 1 und dann geht
   // es so weiter - vor allem wenn ich einen Filter nutze, dass ich mich
