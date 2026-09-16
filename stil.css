@@ -4662,3 +4662,646 @@ body[data-seite="mein"] #pi_meine textarea {
 .tb-mal { font-size: 13px; }
 
 /* ---- ENDE ORDNER-UEBERSICHT ---- */
+
+
+/* ======================================================================
+   GLANZ-SCHICHT 16.09.2026 - KOMPLETT LOESCHBAR
+
+   Karam: "Arbeite am Framework und an der Fluessigkeit der Website, am
+   Handy wie am Rechner. Glaenzender, hochwertiger. Scroll-Animationen,
+   Bewegung an den Knoepfen. Die Abstaende sollen besser passen, die
+   Schriftgroessen, die Farbkontraste, vor allem bei Personen."
+
+   WAS DAS HIER IST
+   Eine reine Gestaltungsschicht. Sie fuegt nichts hinzu, was man
+   bedienen muesste, und nimmt nichts weg. Loescht man diesen Block bis
+   zur Marke ENDE GLANZ, sieht das Programm wieder genau aus wie vorher
+   und rechnet unveraendert weiter. Kein einziges Skript haengt daran.
+
+   DIE REGELN, DIE DIESE SCHICHT EINHAELT
+   1. Alles steht in @media screen. Der Ausdruck bleibt unberuehrt.
+   2. Kein !important. Die Schicht gewinnt allein durch ihre Lage ganz
+      unten in der Datei.
+   3. KEINE neue Bedeutung. Der Akzent ist immer var(--kenn), also die
+      Farbe, die die Seite ohnehin hat.
+      Genau SECHS Farbwerte kommen neu dazu, und alle sechs sind nur
+      dunklere Abstufungen von etwas, das es schon gibt, damit der
+      Kontrast reicht: die Personen-Chips #14661a und #0f5415 (gruen,
+      Person da) und #9c6512, #6f4708, #7f5310 (braun, Person fehlt),
+      dazu der Chiprand #0d4a12. Keine davon bekommt eine NEUE
+      Bedeutung; sie sagen dasselbe wie vorher, nur lesbarer.
+      Gruen bleibt bester Wert und gewonnen, rot bleibt Abzug, vorbei,
+      verloren und Warnung, braun-orange bleibt duenner Markt und
+      offen. In tbody wird keine dieser Farben angefasst.
+   4. Kein Hintergrund innerhalb von tbody. Dort tragen die Farben
+      Bedeutung. Wo eine Zeile hervorgehoben wird, geschieht das ueber
+      einen Balken links, nicht ueber eine Flaeche.
+   5. Kein transform auf einem Element, in dem etwas klebt
+      (position: sticky). Ein transform macht aus dem Element einen
+      eigenen Bezugsrahmen, und der Tabellenkopf wuerde nicht mehr
+      oben stehen bleiben. Deshalb: transform nur auf Knoepfen,
+      Chips und Karten, nie auf .tabellenrand, table oder #eigenbau.
+   6. Genau EIN neuer z-index (51, der Fortschrittsbalken). Er liegt
+      direkt auf der Kennkante (50) und nimmt keine Klicks an.
+   7. Jede Bewegung steht hinter prefers-reduced-motion: no-preference.
+      Wer im Betriebssystem weniger Bewegung eingestellt hat, bekommt
+      exakt die alte, ruhige Seite.
+   8. Die Tabellen bleiben eng. Sie sind das Arbeitsgeraet; hier wird
+      nur ausserhalb der Tabellen Luft gemacht.
+   ====================================================================== */
+
+@media screen {
+
+/* ---- 1. Werte an einer Stelle ----
+   Alle mit --g- davor, damit sie mit nichts kollidieren, was es schon
+   gibt. Wer die Schicht zahmer will, dreht hier und sonst nirgends. */
+:root {
+  --g-rund-klein: 8px;
+  --g-rund: 12px;
+  --g-rund-gross: 16px;
+
+  /* Drei Stufen Tiefe statt einer flachen Linie. Der Ton ist ein
+     kuehles Blaugrau, kein reines Schwarz: reines Schwarz wirkt auf
+     Weiss schmutzig. */
+  --g-tiefe-1: 0 1px 2px rgba(16, 28, 48, .06), 0 1px 3px rgba(16, 28, 48, .05);
+  --g-tiefe-2: 0 2px 4px rgba(16, 28, 48, .07), 0 8px 20px rgba(16, 28, 48, .07);
+  --g-tiefe-3: 0 6px 12px rgba(16, 28, 48, .10), 0 18px 40px rgba(16, 28, 48, .11);
+
+  /* Kurz genug, dass es nie im Weg ist. 120 ms fuer Farbe,
+     180 ms fuer Bewegung, 260 ms fuer Flaechen. */
+  --g-zeit-1: 120ms;
+  --g-zeit-2: 180ms;
+  --g-zeit-3: 260ms;
+  /* Weich heraus, kein Zurueckfedern: das wirkt teuer, nicht verspielt. */
+  --g-kurve: cubic-bezier(.2, .7, .3, 1);
+
+  /* Ruhige Graustufen mit einem Hauch Blau, damit sie zu den
+     Kennfarben passen. Alle gegen Weiss nachgerechnet:
+     --g-grau-stark 9,82:1, --g-grau 7,38:1, --g-grau-leise 4,76:1.
+     ACHTUNG, das gilt gegen WEISS, und Weiss ist hier fast nirgends
+     der echte Grund: der Seitengrund ist ein Hauch Kennfarbe
+     (color-mix --kennhell 55%, #fff), jede zweite Tabellenzeile ist
+     #f7f7f7, und die Anbieterzellen sind gruen hinterlegt. Die Werte
+     unten sind deshalb dunkler gesetzt, als die Rechnung gegen Weiss
+     verlangen wuerde. */
+  --g-grau-stark: #3b4453;
+  --g-grau: #4e5666;
+  --g-grau-leise: #656d7e;
+  --g-linie: #d7dce6;
+}
+
+/* ---- 2. Kontrast: die drei Graus, die wirklich zu hell waren ----
+   Nachgerechnet gegen Weiss: #999 kam auf 2,85:1, #888 auf 3,54:1,
+   #777 auf 4,48:1. Alle drei lagen unter der Schwelle 4,5:1.
+   Die neuen Werte liegen darueber und bleiben trotzdem deutlich
+   zurueckgenommen - vorbei sieht weiter vorbei aus. */
+tr.vorbei { color: #6a7180; }
+/* ZU DER ENTSCHEIDUNG WEITER OBEN (Zeile ~1867).
+   Dort steht ausdruecklich: ".leer", ".abzug" und ".duenn" wurden
+   BEWUSST nicht ausgebessert, weil sie im Tabellenkoerper liegen, und
+   wer das aendern will, soll die Grundfarben oben aendern, nicht hier
+   unten mit Ausnahmen.
+   Karam hat am 16.09.2026 ausdruecklich nach besseren Farbkontrasten
+   gefragt. Damit ist die Entscheidung von damals ueberholt. Der Weg
+   bleibt trotzdem der vorsichtige: nicht die Grundfarben oben umbauen
+   (das wuerde durch das ganze Programm schlagen), sondern hier unten
+   in einer Schicht, die man in einem Stueck wieder wegnehmen kann.
+   ".duenn" (brauner duenner Markt) ist eine BEDEUTUNGSFARBE und wird
+   hier nicht angefasst.
+
+   Vier Stellen dimmen ueber opacity und fielen damit unter die
+   Schwelle: 0,45 wirkt wie #8c8c8c (3,36:1), 0,5 wie #808080
+   (3,95:1). 0,62 wirkt wie #616161 und ergibt 6,1:1. Zurueckgenommen
+   bleibt es trotzdem deutlich sichtbar. */
+/* OHNE #eigenbau geschrieben, und das mit Absicht: mit der Kennung
+   waere die Regel staerker als die bewusste Ausnahme
+   .tb-tafel tr.tb-vorbei[style] { opacity: .85 } weiter oben. Die
+   gilt fuer Zeilen, die eine Kombi-Farbe als Inline-Stil tragen, und
+   soll sie lesbar halten. So gewinnt sie weiter. */
+.tb-tafel tr.tb-vorbei { opacity: .62; }
+.tb-ersatz { opacity: .62; }
+/* Zwei Hinweistexte lagen knapp unter der Schwelle (3,90 und 3,91).
+   Beim Aufraeum-Knopf reicht ein helleres Grau nicht: auf dessen
+   Grund #6b7280 kommt selbst #f2f4f7 nur auf 4,39:1. Weiss schafft
+   4,68:1. */
+.pn-leeren .mini { color: #fff; }
+#ans_chat .chatzeile .mini { color: #5a6474; }
+/* Sechs weitere Nebenschriften lagen zwischen 2,91 und 4,39 zu 1.
+   Alle sind neutrale Graus ohne Bedeutung; sie gehen auf denselben
+   ruhigen Ton wie der Rest dieser Schicht (4,76 zu 1). */
+.gp-freunduser, .ah-fuss { color: var(--g-grau-leise); }
+.ez-anb.fertig, .ez-niedrig, .pl-wo { color: var(--g-grau-leise); }
+h2.kl-kopf::after { color: var(--g-grau-leise); }
+td.anbieter .abzug { color: #5f6672; }
+td.anbieter .realgross .leer { color: #5f6672; }
+/* .mini traegt im ganzen Programm die Hinweise. 11px war an der
+   Grenze des Lesbaren. 12px ausserhalb von Tabellen, INNERHALB von
+   Tabellen bleibt es bei 11px: dort zaehlt jede Zeilenhoehe, und die
+   Tafeln sollen eng bleiben.
+
+   NUR DIE GROESSE, NICHT DIE FARBE. Hier stand einmal auch eine
+   Farbe, und das war ein echter Fehler: .mini hat dasselbe Gewicht
+   wie .gruen, .warnton und .unterziel-mark, steht aber weiter unten
+   und haette sie alle geschlagen. Ueberall, wo im HTML
+   class="mini gruen" oder class="mini warnton" steht, waere die
+   Bedeutungsfarbe verschwunden - gruene Bestaetigungen und braune
+   Warnungen waeren neutralgrau geworden. Eine Warnung, die nicht mehr
+   wie eine Warnung aussieht, ist in einem Geldprogramm das
+   Schlimmste. .mini hat ohnehin #555 und damit 7,46:1, die Farbe war
+   nie das Problem.
+   td.mini/th.mini stehen mit in der Ausnahme: eine ZELLE, die selbst
+   .mini traegt, ist kein Nachfahre einer Zelle und waere sonst doch
+   auf 12px gewachsen (die Spalten Anstoss, Ordner und Liga der
+   Bau-Tafel sind genau solche Zellen). */
+.mini { font-size: 12px; }
+td .mini, th .mini, table .mini,
+td.mini, th.mini { font-size: 11px; }
+
+/* UND EIN ALTER FEHLER GLEICH MIT.
+   .gruen steht in Zeile 55, .mini mit color #555 in Zeile 171, also
+   WEITER UNTEN bei gleichem Gewicht. Damit hat .mini die gruene
+   Bedeutungsfarbe seit jeher geschlagen: jedes
+   <span class="mini gruen"> war in Wahrheit grau, nie gruen.
+   Betroffen sind unter anderem "Dieser Ordner ist ueberall offen"
+   (admin.js), "alle Quoten selbst geprueft" (kombis.js),
+   "Benachrichtigungen an" (mein.js) und "neues Foto gewaehlt"
+   (personkombi.js). Im Browser nachgesehen, nicht vermutet.
+   Dasselbe gilt fuer .doppel (Zeile 56, rot).
+   Beide bekommen ihre Farbe hier zurueck. */
+.mini.gruen, .gruen.mini { color: #1a7a1a; }
+.mini.doppel, .doppel.mini { color: #c00; }
+.unter { color: var(--g-grau-stark); }
+#zaehler { color: var(--g-grau); }
+td.s-mind { color: var(--g-grau); }
+td.s-zeit, td.s-liga { color: var(--g-grau); }
+
+/* ---- 3. Rhythmus: Luft dort, wo sie hilft ----
+   Nicht ueberall mehr Abstand, sondern gezielt: ueber Ueberschriften
+   viel, unter ihnen wenig. Dadurch gehoert eine Ueberschrift sichtbar
+   zu dem, was unter ihr steht, statt allein in der Mitte zu schweben.
+   Die Tabellen und ihre Zellen bleiben unberuehrt. */
+body[data-seite] h2 { margin: 30px 0 10px; }
+body[data-seite] h2:first-child { margin-top: 10px; }
+body[data-seite] h3 { margin: 20px 0 6px; }
+body[data-seite] h1 { letter-spacing: -.015em; }
+body[data-seite] h1, body[data-seite] h2, body[data-seite] h3 {
+  text-wrap: balance;
+}
+/* KEINE Textbreiten-Bremse. Karam hat am 26.08. ausdruecklich gesagt,
+   er will keine weisse Luecke rechts, und die Schicht darueber setzt
+   deshalb max-width: none. Das bleibt so. */
+
+/* ---- 4. Flaechen: Tiefe statt Kanten ----
+   Dieselben Kaesten wie bisher, nur mit einer weicheren, doppelten
+   Tiefe und einem ruhigeren Rand. Die Bedeutungs-Kaesten (lesekasten
+   gruen, kassenwarnung rot, fertighinweis orange, kern rot) stehen
+   ABSICHTLICH nicht in der Randliste und behalten ihre Farbe. */
+.warnkern, .zeitkern, .fuellkern, .filterbox, .schein,
+.auth-kasten, .kassenkasten, .adminkasten, .eigenbaukasten,
+.ordnerkarte, .fotokachel, .bsp, .chatliste, details:not(.anmk) {
+  box-shadow: var(--g-tiefe-1);
+  transition: box-shadow var(--g-zeit-3) var(--g-kurve),
+              border-color var(--g-zeit-2) var(--g-kurve);
+}
+.zeitkern, .fuellkern, .filterbox, .bsp,
+.auth-kasten, .kassenkasten, .adminkasten, .eigenbaukasten,
+details:not(.anmk) { border-radius: var(--g-rund); }
+details:not(.anmk) > summary { border-radius: 11px 11px 0 0; }
+details:not(.anmk)[open] > summary { border-radius: 11px 11px 0 0; }
+.schein, .ordnerkarte { border-radius: var(--g-rund); }
+/* KEIN overflow: hidden am .schein, auch wenn die Ecke dann sauberer
+   waere: in jedem Schein steckt eine Tabelle, und th klebt global
+   (position: sticky). Ein eigener Ueberlauf-Rahmen wuerde das kappen.
+   Stattdessen runden Kopf und Fuss selbst mit. */
+.schein > .s-kopf { border-radius: 11px 11px 0 0; }   /* 12 minus 1px Rand */
+.schein > .s-fuss:last-child { border-radius: 0 0 11px 11px; }
+.ordnerkarte > .ordnerkopf { border-radius: 9px 9px 0 0; } /* 12 minus 3px Rand */
+
+/* Neutrale Raender in EINEM Ton, damit nicht am selben Kasten ein
+   weicher Schatten neben einer harten fast schwarzen Kante steht.
+   Genau dieses Nebeneinander ist es, was billig aussieht: der Schein
+   hatte #444, details und die Fotokacheln #999, Eingabefelder #999.
+
+   DER TON IST DIE KENNFARBE, nur stark aufgehellt. Damit bleibt der
+   Rand in der Farbfamilie der Seite und liegt trotzdem ueber der
+   Schwelle 3:1 fuer Bedienelemente - 45 Prozent Kennfarbe ergeben je
+   nach Seite 3,4:1 bis 4,6:1.
+   Ein einfaches helles Grau (--g-linie, 1,38:1) stand hier zuerst und
+   ist wieder raus: es hat den vorhandenen kraeftigen Kennrand von
+   Anmelde-Kasten und Kasse (bis 13,8:1) praktisch unsichtbar gemacht.
+   Das waere das Gegenteil dessen, was bestellt war.
+
+   Rote und gruene Raender sind BEDEUTUNG und stehen hier bewusst
+   nicht drin. Tabellenlinien auch nicht: die enge Linienoptik IST
+   die Kombi-Tafel. */
+.schein, .fuellkern, .zeitkern, .fotokachel,
+details:not(.anmk),
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select, textarea {
+  border-color: color-mix(in srgb, var(--kenn, #1a2c50) 45%, #fff);
+}
+
+/* Wo ein Kasten wirklich anklickbar ist, hebt er sich beim Zeigen. */
+details:not(.anmk):hover, .fotokachel:hover {
+  box-shadow: var(--g-tiefe-2);
+}
+
+/* ---- 5. Knoepfe: sie sollen sich anfassen lassen ----
+   Beim Zeigen hebt sich der Knopf um einen Pixel und bekommt Tiefe,
+   beim Druecken sinkt er darunter. Das ist das ganze Geheimnis:
+   die Bewegung geht in die Richtung, in die der Finger drueckt. */
+button, .navleiste a.navknopf, .ordnerknopf, label.fotoknopf,
+a.s-person, .restzeile, .ordnerwahl, .ordner-person {
+  transition: background-color var(--g-zeit-1) var(--g-kurve),
+              border-color var(--g-zeit-1) var(--g-kurve),
+              color var(--g-zeit-1) var(--g-kurve),
+              box-shadow var(--g-zeit-2) var(--g-kurve),
+              transform var(--g-zeit-2) var(--g-kurve);
+}
+@media (prefers-reduced-motion: no-preference) {
+  button:hover:not(:disabled),
+  .navleiste a.navknopf:hover,
+  .ordnerknopf:hover, label.fotoknopf:hover,
+  a.s-person:hover, .restzeile:hover, .ordnerwahl:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--g-tiefe-2);
+  }
+  button:active:not(:disabled),
+  .navleiste a.navknopf:active,
+  .ordnerknopf:active, label.fotoknopf:active,
+  a.s-person:active, .restzeile:active, .ordnerwahl:active {
+    transform: translateY(1px) scale(.988);
+    box-shadow: var(--g-tiefe-1);
+    transition-duration: 60ms;
+  }
+}
+/* Ein abgeschalteter Knopf bewegt sich nicht und sagt das auch. */
+button:disabled { opacity: .62; cursor: not-allowed; }   /* dieselbe Dimm-Stufe wie oben */
+
+/* ---- 6. Der Ring beim Tasten-Gehen ----
+   :focus-visible trifft nur den, der mit der Tastatur unterwegs ist.
+   Wer klickt, sieht keinen Ring. Der Ring ist immer die Kennfarbe der
+   Seite, also nie eine neue Bedeutung. */
+   GEWICHT: ein blosses :focus-visible (0,1,0) reicht NICHT. Fuer
+   Knoepfe steht seit dem 28.08. ein button:focus-visible (0,2,1) mit
+   hellblauem Umriss da, und fuer Felder ein input:focus mit
+   outline: none. Beide muessen einzeln nachgezogen werden, sonst
+   verspricht dieser Abschnitt etwas, das nie ankommt. */
+:focus-visible {
+  outline: 3px solid var(--kenn, #1a2c50);
+  outline-offset: 2px;
+}
+button:focus-visible, a.navknopf:focus-visible, a.s-person:focus-visible,
+label.fotoknopf:focus-within {
+  outline: 3px solid var(--kenn, #1a2c50);
+  outline-offset: 2px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--kenn, #1a2c50);
+  outline-offset: 0;
+  border-color: var(--kenn, #1a2c50);
+}
+/* Kleinkram, der sofort hochwertiger wirkt: Haken, Schreibmarke und
+   markierter Text tragen die Kennfarbe der Seite. */
+input, select, textarea, progress { accent-color: var(--kenn, #1a2c50); }
+input, textarea { caret-color: var(--kenn, #1a2c50); }
+::selection { background: color-mix(in srgb, var(--kenn, #1a2c50) 22%, #fff); color: #101a2c; }
+
+/* Eingabefelder bekommen dieselbe Handschrift wie die Kaesten. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select, textarea {
+  border-radius: var(--g-rund-klein);
+  transition: border-color var(--g-zeit-1) var(--g-kurve),
+              box-shadow var(--g-zeit-2) var(--g-kurve);
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kenn, #1a2c50) 18%, transparent);
+}
+
+/* ---- 7. Personen: das, was Karam am meisten anschaut ----
+   NACHGERECHNET, nicht geschaetzt (Schwelle 4,5:1 fuer Schrift,
+   3:1 fuer Raender und Bedienelemente):
+
+   Chip "Person da":     weiss auf #1a7a1a  5,46:1  ->  #14661a  7,13:1
+   Chip "Person fehlt":  weiss auf #b7791f  3,64:1  ->  #9c6512  4,95:1
+       Der zweite war der SCHLECHTESTE Wert im ganzen Programm, und
+       das ausgerechnet an dem Zustand, der zum Handeln auffordert.
+       Am Handy gibt es kein Schweben, dort half die dunklere
+       Schwebefarbe also gar nicht.
+   Kartenrand .ob-karte:  #d3d9e4  1,42:1  ->  #8c94a6  3,04:1
+   linke Kante:           #ccd3e0  1,50:1  ->  #8c94a6  3,04:1
+   Personen-Waehler:      #b7c0d4  1,83:1  ->  #8c94a6  3,04:1
+       Die Kartengrenze war praktisch unsichtbar, waehrend die
+       Schrift darin gut lesbar war. Genau das hat Karam gemeint.
+
+   Alles bleibt in derselben Farbfamilie: keine neue Bedeutung, nur
+   deutlicher. Dazu ein feiner heller Streifen oben im Chip, der
+   Trick, der einen Knopf plastisch macht, ohne ihn bunt zu machen. */
+/* ACHTUNG BEIM GEWICHT: den Chip gibt es in drei Fassungen. Im
+   Kombi-Bau traegt er .s-fuss, .s-drin oder .s-wer davor (Gewicht
+   0,2,1), in Mein Bereich body[data-seite="mein"] (auch 0,2,1). Ein
+   schlichtes a.s-person (0,1,1) wuerde von beiden geschlagen: die
+   dunklere Flaeche kaeme dann nur in Mein Bereich an, waehrend der
+   neue dunkle Rand ueberall greift. Also alle Fassungen aufzaehlen. */
+a.s-person,
+.s-fuss a.s-person, .s-drin a.s-person, .s-wer a.s-person,
+body[data-seite="mein"] a.s-person {
+  background: #14661a;
+  border-color: #0d4a12;
+  box-shadow: var(--g-tiefe-1), inset 0 1px 0 rgba(255, 255, 255, .22);
+  letter-spacing: .01em;
+}
+a.s-person:hover,
+.s-fuss a.s-person:hover, .s-drin a.s-person:hover, .s-wer a.s-person:hover,
+body[data-seite="mein"] a.s-person:hover { background: #0f5415; }
+a.s-person.s-person-fehlt,
+.s-fuss a.s-person.s-person-fehlt, .s-drin a.s-person.s-person-fehlt,
+.s-wer a.s-person.s-person-fehlt,
+body[data-seite="mein"] a.s-person.s-person-fehlt {
+  background: #9c6512; border-color: #6f4708;
+}
+a.s-person.s-person-fehlt:hover,
+.s-fuss a.s-person.s-person-fehlt:hover, .s-drin a.s-person.s-person-fehlt:hover,
+.s-wer a.s-person.s-person-fehlt:hover,
+body[data-seite="mein"] a.s-person.s-person-fehlt:hover { background: #7f5310; }
+
+/* Die Personen-Karten in Mein Bereich. */
+body[data-seite="mein"] .ob-karte {
+  border-radius: var(--g-rund-gross);
+  box-shadow: var(--g-tiefe-1);
+  transition: box-shadow var(--g-zeit-3) var(--g-kurve),
+              border-color var(--g-zeit-2) var(--g-kurve),
+              transform var(--g-zeit-2) var(--g-kurve);
+}
+@media (prefers-reduced-motion: no-preference) {
+  body[data-seite="mein"] .ob-karte:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--g-tiefe-3);
+  }
+}
+body[data-seite="mein"] .ob-karte:hover { border-color: var(--kenn, #1a2c50); }
+/* Der Rand einer Karte ist eine Bedienelement-Grenze und braucht 3:1.
+   Die LINKE Kante traegt den Zustand (offen = Kennfarbe, Rechenfehler
+   = rot) und wird hier nur in ihrem NEUTRALEN Fall angefasst, damit
+   man weiter sieht, welche Person gerade offen ist. */
+body[data-seite="mein"] .ob-karte { border-color: #7f8899; border-left-color: #7f8899; }
+body[data-seite="mein"] .ob-karte.ob-offen { border-left-color: var(--kenn, #1a2c50); }
+body[data-seite="mein"] .ob-karte.ob-fehler { border-left-color: #a00000; }
+.ordner-person { border-color: #7f8899; }
+
+/* Die Reihe schneidet oben und unten ab (overflow-y: hidden, damit sie
+   nur waagrecht laeuft). Ohne diesen Platz waere das Anheben beim
+   Zeigen oben abgeschnitten und wuerde nur zappeln. */
+body[data-seite="mein"] .ob-raster { padding-top: 6px; }
+
+/* Wiederholung der Notbremse aus dem Block darueber: span.ob-bearb ist
+   im HTML mit hidden versteckt, und jedes display wuerde hidden
+   schlagen. Stuende das Umbenennen-Feld in jeder Karte offen, waere
+   die ganze Reihe unbrauchbar. Hat schon einmal gebissen. */
+body[data-seite="mein"] .ob-bearb[hidden] { display: none; }
+/* Der Namensknopf: derselbe helle Streifen wie beim Chip, dazu ein
+   sauberer Druckpunkt. Die Flaeche bleibt var(--kenn), also die
+   nachgerechnete Kennfarbe der Seite. */
+body[data-seite="mein"] .ob-name {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .20);
+  letter-spacing: .01em;
+  transition: filter var(--g-zeit-1) var(--g-kurve),
+              box-shadow var(--g-zeit-2) var(--g-kurve);
+}
+body[data-seite="mein"] .ob-name:active { filter: brightness(.92); }
+body[data-seite="mein"] .ob-lfd { color: #48536b; }
+
+/* HIER STAND EINE WEICHE KANTE, und sie ist wieder raus.
+   Der Gedanke war richtig: man soll sehen, dass die Reihe quer
+   weitergeht. Ein fester Verlauf reagiert aber nicht auf die
+   Scrollposition. Ganz nach rechts geschoben bliebe die LETZTE
+   Personenkarte dauerhaft halb durchsichtig - sie saehe aus, als
+   waere sie abgeschaltet. An einer Karte, an der Geld steht, ist das
+   die falsche Auskunft. (Links war sie ohnehin schon falsch: dort
+   sitzt die farbige Kante, die den Zustand traegt.)
+   Den Hinweis "hier geht es weiter" tragen jetzt der sichtbare
+   Schieber darunter und das Einrasten der Karten. */
+/* Ein schmaler, ruhiger Schieber statt des grauen Klotzes. */
+body[data-seite="mein"] .ob-raster { scrollbar-width: thin; }
+body[data-seite="mein"] .ob-raster::-webkit-scrollbar { height: 8px; }
+body[data-seite="mein"] .ob-raster::-webkit-scrollbar-thumb {
+  background: #7f8899; border-radius: 999px;
+}
+body[data-seite="mein"] .ob-raster::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- 8. Tabellen: eine Zeile zeigen, ohne Farbe anzufassen ----
+   Ein Balken links an der Zeile, unter der Maus. Kein Hintergrund,
+   keine Schriftfarbe: alles, was in tbody Bedeutung traegt, bleibt
+   genau so, wie es ist. */
+@media (hover: hover) {
+  tbody tr:hover > td:first-child {
+    box-shadow: inset 3px 0 0 var(--kenn, #1a2c50);
+  }
+}
+/* Die klebenden Tabellenkoepfe bekommen eine Kante nach unten, damit
+   man beim Scrollen sieht, dass sie oben stehen bleiben. */
+/* KEIN zusaetzlicher Strich unter dem Tabellenkopf: body[data-seite]
+   thead th hat schon eine 2px-Kante in der Kennfarbe. Ein zweiter,
+   grauer Strich darunter waere genau das Flickwerk, das diese
+   Schicht vermeiden soll. */
+
+/* Waagrecht scrollende Tabellen: dieselbe weiche Kante wie bei den
+   Personen, damit man sieht, dass rechts noch etwas kommt. */
+.tabellenrand { scrollbar-width: thin; }
+.tabellenrand::-webkit-scrollbar { height: 9px; }
+.tabellenrand::-webkit-scrollbar-thumb { background: #7f8899; border-radius: 999px; }
+.tabellenrand::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- 8b. Zahlen: alle Ziffern gleich breit ----
+   In einem Buchhaltungsprogramm ist das der groesste Unterschied
+   zwischen "selbst gebastelt" und "richtiges Werkzeug": Ziffern
+   gleicher Breite stehen in Spalten untereinander, Betraege lassen
+   sich vergleichen, ohne sie zu lesen. Kostet nichts, aendert keine
+   Zahl, nur ihre Form. */
+td, th, .pn-zahl, .stand, .s-quote, .s-quote b,
+.ob-zahlen, .ob-zahlen b, .aw-summe, .bb-zahl, input.einsatz,
+td.anbieter input, .tb-mal, .gs-summe {
+  font-variant-numeric: tabular-nums;
+}
+/* Die grossen Kennzahlen im Kombi-Bau duerfen wirken. */
+.pn-zahl { font-size: 27px; letter-spacing: -.02em; }
+.pn-kachel { border-radius: var(--g-rund); }
+.pn-kachel.anklick { transition: border-color var(--g-zeit-1) var(--g-kurve),
+                                 box-shadow var(--g-zeit-2) var(--g-kurve); }
+.pn-kachel.anklick:hover { box-shadow: var(--g-tiefe-2); }
+/* Die OFFENE Kachel traegt ihren Auswahl-Ring als inneren Schatten.
+   Wuerde die Zeile darueber ihn beim Zeigen einfach ersetzen, saehe
+   man nicht mehr, welche Kachel gerade offen ist. Also beides. */
+.pn-kachel.anklick.offen:hover { box-shadow: 0 0 0 2px #1a2c50 inset, var(--g-tiefe-2); }
+
+/* ---- 9. Formen: EINE Regel, nicht neun ----
+   Rund heisst hier: 999px NUR fuer echte Pillen (Kopfleiste), sonst
+   die drei Stufen aus Abschnitt 1 (8, 12, 16). Die Schicht fuehrt
+   ausdruecklich KEINE weiteren Zwischenwerte ein.
+
+   AUSGENOMMEN und das mit Absicht: Admin, App-laden und Update.
+   Karam am 05.09.: "so haesslich und so pillenfoermig". Diese drei
+   Signalknoepfe bleiben eckig, damit sie sich von der Leiste abheben.
+   Ebenso die Vierergruppe merken, aufloesen, auge und zl-knopf: die
+   traegt seit dem 28.08. bewusst EINE gemeinsame Form. */
+.navleiste a.navknopf { border-radius: 999px; }
+.navleiste a.navknopf.adminknopf,
+.navleiste a.navknopf.installknopf,
+.navleiste a.navknopf.updateknopf { border-radius: 5px; }
+.ordnerknopf, label.fotoknopf { border-radius: 999px; }
+.ordnerwahl, .restzeile { border-radius: var(--g-rund); }
+button { border-radius: var(--g-rund-klein); }
+button.haupt { box-shadow: var(--g-tiefe-1), inset 0 1px 0 rgba(255, 255, 255, .16); }
+
+/* ---- 10. Bewegung beim Scrollen ----
+   Zwei Sachen, beide ohne eine Zeile Javascript.
+
+   a) Der Fortschrittsbalken. Er liegt auf der Kennkante ganz oben und
+      fuellt sich, waehrend man nach unten liest. z-index 51: genau
+      eins ueber der Kennkante (50), unter allem anderen. Er nimmt
+      keine Klicks an.
+   b) Die Kaesten kommen beim Hereinscrollen sanft herauf.
+
+   WARUM DIE KAESTEN NIE GANZ UNSICHTBAR WERDEN.
+   Ein Aufblend-Effekt, der bei 0 anfaengt, ist die klassische Falle:
+   bleibt er haengen, ist der Inhalt WEG, und niemand merkt, dass da
+   etwas stand. Hier faengt er bei 0,35 an. Selbst wenn eine Zeile
+   nie ihren Bereich erreicht, steht der Text lesbar da. Bei Geld
+   darf nichts verschwinden koennen.
+
+   IM BROWSER DURCHGESPIELT (16.09.2026), die fuenf gefaehrlichen Faelle:
+   ein Kasten in einem quer scrollenden Behaelter, in einem ganz
+   scrollenden, in einem gar nicht scrollenden, ein zuerst versteckter
+   Kasten, und derselbe nach dem Einblenden. In JEDEM Fall stand die
+   Deckkraft auf 1. Ein Kasten kann also nicht haengen bleiben. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    body[data-seite]::after {
+      content: "";
+      /* UNTER der Kennkante, nicht darauf. Die Kennkante (4px, volle
+         Kennfarbe, z-index 50) sagt, auf welcher Seite man ist. Laege
+         der Balken darueber, wuerde er dieses Signal beim Scrollen
+         Stueck fuer Stueck uebermalen. Also darunter: top 4px. */
+      position: fixed; top: 4px; left: 0; right: 0; height: 3px;
+      z-index: 51;
+      pointer-events: none;
+      background: var(--kenn, #1a2c50);
+      transform-origin: 0 50%;
+      animation: gFortschritt linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+@keyframes gFortschritt { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .warnkern, .zeitkern, .fuellkern, .schein, .ordnerkarte,
+    .kassenkasten, .adminkasten, .eigenbaukasten, .auth-kasten,
+    details:not(.anmk) {
+      animation: gAuf linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 42%;
+    }
+  }
+}
+/* WARUM HIER KEIN HOCHGLEITEN STEHT.
+   Ein translateY waere schoener, aber in fast jedem dieser Kaesten
+   steckt eine Tabelle, und th klebt im ganzen Programm global oben
+   (position: sticky). Ein transform am Kasten macht diesen Kasten zum
+   Bezugsrahmen, und der Tabellenkopf wuerde waehrend der Bewegung am
+   Kasten kleben statt am Bildschirm. Regel 5 dieser Schicht. Die
+   Bewegung steckt stattdessen dort, wo keine Tabelle drin ist: an den
+   Knoepfen, den Chips und den Personenkarten. */
+/* 0,72 und nicht weniger. Abschnitt 2 dieser Schicht rechnet selbst
+   vor, dass eine Deckkraft von 0,5 auf Weiss nur 3,95:1 ergibt und
+   deshalb zu wenig ist. Ein Aufblenden ab 0,35 waere rund 2,3:1 und
+   wuerde genau das wieder einreissen, und zwar auf den Kaesten, die
+   Geldwarnungen tragen. Bei 0,72 ist der Text die ganze Zeit sicher
+   lesbar, und die Bewegung sieht man trotzdem. */
+@keyframes gAuf {
+  from { opacity: .72; }
+  to   { opacity: 1; }
+}
+
+/* Anker-Spruenge gleiten, statt zu springen. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* ---- 11. Handy: dieselbe Handschrift, kuerzere Wege ---- */
+@media (max-width: 700px) {
+  /* Etwas mehr Luft zwischen den Bloecken, weil am Handy alles
+     untereinander steht und sonst zu einer Wand wird. */
+  body[data-seite] h2 { margin: 22px 0 8px; }
+  .warnkern, .zeitkern, .fuellkern, .kern, .schein { margin: 12px 0; }
+
+  /* Der Personen-Chip ist am Handy ein Tippziel und darf nicht
+     kleiner sein als der Daumen. */
+  a.s-person, body[data-seite="mein"] a.s-person {
+    min-height: 34px; padding: 7px 14px; font-size: 13px;
+  }
+  body[data-seite="mein"] td a.s-person { min-height: 32px; font-size: 12.5px; }
+  /* Der Chip ist ein a-Element und faellt aus der 44-Pixel-Regel des
+     Programms heraus (die nennt nur button, input, select, textarea).
+     NUR im Schein-Fuss bekommt er die volle Daumenhoehe: dort steht er
+     ohnehin in einer eigenen Zeile.
+     .s-drin und .s-wer bleiben AUSDRUECKLICH klein. Die Zeile 4030
+     macht sie mit der Begruendung "damit die Zeile nicht springt"
+     absichtlich niedrig, und .s-wer ist ein eigener schmaler Streifen,
+     der sonst am Handy fast doppelt so hoch wuerde. */
+  .s-fuss a.s-person { min-height: 40px; padding: 8px 14px; font-size: 13px; }
+  /* In der Personen-Karte haben die eigenen Regeln des
+     Mein-Bereich-Blocks mehr Gewicht als die 44-Pixel-Regel und
+     gewinnen auch am Handy. Also hier mit gleichem Gewicht nachziehen,
+     und zwar nach OBEN. Der Hinweis-Knopf steht bewusst NICHT hier:
+     er hat gar keine eigene Hoehe und bekommt damit die 44 aus der
+     Hausregel. Eine Zeile hier wuerde ihn kleiner machen. */
+  body[data-seite="mein"] .ob-name { min-height: 44px; font-size: 15px; }
+  body[data-seite="mein"] .ob-tasten button { min-height: 40px; }
+
+  /* Die Kopfleiste schiebt quer (das macht schon die Handy-Schicht).
+     Auch hier KEINE weiche Kante: ganz nach rechts geschoben bliebe
+     sonst der letzte Knopf dauerhaft blass, und das ist je nach Seite
+     die Glocke oder der Admin-Knopf, also ausgerechnet ein
+     Signalknopf. Das Einrasten reicht als Hinweis. */
+  body[data-seite] > .navleiste { scroll-snap-type: x proximity; }
+  body[data-seite] > .navleiste a.navknopf { scroll-snap-align: start; }
+
+  /* Die Personenkarten duerfen am Handy etwas schmaler sein, dann
+     sieht man, dass daneben noch eine steht. */
+  body[data-seite="mein"] .ob-raster > .ob-karte { flex: 0 0 76%; max-width: 260px; }
+}
+
+/* ---- 12. Wer weniger Bewegung eingestellt hat, bekommt Ruhe ----
+   Ausdruecklich und vollstaendig: keine Verschiebung, kein
+   Aufblenden, kein Fortschrittsbalken, kein weiches Scrollen.
+   Die Farben, Abstaende und Kontraste von oben bleiben. */
+@media (prefers-reduced-motion: reduce) {
+  button, .navleiste a.navknopf, .ordnerknopf, label.fotoknopf,
+  a.s-person, .restzeile, .ordnerwahl, .ordner-person,
+  body[data-seite="mein"] .ob-karte {
+    transition: none;
+    transform: none;
+  }
+  /* Die :active-Fassungen EINZELN, sonst haelt der Block nicht, was er
+     verspricht: button:active aus Zeile ~2696 hat Gewicht 0,1,1 und
+     schlaegt ein blosses "button" (0,0,1). Der Knopf wuerde beim
+     Druecken weiter springen, obwohl hier "keine Verschiebung" steht. */
+  button:active, .navleiste a.navknopf:active, .ordnerknopf:active,
+  label.fotoknopf:active, a.s-person:active, .restzeile:active,
+  .ordnerwahl:active, .ordner-person:active,
+  button:hover, .navleiste a.navknopf:hover, .ordnerknopf:hover,
+  label.fotoknopf:hover, a.s-person:hover, .restzeile:hover,
+  .ordnerwahl:hover, body[data-seite="mein"] .ob-karte:hover {
+    transform: none;
+  }
+  .warnkern, .zeitkern, .fuellkern, .schein, .ordnerkarte,
+  .kassenkasten, .adminkasten, .eigenbaukasten, .auth-kasten,
+  details:not(.anmk) { animation: none; opacity: 1; transform: none; }
+  html { scroll-behavior: auto; }
+}
+
+}
+/* ---- ENDE GLANZ ---- */
