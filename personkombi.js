@@ -107,7 +107,15 @@ async function pkBearbeiten(ordnerId, scheinId) {
   zeichneBereich();
 }
 
-function pkAbbrechen() { pkOffen = null; pkStand = null; zeichneBereich(); }
+// Steht gerade die Auswert-Ansicht offen (der Stift laesst sich seit
+// 17.09.2026 auch dort druecken), muss sie nach jedem Schliessen des
+// Formulars mitgezogen werden - zeichneBereich zeichnet sie nicht.
+function pkAuswertenNachziehen() {
+  if (typeof mbAktiverBlock === "function" && mbAktiverBlock() === "auswerten" &&
+      typeof zeichneAuswerten === "function") zeichneAuswerten();
+}
+
+function pkAbbrechen() { pkOffen = null; pkStand = null; zeichneBereich(); pkAuswertenNachziehen(); }
 
 // ---------- Formular ----------
 
@@ -292,10 +300,10 @@ function pkZeileWeg(i) {
 // Gleiche Behandlung wie beim Foto-Upload im Admin: auf 1600 px verkleinern
 // und als JPEG 0.8 ablegen. Ein Handyfoto in voller Groesse waere sonst
 // mehrere Megabyte, und es liegt verschluesselt in einer Textspalte.
-function pkFotoWaehlen(eingabe) {
-  const datei = (eingabe.files || [])[0];
-  eingabe.value = "";
-  if (!datei) return;
+// DIE eine Bild-Pipeline fuer Handeingaben: verkleinern, JPEG, fertig.
+// Benutzt von pkFotoWaehlen UND vom Schnell-Eintrag (schnell.js) -
+// zwei Verkleinerungs-Fassungen wuerden frueher oder spaeter driften.
+function pkBildVerkleinern(datei, dann) {
   const leser = new FileReader();
   leser.onload = ev => {
     const bild = new Image();
@@ -305,17 +313,26 @@ function pkFotoWaehlen(eingabe) {
       c.width = Math.round(bild.width * faktor);
       c.height = Math.round(bild.height * faktor);
       c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
-      pkMerken();
-      pkStand.foto = c.toDataURL("image/jpeg", 0.8);
-      pkStand.fotoName = datei.name || "wettschein.jpg";
-      pkStand.fotoWeg = false;
-      zeichneBereich();
+      dann(c.toDataURL("image/jpeg", 0.8), datei.name || "wettschein.jpg");
     };
     bild.onerror = () => meldungM("Das Bild liess sich nicht lesen.", "warn");
     bild.src = ev.target.result;
   };
   leser.onerror = () => meldungM("Die Datei liess sich nicht lesen.", "warn");
   leser.readAsDataURL(datei);
+}
+
+function pkFotoWaehlen(eingabe) {
+  const datei = (eingabe.files || [])[0];
+  eingabe.value = "";
+  if (!datei) return;
+  pkBildVerkleinern(datei, (foto, name) => {
+    pkMerken();
+    pkStand.foto = foto;
+    pkStand.fotoName = name;
+    pkStand.fotoWeg = false;
+    zeichneBereich();
+  });
 }
 
 function pkFotoWeg() {
@@ -439,6 +456,7 @@ async function pkSpeichern() {
     meldungM("Kombination bei der Person angelegt.", "gut");
     pkOffen = null; pkStand = null;
     zeichneBereich();
+    pkAuswertenNachziehen();
     return;
   }
 
@@ -478,7 +496,10 @@ async function pkSpeichern() {
 
   // Die offenen Spalten daneben (stand, notiz, nummer, ordner, foto).
   const key = holen.key;
-  const felder = { stand: s.stand, nummer: nummer, ordner: pkOffen.ordnerId,
+  // ordnerId kann seit dem Stift im Auswerten auch "" sein (Kombination
+  // ohne Person) - eine leere Zeichenkette waere in der uuid-Spalte ein
+  // Fehler, null heisst ehrlich "keine Person".
+  const felder = { stand: s.stand, nummer: nummer, ordner: pkOffen.ordnerId || null,
                    notiz: await e2eZu(key, s.notiz || "") || "" };
   if (s.foto) { felder.foto = await e2eZu(key, s.foto); felder.foto_name = await e2eZu(key, s.fotoName || ""); }
   else if (s.fotoWeg) { felder.foto = null; felder.foto_name = null; }
@@ -492,4 +513,5 @@ async function pkSpeichern() {
   }
   pkOffen = null; pkStand = null;
   zeichneBereich();
+  pkAuswertenNachziehen();
 }

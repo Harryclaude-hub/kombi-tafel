@@ -4401,9 +4401,15 @@ body[data-seite="mein"] td a.s-person { min-height: 26px; padding: 3px 10px; fon
    Originallogo nutzt, mit den Namen." Also Logo UND Name, nicht mehr
    das Logo allein. Reine Optik, es geht ohne diesen Block nichts
    verloren. */
+/* Karam (17.09.2026 abends): "die Logo-Anzeigen haben irgendeinen
+   komischen Hintergrund, das taugt mir nicht." Das war die alte bunte
+   Markenfarbe HINTER dem quadratischen Original-Symbol. Der Logo-Chip
+   ist jetzt ruhig weiss mit Kante - das Symbol traegt die Farbe. */
 .marke.mit-logo {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 10px 3px 6px; line-height: 1.1;
+  background: #fff; color: #1c2740;
+  border: 1px solid #c3ccd9; border-radius: 8px;
 }
 .marke.mit-logo .anb-logo {
   display: block; height: 18px; width: auto; max-width: 96px;
@@ -5973,3 +5979,54 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE ANBIETER-ID ---- */
+
+/* =====================================================================
+   AUSWERTEN KANN ALLES + SCHNELL-EINTRAG (17.09.2026 abends)
+   Design-Schicht zu den Abend-Stuecken: Notizfeld und Voll-Formular an
+   der Auswert-Karte, Blitz beim Doppelklick-Sprung, Reiterleiste des
+   gemergten Buchhaltungs-Blocks, das Schnell-Formular. Bis zur Marke
+   ENDE ABEND loeschen.
+   ===================================================================== */
+@media screen {
+  body[data-seite="mein"] #auswerten .aw-notizzeile {
+    display: flex; align-items: flex-start; gap: 6px; margin-top: 6px;
+  }
+  body[data-seite="mein"] #auswerten .aw-notiz {
+    flex: 1 1 auto; min-width: 0; min-height: 34px; resize: vertical;
+    padding: 6px 9px; border: 1px solid #b9c2cd; border-radius: 7px;
+    font: inherit; font-size: 13px;
+  }
+  body[data-seite="mein"] #auswerten .aw-pkform {
+    flex: 1 1 100%; margin: 8px 0; padding: 8px;
+    border: 2px solid #1a2c50; border-radius: 10px; background: #fff;
+  }
+  /* Der Doppelklick-Sprung aus der Tabelle: dieselbe orange Blitz-Logik
+     wie im Kombi-Bau, als Umrandung statt Hintergrund. */
+  body[data-seite="mein"] #auswerten .aw-karte.aw-blitz {
+    outline: 3px solid #c86a00; outline-offset: 2px;
+  }
+  body[data-seite="mein"] #scheine_db tbody tr[ondblclick],
+  body[data-seite="mein"] #personenkasse tbody tr[ondblclick] { cursor: zoom-in; }
+  body[data-seite="mein"] #buch_reiter { margin-bottom: 10px; }
+  body[data-seite="mein"] #buch_reiter button { min-height: 38px; }
+
+  /* Schnell-Eintrag: Bild links, Felder als das gewohnte Raster. */
+  body[data-seite="mein"] .se-kasten {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+    padding: 12px; border: 1px solid #c3ccd9; border-radius: 12px; background: #fff;
+  }
+  body[data-seite="mein"] .se-foto {
+    flex: 0 0 150px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  }
+  body[data-seite="mein"] .se-foto img.minifoto { max-width: 150px; max-height: 150px; }
+  body[data-seite="mein"] .se-felder { flex: 1 1 320px; }
+  body[data-seite="mein"] .se-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  body[data-seite="mein"] .se-fuss {
+    flex: 1 1 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  body[data-seite="mein"] .se-fuss .haupt { min-height: 44px; padding: 8px 18px; }
+  @media (max-width: 700px) {
+    body[data-seite="mein"] .se-foto { flex: 1 1 100%; }
+  }
+}
+/* ---- ENDE ABEND ---- */

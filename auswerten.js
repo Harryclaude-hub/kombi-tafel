@@ -764,6 +764,156 @@ async function awPersonZuordnen(scheinId, ordnerId) {
   awSummeAuffrischen();
 }
 
+// ---------- Der Sprung aus der grossen Tabelle ----------
+// Karam (17.09.2026): "Wenn ich sie bearbeiten moechte, mache ich einen
+// Doppelklick auf die Wette, und dann bringt es mich beim Auswerten
+// genau auf diese eine Wette."
+// Der Sprung stellt die Ansicht BEWUSST um, damit die Karte sicher im
+// Bild ist: Zeitraum alles, beide Stand-Schalter an, Filter weg - und
+// die Suche steht SICHTBAR auf der festen Nummer, damit jeder sieht,
+// warum die Liste gerade so kurz ist.
+function awZuKombi(scheinId) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === scheinId);
+  if (!s) { meldungM("Diese Kombination ist nicht mehr da. Lad die Seite neu.", "warn"); return; }
+  awZeitraumSetzen({ art: "alles" });
+  awZeigSetzen({ gew: true, ver: true });
+  awListeSchreiben(AW_PERSONEN, []);
+  awListeSchreiben(AW_ANBIETER, []);
+  awPersonSuche = "";
+  // Die feste Nummer ist der beste Griff; ohne sie der erste Spielname.
+  const d = s.daten || {};
+  awSuche = s.nummer ? ("nr " + s.nummer)
+    : ((d.wetten && d.wetten[0] && d.wetten[0].spiel) || "");
+  if (typeof mbBlockZeigen === "function") mbBlockZeigen("auswerten");
+  zeichneAuswerten();
+  const karte = el("aw_" + scheinId);
+  if (karte) {
+    karte.classList.add("aw-blitz");
+    setTimeout(() => { try { karte.classList.remove("aw-blitz"); } catch (e) { } }, 4000);
+    try { karte.scrollIntoView({ block: "center" }); } catch (e) { }
+  } else {
+    meldungM("Nr. " + (s.nummer || "?") + " ist im Auswerten gerade nicht im Bild - " +
+      "die Suche oben zeigt, wonach gesucht wurde.", "warn");
+  }
+}
+
+// ---------- Anbieter direkt an der Karte umhaengen ----------
+// Karam (17.09.2026): "Ich kann bitte auch den Anbieter aendern."
+// Dieselbe Regel wie beim Anbieter-Wechsel im Kombi-Bau (20260903d):
+// Einsatz, Quote und moeglicher Gewinn bleiben stehen - das sind die
+// Zahlen, die beim Anbieter wirklich auf dem Schein standen. Nur das
+// Etikett war falsch. Geschrieben wird wie bei jedem daten-Feld:
+// frisch holen, neu verschluesselt zurueck.
+let awAwOffen = "";
+
+function awAnbieterWahlUm(id) {
+  awAwOffen = (awAwOffen === id) ? "" : id;
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (s) awKarteAuffrischen(s);
+}
+
+function awAnbieterWahlHtml(s) {
+  const liste = (typeof KASSE_ANBIETER !== "undefined" && KASSE_ANBIETER.length)
+    ? KASSE_ANBIETER
+    : [["st", "Stake"], ["iw", "Interwetten"], ["bw", "Bwin"], ["b3", "Bet365"],
+       ["ad", "Admiral"], ["bt", "Betway"], ["mb", "Merkur Bets"]];
+  let h = '<div class="aw-pwahl" id="aw_aw_' + s.id + '">' +
+    '<div class="aw-pwkopf"><b>Anbieter umhängen</b> <span class="mini">- Einsatz, Quote und ' +
+    "möglicher Gewinn bleiben stehen</span>" +
+    '<button class="aw-pwzu" onclick="awAnbieterWahlUm(\'' + s.id + '\')">schließen</button></div>' +
+    '<div class="aw-fchips">';
+  const jetzt = (s.daten || {}).kz || "";
+  for (const [kz, name] of liste) {
+    h += '<button class="aw-chip' + (jetzt === kz ? " aktiv" : "") +
+      '" onclick="awAnbieterSetzen(\'' + s.id + "','" + kz + '\')" title="' +
+      (jetzt === kz ? "liegt schon hier" : "zu " + textSicherM(name) + " umhängen") + '">' +
+      textSicherM(name) + "</button>";
+  }
+  return h + "</div></div>";
+}
+
+async function awAnbieterSetzen(scheinId, kz) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === scheinId);
+  if (!s) return;
+  if (s.daten && s.daten.gesperrt) {
+    meldungM("Diese Kombination ist auf diesem Gerät nicht lesbar - ohne ihren Inhalt " +
+      "darf hier nichts geschrieben werden.", "warn");
+    return;
+  }
+  const vorher = (s.daten || {}).kz || "";
+  if (vorher === kz) { awAwOffen = ""; awKarteAuffrischen(s); return; }
+  const name = (typeof anbieterName === "function" && anbieterName(kz)) || kz;
+  // Frisch holen - nie den Seitenstand zurueckschreiben.
+  const holen = await supaScheinHolen(scheinId);
+  if (holen.fehler) {
+    meldungM("Anbieter nicht geändert: " + textSicherM(String(holen.fehler).slice(0, 100)), "warn");
+    return;
+  }
+  const neu = Object.assign({}, holen.daten || s.daten || {});
+  neu.kz = kz;
+  neu.anbieter = name;
+  const r = await supaScheinDatenSchreiben(scheinId, holen.key, neu);
+  if (r.error || !r.data || !r.data.length) {
+    meldungM("<b>Anbieter nicht geändert.</b> " +
+      (r.error ? textSicherM(String(r.error.message).slice(0, 100))
+               : "Es wurde keine Zeile geändert (Schreibrecht?)."), "warn");
+    return;
+  }
+  s.daten = Object.assign({}, s.daten, { kz: kz, anbieter: name });
+  delete s._suchtext;               // der Anbieter steht im Suchtext
+  awAwOffen = "";
+  meldungM("<b>Nr. " + (s.nummer || "?") + "</b> hängt jetzt bei <b>" + textSicherM(name) +
+    "</b> (vorher " + textSicherM((typeof anbieterName === "function" && anbieterName(vorher)) || vorher || "?") +
+    "). Einsatz, Quote und möglicher Gewinn sind unverändert.", "gut");
+  if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
+  // Die Anbieter-Chips rechts und die Summen zaehlen jetzt anders -
+  // ein Anbieter-Wechsel ist selten, das volle Neuzeichnen ist ehrlich.
+  zeichneAuswerten();
+  const karte = el("aw_" + scheinId);
+  if (karte && karte.scrollIntoView) { try { karte.scrollIntoView({ block: "center" }); } catch (e) { } }
+}
+
+// ---------- Notiz, Einsatz und der Stift ----------
+// Alle drei laufen ueber die vorhandenen Wege aus mein.js - hier steht
+// nur das Anstossen und das Nachzeichnen der Auswert-Ansicht.
+async function awNotiz(id, wert) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (!s) return;
+  if (typeof tuNotiz !== "function") {
+    meldungM("Notizen gehen hier gerade nicht - die Seite ist unvollständig geladen.", "warn");
+    return;
+  }
+  await tuNotiz(id, wert);
+  s.notiz = wert;                   // die grosse Tabelle liest dieselbe Liste
+}
+
+async function awEinsatz(id, wert) {
+  if (typeof tuEinsatz !== "function") {
+    meldungM("Einsatz ändern geht hier gerade nicht - die Seite ist unvollständig geladen.", "warn");
+    return;
+  }
+  // tuEinsatz fragt nach, skaliert den Moeglich-Wert, schreibt die
+  // Anmerkung und laedt den Bereich frisch. Danach die Auswert-Ansicht
+  // aus derselben frischen Liste.
+  await tuEinsatz(id, wert);
+  zeichneAuswerten();
+}
+
+async function awStift(id) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (!s) return;
+  if (typeof pkBearbeiten !== "function") {
+    meldungM("Bearbeiten geht hier gerade nicht - personkombi.js fehlt.", "warn");
+    return;
+  }
+  // pkBearbeiten holt den Schein frisch und setzt pkOffen; die Karte
+  // zeichnet das Formular dann selbst ein (awKarteHtml).
+  await pkBearbeiten(s.ordner || "", id);
+  zeichneAuswerten();
+  const karte = el("aw_" + id);
+  if (karte && karte.scrollIntoView) { try { karte.scrollIntoView({ block: "start" }); } catch (e) { } }
+}
+
 // ---------- Die Anbieter-ID: eintippen und aendern ----------
 // Karam (17.09.2026): "Jede einzelne Wette hat eine ID beim Anbieter.
 // Die ist entweder vorhanden oder nicht vorhanden, oder ich tippe sie
@@ -1110,6 +1260,12 @@ function awKarteHtml(s, lfd, gesamt) {
           ' in diesem Zeitraum">' + lfd + "/" + gesamt + "</span> " : "") +
         "<b>Nr. " + (s.nummer || "?") + "</b> " +
         (typeof markeM === "function" ? markeM(d.kz) : textSicherM(d.kz || "")) + " " +
+        // Karam (17.09.2026): "Ich kann bitte auch den Anbieter aendern."
+        (schreib
+          ? '<button class="aw-pknopf" onclick="awAnbieterWahlUm(\'' + s.id + '\')" ' +
+            'title="Diese Kombination lag beim falschen Anbieter? Hier umhängen - ' +
+            'Einsatz, Quote und möglicher Gewinn bleiben stehen.">&#9998; Anbieter</button>'
+          : "") +
         // Zwei verschiedene Zeiten, deshalb beide ausgeschrieben.
         // Karam (16.09.2026): "Nenn das so, dass es erkannt wird."
         '<span class="aw-zeit-gesetzt" title="Der Moment, in dem du sie in den Verlauf gelegt hast">' +
@@ -1132,12 +1288,28 @@ function awKarteHtml(s, lfd, gesamt) {
             (s.ordner ? "ändern" : "zuordnen") + "</button>"
           : "") +
       "</div>" +
-      // Der Waehler wird NUR gebaut, wenn er offen ist - bei langen
-      // Listen wuerde er sonst an jeder Karte unsichtbar mitgeschleppt.
+      // Die Waehler werden NUR gebaut, wenn sie offen sind - bei langen
+      // Listen wuerden sie sonst an jeder Karte unsichtbar mitgeschleppt.
       (schreib && awPwOffen === s.id ? awPersonWahlHtml(s) : "") +
+      (schreib && awAwOffen === s.id ? awAnbieterWahlHtml(s) : "") +
+      // Der Stift: das VOLLE Bearbeiten-Formular (personkombi.js) direkt
+      // in der Karte - Quoten je Wette, Datum, Nummer, Foto. Karam
+      // (17.09.2026): das Auswerten soll alles koennen ausser Loeschen.
+      (schreib && typeof pkOffen !== "undefined" && pkOffen && pkOffen.scheinId === s.id &&
+        typeof pkFormularHtml === "function"
+        ? '<div class="aw-pkform">' + pkFormularHtml(pkOffen.ordnerId) + "</div>" : "") +
       '<div class="aw-spiele mini">' + spiele.join("<br>") + "</div>" +
       '<div class="aw-geld">' +
-        "Einsatz <b>" + awGeld(d.einsatz) + "</b> &middot; Quote <b>" +
+        // Der Einsatz ist hier AENDERBAR (Karam 17.09.: das Auswerten
+        // soll alles koennen). Es laeuft ueber tuEinsatz aus mein.js -
+        // mit dessen Rueckfrage, Skalierung des Moeglich-Werts und
+        // Anmerkung am Schein. Keine zweite Geld-Logik.
+        "Einsatz " + (schreib
+          ? '<input class="einsatz aw-echt" type="text" inputmode="decimal" value="' +
+            Number(d.einsatz || 0).toFixed(2) + '" onchange="awEinsatz(\'' + s.id +
+            '\', this.value)"> &euro;'
+          : "<b>" + awGeld(d.einsatz) + "</b>") +
+        " &middot; Quote <b>" +
         Number(d.quote || 0).toFixed(2) + "</b> &middot; möglich <b>" + awGeld(d.moeglich) + "</b>" +
       "</div>" +
       // Karam (17.09.2026): "Es gibt noch eine ID. Die ist entweder
@@ -1162,6 +1334,19 @@ function awKarteHtml(s, lfd, gesamt) {
           '<button onclick="awIdSpeichern(\'' + s.id + '\')">so speichern</button>' +
         "</div>"
         : "") +
+      // Karam (17.09.2026): "beim Auswerten direkt daneben ein
+      // Notizenbereich - und das wird ueberall angezeigt." Es ist
+      // DIESELBE Notiz-Spalte wie in der grossen Tabelle (tuNotiz).
+      (schreib
+        ? '<div class="aw-notizzeile"><label class="mini" for="aw_no_' + s.id +
+          '">&#128221; Notiz</label>' +
+          '<textarea id="aw_no_' + s.id + '" class="aw-notiz" rows="1" ' +
+          'placeholder="Notiz zu dieser Kombination - steht überall dabei" ' +
+          'onchange="awNotiz(\'' + s.id + '\', this.value)">' +
+          textSicherM(s.notiz || "") + "</textarea></div>"
+        : (s.notiz
+          ? '<div class="aw-notizzeile mini">&#128221; ' + textSicherM(s.notiz) + "</div>"
+          : "")) +
     "</div>" +
     '<div class="aw-tasten">' +
       (schreib
@@ -1190,7 +1375,10 @@ function awKarteHtml(s, lfd, gesamt) {
           (s.stand !== "offen"
             ? '<button class="aw-zurueck mini" onclick="awStand(\'' + s.id +
               '\',\'offen\')">nochmal offen</button>'
-            : "")
+            : "") +
+          '<button class="aw-zurueck mini" onclick="awStift(\'' + s.id + '\')" ' +
+            'title="Alles bearbeiten: Quoten je Wette, Datum, Nummer, Foto">' +
+            "&#9999;&#65039; alles bearbeiten</button>"
         : '<span class="mini">' + s.stand + "</span>") +
       // Was ist gekommen? Bei gewonnen steht der Betrag daneben und ist
       // aenderbar, falls der Anbieter weniger ausgezahlt hat als moeglich.

@@ -210,6 +210,27 @@ async function supaTeilen(gastId, rolle) {
 // seit dem ersten Teilen vor lauter Schloessern.
 // Jetzt prueft der Besitzer bei jedem Laden selbst nach und liefert nach.
 // Gibt zurueck, wie viele Schluessel WIRKLICH geschrieben wurden.
+// SEIT 17.09.2026 wird auch ERNEUERT, nicht nur nachgeliefert. Karams
+// Fall: die Freigabe TRUG einen Schluessel, aber der Kollege sah bei
+// neueren Eintraegen trotzdem Schloesser. Das passiert, wenn sich seit
+// dem Teilen etwas gedreht hat - der Bereichsschluessel des Besitzers
+// (Browserdaten weg, neu erzeugt) oder das Schluesselpaar des Gastes
+// (neues Geraet, Passwort neu gesetzt). Die alte Fassung prueft nur
+// "schluessel IS NULL" und haette diesen Zustand NIE geheilt.
+// Jetzt merkt sich das Besitzer-Geraet je Gast, MIT WELCHEM Stand
+// (eigener Bereichsschluessel + pubkey des Gastes) zuletzt geliefert
+// wurde. Weicht der Stand ab oder fehlt der Schluessel, wird frisch
+// verschluesselt und geschrieben. Der Merker ist nur eine Drossel -
+// geloescht heisst er nur: einmal umsonst neu schreiben.
+async function supaNachlieferMarke(text) {
+  try {
+    const bytes = new TextEncoder().encode(String(text));
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(hash)].slice(0, 12)
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) { return "ohne-marke"; }
+}
+
 async function supaSchluesselNachliefern() {
   const u = await supaNutzer();
   if (!u || typeof kryptoMeinPriv !== "function") return { nachgeliefert: 0, offen: 0 };
@@ -217,19 +238,28 @@ async function supaSchluesselNachliefern() {
   const priv = await kryptoMeinPriv();
   // Ohne eigenen Schluessel auf diesem Geraet geht es nicht. Das ist kein
   // Fehler: dann muss der Besitzer erst "Schluessel nachtragen" machen.
+  // Der Aufrufer MELDET diesen Fall inzwischen (mein.js) - vorher war er
+  // still, und stille Fehlschlaege sind die teuerste Fehlerklasse.
   if (!raw || !priv) return { nachgeliefert: 0, offen: 0, ohneEigenen: true };
 
-  const offen = await supa.from("kt_freigaben").select("gast")
-    .eq("owner", u.id).is("schluessel", null);
-  if (offen.error || !offen.data || !offen.data.length) return { nachgeliefert: 0, offen: 0 };
+  const alle = await supa.from("kt_freigaben").select("gast, schluessel")
+    .eq("owner", u.id);
+  if (alle.error || !alle.data || !alle.data.length) return { nachgeliefert: 0, offen: 0 };
 
   let n = 0, ohnePub = 0;
-  for (const f of offen.data) {
+  for (const f of alle.data) {
     const gp = await supa.from("kt_profiles").select("pubkey").eq("id", f.gast).maybeSingle();
     // Der Gast war noch nie mit der verschluesselten Fassung angemeldet.
     // Dann gibt es nichts, wofuer man verschluesseln koennte - beim
     // naechsten Laden noch einmal.
     if (!gp.data || !gp.data.pubkey) { ohnePub++; continue; }
+    const marke = await supaNachlieferMarke(raw + "|" + gp.data.pubkey);
+    const merkName = "kt_nachliefer_" + f.gast;
+    let alt = null;
+    try { alt = localStorage.getItem(merkName); } catch (e) { }
+    // Schluessel da UND derselbe Stand wie beim letzten Liefern von
+    // diesem Geraet: nichts zu tun.
+    if (f.schluessel && alt === marke) continue;
     const paar = await kryPaarSchluessel(priv, gp.data.pubkey);
     const paket = await kryAes(paar, raw);
     // .select() ist Pflicht: ohne das sieht ein an RLS gescheitertes
@@ -237,7 +267,10 @@ async function supaSchluesselNachliefern() {
     // steht wieder null da, ohne dass jemand weiss warum.
     const r = await supa.from("kt_freigaben").update({ schluessel: paket })
       .eq("owner", u.id).eq("gast", f.gast).select();
-    if (!r.error && r.data && r.data.length) n++;
+    if (!r.error && r.data && r.data.length) {
+      n++;
+      try { localStorage.setItem(merkName, marke); } catch (e) { }
+    }
   }
   return { nachgeliefert: n, offen: ohnePub };
 }

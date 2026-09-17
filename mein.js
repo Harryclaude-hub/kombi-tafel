@@ -225,10 +225,6 @@ async function zeigeApp() {
 <div id="anbieterkopf"></div>
 <div id="mb_navi" class="mb-navi"></div>
 
-<div id="blk_tag" class="mb-block">
-<div id="tagesuebersicht"></div>
-</div>
-
 <div id="blk_auswerten" class="mb-block">
 <div id="auswerten"></div>
 </div>
@@ -252,7 +248,20 @@ Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ergebnisse"></div>
 </div>
 
+<div id="blk_schnell" class="mb-block">
+<h2>&#128247; Kombi aus Screenshot</h2>
+<p class="mini">Karams Schnellweg: ein Bild vom Wettschein, dazu Einsatz, Multiplikator und
+möglicher Gewinn - fertig. Keine einzelnen Wetten nötig; die Kombination zählt überall voll
+mit und wird im <b>Auswerten</b> auf gewonnen oder verloren gestellt.</p>
+<div id="schnellkasten"></div>
+</div>
+
 <div id="blk_buch" class="mb-block">
+<!-- Seit 17.09.2026 abends: Buchhaltung und Tagesuebersicht sind EIN
+     Block mit einer Reiterleiste (buchReiterZeigen in mein.js). Beide
+     Zeichner laufen unveraendert - nur die Navigation ist gemerged. -->
+<div id="buch_reiter" class="vf-schalter"></div>
+<div id="tagesuebersicht"></div>
 <div id="buchhaltung"></div>
 </div>
 
@@ -293,18 +302,13 @@ ihr euch gegenseitig; die Zahl am Chat-Knopf oben zeigt neue Nachrichten.</p>
 </div>
 </div>
 
-<div id="blk_pruefen" class="mb-block">
-<h2>&#128269; Nachrechnen</h2>
-<p class="mini">Hier wird jede Zahl noch einmal nachgerechnet: passt die Gesamtquote zu den
-Einzelquoten, ist die Gebühr des Anbieters wirklich abgezogen, hängt jede Kombination an einer
-Person, stecken die Wetten noch im richtigen Foto-Ordner, und reicht das Geld, das die Person
-eingezahlt hat, für das, was gesetzt wurde. Nichts davon wird geschätzt.</p>
-<div id="pruefbericht"></div>
-<h2>&#128193; Bilanz je Foto-Ordner</h2>
-<p class="mini">Ein Foto-Ordner ist eine Lieferung Wettscheine. Hier siehst du pro Ordner
-jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen ist.</p>
-<div id="ordnerbilanz"></div>
-</div>`;
+<!-- Der Block "Nachrechnen" ist seit 17.09.2026 abends raus (Karam:
+     "einfach entfernen, den will ich gar nicht mehr haben"). Die
+     Funktionen zeichnePruefung und die Ordnerbilanz stehen weiter in
+     mein.js - zurueckholen heisst: diese zwei DIVs samt Ueberschriften
+     wieder einsetzen, den MB_BLOECKE-Eintrag "pruefen" und den Aufruf
+     zeichnePruefung(scheine) in zeichneBereich. Die Rechenfehler-
+     Warnungen der Personen-Kasse haengen NICHT hieran (personPruefen). -->`;
 
   zeichneMbNavi();
   // Stand eine eigene Ansicht offen (Profil/Freunde/Chat), bleibt sie es
@@ -319,12 +323,19 @@ jeden Einsatz, wie er gespielt wurde, und wie viel Geld insgesamt hineingegangen
   // Aufbau der Seite, sonst gibt es kein Feld fuer die Meldung.
   supaSchluesselNachliefern().then(s => {
     if (s.nachgeliefert)
-      meldungM("&#128273; <b>" + s.nachgeliefert + " Freigabe(n) freigeschaltet.</b> Wer deinen Bereich " +
-        "sehen darf, kann jetzt wirklich alles lesen und mitarbeiten - vorher standen dort nur Schlösser.", "gut");
+      meldungM("&#128273; <b>" + s.nachgeliefert + " Freigabe(n) freigeschaltet oder erneuert.</b> Wer deinen " +
+        "Bereich sehen darf, kann jetzt wirklich alles lesen und mitarbeiten - vorher standen dort " +
+        "Schlösser. Der Gast muss seine Seite einmal neu laden.", "gut");
     else if (s.offen)
       meldungM("<b>" + s.offen + " Freigabe(n) warten noch.</b> Diese Leute waren noch nie mit der " +
         "verschlüsselten Fassung angemeldet. Sobald sie sich einmal anmelden, wird der Schlüssel " +
         "beim nächsten Laden automatisch nachgeliefert.", "warn");
+    // Vorher STILL: ohne eigenen Bereichsschluessel auf diesem Geraet
+    // kann niemand beliefert werden - und niemand erfuhr es.
+    else if (s.ohneEigenen)
+      meldungM("<b>&#128273; Deine Freigaben können von diesem Gerät aus nicht beliefert werden</b> - " +
+        "ihm fehlt dein Bereichsschlüssel. Oben unter <b>Schlüssel</b> einmal nachtragen, dann " +
+        "läuft es beim nächsten Laden von selbst.", "warn");
   });
   await zeichneTabs();
   // Freunde, Teilen und Buchhaltung werden erst gezeichnet, wenn ihre
@@ -440,13 +451,47 @@ async function tuPushEinschalten() {
 // Immer nur EIN Block sichtbar - das entwirrt die Seite (Karams Wunsch
 // vom 26.08.). Der zuletzt offene Block wird gemerkt.
 
+// Seit 17.09.2026 abends: "Nachrechnen" ist raus (Karam), und die
+// Tagesuebersicht wohnt als Reiter IM Buchhaltungs-Block (BUCH_REITER).
 const MB_BLOECKE = [
-  ["tag", "&#128197; Tagesübersicht"],
   ["auswerten", "&#9989; Auswerten"],
   ["kombis", "&#127919; Kombinationen und Personen"],
-  ["buch", "&#128210; Buchhaltung"],
-  ["pruefen", "&#128269; Nachrechnen"]
+  ["schnell", "&#128247; Kombi aus Screenshot"],
+  ["buch", "&#128210; Buchhaltung &amp; Tagesübersicht"]
 ];
+
+// ---------- Buchhaltung & Tagesuebersicht: EIN Block, zwei Reiter ----------
+// Karam (17.09.2026 abends): "Buchhaltung und Tagesuebersicht mergen,
+// alle Anzeigen mit Buttons ganz oben." Gemerged ist die NAVIGATION:
+// beide Zeichner (zeichneTagesuebersicht, zeichneBuchhaltung) laufen
+// voellig unveraendert weiter - kein Rechenweg wurde angefasst.
+const BUCH_REITER = [
+  ["kassen", "&#128210; Buchhaltung"],
+  ["tag", "&#128197; Tagesübersicht"]
+];
+function buchReiter() {
+  try {
+    const b = localStorage.getItem("kt_buch_reiter");
+    return BUCH_REITER.some(x => x[0] === b) ? b : "kassen";
+  } catch (e) { return "kassen"; }
+}
+function buchReiterZeigen(kurz) {
+  if (!BUCH_REITER.some(x => x[0] === kurz)) kurz = "kassen";
+  try { localStorage.setItem("kt_buch_reiter", kurz); } catch (e) { }
+  const leiste = el("buch_reiter");
+  if (leiste) {
+    leiste.innerHTML = BUCH_REITER.map(([k, titel]) =>
+      '<button data-br="' + k + '" class="' + (k === kurz ? "aktiv" : "") +
+      '" onclick="buchReiterZeigen(\'' + k + '\')">' + titel + "</button>").join("");
+  }
+  const tag = el("tagesuebersicht"), buch = el("buchhaltung");
+  if (tag) tag.style.display = (kurz === "tag") ? "" : "none";
+  if (buch) buch.style.display = (kurz === "kassen") ? "" : "none";
+  // Erst beim Aufmachen rechnen - beide gehen ueber alle Personen bzw.
+  // laden ihre Buchungen selbst (dieselbe Ueberlegung wie bisher).
+  if (kurz === "tag" && typeof zeichneTagesuebersicht === "function") zeichneTagesuebersicht();
+  if (kurz === "kassen" && typeof zeichneBuchhaltung === "function") zeichneBuchhaltung();
+}
 
 // Hat die Auswert-Ansicht einen Stand geaendert? Dann stimmen die grosse
 // Tabelle, die Personen-Kasse und die Badges nicht mehr. Sie werden NICHT
@@ -547,7 +592,12 @@ function fotoFlicken(s) {
 const MB_ANSICHTEN = ["profil", "freunde", "chat"];
 
 function mbAktiverBlock() {
-  const b = localStorage.getItem("kt_mb_block") || "kombis";
+  let b = localStorage.getItem("kt_mb_block") || "kombis";
+  // Alte, auf dem Geraet gemerkte Namen freundlich uebersetzen (Falle:
+  // localStorage-Schluessel mit Altwert): "tag" wohnt jetzt im
+  // Buchhaltungs-Block, "pruefen" ist raus.
+  if (b === "tag") b = "buch";
+  if (b === "pruefen") b = "kombis";
   return MB_BLOECKE.some(x => x[0] === b) ? b : "kombis";
 }
 
@@ -555,13 +605,17 @@ function mbBlockZeigen(kurz) {
   // Alte Aufrufer (z. B. der Profil-Knopf in der Navileiste) kennen die
   // frueheren Blocknamen noch - sie landen in der jeweiligen Ansicht.
   if (MB_ANSICHTEN.includes(kurz)) { mbAnsichtOeffnen(kurz); return; }
+  // Alte Aufrufer mit dem frueheren Blocknamen "tag" landen im
+  // gemergten Buchhaltungs-Block, gleich im richtigen Reiter.
+  if (kurz === "tag") {
+    try { localStorage.setItem("kt_buch_reiter", "tag"); } catch (e) { }
+    kurz = "buch";
+  }
   localStorage.setItem("kt_mb_block", kurz);
-  // Die Tagesuebersicht wird erst beim Aufmachen gerechnet - sie geht
-  // ueber alle Personen und soll nicht bei jedem Zeichnen mitlaufen.
-  if (kurz === "tag" && typeof zeichneTagesuebersicht === "function") zeichneTagesuebersicht();
-  // Die Buchhaltung genauso (Falle 5): sie laedt ihre Buchungen selbst
-  // und wird nach dem Datenladen von zeichneBereich nochmal aufgefrischt.
-  if (kurz === "buch" && typeof zeichneBuchhaltung === "function") zeichneBuchhaltung();
+  // Der gemergte Block rechnet erst beim Aufmachen (Falle 5): beide
+  // Zeichner gehen ueber alle Personen bzw. laden ihre Buchungen selbst.
+  if (kurz === "buch") buchReiterZeigen(buchReiter());
+  if (kurz === "schnell" && typeof zeichneSchnell === "function") zeichneSchnell();
   if (kurz === "auswerten" && typeof zeichneAuswerten === "function") zeichneAuswerten();
   // Wurde in der Auswert-Ansicht etwas umgestellt, stimmen Tabelle,
   // Personen-Kasse und Badges nicht mehr. Jetzt ist der ruhige Moment,
@@ -1761,17 +1815,16 @@ async function zeichneBereich() {
   // 17.09.2026 auf Karams Wunsch aus dieser Ansicht genommen worden: die
   // Scheine sind angelegt, die Personen stehen. Siehe mein.html.
   zeichnePersonenKasse(scheine);
-  zeichnePruefung(scheine);
+  // zeichnePruefung laeuft hier seit 17.09.2026 abends NICHT mehr: der
+  // Block "Nachrechnen" ist auf Karams Wunsch raus (siehe mein-Template).
   const gefiltert = scheineNachOrdnerFilter(scheine);
   zeichneKontoDb(gefiltert);
   zeichneScheineDb(gefiltert);
   kontoBereichEinordnen();
-  // Steht die Tagesuebersicht gerade offen, muss sie die neuen Zahlen sehen.
-  if (mbAktiverBlock() === "tag" && typeof zeichneTagesuebersicht === "function")
-    zeichneTagesuebersicht();
-  // Die Buchhaltung ebenso - sie rechnet mit den offenen Scheinen
-  // (bbScheinLage liest kasseScheine, das gerade neu gefuellt wurde).
-  if (mbAktiverBlock() === "buch") zeichneBuchhaltung();
+  // Steht der gemergte Buchhaltungs-Block offen, muss der gerade
+  // sichtbare Reiter die neuen Zahlen sehen (bbScheinLage liest
+  // kasseScheine, das eben neu gefuellt wurde).
+  if (mbAktiverBlock() === "buch") buchReiterZeigen(buchReiter());
   // Chat NUR laden, wenn seine Ansicht offen ist (Falle 1): ladeChat
   // markiert alles als gelesen, und das darf nicht unsichtbar passieren.
   if (mbAnsicht === "chat") await ladeChat(true);
@@ -1877,26 +1930,18 @@ function zeichneScheineDb(scheine) {
     "<th>Einsatz</th><th>Möglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
-    // Karam (17.09.2026): "Neben der Person ein Button, wo man eine Person
-    // wechseln kann." Er steht direkt unter der Auswahl und nur dann, wenn
-    // es ueberhaupt eine Person gibt, die falsch sein koennte.
-    // Bewusst NICHT in personKnopfM: das ist der geteilte Chip fuer ALLE
-    // Tabellen, und ein Schreibknopf haette dort nichts verloren.
+    // Karam (17.09.2026, Abend): "Bei Personen und Kombinationen nur die
+    // Kombis, OHNE Bearbeitungsmoeglichkeiten. Wenn ich sie bearbeiten
+    // moechte, mache ich einen Doppelklick und lande im Auswerten genau
+    // auf dieser Wette. Das Einzige, was hier bleibt, ist Loeschen."
+    // Deshalb ist diese Tabelle seit heute reine ANZEIGE: die Auswahl-,
+    // Stand-, Einsatz-, Betrag- und Notiz-Felder von frueher liegen
+    // jetzt alle an der Auswert-Karte (auswerten.js).
     const wegMarke = personLosgeloest(s)
       ? '<div class="pweg-marke mini">war bei <b>' +
         textSicherM((s.daten.personWeg && s.daten.personWeg.name) || "?") + "</b></div>"
       : "";
-    const ordnerZelle = (schreib
-      ? "<select onchange=\"tuScheinOrdner('" + s.id + "', this.value)\">" +
-        "<option value=''" + (!s.ordner ? " selected" : "") + ">ohne Person</option>" +
-        ordnerListe.map(o => "<option value='" + o.id + "'" + (s.ordner === o.id ? " selected" : "") +
-          ">" + textSicherM(o.name) + "</option>").join("") + "</select>" +
-        (s.ordner
-          ? '<div><button class="pweg-knopf mini" onclick="tuPersonWeg(\'' + s.id + '\')" ' +
-            'title="Diese Kombination geh&ouml;rt nicht zu dieser Person">nicht diese Person</button></div>'
-          : "")
-      : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?")
-                  : "<span class='mini'>ohne</span>")) + wegMarke;
+    const ordnerZelle = personKnopfM(s.ordner) + wegMarke;
     const zklassen = [];
     // Abgezogene bekommen eine EIGENE Zeilenfarbe: sie sehen sonst aus
     // wie nie zugeordnete, und genau das sind sie nicht.
@@ -1907,7 +1952,10 @@ function zeichneScheineDb(scheine) {
     if (gr && !gr.voll) zklassen.push("unterziel");
     const dp = dopp[s.id];
     if (dp && dp.spaeter) zklassen.push("doppelzeile");
-    html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") + "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + standMarke(s) + "</td>" +
+    html += "<tr" + (zklassen.length ? " class='" + zklassen.join(" ") + "'" : "") +
+      " ondblclick=\"awZuKombi('" + s.id + "')\"" +
+      " title='Doppelklick: im Auswerten öffnen und dort bearbeiten'" +
+      "><td class='mini'>" + zeitM(s.created_at) + "</td><td>" + markeM(d.kz) + standMarke(s) + "</td>" +
       "<td>" + ordnerZelle + "</td>" +
       // Spiel, Linie, Fotoname und das Foto selbst kommen von Menschen und
       // muessen als TEXT eingesetzt werden, nie als HTML (siehe textSicherM).
@@ -1929,34 +1977,21 @@ function zeichneScheineDb(scheine) {
       "<div class='mini anbid" + (d.anbieterId ? "" : " anbid-fehlt") + "'>Anbieter-ID: " +
         (d.anbieterId ? "<b>" + textSicherM(d.anbieterId) + "</b>" : "keine") + "</div>" +
       anmerkungenBlock(s) + "</td>" +
-      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + einsatzZelle(s, schreib) +
+      "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + einsatzZelle(s, false) +
         luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
-      "<td>" + echtZelle(s, schreib) + "</td>" +
-      "<td class='standzelle st-" + s.stand + "'>" + (schreib
-        ? "<select onchange=\"tuStand('" + s.id + "', this.value)\">" +
-          ["offen", "gewonnen", "verloren"].map(o => "<option" + (s.stand === o ? " selected" : "") + ">" + o + "</option>").join("") + "</select>"
-        : s.stand) +
+      "<td>" + echtZelle(s, false) + "</td>" +
+      "<td class='standzelle st-" + s.stand + "'>" + s.stand +
       // Dieselbe Frage wie im Auswerten, dieselbe Funktion (awTeilGewinn
       // in auswerten.js) - keine zweite Rechnung, die abweichen koennte.
       (typeof awTeilGewinn === "function" && awTeilGewinn(s)
         ? "<div class='mini st-teilmark'>nicht zur Gänze gewonnen</div>" : "") +
       (scheinWartet(s) ? "<div class='mini fertigmark'>alle Spiele aus - Ergebnis?</div>" : "") + "</td>" +
-      "<td class='notizzelle'>" + (schreib
-        // Auch die Notiz: sie steht zwar in einem textarea, aber ein
-        // </textarea> darin wuerde das Feld schliessen und den Rest als
-        // HTML in die Seite entlassen.
-        ? "<textarea class='notizfeld' onchange=\"tuNotiz('" + s.id + "', this.value)\">" + textSicherM(s.notiz || "") + "</textarea>"
-        : "<span class='mini'>" + textSicherM(s.notiz || "") + "</span>") + "</td>" +
+      "<td class='notizzelle'><span class='mini'>" + textSicherM(s.notiz || "") + "</span></td>" +
       "<td>" + (aktiverBereich.rolle !== "ich"
         ? "<button onclick=\"tuKopieren('" + s.id + "')\">zu mir kopieren</button> " : "") +
-        // Der Foto-Knopf steht in der LETZTEN Spalte. Das ist Absicht:
-        // die Handy-Aufschriften in stil.css haengen an der Spaltenfolge
-        // (td:nth-child(n)::before), eine neue Spalte wuerde sie alle
-        // verschieben. Hier kommt nur ein Knopf dazu.
-        fotoKnopfHtml(s.id, true) + " " +
-        (schreib ? "<button title='Bearbeiten: Foto, Quoten je Wette, Datum, Nummer' " +
-          "onclick=\"pkBearbeiten('" + (s.ordner || "") + "','" + s.id + "')\">&#9999;&#65039;</button> " : "") +
+        // Loeschen ist das EINZIGE, was hier bleibt (Karams Regel vom
+        // Abend) - alles andere macht der Doppelklick im Auswerten.
         (schreib ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
           "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>" : "") + "</td></tr>";
   }
@@ -2008,7 +2043,12 @@ async function tuNotiz(id, wert) {
   const key = await kryptoBereich(aktiverBereich.id);
   if (!key) { meldungM("Notiz nicht gespeichert: kein Schlüssel für diesen Bereich.", "warn"); return; }
   const r = await supaScheinAendern(id, { notiz: await e2eZu(key, wert) || "" });
-  if (r.error) meldungM("Notiz nicht gespeichert: " + r.error.message, "warn");
+  if (r.error) { meldungM("Notiz nicht gespeichert: " + r.error.message, "warn"); return; }
+  // Die 0-Zeilen-Falle: ohne diese Pruefung saehe eine an RLS
+  // gescheiterte Notiz aus wie eine gespeicherte.
+  if (!r.data || !r.data.length) {
+    meldungM("Notiz nicht gespeichert - kein Schreibrecht oder die Kombination ist weg.", "warn");
+  }
 }
 
 // MIT RUECKFRAGE und mit Pruefung, ob es wirklich geklappt hat.
@@ -2328,7 +2368,9 @@ function kombiUebersichtHtml(ordnerId, scheine) {
     "<th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th><th>Foto</th><th></th></tr></thead><tbody>";
   for (const s of meine) {
     const d = s.daten;
-    h += "<tr" + (scheinWartet(s) ? " class='fertigzeile'" : "") + ">" +
+    h += "<tr" + (scheinWartet(s) ? " class='fertigzeile'" : "") +
+      " ondblclick=\"awZuKombi('" + s.id + "')\"" +
+      " title='Doppelklick: im Auswerten öffnen und dort bearbeiten'>" +
       "<td class='mini'>" + zeitM((d.handeingabe && d.zeit) ? d.zeit : s.created_at) +
         (d.handeingabe ? '<div class="pkmarke">von Hand</div>' : "") + "</td>" +
       "<td>" + markeM(d.kz) + "</td>" +
@@ -2339,10 +2381,10 @@ function kombiUebersichtHtml(ordnerId, scheine) {
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + s.stand + (scheinWartet(s) ? ' <span class="fertigbadge">Ergebnis?</span>' : "") + "</td>" +
       "<td>" + (fotoErwartet(s) ? fotoBildHtml(s) : '<span class="mini">-</span>') + "</td>" +
-      "<td>" + (darfSchreiben() && typeof pkBearbeiten === "function"
-        ? "<button title='Diese Kombination bearbeiten' " +
-          "onclick=\"pkBearbeiten('" + ordnerId + "', '" + s.id + "')\">&#9998;</button> " +
-          "<button class='knopfweg' title='Diese Kombination loeschen' " +
+      // Auch hier gilt seit dem Abend des 17.09.: nur ansehen und
+      // loeschen - bearbeitet wird im Auswerten (Doppelklick).
+      "<td>" + (darfSchreiben()
+        ? "<button class='knopfweg' title='Diese Kombination loeschen' " +
           "onclick=\"tuLoeschen('" + s.id + "')\">&#128465;</button>"
         : "") + "</td></tr>";
   }
@@ -4559,6 +4601,10 @@ function pruefStufeText(st) {
   return st === "fehler" ? "Fehler" : (st === "warnung" ? "Auffällig" : "Hinweis");
 }
 
+// ACHTUNG: Seit 17.09.2026 abends OHNE Aufrufer - der Block "Nachrechnen"
+// ist auf Karams Wunsch aus der Ansicht genommen (Zitat und Rueckweg
+// stehen im Seiten-Template oben bei blk_buch). Absichtlich stehen
+// gelassen, nicht toter Zufall.
 function zeichnePruefung(scheine) {
   const box = el("pruefbericht");
   if (!box) return;
