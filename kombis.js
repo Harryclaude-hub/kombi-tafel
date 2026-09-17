@@ -1717,32 +1717,83 @@ function zeichneGesetzte() {
     .slice()
     .sort((a, b) => String(b.zeit || "").localeCompare(String(a.zeit || "")));
   const sichtIds = ebSichtbareIds();
-  // Passt diese Kombination zu dem, was gerade in der Tabelle steht?
-  // Unlesbare und von Hand angelegte Kombinationen haben keine Wetten-
-  // Kennung und koennen deshalb NIE passen. Die bleiben immer stehen,
-  // sonst verschwaende ausgerechnet das, was niemand nachpruefen kann.
-  const passt = (e) => {
-    if (e.unlesbar) return true;
+  const satzJetzt = (typeof aktiverSatzId === "function") ? aktiverSatzId() : null;
+  // WARUM eine Kombination nicht gezeigt wird. Leerer Text heisst: sie
+  // wird gezeigt. Ein Richter, ein Kriterium - die Toepfe unten zaehlen
+  // genau den Grund, der hier entschieden wurde, und koennen deshalb
+  // nicht auseinanderlaufen.
+  //
+  // Karam (17.09.2026): "Ich habe auf einmal so richtig viele Kombis, so
+  // fast 40 Kombis noch da, und ich weiss nicht warum. Die gehoeren ja
+  // nicht zusammen."
+  // HIER STAND: keine Wetten-Kennung, also IMMER zeigen. Gemeint waren
+  // die von Hand angelegten und die unlesbaren, und solange es zwei davon
+  // gab, fiel es nicht auf. Am 17.09.2026 kamen 36 alte Fotoscheine dazu
+  // (altimport.js). Deren Spiele stehen nur auf dem Foto, sie KOENNEN
+  // keine Kennung tragen - und damit standen 38 fremde Kombinationen in
+  // jedem Ordner. Ohne Kennung entscheidet jetzt der ORDNER, und der ist
+  // selbst eine Kennung (Regel 2).
+  // Bewusst NICHT der Zeitraum: ebZeitPasst fragt in seiner ersten Zeile
+  // ebNurOffen ab, und das steht auf an. Beim ersten getippten Datum
+  // waeren damit 30 der 38 verschwunden - auch bei genau dem Zeitraum,
+  // der sie treffen soll.
+  const grundWeg = (e) => {
+    if (e.unlesbar) return "";               // darf nie verschwinden
     const mitId = (e.wetten || []).filter(t => t && t.id);
-    if (!mitId.length) return true;
-    return mitId.some(t => sichtIds.has(String(t.id)));
+    if (mitId.some(t => sichtIds.has(String(t.id)))) return "";
+    if (mitId.length) return "keinTreffer";
+    // Ab hier traegt kein einziges Bein eine Kennung.
+    // Ist der Massstab unbekannt (Ordner noch nicht geladen) oder
+    // ausdruecklich "alles", wird nicht geurteilt, sondern stehengelassen -
+    // derselbe Resttopf-Gedanke wie in ebSichtbareWetten.
+    if (!satzJetzt || satzJetzt === SATZ_ALLE) return "";
+    // Ein Ordner, den es in SAETZE gar nicht gibt, ist kein Urteil wert:
+    // altimport.js legt die Scheine ausdruecklich auch dann an, wenn sich
+    // der Ordner nicht anlegen liess.
+    if (e.satz && !SAETZE.some(x => x.id === e.satz)) return "";
+    // eintragImOrdner sagt bereits: ohne eigenen Ordner ueberall zeigen.
+    // Das ist der Schutz fuer die Kombis von Hand (satz ist dort "").
+    return eintragImOrdner(e.satz, e.wetten, satzJetzt) ? "" : "ohneKennung";
   };
-  const alle = gsNurPassende ? ausAllen.filter(passt) : ausAllen;
-  const wegGefiltert = ausAllen.length - alle.length;
+  const weg = { keinTreffer: 0, ohneKennung: 0, euro: 0 };
+  const alle = [];
+  for (const e of ausAllen) {
+    const g = gsNurPassende ? grundWeg(e) : "";
+    if (!g) { alle.push(e); continue; }
+    weg[g]++;
+    weg.euro += Number(e.einsatz) || 0;
+  }
+  const wegGefiltert = weg.keinTreffer + weg.ohneKennung;
+  // Derselbe Satz an JEDER Stelle, an der etwas ausgeblendet ist - sonst
+  // haengt es vom Zufall ab, welchen Zweig Karam gerade vor sich hat.
+  // Mit Geld dahinter: sichtbare Summe plus ausgeblendete Summe ergibt
+  // wieder die Gesamtsumme, und das ist der zweite Weg (Regel 5).
+  const wegText = () => wegGefiltert
+    ? " <b>" + wegGefiltert + "</b> weitere sind ausgeblendet, zusammen <b>" +
+      weg.euro.toFixed(2) + " &euro;</b>" +
+      (weg.ohneKennung
+        ? " (davon <b>" + weg.ohneKennung + "</b> ganz ohne Wetten-Kennung: alte " +
+          "Fotoscheine und Kombis von Hand. Die h&auml;ngen an ihrem eigenen Ordner, " +
+          "nicht an dieser Tabelle - &ouml;ffne den Ordner, dann stehen sie da.)"
+        : "") + "." +
+      ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length + " zeigen</button>"
+    : "";
   // Anbieter-Filter von den Karten oben: nur die Anzeige. Unlesbare
   // Eintraege bleiben IMMER sichtbar - sie duerfen nie verschwinden.
   const liste = (typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
     ? alle.filter(e => e.unlesbar || e.kz === bauAnbieterFilter) : alle;
   if (!liste.length) {
+    // Auch der Anbieter-Zweig bekommt den Satz ueber die Ausgeblendeten.
+    // Ohne ihn stuende dort eine Zahl, die um die Ausgeblendeten zu klein
+    // ist, samt der Zusage "zeigt alle" - und die waere dann gelogen.
     box.innerHTML = '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
       ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist hier nichts gesetzt (" +
-        alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt alle)."
+        alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt die übrigen)."
       : (wegGefiltert
         ? "Zu den Wetten, die gerade in der Tabelle stehen, gibt es noch keine gesetzte " +
-          "Kombination. <b>" + wegGefiltert + "</b> andere sind ausgeblendet."
+          "Kombination."
         : "Es ist noch nichts gesetzt.")) +
-      (wegGefiltert ? ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length +
-        " zeigen</button>" : "") + "</p>";
+      wegText() + "</p>";
     return;
   }
   // Farben IMMER ueber die ungefilterte Liste vergeben - sonst wechselt
@@ -1751,7 +1802,12 @@ function zeichneGesetzte() {
   // tut. Zwei verschiedene Farbskalen auf einer Seite hiessen: dieselbe
   // Kombination haette oben eine andere Farbe als unten, und die Farbe
   // waere als Wiedererkennung wertlos.
-  const karte = kombiKarte(alle);
+  // Die Farbliste ist DIESELBE, die zeichneEigenbau oben benutzt
+  // (gesetzteEintraege des offenen Ordners). Vorher stand hier nur
+  // kombiKarte(alle) - also die bereits gefilterte Liste. Damit bekam
+  // jede Kombination eine andere Farbe, sobald sich die Filterung
+  // aenderte, und genau das schliesst der Kommentar darueber aus.
+  const karte = kombiKarte(alle, gesetzteEintraege());
   let summe = 0, zeilen = "";
   for (const e of liste) {
     summe += Number(e.einsatz) || 0;
@@ -1804,11 +1860,19 @@ function zeichneGesetzte() {
           "oben steckt. <b>Helle</b> Wetten stehen in der Tabelle, <b>graue</b> kommen aus " +
           "einem anderen Ordner - der steht dahinter."
         : ". Gezeigt wird ALLES aus allen Ordnern.") +
-      (wegGefiltert
-        ? " <b>" + wegGefiltert + "</b> weitere passen zu keiner Wette aus der Tabelle." +
-          ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length + " zeigen</button>"
-        : (gsNurPassende ? "" :
-          ' <button onclick="gsNurPassendeZeigen()">nur die passenden zeigen</button>')) +
+      // Im Ordner der alten Fotoscheine gibt es gar keine Wetten-Zeilen.
+      // Dann stimmt der Satz darueber nicht: es steckt KEINE Wette aus der
+      // Tabelle drin, und die grauen Beine kommen nicht aus einem anderen
+      // Ordner, sondern aus genau diesem. Das gehoert dazugesagt.
+      (gsNurPassende && liste.some(e => !e.unlesbar &&
+        !(e.wetten || []).some(t => t && t.id))
+        ? " Kombinationen <b>ganz ohne Wetten-Kennung</b> (alte Fotoscheine, Kombis von " +
+          "Hand) stehen hier, weil sie zu <b>diesem</b> Ordner gehören - ihre Wetten sind " +
+          "deshalb alle grau."
+        : "") +
+      wegText() +
+      (wegGefiltert || gsNurPassende ? "" :
+        ' <button onclick="gsNurPassendeZeigen()">nur die passenden zeigen</button>') +
       (liste.length !== alle.length ? " (dazu " + (alle.length - liste.length) +
         " bei anderen Anbietern ausgeblendet)" : "") + " " +
       '<span id="gs_stand_summe"></span></p>';
