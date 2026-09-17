@@ -1,6 +1,6 @@
 # Kombi-Tafel - Übergabe vom 17.09.2026
 
-Stand am Ende dieses Tages: Fassung **`20260917s`**, Commit **`bea17f7`**,
+Stand am Ende dieses Tages: Fassung **`20260917t`**, Commit **`e398d12`**,
 alles committet und nach `origin/main` gepusht, Arbeitsbaum sauber.
 **Ganz unten steht ein NACHTRAG vom Abend** (zweite Sitzung desselben
 Tages, Fassungen k bis s) - der gehört mitgelesen, vor allem der neue
@@ -552,3 +552,58 @@ Alle alten Suiten wurden dorthin kopiert und dort weitergepflegt.
   (erst relevant, wenn EINE Person tausende Kombinationen hat).
 - Alt-Punkte unverändert: ergebnis-scan Version 3 (Pins), TURN,
   doppelte Fotos der 36 Altscheine, Eingabetafel-Rückholschalter.
+
+---
+
+# ZWEITER NACHTRAG, noch später am 17.09.2026 (Fassung `20260917t`, Commit `e398d12`)
+
+Karams zweites Abend-Paket, alles gepusht, 30 Suiten grün (neu:
+`t_schluessel.js`, `t_abend.js`).
+
+- **Auswerten ist DER Bearbeitungsort**: an jeder Karte jetzt auch
+  Anbieter umhängen (Geldzahlen bleiben stehen, wie 20260903d), Notiz
+  (gleiche Spalte wie die Tabelle, tuNotiz hat jetzt die 0-Zeilen-
+  Wache), Einsatz (über tuEinsatz) und der Stift, der das VOLLE
+  personkombi-Formular in der Karte öffnet (pkSpeichern/pkAbbrechen
+  ziehen die Ansicht nach; `pkAuswertenNachziehen`).
+- **Kombinationen + Personen-Kasse sind reine Anzeige**, nur Löschen
+  bleibt. **Doppelklick** auf eine Zeile = `awZuKombi`: öffnet das
+  Auswerten, stellt SICHTBAR um (Zeitraum alles, Schalter an, Filter
+  leer, Suche auf "nr X") und blitzt die Karte an.
+- **"Nachrechnen" ist raus** (Funktionen bleiben, Rückweg steht als
+  Kommentar im mein-Template). **Buchhaltung und Tagesübersicht sind
+  EIN Block** mit Reiterleiste (`buchReiterZeigen`, Merker
+  kt_buch_reiter; alte Geräte-Werte tag/pruefen werden übersetzt).
+  WICHTIG: nur die Navigation ist gemerged, beide Zeichner unverändert.
+  Karams tieferes Prioritäten-Rework der Buchhaltung ist NICHT gebaut -
+  siehe offen.
+- **Neu: `schnell.js`** - Block "Kombi aus Screenshot": Bild + Einsatz
+  + Multiplikator + möglich (fehlendes wird gerechnet und benannt),
+  freiwillig Person/Anbieter-ID. Gleiche Datensatz-Form wie personkombi
+  (handeingabe + ohneNachweis, H-Kennung); Bild-Pipeline ist
+  `pkBildVerkleinern` (aus personkombi herausgezogen).
+- **Schlüssel-Erneuerung** (`supaSchluesselNachliefern`): liefert jetzt
+  auch, wenn die Freigabe schon einen Schlüssel TRÄGT, aber der Stand
+  sich gedreht hat (Bereichsschlüssel des Besitzers oder pubkey des
+  Gastes) - Geräte-Merker `kt_nachliefer_<gast>` als Drossel. Der
+  stille "ohne eigenen Schlüssel"-Fall wird jetzt gemeldet. Das ist die
+  wahrscheinliche Heilung für Karams "der Kollege sieht den 1117er
+  verschlüsselt": Karam einmal Mein Bereich öffnen, Kollege neu laden.
+  In kt_freigaben ist beidseitig ein Schlüssel da (per SQL geprüft),
+  einen Schein/Nutzer "1117" gibt es nicht - vermutlich eine Person
+  "P-1117" (Namen sind verschlüsselt, von außen nicht prüfbar).
+- **Logo-Chips** sind jetzt ruhig weiß mit Kante (Karams "komischer
+  Hintergrund" war die Markenfarbe HINTER dem Symbol).
+
+## Offen nach dem zweiten Nachtrag
+
+- **Buchhaltungs-Rework mit Prioritäten** (Karams Wunsch: "alle
+  Anzeigen mit Buttons ganz oben: Anbieter, pro Person, Datum, nur
+  Geld, wie viel offen"): heute nur die Navigation gemerged. Das echte
+  Umsortieren der Buchhaltungs-Inhalte braucht eine Runde MIT Karam
+  vor dem Bildschirm - dort NICHTS auseinandernehmen, bevor er nicht
+  je Kachel gesagt hat, was wohin soll.
+- **ID-Auslese aus dem Foto** weiter offen (siehe oben).
+- **Karams Buchhaltungs-Fehler** weiter unbenannt - nachfragen.
+- pk-Formular-Styles in der Auswert-Karte am Handy nachmessen, wenn
+  Karam den Stift dort wirklich benutzt (heute nur Desktop gemessen).
