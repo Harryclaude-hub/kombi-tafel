@@ -5785,3 +5785,38 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE PERSON-WAEHLER ---- */
+
+/* =====================================================================
+   ANWESENDE EINSAETZE IN DER GESETZT-LISTE (17.09.2026) - Design-Schicht
+   Karam: "da muss immer der anwesende Einsatz markiert werden ... und
+   dann kann ich auf den jeweiligen Einsatz druecken und es bringt mich
+   direkt zu dem Einsatz in der Tabelle." Funktion in kombis.js
+   (zeichneGesetzte, gsZuWette). Bis ENDE ANWESENDE loeschen - dann sind
+   die Haken-Beine wieder schlicht, springen aber weiter.
+   ===================================================================== */
+@media screen {
+  .gs-tafel .gs-drin {
+    color: #0a5a0a; cursor: pointer;
+    border-bottom: 1px dashed #1a7a1a;
+  }
+  .gs-tafel .gs-drin:hover { background: #eaf6ea; }
+  .gs-tafel .gs-treff {
+    display: inline-block; margin-bottom: 3px; padding: 1px 8px;
+    border: 1px solid #7a8698; border-radius: 999px;
+    font-size: 11px; font-weight: 700; color: #2c3a52; background: #f3f5f8;
+  }
+  .gs-tafel .gs-treff-voll {
+    border-color: #1a7a1a; color: #0a5a0a; background: #eaf6ea;
+  }
+  /* Der Blitz an der Zielzeile: eine Umrandung, kein Hintergrund - der
+     Hintergrund traegt die Kombi-Farbe. */
+  .tb-tafel tr.tb-blitz td {
+    box-shadow: inset 0 3px 0 #c86a00, inset 0 -3px 0 #c86a00;
+  }
+  .tb-tafel tr.tb-blitz td:first-child { box-shadow: inset 3px 3px 0 #c86a00, inset 3px -3px 0 #c86a00; }
+  .tb-tafel tr.tb-blitz td:last-child { box-shadow: inset -3px 3px 0 #c86a00, inset -3px -3px 0 #c86a00; }
+  @media (max-width: 700px) {
+    .gs-tafel .gs-drin { padding: 2px 0; }
+  }
+}
+/* ---- ENDE ANWESENDE ---- */

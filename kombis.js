@@ -1821,14 +1821,37 @@ function zeichneGesetzte() {
       continue;
     }
     // Jede Wette der Kombination. Die, die gerade in der Tabelle steht,
-    // bleibt hell. Die anderen werden zurueckgenommen und sagen dazu,
-    // aus welchem Ordner sie kommen - das ist der ganze Punkt.
-    const wetten = (e.wetten || []).map(w => {
+    // ist MARKIERT (Haken davor) und anklickbar: der Klick springt zu
+    // ihrer Zeile in der Bau-Tabelle (gsZuWette). Die anderen werden
+    // zurueckgenommen und sagen dazu, aus welchem Ordner sie kommen.
+    // Markiert wird NUR ueber die Wetten-Kennung (Regel 2): ein Spiel
+    // mit demselben Namen von vor drei Wochen ist eine andere Zeile und
+    // bekommt nie einen Haken.
+    const beine = e.wetten || [];
+    const drinZahl = beine.filter(w => w && w.id && sichtIds.has(String(w.id))).length;
+    // Karam (17.09.2026): "da sind alle drei markiert, da ist die ganze
+    // Kombi eigentlich schon gespielt worden von diesen Einsaetzen."
+    const treffMarke = drinZahl
+      ? '<div class="gs-treff' +
+        (drinZahl === beine.length ? " gs-treff-voll" : "") + '">' +
+        (drinZahl === beine.length
+          ? (beine.length === 1
+            ? "der Einsatz steht in dieser Tabelle - von hier schon gespielt"
+            : "alle " + beine.length + " Einsätze aus dieser Tabelle - die ganze Kombi " +
+              "ist mit genau diesen Zeilen schon gespielt")
+          : drinZahl + " von " + beine.length + " Einsätzen aus dieser Tabelle") + "</div>"
+      : "";
+    const wetten = treffMarke + beine.map(w => {
       const drin = w && w.id && sichtIds.has(String(w.id));
       const ordner = drin ? "" : gsBeinOrdner(w, e);
       const text = textSicher(w.spiel || "") +
         (w.linie ? ' <span class="mini">' + textSicher(w.linie) + "</span>" : "");
-      if (drin) return '<span class="gs-bein gs-drin">' + text + "</span>";
+      if (drin) {
+        const ruf = "gsZuWette('" + String(w.id).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')";
+        return '<span class="gs-bein gs-drin" role="button" tabindex="0" onclick="' +
+          textSicher(ruf) + '" title="Diese Wette steht in der Tabelle - antippen ' +
+          'springt zu ihrer Zeile, dort kannst du sie anhaken">&#10003; ' + text + "</span>";
+      }
       return '<span class="gs-bein gs-weg">' + text +
         (ordner ? ' <span class="gs-ordner">' +
           textSicher(typeof satzTitelVon === "function" ? satzTitelVon(ordner) : ordner) +
@@ -1899,6 +1922,34 @@ function zeichneGesetzte() {
         " bei anderen Anbietern ausgeblendet)" : "") + " " +
       '<span id="gs_stand_summe"></span></p>';
   zeichneGesetzteAusgaenge(liste);
+}
+
+// Karam (17.09.2026): "Dann kann ich auf den jeweiligen Einsatz druecken
+// bei den gesetzten Kombis, und dann bringt es mich direkt zu dem
+// vorgeschlagenen Einsatz bei der Liste unten dran, wo ich sie
+// auswaehlen kann."
+// Der Sprung laeuft NUR ueber die Wetten-Kennung (Regel 2). Steht die
+// Zeile gerade nicht in der Tabelle (Zeitraumfilter, anderer Ordner),
+// wird das GESAGT statt still nichts zu tun.
+function gsZuWette(wetteId) {
+  const kaesten = [...document.querySelectorAll(".eb-wahl")]
+    .filter(c => String(c.value).split("|")[0] === String(wetteId));
+  if (!kaesten.length) {
+    meldung("Diese Wette steht gerade nicht in der Tabelle. Meist ist ein " +
+      "Zeitraum-Filter offen oder ein anderer Ordner gewählt.", "warn");
+    return;
+  }
+  const zeilen = kaesten.map(c => c.closest("tr")).filter(Boolean);
+  if (!zeilen.length) return;
+  // Alte Blitzmarken weg, dann die neuen setzen. Die Marke ist eine
+  // Umrandung, KEIN Hintergrund - der Hintergrund traegt die Kombi-Farbe
+  // und darf nicht ueberdeckt werden.
+  document.querySelectorAll(".tb-blitz").forEach(z => z.classList.remove("tb-blitz"));
+  for (const z of zeilen) z.classList.add("tb-blitz");
+  try { zeilen[0].scrollIntoView({ block: "center", behavior: "smooth" }); }
+  catch (e) { zeilen[0].scrollIntoView(); }
+  // Die Marke raeumt sich selbst weg - sie soll zeigen, nicht bleiben.
+  setTimeout(() => zeilen.forEach(z => z.classList.remove("tb-blitz")), 4000);
 }
 
 // ---------- Die Tabelle: alles wie im Foto, zum Selberbauen ----------
