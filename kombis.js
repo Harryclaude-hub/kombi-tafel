@@ -1698,6 +1698,15 @@ let gsNurPassende = true;
 function gsAlleZeigen() { gsNurPassende = false; zeichneGesetzte(); }
 function gsNurPassendeZeigen() { gsNurPassende = true; zeichneGesetzte(); }
 
+// Grosse Mengen (Karam, 17.09.2026): gezeichnet wird in Bloecken von
+// 200 Zeilen. Summe und Zaehler unten laufen IMMER ueber die ganze
+// Liste - nur das Zeichnen selbst ist begrenzt, und die Grenze steht
+// mit Zahl und Knopf ausdruecklich da.
+const GS_BLOCK = 200;
+let gsLimit = GS_BLOCK;
+function gsMehrZeilen() { gsLimit += GS_BLOCK; zeichneGesetzte(); }
+function gsAlleZeilen() { gsLimit = Number.MAX_SAFE_INTEGER; zeichneGesetzte(); }
+
 // Zu welchem Ordner gehoert dieses Bein? Erst das Bein selbst (seit
 // 16.09. traegt es seinen Ordner mit), sonst die Wette nachschlagen.
 // Nichts erfinden: ohne Fund bleibt es leer.
@@ -1809,9 +1818,12 @@ function zeichneGesetzte() {
   // jede Kombination eine andere Farbe, sobald sich die Filterung
   // aenderte, und genau das schliesst der Kommentar darueber aus.
   const karte = kombiKarte(alle, gesetzteEintraege());
-  let summe = 0, zeilen = "";
-  for (const e of liste) {
-    summe += Number(e.einsatz) || 0;
+  // Die Summe ueber ALLES, gezeichnet wird nur bis gsLimit.
+  let summe = 0;
+  for (const e of liste) summe += Number(e.einsatz) || 0;
+  const zeigenListe = liste.length > gsLimit ? liste.slice(0, gsLimit) : liste;
+  let zeilen = "";
+  for (const e of zeigenListe) {
     const st = e.stamm || e.scheinId || ("zeit:" + e.zeit);
     const stil = karte.farbe[st] ? ' style="background:' + karte.farbe[st] + '"' : "";
     if (e.unlesbar) {
@@ -1862,7 +1874,7 @@ function zeichneGesetzte() {
     // Anbieter ihn zeigt), sonst die Schaetzung Einsatz x Quote.
     const moeg = (Number(e.moeglich) > 0) ? Number(e.moeglich)
       : (Number(e.einsatz) || 0) * (Number(e.quote) || 0);
-    zeilen += "<tr" + stil + " data-erg='" + liste.indexOf(e) + "'>" +
+    zeilen += "<tr" + stil + " data-erg='" + zeigenListe.indexOf(e) + "'>" +
       '<td class="gs-nr">' + (e.nummer || "-") + "</td>" +
       "<td>" + (e.kz ? anbieterZeichen(e.kz) + " " : "") + textSicher(e.anbieter || anbieterName(e.kz) || "") + "</td>" +
       '<td class="tb-q">' + (Number(e.einsatz) || 0).toFixed(2) + " &euro;</td>" +
@@ -1879,6 +1891,14 @@ function zeichneGesetzte() {
     "</tbody></table></div>" +
     '<p class="mini"><b>' + liste.length + " gesetzt</b>, zusammen <b>" +
       summe.toFixed(2) + " &euro;</b>" +
+      (zeigenListe.length < liste.length
+        ? ". <b>Gezeichnet sind die ersten " + zeigenListe.length + " Zeilen</b> - " +
+          "Summe und Zähler zählen trotzdem alle. " +
+          '<button onclick="gsMehrZeilen()">die nächsten ' +
+          Math.min(GS_BLOCK, liste.length - zeigenListe.length) + "</button> " +
+          '<button onclick="gsAlleZeilen()">alle ' + liste.length +
+          " zeichnen (kann träge werden)</button>"
+        : "") +
       (gsNurPassende
         ? ". Gezeigt wird jede Kombination, in der mindestens eine Wette aus der Tabelle " +
           "oben steckt. <b>Helle</b> Wetten stehen in der Tabelle, <b>graue</b> kommen aus " +
@@ -1921,7 +1941,9 @@ function zeichneGesetzte() {
       (liste.length !== alle.length ? " (dazu " + (alle.length - liste.length) +
         " bei anderen Anbietern ausgeblendet)" : "") + " " +
       '<span id="gs_stand_summe"></span></p>';
-  zeichneGesetzteAusgaenge(liste);
+  // Die Ausgaenge nur fuer die gezeichneten Zeilen holen - die
+  // data-erg-Nummern zeigen in genau diese Liste.
+  zeichneGesetzteAusgaenge(zeigenListe);
 }
 
 // Karam (17.09.2026): "Dann kann ich auf den jeweiligen Einsatz druecken

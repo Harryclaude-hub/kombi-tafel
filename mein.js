@@ -1860,6 +1860,12 @@ function zeichneScheineDb(scheine) {
       ' (' + alleZahl + ' Einträge ausgeblendet)</p>';
     return;
   }
+  // Karam (17.09.2026): riesengrosse Mengen ohne Lag. Gezeichnet werden
+  // hoechstens mbTabelleLimit Zeilen; gezaehlt, gefiltert und gruppiert
+  // wird weiter ueber alles. Was fehlt, steht mit Zahl und Knopf unten.
+  const anzeigeAlle = scheine;
+  const abgeschnitten = anzeigeAlle.length > mbTabelleLimit;
+  if (abgeschnitten) scheine = anzeigeAlle.slice(0, mbTabelleLimit);
   const schreib = darfSchreiben();
   // Das Stift-Formular (Foto, Quoten je Wette, Datum, Stand) erscheint
   // ueber der Liste - die Personen-Kasse hat keine eigene Kombi-Liste
@@ -1959,7 +1965,31 @@ function zeichneScheineDb(scheine) {
         "der Person um genau diesen Betrag. Die markierten Zeilen können weg - " +
         "der erste Eintrag bleibt.</div>"
       : "") +
-    html + "</tbody></table>";
+    html + "</tbody></table>" +
+    (abgeschnitten
+      ? '<div class="mb-mehr"><b>' + scheine.length + " von " + anzeigeAlle.length +
+        "</b> Zeilen gezeichnet - Konto, Kacheln und Buchhaltung zählen immer alle. " +
+        '<button onclick="mbTabelleMehr()">die nächsten ' +
+        Math.min(MB_TABELLE_BLOCK, anzeigeAlle.length - scheine.length) + " zeigen</button> " +
+        '<button onclick="mbTabelleAlle()">alle ' + anzeigeAlle.length +
+        " zeigen (kann träge werden)</button></div>"
+      : "");
+}
+
+// Wie viele Zeilen die grosse Tabelle hoechstens zeichnet. Die Grenze
+// waechst nur ueber die Knoepfe und faellt beim naechsten Seitenaufbau
+// zurueck - beim Blaettern in 10.000 Zeilen soll kein Klick auf einen
+// Stand-Schalter die Ansicht wieder einkuerzen muessen, deshalb wird
+// sie beim Neuzeichnen NICHT zurueckgesetzt.
+const MB_TABELLE_BLOCK = 200;
+let mbTabelleLimit = MB_TABELLE_BLOCK;
+function mbTabelleMehr() {
+  mbTabelleLimit += MB_TABELLE_BLOCK;
+  zeichneScheineDb(scheineNachOrdnerFilter(kasseScheine));
+}
+function mbTabelleAlle() {
+  mbTabelleLimit = Number.MAX_SAFE_INTEGER;
+  zeichneScheineDb(scheineNachOrdnerFilter(kasseScheine));
 }
 
 async function tuStand(id, wert) {

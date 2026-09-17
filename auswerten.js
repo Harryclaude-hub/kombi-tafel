@@ -203,6 +203,8 @@ function awBeinTrifft(t, worte) {
 
 function awSuchen(wert) {
   awSuche = String(wert || "");
+  // Neue Suche = neue Menge = wieder beim ersten Block anfangen.
+  awLimit = AW_BLOCK;
   // NUR Liste, Summenkacheln und die Standzeile neu - nicht die ganze
   // Ansicht. Sonst waere das Eingabefeld nach dem ersten Buchstaben weg.
   // Dieselbe Falle wie bei obSuchen in mein.js.
@@ -403,7 +405,19 @@ function awEndeText(s) {
 }
 
 // ---------- Zeichnen ----------
+// Karam (17.09.2026): "riesengrosse Mengen ... die Suchmaschine muss
+// noch immer funktionieren, auch bei 10.000 Kombis." Gesucht, gefiltert
+// und summiert wird IMMER ueber alle Daten (awGefiltert) - nur
+// GEZEICHNET wird in Bloecken. 10.000 Karten auf einmal in die Seite zu
+// schreiben waere die Gedenkminute, vor der er warnt. Was nicht
+// gezeichnet ist, steht mit Zahl und Nachlade-Knopf ausdruecklich da.
+const AW_BLOCK = 150;
+let awLimit = AW_BLOCK;
+
 function zeichneAuswerten() {
+  // Jedes volle Neuzeichnen (Zeitraum, Filter, Stand-Schalter) beginnt
+  // wieder mit dem ersten Block - die Menge darunter ist eine andere.
+  awLimit = AW_BLOCK;
   const box = el("auswerten");
   if (!box) return;
   const g = awGrenzen();
@@ -411,6 +425,13 @@ function zeichneAuswerten() {
   box.innerHTML = awKopfHtml(g, liste) +
     '<div id="aw_liste">' + awListeHtml(liste) + "</div>";
 }
+
+function awNurListeNeu() {
+  const k = el("aw_liste");
+  if (k) k.innerHTML = awListeHtml(awScheine());
+}
+function awMehrZeigen() { awLimit += AW_BLOCK; awNurListeNeu(); }
+function awAlleZeigen() { awLimit = Number.MAX_SAFE_INTEGER; awNurListeNeu(); }
 
 // ---------- Die beiden Filterkaesten rechts ----------
 // Gezeigt wird IMMER nur, was im Zeitraum wirklich vorkommt, mit der
@@ -962,7 +983,19 @@ function awListeHtml(liste) {
   // einfach nicht verwirre." Das ist eine LAUFENDE Nummer im gerade
   // gefilterten Zeitraum, NICHT die feste Nr. des Scheins. Beide stehen
   // nebeneinander, damit man sie nie verwechselt.
-  return liste.map((s, i) => awKarteHtml(s, i + 1, liste.length)).join("");
+  // Gezeichnet wird hoechstens bis awLimit. Die laufende Nummer und das
+  // "von N" zaehlen trotzdem ueber ALLES - die Menge aendert sich durch
+  // das Blaettern ja nicht.
+  const zeigen = liste.length > awLimit ? liste.slice(0, awLimit) : liste;
+  return zeigen.map((s, i) => awKarteHtml(s, i + 1, liste.length)).join("") +
+    (zeigen.length < liste.length
+      ? '<div class="aw-mehr"><b>' + zeigen.length + " von " + liste.length +
+        "</b> Kombinationen gezeichnet - die Zahlen und Summen oben zählen immer alle. " +
+        '<button onclick="awMehrZeigen()">die nächsten ' +
+        Math.min(AW_BLOCK, liste.length - zeigen.length) + " zeigen</button> " +
+        '<button onclick="awAlleZeigen()">alle ' + liste.length +
+        " zeigen (kann träge werden)</button></div>"
+      : "");
 }
 
 function awKarteHtml(s, lfd, gesamt) {

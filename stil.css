@@ -5844,3 +5844,18 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE BILDLADER ---- */
+
+/* =====================================================================
+   BLOCKWEISES ZEICHNEN (17.09.2026) - reine Design-Schicht
+   Die Nachlade-Kaesten der drei langen Listen (Auswerten, grosse
+   Tabelle, Gesetzt-Liste). Bis ENDE BLOECKE loeschen.
+   ===================================================================== */
+@media screen {
+  .aw-mehr, .mb-mehr {
+    margin: 10px 0; padding: 10px 12px;
+    border: 1px dashed #7a8698; border-radius: 10px;
+    background: #f6f8fa; color: #2c3a52;
+  }
+  .aw-mehr button, .mb-mehr button { min-height: 34px; }
+}
+/* ---- ENDE BLOECKE ---- */
