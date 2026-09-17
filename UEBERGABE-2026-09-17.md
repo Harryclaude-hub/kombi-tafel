@@ -1,6 +1,6 @@
 # Kombi-Tafel - Übergabe vom 17.09.2026
 
-Stand am Ende dieses Tages: Fassung **`20260917u`**, Commit **`67ef659`**,
+Stand am Ende dieses Tages: Fassung **`20260917v`**, Commit **`0c6eaaf`**,
 alles committet und nach `origin/main` gepusht, Arbeitsbaum sauber.
 **Ganz unten steht ein NACHTRAG vom Abend** (zweite Sitzung desselben
 Tages, Fassungen k bis s) - der gehört mitgelesen, vor allem der neue
@@ -603,6 +603,17 @@ Karams zweites Abend-Paket, alles gepusht, 30 Suiten grün (neu:
   e.zeit - NICHT ebZeitPasst). Jeder Ausblende-Grund hat seinen Satz,
   Unlesbare stehen in jedem Fach, t_gesetzt §11 und t_drei sind
   nachgezogen.
+
+- **Geisterzeile im frischen Ordner (Fassung v):** Karams Nacht-Fund.
+  Gemessen: Schein Nr. 2 (29.08.) stammt aus dem GELÖSCHTEN Ordner
+  2026-08-29-mittag; solche Kombis und die unlesbaren standen bewusst
+  in jedem Ordner. Jetzt: eigene Fächer „Ordner gelöscht" und „nicht
+  lesbar" im Wähler (Chips nur wenn nötig), der frische Ordner ist
+  wirklich leer, die Unlesbaren hängen als Warnkasten über jeder
+  Ansicht (Doppelt-Setzen-Schutz lauter statt leiser). Merke: in
+  Karams Konto liegen außerdem zwei Scheine ohne beine-Spalte
+  (29./30.08., einer ohne Nummer) - Kandidaten für „ohne Ordner"
+  oder „Ordner gelöscht", falls er fragt.
 
 ## Offen nach dem zweiten Nachtrag
 
