@@ -1830,6 +1830,10 @@ function zeichneScheineDb(scheine) {
         ? "<select onchange=\"tuStand('" + s.id + "', this.value)\">" +
           ["offen", "gewonnen", "verloren"].map(o => "<option" + (s.stand === o ? " selected" : "") + ">" + o + "</option>").join("") + "</select>"
         : s.stand) +
+      // Dieselbe Frage wie im Auswerten, dieselbe Funktion (awTeilGewinn
+      // in auswerten.js) - keine zweite Rechnung, die abweichen koennte.
+      (typeof awTeilGewinn === "function" && awTeilGewinn(s)
+        ? "<div class='mini st-teilmark'>nicht zur Gänze gewonnen</div>" : "") +
       (scheinWartet(s) ? "<div class='mini fertigmark'>alle Spiele aus - Ergebnis?</div>" : "") + "</td>" +
       "<td class='notizzelle'>" + (schreib
         // Auch die Notiz: sie steht zwar in einem textarea, aber ein
@@ -1945,13 +1949,22 @@ function echtZurueckWert(s) {
 }
 
 function echtZelle(s, schreib) {
+  // Karam (17.09.2026): "eingesetzter Betrag, Quote, gewonnener Betrag
+  // oder halt verloren." Bei verloren steht deshalb der Verlust in Rot
+  // da, nicht nur ein Strich - der Betrag ist der Einsatz.
+  if (s.stand === "verloren") {
+    return "<b class='rot'>-" + Number((s.daten || {}).einsatz || 0).toFixed(2) + " &euro;</b>";
+  }
   if (s.stand !== "gewonnen") return "<span class='mini'>-</span>";
   const moeglich = s.daten.moeglich || 0;
   const analyse = s.daten.fotoAnalyse || null;
   const hat = s.echt_zurueck !== null && s.echt_zurueck !== undefined;
   const gebuehr = hat ? (moeglich - Number(s.echt_zurueck)) : 0;
+  // Frueher stand hier "Gebühren" - seit dem orangenen Ausgang im
+  // Auswerten kann die Differenz auch ein gevoidetes Bein sein. Das
+  // neutrale Wort stimmt fuer beide Faelle.
   const gebuehrText = (hat && gebuehr > 0.004)
-    ? "<div class='mini rot'>Gebühren: " + gebuehr.toFixed(2) + " &euro;</div>" : "";
+    ? "<div class='mini rot'>weniger als möglich: " + gebuehr.toFixed(2) + " &euro;</div>" : "";
   // Das Foto vom Wettschein hat den echten Auszahlungsbetrag schon gelesen:
   // er steht als Vorschlag im Feld, bis Karam etwas anderes eintraegt.
   const vorschlag = (analyse && analyse.gewinn) ? analyse.gewinn : moeglich;

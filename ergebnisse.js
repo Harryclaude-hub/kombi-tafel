@@ -200,6 +200,17 @@ function ergebnisMelden(umgestellt) {
 }
 
 // ---------- Die Eingabetafel ----------
+// Karam (17.09.2026): "Hier bei Kombinationen ganz unten ist Ergebnisse.
+// Bitte entfernen wir das, diese Ergebnisse eintragen."
+// Die grosse Tafel ist deshalb ueber diesen Schalter AUS. Ihr Code
+// bleibt vollstaendig stehen - zurueckholen heisst: ERG_TAFEL_AN auf
+// true, Fassung hochziehen, fertig.
+// Ergebnisse ENTSTEHEN weiter wie bisher: die Selbstsuche laeuft, der
+// Server-Waechter laeuft, und entschieden wird im Auswerten (gruen /
+// rot / orange) oder am Stand-Schalter der grossen Tabelle. Nur die
+// Bilanz der Selbstsuche bleibt als eine Zeile sichtbar - ein stiller
+// Suchlauf waere die Fehlerklasse "stiller Fehlschlag".
+const ERG_TAFEL_AN = false;
 
 function ergFeldWert(z, feld) {
   return (z && z[feld] !== null && z[feld] !== undefined) ? z[feld] : "";
@@ -208,6 +219,11 @@ function ergFeldWert(z, feld) {
 async function ergebnisseZeichnen() {
   const box = document.getElementById("ergebnisse");
   if (!box || !aktiverBereich) return;
+  if (!ERG_TAFEL_AN) {
+    const lage = ergSucheLageText();
+    box.innerHTML = lage ? '<p class="mini erg-lage">' + lage + "</p>" : "";
+    return;
+  }
   const liste = Array.isArray(kasseScheine) ? kasseScheine : [];
   const offene = liste.filter(s => s.stand === "offen" && s.daten && (s.daten.wetten || []).length);
   if (!offene.length) { box.innerHTML = ""; return; }

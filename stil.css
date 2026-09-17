@@ -5739,6 +5739,8 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
   body[data-seite="mein"] #auswerten .aw-teilform[hidden] { display: none; }
   body[data-seite="mein"] #auswerten .aw-teilok { min-height: 34px; }
+  /* Dieselbe Marke in der grossen Tabelle (Stand-Spalte). */
+  body[data-seite="mein"] #scheine_db .st-teilmark { color: #8a4a00; font-weight: 700; }
   @media (max-width: 700px) {
     body[data-seite="mein"] #auswerten .aw-orange { min-height: 46px; }
   }
