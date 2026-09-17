@@ -1705,8 +1705,120 @@ function anbieterZeichen(kz) {
 // gsNurPassende = true ist der Normalfall. Der Knopf "alle zeigen" haengt
 // daran; ausgeblendet wird NIE stillschweigend, die Zahl steht immer da.
 let gsNurPassende = true;
-function gsAlleZeigen() { gsNurPassende = false; zeichneGesetzte(); }
-function gsNurPassendeZeigen() { gsNurPassende = true; zeichneGesetzte(); }
+// Karam (17.09.2026, spaet abends): "Gib mir bei Gesetzt die Moeglichkeit,
+// nicht nur alle zu sehen, sondern unterschiedliche Ordner direkt zu
+// oeffnen - hinter einem Knopf zum Zuklappen. Oder alles Gesetzte zu
+// einem bestimmten Datum suchen."
+// gsWahl haelt die Auswahl NUR im Speicher (wie gsNurPassende): eine
+// gemerkte Auswahl liesse beim naechsten Oeffnen Kombinationen fehlen,
+// ohne dass irgendwo steht warum.
+//   art: "passend" (zur Tabelle, Normalfall) | "alle" | "ordner" | "ohne"
+//   satz: der gewaehlte Ordner bei art "ordner"
+//   von/bis: Setz-Datum (e.zeit), gilt in JEDER Art
+let gsWahl = { art: "passend", satz: "", von: "", bis: "" };
+let gsWahlOffen = false;
+
+function gsWahlUm() { gsWahlOffen = !gsWahlOffen; zeichneGesetzte(); }
+function gsArt(art, satz) {
+  gsWahl.art = art;
+  gsWahl.satz = satz || "";
+  gsNurPassende = (art === "passend");
+  gsLimit = GS_BLOCK;                 // neue Menge, wieder beim ersten Block
+  zeichneGesetzte();
+}
+function gsZeit() {
+  const von = document.getElementById("gs_von"), bis = document.getElementById("gs_bis");
+  gsWahl.von = von ? von.value : "";
+  gsWahl.bis = bis ? bis.value : "";
+  gsLimit = GS_BLOCK;
+  zeichneGesetzte();
+}
+function gsZeitWeg() {
+  gsWahl.von = ""; gsWahl.bis = "";
+  gsLimit = GS_BLOCK;
+  zeichneGesetzte();
+}
+// Die zwei alten Knoepfe laufen ueber DENSELBEN Zustand weiter.
+// "alle zeigen" hebt auch den Zeitraum auf - der Knopf verspricht ALLE,
+// und ein stehengebliebener Zeitfilter machte das Versprechen zur Luege.
+function gsAlleZeigen() { gsWahl.von = ""; gsWahl.bis = ""; gsArt("alle"); }
+function gsNurPassendeZeigen() { gsArt("passend"); }
+
+// Gehoert dieser Eintrag STRENG zu diesem Ordner? Anders als
+// eintragImOrdner gibt es hier KEINEN Freibrief fuer Eintraege ohne
+// Ordner - der Waehler hat fuer die ein eigenes Fach ("ohne").
+function gsImOrdnerStreng(e, satz) {
+  if (e.satz === satz) return true;
+  for (const t of (e.wetten || [])) if (t && t.satz === satz) return true;
+  return false;
+}
+function gsOhneOrdner(e) {
+  if (e.satz) return false;
+  for (const t of (e.wetten || [])) if (t && t.satz) return false;
+  return true;
+}
+
+// Der zuklappbare Waehler ueber der Gesetzt-Liste. Zu: ein Knopf und
+// EIN Satz, was gerade gilt. Auf: Faecher (passend, alles, ohne Ordner,
+// jeder Foto-Ordner mit Anzahl) und das Setz-Datum von/bis.
+function gsWahlHtml(ausAllen) {
+  // Was ein Klick zeigen WUERDE: gezaehlt wird mit dem aktiven
+  // Zeitfenster, denn das gilt in jedem Fach.
+  const imZeit = (e) => {
+    if (!(gsWahl.von || gsWahl.bis)) return true;
+    const tag = String(e.zeit || "").slice(0, 10);
+    if (!tag) return false;
+    if (gsWahl.von && tag < gsWahl.von) return false;
+    if (gsWahl.bis && tag > gsWahl.bis) return false;
+    return true;
+  };
+  const basis = (ausAllen || []).filter(e => !e.unlesbar && imZeit(e));
+  const ohneZahl = basis.filter(gsOhneOrdner).length;
+
+  const zeit = (gsWahl.von || gsWahl.bis)
+    ? " Gesetzt " + (gsWahl.von ? "ab <b>" + gsWahl.von + "</b>" : "") +
+      (gsWahl.von && gsWahl.bis ? " " : "") +
+      (gsWahl.bis ? "bis <b>" + gsWahl.bis + "</b>" : "") + "."
+    : "";
+  const lage =
+    (gsWahl.art === "alle" ? "Gezeigt wird <b>alles</b> aus allen Ordnern."
+    : gsWahl.art === "ohne" ? "Gezeigt werden nur Kombinationen <b>ohne Ordner</b> (Handeinträge und Screenshot-Kombis)."
+    : gsWahl.art === "ordner" ? "Gezeigt wird nur der Ordner <b>" +
+        textSicher(typeof satzTitelVon === "function" ? satzTitelVon(gsWahl.satz) : gsWahl.satz) + "</b>."
+    : "Gezeigt wird, was zur <b>Tabelle oben</b> passt.") + zeit;
+
+  let h = '<div class="gs-wahl">' +
+    '<button class="gs-wahl-knopf" onclick="gsWahlUm()">&#128194; Ordner und Zeitraum ' +
+      (gsWahlOffen ? "&#9662;" : "&#9656;") + "</button> " +
+    '<span class="mini gs-lage">' + lage + "</span>";
+  if (gsWahlOffen) {
+    const chip = (an, ruf, text, zahl) =>
+      '<button class="gs-chip' + (an ? " aktiv" : "") + '" onclick="' + ruf + '">' + text +
+      (zahl === null ? "" : ' <span class="gs-chipz">' + zahl + "</span>") + "</button>";
+    let chips =
+      chip(gsWahl.art === "passend", "gsNurPassendeZeigen()", "zur Tabelle passend", null) +
+      chip(gsWahl.art === "alle", "gsArt('alle')", "alles", basis.length) +
+      chip(gsWahl.art === "ohne", "gsArt('ohne')", "ohne Ordner", ohneZahl);
+    for (const s of (Array.isArray(SAETZE) ? SAETZE : [])) {
+      if (s.id === SATZ_ALLE) continue;
+      const zahl = basis.filter(e => gsImOrdnerStreng(e, s.id)).length;
+      chips += chip(gsWahl.art === "ordner" && gsWahl.satz === s.id,
+        "gsArt('ordner','" + String(s.id).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')",
+        textSicher(s.titel || s.id), zahl);
+    }
+    h += '<div class="gs-wahl-panel">' +
+      '<div class="gs-wahl-chips">' + chips + "</div>" +
+      '<div class="gs-wahl-zeit mini">Gesetzt am: von ' +
+        '<input type="date" id="gs_von" value="' + textSicher(gsWahl.von) + '" onchange="gsZeit()"> bis ' +
+        '<input type="date" id="gs_bis" value="' + textSicher(gsWahl.bis) + '" onchange="gsZeit()">' +
+        ((gsWahl.von || gsWahl.bis)
+          ? ' <button onclick="gsZeitWeg()">Zeitraum leeren</button>' : "") +
+        " <span>(der Tag, an dem gesetzt wurde - nicht der Spieltag)</span>" +
+      "</div>" +
+    "</div>";
+  }
+  return h + "</div>";
+}
 
 // Grosse Mengen (Karam, 17.09.2026): gezeichnet wird in Bloecken von
 // 200 Zeilen. Summe und Zaehler unten laufen IMMER ueber die ganze
@@ -1757,8 +1869,31 @@ function zeichneGesetzte() {
   // ebNurOffen ab, und das steht auf an. Beim ersten getippten Datum
   // waeren damit 30 der 38 verschwunden - auch bei genau dem Zeitraum,
   // der sie treffen soll.
+  // Karam (17.09.2026, spaet abends): "Bei der aktuellen Folder gesetzt
+  // ist irgendwas, das sich da nicht gehoert." Das waren die Eintraege
+  // OHNE eigenen Ordner (Kombis von Hand, seit heute auch jede
+  // Screenshot-Kombi aus schnell.js): eintragImOrdner laesst sie mit
+  // Absicht ueberall durch, und seit dem Schnell-Eintrag ist "ueberall"
+  // eine Plage. Sie haben jetzt ihr EIGENES Fach im Ordner-Waehler
+  // ("ohne Ordner") und werden im Passend-Modus gezaehlt ausgeblendet -
+  // nie still (Regel 4).
   const grundWeg = (e) => {
     if (e.unlesbar) return "";               // darf nie verschwinden
+    // Das Setz-Datum (gsWahl.von/bis) gilt in JEDER Art. Verglichen
+    // wird ueber e.zeit - den Moment des Speicherns, NICHT ueber
+    // ebZeitPasst (das fragt ebNurOffen mit, die bekannte Falle).
+    if (gsWahl.von || gsWahl.bis) {
+      const tag = String(e.zeit || "").slice(0, 10);
+      if (!tag) return "ohneZeit";           // Resttopf: gezaehlt, nicht still
+      if (gsWahl.von && tag < gsWahl.von) return "zeit";
+      if (gsWahl.bis && tag > gsWahl.bis) return "zeit";
+    }
+    if (gsWahl.art === "alle") return "";
+    if (gsWahl.art === "ohne") return gsOhneOrdner(e) ? "" : "andererOrdner";
+    if (gsWahl.art === "ordner") {
+      return gsImOrdnerStreng(e, gsWahl.satz) ? "" : "andererOrdner";
+    }
+    // art "passend": wie bisher an der Tabelle des offenen Ordners.
     const mitId = (e.wetten || []).filter(t => t && t.id);
     if (mitId.some(t => sichtIds.has(String(t.id)))) return "";
     if (mitId.length) return "keinTreffer";
@@ -1767,36 +1902,44 @@ function zeichneGesetzte() {
     // ausdruecklich "alles", wird nicht geurteilt, sondern stehengelassen -
     // derselbe Resttopf-Gedanke wie in ebSichtbareWetten.
     if (!satzJetzt || satzJetzt === SATZ_ALLE) return "";
+    // GANZ ohne Ordner: frueher "ueberall zeigen", seit heute das
+    // eigene Fach (siehe oben) - der Zaehler unten nennt sie.
+    if (gsOhneOrdner(e)) return "ohneOrdner";
     // Ein Ordner, den es in SAETZE gar nicht gibt, ist kein Urteil wert:
     // altimport.js legt die Scheine ausdruecklich auch dann an, wenn sich
     // der Ordner nicht anlegen liess.
     if (e.satz && !SAETZE.some(x => x.id === e.satz)) return "";
-    // eintragImOrdner sagt bereits: ohne eigenen Ordner ueberall zeigen.
-    // Das ist der Schutz fuer die Kombis von Hand (satz ist dort "").
     return eintragImOrdner(e.satz, e.wetten, satzJetzt) ? "" : "ohneKennung";
   };
-  const weg = { keinTreffer: 0, ohneKennung: 0, euro: 0 };
+  const weg = { keinTreffer: 0, ohneKennung: 0, ohneOrdner: 0,
+    andererOrdner: 0, zeit: 0, ohneZeit: 0, euro: 0 };
   const alle = [];
   for (const e of ausAllen) {
-    const g = gsNurPassende ? grundWeg(e) : "";
+    const g = grundWeg(e);
     if (!g) { alle.push(e); continue; }
     weg[g]++;
     weg.euro += Number(e.einsatz) || 0;
   }
-  const wegGefiltert = weg.keinTreffer + weg.ohneKennung;
+  const wegGefiltert = weg.keinTreffer + weg.ohneKennung + weg.ohneOrdner +
+    weg.andererOrdner + weg.zeit + weg.ohneZeit;
   // Derselbe Satz an JEDER Stelle, an der etwas ausgeblendet ist - sonst
   // haengt es vom Zufall ab, welchen Zweig Karam gerade vor sich hat.
   // Mit Geld dahinter: sichtbare Summe plus ausgeblendete Summe ergibt
   // wieder die Gesamtsumme, und das ist der zweite Weg (Regel 5).
+  // JEDER Grund bekommt seinen eigenen Satz - ein falscher Grund ist
+  // schlimmer als gar keiner, weil man ihm nachgeht.
   const wegText = () => wegGefiltert
     ? " <b>" + wegGefiltert + "</b> weitere sind ausgeblendet, zusammen <b>" +
-      weg.euro.toFixed(2) + " &euro;</b>" +
-      (weg.ohneKennung
-        ? " (davon <b>" + weg.ohneKennung + "</b> ganz ohne Wetten-Kennung: alte " +
-          "Fotoscheine und Kombis von Hand. Die h&auml;ngen an ihrem eigenen Ordner, " +
-          "nicht an dieser Tabelle - &ouml;ffne den Ordner, dann stehen sie da.)"
-        : "") + "." +
-      ' <button onclick="gsAlleZeigen()">alle ' + ausAllen.length + " zeigen</button>"
+      weg.euro.toFixed(2) + " &euro;</b>:" +
+      (weg.keinTreffer ? " " + weg.keinTreffer + " ohne Wette in dieser Tabelle," : "") +
+      (weg.ohneKennung ? " " + weg.ohneKennung + " aus einem anderen Ordner (alte Fotoscheine)," : "") +
+      (weg.ohneOrdner ? " <b>" + weg.ohneOrdner + " ganz ohne Ordner</b> (Handeinträge und " +
+        "Screenshot-Kombis - eigenes Fach im Ordner-Wähler)," : "") +
+      (weg.andererOrdner ? " " + weg.andererOrdner + " in anderen Ordnern," : "") +
+      (weg.zeit ? " " + weg.zeit + " außerhalb des gewählten Zeitraums," : "") +
+      (weg.ohneZeit ? " " + weg.ohneZeit + " ohne Setz-Zeit (dem Zeitraum nicht zuzuordnen)," : "") +
+      " " +
+      '<button onclick="gsAlleZeigen()">alle ' + ausAllen.length + " zeigen</button>"
     : "";
   // Anbieter-Filter von den Karten oben: nur die Anzeige. Unlesbare
   // Eintraege bleiben IMMER sichtbar - sie duerfen nie verschwinden.
@@ -1806,12 +1949,14 @@ function zeichneGesetzte() {
     // Auch der Anbieter-Zweig bekommt den Satz ueber die Ausgeblendeten.
     // Ohne ihn stuende dort eine Zahl, die um die Ausgeblendeten zu klein
     // ist, samt der Zusage "zeigt alle" - und die waere dann gelogen.
-    box.innerHTML = '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
+    // Der Waehler steht AUCH hier - aus einem leeren Fach muss man
+    // wieder herauskommen.
+    box.innerHTML = gsWahlHtml(ausAllen) +
+      '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
       ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist hier nichts gesetzt (" +
         alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt die übrigen)."
       : (wegGefiltert
-        ? "Zu den Wetten, die gerade in der Tabelle stehen, gibt es noch keine gesetzte " +
-          "Kombination."
+        ? "In dieser Auswahl ist nichts gesetzt."
         : "Es ist noch nichts gesetzt.")) +
       wegText() + "</p>";
     return;
@@ -1895,6 +2040,7 @@ function zeichneGesetzte() {
       '<td class="gs-wetten">' + wetten + "</td></tr>";
   }
   box.innerHTML =
+    gsWahlHtml(ausAllen) +
     '<div class="tabellenrand"><table class="tb-tafel gs-tafel"><thead><tr>' +
       "<th>Nr.</th><th>Anbieter</th><th>Einsatz</th><th>Quote</th><th>möglich</th>" +
       "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
@@ -1909,11 +2055,11 @@ function zeichneGesetzte() {
           '<button onclick="gsAlleZeilen()">alle ' + liste.length +
           " zeichnen (kann träge werden)</button>"
         : "") +
-      (gsNurPassende
+      (gsWahl.art === "passend"
         ? ". Gezeigt wird jede Kombination, in der mindestens eine Wette aus der Tabelle " +
           "oben steckt. <b>Helle</b> Wetten stehen in der Tabelle, <b>graue</b> kommen aus " +
           "einem anderen Ordner - der steht dahinter."
-        : ". Gezeigt wird ALLES aus allen Ordnern.") +
+        : "") +
       // Im Ordner der alten Fotoscheine gibt es gar keine Wetten-Zeilen.
       // Dann stimmt der Satz darueber nicht: es steckt KEINE Wette aus der
       // Tabelle drin, und die grauen Beine kommen nicht aus einem anderen
@@ -1923,12 +2069,12 @@ function zeichneGesetzte() {
       // aus einem Ordner, den es nicht mehr gibt, steht hier NICHT, weil
       // sie hierher gehoert, sondern weil ueber sie nichts zu sagen ist.
       (function () {
-        if (!gsNurPassende) return "";
-        let hier = 0, ohneOrdner = 0, fremd = 0;
+        if (gsWahl.art !== "passend") return "";
+        let hier = 0, fremd = 0;
         for (const e of liste) {
           if (e.unlesbar || (e.wetten || []).some(t => t && t.id)) continue;
-          if (!e.satz) ohneOrdner++;
-          else if (!SAETZE.some(x => x.id === e.satz)) fremd++;
+          if (!e.satz) continue;   // steht seit 17.09. abends im eigenen Fach
+          if (!SAETZE.some(x => x.id === e.satz)) fremd++;
           else hier++;
         }
         return (hier
@@ -1936,18 +2082,14 @@ function zeichneGesetzte() {
             "Fotoscheine) stehen hier, weil sie zu <b>diesem</b> Ordner gehören - ihre " +
             "Wetten sind deshalb alle grau."
           : "") +
-          (ohneOrdner
-            ? " <b>" + ohneOrdner + "</b> hat gar keinen Ordner (Kombi von Hand) und " +
-              "steht deshalb in jedem."
-            : "") +
           (fremd
             ? " <b>" + fremd + "</b> steht hier, weil es den Ordner dazu nicht mehr gibt - " +
               "darüber lässt sich nichts sagen, also bleibt sie stehen."
             : "");
       })() +
       wegText() +
-      (wegGefiltert || gsNurPassende ? "" :
-        ' <button onclick="gsNurPassendeZeigen()">nur die passenden zeigen</button>') +
+      (gsWahl.art !== "passend"
+        ? ' <button onclick="gsNurPassendeZeigen()">zurück: passend zur Tabelle</button>' : "") +
       (liste.length !== alle.length ? " (dazu " + (alle.length - liste.length) +
         " bei anderen Anbietern ausgeblendet)" : "") + " " +
       '<span id="gs_stand_summe"></span></p>';

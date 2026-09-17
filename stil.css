@@ -6030,3 +6030,50 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE ABEND ---- */
+
+/* =====================================================================
+   ORDNER- UND ZEITRAUM-WAEHLER DER GESETZT-LISTE (17.09.2026 spaet)
+   Karam: "nicht nur alle sehen, sondern unterschiedliche Ordner direkt
+   oeffnen - hinter einem Knopf zum Zuklappen. Oder alles Gesetzte zu
+   einem Datum suchen." Funktion in kombis.js (gsWahl). Bis zur Marke
+   ENDE GS-WAHL loeschen.
+   ===================================================================== */
+@media screen {
+  .gs-wahl { margin: 6px 0 10px; }
+  .gs-wahl-knopf {
+    min-height: 36px; padding: 5px 14px; border-radius: 8px;
+    border: 1px solid #8a94a6; background: #f3f5f8; color: #1c2740;
+    font-weight: 700; cursor: pointer;
+  }
+  .gs-lage { margin-left: 8px; }
+  .gs-wahl-panel {
+    margin-top: 8px; padding: 10px;
+    border: 1px dashed #8a94a6; border-radius: 10px; background: #f8fafc;
+  }
+  /* Die Faecher laufen quer weiter statt den Kasten in die Hoehe zu
+     ziehen - bei vielen Ordnern wichtig. */
+  .gs-wahl-chips {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px;
+    overscroll-behavior-x: contain;
+  }
+  .gs-chip {
+    flex: 0 0 auto; min-height: 34px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid #8a94a6; background: #fff; color: #1c2740;
+    font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  }
+  .gs-chip.aktiv { background: #1a2c50; border-color: #1a2c50; color: #fff; }
+  .gs-chipz {
+    display: inline-block; min-width: 1.5em; padding: 0 5px; margin-left: 4px;
+    border-radius: 999px; background: rgba(0, 0, 0, .10);
+    font-size: 11px; font-weight: 700; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .gs-chip.aktiv .gs-chipz { background: rgba(255, 255, 255, .25); }
+  .gs-wahl-zeit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .gs-wahl-zeit input { padding: 5px 8px; border: 1px solid #b9c2cd; border-radius: 7px; }
+  @media (max-width: 700px) {
+    .gs-wahl-knopf { min-height: 42px; }
+    .gs-chip { min-height: 40px; }
+  }
+}
+/* ---- ENDE GS-WAHL ---- */
