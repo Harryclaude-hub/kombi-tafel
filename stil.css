@@ -5633,8 +5633,13 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
   /* Der Kasten der Buchung bekommt denselben ruhigen Rahmen wie die
      Personendaten, damit die zwei Bloecke gleich aussehen. */
-  body[data-seite="mein"] .kassenformular { padding: 10px 12px; }
+  /* Der Kasten war eine flex-Zeile, solange die Eingaben ohne
+     Beschriftung hintereinander standen. Jetzt stehen darin drei
+     Bloecke untereinander (Titel, Raster, Knopf) - als flex-Kind
+     schrumpfte das Raster sonst auf eine einzige Spalte zusammen. */
+  body[data-seite="mein"] .kassenformular { display: block; padding: 10px 12px; }
   body[data-seite="mein"] .kassenformular h4 { margin: 0; }
+  body[data-seite="mein"] .kassenformular .feldraster { width: 100%; }
 
   /* Die Zahlen auf der Personen-Karte: fuenf Werte in zwei Spalten liessen
      den letzten allein in der linken Haelfte stehen. Er nimmt jetzt die
