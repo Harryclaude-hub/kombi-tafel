@@ -34,6 +34,11 @@ const AW_NUR_OFFEN = "kt_aw_nur_offen";
 // versehentlich leere Auswertung.
 const AW_PERSONEN = "kt_aw_personen";
 const AW_ANBIETER = "kt_aw_anbieter";
+// Karam (17.09.2026): "Ich will, dass die Reihenfolge auch ihrer Aelte so
+// ist, dass man sie ganz unten angezeigt bekommt." Also NEUESTE zuerst,
+// die alten August-Scheine stehen damit am Ende der Liste. Umstellbar,
+// denn zum Abarbeiten der Reihe nach ist die andere Richtung besser.
+const AW_REIHE = "kt_aw_reihe";
 
 // Karams Konten-Uebersicht hatte den Stand Montag, 14.09.2026 18:00.
 // Alles, was danach gespielt wurde, fehlt dort und muss dazugerechnet
@@ -67,6 +72,16 @@ function awListeLesen(schluessel) {
 function awListeSchreiben(schluessel, liste) {
   try { localStorage.setItem(schluessel, JSON.stringify(liste)); } catch (e) { }
 }
+// "neu" = neueste zuerst (alte unten), "alt" = aelteste zuerst.
+function awReihe() {
+  try { return localStorage.getItem(AW_REIHE) === "alt" ? "alt" : "neu"; }
+  catch (e) { return "neu"; }
+}
+function awReiheSetzen(art) {
+  try { localStorage.setItem(AW_REIHE, art === "alt" ? "alt" : "neu"); } catch (e) { }
+  awNeuZeichnen();
+}
+
 function awPersonenFilter() { return awListeLesen(AW_PERSONEN); }
 function awAnbieterFilter() { return awListeLesen(AW_ANBIETER); }
 
@@ -196,9 +211,13 @@ function awGefiltert() {
 
 function awScheine() {
   const nurOffen = awNurOffen();
+  const alt = awReihe() === "alt";
   return awGefiltert()
     .filter(s => !nurOffen || s.stand === "offen")
-    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+    .sort((a, b) => {
+      const v = String(a.created_at || "").localeCompare(String(b.created_at || ""));
+      return alt ? v : -v;
+    });
 }
 
 function awPersonName(id) {
@@ -305,6 +324,20 @@ function awFilterHtml(imZeitraum) {
     "</div>";
 }
 
+// Der frueheste oder spaeteste Zeitpunkt der Liste, unabhaengig davon,
+// wie sie gerade sortiert ist.
+function awRandZeit(liste, frueh) {
+  if (!liste.length || typeof wannText !== "function") return "-";
+  let beste = null;
+  for (const s of liste) {
+    const t = String(s.created_at || "");
+    if (!t) continue;
+    if (beste === null) { beste = t; continue; }
+    if (frueh ? (t < beste) : (t > beste)) beste = t;
+  }
+  return beste === null ? "-" : wannText(beste);
+}
+
 function awKopfHtml(g, liste) {
   const z = awZeitraum();
   const knopf = (art, text) => '<button class="aw-zeit' + (z.art === art ? " aktiv" : "") +
@@ -331,12 +364,13 @@ function awKopfHtml(g, liste) {
         '<span class="aw-spw">' + g.spanne + "</span></span>" +
       '<span class="aw-sp"><span class="aw-spt">Sätze</span>' +
         '<span class="aw-spw">' + liste.length + "</span></span>" +
+      // NICHT liste[0] und liste[letzter]: die Reihenfolge ist umstellbar,
+      // und dann staende der juengste unter "Erster gesetzt". Also wirklich
+      // das Kleinste und das Groesste suchen.
       '<span class="aw-sp"><span class="aw-spt">Erster gesetzt</span>' +
-        '<span class="aw-spw">' + (liste.length && typeof wannText === "function"
-          ? wannText(liste[0].created_at) : "-") + "</span></span>" +
+        '<span class="aw-spw">' + awRandZeit(liste, true) + "</span></span>" +
       '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
-        '<span class="aw-spw">' + (liste.length && typeof wannText === "function"
-          ? wannText(liste[liste.length - 1].created_at) : "-") + "</span></span>" +
+        '<span class="aw-spw">' + awRandZeit(liste, false) + "</span></span>" +
     "</div>" +
     awFilterHtml(awImZeitraum()) +
     "</div>" +
@@ -354,7 +388,14 @@ function awKopfHtml(g, liste) {
         '" onchange="awEigenSetzen()"></label></div>'
       : "") +
     '<div class="aw-zeile"><label><input type="checkbox"' + (awNurOffen() ? " checked" : "") +
-      ' onchange="awNurOffenSetzen(this.checked)"> nur die noch offenen zeigen</label></div>' +
+      ' onchange="awNurOffenSetzen(this.checked)"> nur die noch offenen zeigen</label>' +
+      ' &nbsp; <label>Reihenfolge: ' +
+      '<select onchange="awReiheSetzen(this.value)">' +
+        '<option value="neu"' + (awReihe() === "neu" ? " selected" : "") +
+          ">neueste zuerst (alte unten)</option>" +
+        '<option value="alt"' + (awReihe() === "alt" ? " selected" : "") +
+          ">älteste zuerst</option>" +
+      "</select></label></div>" +
     awSummeHtml(liste, g);
 }
 

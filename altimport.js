@@ -45,8 +45,14 @@ function altScheinId(s) { return "ALT-" + s.datum + "-" + s.nr; }
 // es gibt." Der Ordner wird beim Anlegen mit erzeugt, er muss nichts
 // vorbereiten. Die Kennung faengt mit dem 25.08. an, damit er in jeder
 // nach Datum sortierten Liste ganz unten steht - als aeltester.
-const ALT_SATZ = "2026-08-25-alt";
-const ALT_SATZ_TITEL = "Alte Scheine 25. bis 28.08.2026";
+// Karam hat den Ordner am 17.09.2026 selbst im Admin angelegt und die 38
+// Fotos hineingeladen. Es wird deshalb KEIN zweiter erzeugt - zwei Ordner
+// fuer dieselben Scheine waeren nur Verwirrung. Fehlt er wider Erwarten,
+// wird er unter derselben Kennung nachgelegt.
+// Die Kennung faengt mit dem 25.08. an und steht damit vor jeder anderen:
+// der Ordner ist der aelteste, genau wie Karam es wollte.
+const ALT_SATZ = "2026-08-25-bis-28";
+const ALT_SATZ_TITEL = "Fotos vom 25.08.2026 (bis-28)";
 
 let altBilder = {};        // Dateiname -> Daten-URL
 let altAuswahl = null;     // Set der angehakten Nummern, null = noch nicht gebaut
