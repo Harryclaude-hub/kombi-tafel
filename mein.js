@@ -241,6 +241,7 @@ Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur,
 Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
 <div id="personenimport"></div>
+<div id="altimport"></div>
 <div id="personenkasse"></div>
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
@@ -1425,6 +1426,12 @@ async function zeichneBereich() {
     // eingefuegte Text nach jedem Zeichnen weg.
     const k = el("personenimport");
     if (!k.innerHTML) k.innerHTML = piPanelHtml();
+  }
+  // Die 38 alten Scheine vom 25. bis 28.08.2026 (altimport.js, loeschbar).
+  // Faellt die Datei weg, bleibt der Kasten leer.
+  if (typeof altPanelHtml === "function" && el("altimport")) {
+    const k = el("altimport");
+    if (!k.innerHTML) { k.innerHTML = altPanelHtml(); altZeichnen(); }
   }
   zeichnePersonenKasse(scheine);
   zeichnePruefung(scheine);
