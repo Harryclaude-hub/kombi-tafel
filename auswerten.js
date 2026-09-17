@@ -76,16 +76,27 @@ function awUmschalten(schluessel, wert) {
   const i = liste.indexOf(String(wert));
   if (i >= 0) liste.splice(i, 1); else liste.push(String(wert));
   awListeSchreiben(schluessel, liste);
-  if (typeof zeichneBereich === "function") zeichneBereich();
+  awNeuZeichnen();
+}
+
+// NUR diese eine Zeile zeichnet die Auswert-Ansicht neu, und alle
+// Filterknoepfe gehen darueber.
+// HIER STAND EIN FEHLER: zeichneBereich(). Das zeichnet Mein Bereich,
+// ruft aber zeichneAuswerten() nicht auf (das macht nur der Reiter
+// oben, mein.js). Ein Klick auf einen Filter aenderte damit zwar den
+// gespeicherten Zustand, aber auf dem Schirm passierte NICHTS - es sah
+// aus, als gaebe es den Filter gar nicht.
+function awNeuZeichnen() {
+  if (typeof zeichneAuswerten === "function") zeichneAuswerten();
 }
 function awPersonUm(id) { awUmschalten(AW_PERSONEN, id == null ? "" : id); }
 function awAnbieterUm(kz) { awUmschalten(AW_ANBIETER, kz == null ? "" : kz); }
-function awPersonenAlle() { awListeSchreiben(AW_PERSONEN, []); if (typeof zeichneBereich === "function") zeichneBereich(); }
-function awAnbieterAlle() { awListeSchreiben(AW_ANBIETER, []); if (typeof zeichneBereich === "function") zeichneBereich(); }
+function awPersonenAlle() { awListeSchreiben(AW_PERSONEN, []); awNeuZeichnen(); }
+function awAnbieterAlle() { awListeSchreiben(AW_ANBIETER, []); awNeuZeichnen(); }
 function awFilterAlle() {
   awListeSchreiben(AW_PERSONEN, []);
   awListeSchreiben(AW_ANBIETER, []);
-  if (typeof zeichneBereich === "function") zeichneBereich();
+  awNeuZeichnen();
 }
 
 // Die beiden Merkmale eines Scheins, immer auf dieselbe Art gelesen.
@@ -234,8 +245,15 @@ function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
     '<button class="aw-chip' + (aus ? " aktiv" : "") + '" onclick="' + alleFn + '()">alle</button>';
   for (const e of eintraege) {
     const an = gewaehlt.indexOf(e.wert) >= 0;
+    // EINFACHE Anfuehrungszeichen im Aufruf, das Attribut selbst haengt
+    // in doppelten. Hier stand JSON.stringify, und das liefert doppelte:
+    // daraus wurde onclick="awPersonUm("pA")". Das Attribut endete beim
+    // zweiten Anfuehrungszeichen, der Klick tat gar nichts, und es sah
+    // aus, als gaebe es den Filter nicht. Im Browser durch echtes
+    // Klicken gefunden, nicht durch Lesen.
+    const ruf = umFn + "('" + String(e.wert).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')";
     h += '<button class="aw-chip' + (an ? " aktiv" : "") + (e.fehlt ? " aw-chipweg" : "") +
-      '" onclick="' + umFn + '(' + JSON.stringify(e.wert) + ')" title="' +
+      '" onclick="' + textSicherM(ruf) + '" title="' +
       (e.fehlt ? "gewählt, kommt in diesem Zeitraum aber nicht vor"
                : e.zahl + " Kombination(en) in diesem Zeitraum") + '">' +
       textSicherM(e.text) + ' <span class="aw-chipz">' + e.zahl + "</span></button>";
@@ -301,6 +319,10 @@ function awKopfHtml(g, liste) {
       knopf("monat", "Dieser Monat") + knopf("vormonat", "Letzter Monat") +
       knopf("alles", "Die ganze Zeit") + knopf("eigen", "Eigener Zeitraum") +
     "</div>" +
+    // Karam (17.09.2026): "Der Filter soll ganz rechts daneben, Zeitraum
+    // und so weiter." Also in DIESELBE Zeile wie die Zeitraum-Angaben,
+    // rechts davon. Am Handy rutscht er darunter.
+    '<div class="aw-reihe">' +
     // Karam (16.09.2026): "bei dem Zeitraum sie nicht untereinander,
     // sondern nebeneinander. Zeitraum, Saetze, Uhrzeit - und da mit der
     // Uhrzeit, also wann es genau gesetzt wurde."
@@ -315,6 +337,8 @@ function awKopfHtml(g, liste) {
       '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
         '<span class="aw-spw">' + (liste.length && typeof wannText === "function"
           ? wannText(liste[liste.length - 1].created_at) : "-") + "</span></span>" +
+    "</div>" +
+    awFilterHtml(awImZeitraum()) +
     "</div>" +
     (z.art === "stichtag"
       ? '<div class="aw-zeile"><label>Stichtag (Stand deiner Excel-Liste): ' +
@@ -331,11 +355,7 @@ function awKopfHtml(g, liste) {
       : "") +
     '<div class="aw-zeile"><label><input type="checkbox"' + (awNurOffen() ? " checked" : "") +
       ' onchange="awNurOffenSetzen(this.checked)"> nur die noch offenen zeigen</label></div>' +
-    // Karam wollte die beiden Filter "ganz rechts". Sie stehen deshalb
-    // in derselben Zeile wie die Summenkacheln, rechts davon; am Handy
-    // rutschen sie darunter.
-    '<div class="aw-oben">' + awSummeHtml(liste, g) +
-      awFilterHtml(awImZeitraum()) + "</div>";
+    awSummeHtml(liste, g);
 }
 
 // Die Summenzeile: Umsatz und Gewinn fuer den Zeitraum.

@@ -1,32 +1,44 @@
 // ============================================================
-// BILDER AUS DEM KOMBI-BAU KOPIEREN
+// BILDER AUS DEM KOMBI-BAU KOPIEREN - JEDES FUER SICH
 // ============================================================
-// Karam, zuerst am 16.09.2026: "Beim Kombi-Bau will ich oben einen
-// Knopf: alle Bilder kopieren, alle die sichtbar sind."
-// Und danach, genauer: "Wenn ich sage, sechsundzwanzig Bilder kopieren,
-// dass sie EINZELN kopiert werden. Ohne dass ich etwas runterladen muss."
+// Karam (17.09.2026): "Beim Kopieren moechte ich, dass die Bilder
+// wirklich alle separat sind. Wenn ich sie kopiere und irgendwo
+// hinzufuege, sind das nicht EIN Bild, sondern sechs unterschiedliche
+// Dateien und Bilder. Sonst ist das viel zu unscharf."
 //
-// ZWEI WEGE, und der erste ist der, den er wollte:
-//   1. EINZELN: ein Klick, ein Bild in der Zwischenablage, einfuegen,
-//      naechster Klick. Der Knopf sagt immer, wo er steht (7 von 26).
-//      Es wird nichts heruntergeladen.
-//   2. ALLE AUF EIN BLATT: die Scheine werden zu EINEM Bild
-//      zusammengesetzt und das kommt in die Zwischenablage. Ein Klick,
-//      ein Einfuegen, alles drauf.
+// DARAUFHIN IST DIE MONTAGE RAUS.
+// Vorher wurden die Scheine zu einem Blatt zusammengesetzt und dabei auf
+// 640 Punkte Breite gebracht. Genau das war das Unscharfe. Diese Datei
+// verkleinert jetzt NICHTS mehr: jedes Bild geht in voller Groesse in
+// die Zwischenablage, so wie es aufgenommen wurde.
 //
-// WARUM ES NICHT ANDERS GEHT.
-// Die Zwischenablage haelt zu jedem Zeitpunkt GENAU EINEN Eintrag.
-// Sechsundzwanzig Bilder gleichzeitig hineinzulegen gibt es in keinem
-// Browser; jedes wuerde das vorige ueberschreiben. Dazu erlaubt ein
-// Browser das Kopieren nur, solange ein Klick frisch ist, eine Schleife
-// ueber zwanzig Bilder lehnt er nach dem ersten ab. Der Schrittweg ist
-// deshalb nicht eine Notloesung, sondern die einzige ehrliche Form von
-// "einzeln kopieren".
+// WAS DIE ZWISCHENABLAGE KANN, AM 17.09.2026 IM BROWSER NACHGEMESSEN,
+// nicht aus dem Kopf:
+//   navigator.clipboard.write([bild1, bild2])
+//     -> NotAllowedError: "Support for multiple ClipboardItems is not
+//        implemented". Mehrere Bilder GLEICHZEITIG gehen also nicht.
+//   ClipboardItem.supports("image/png")  -> true
+//   ClipboardItem.supports("image/jpeg") -> FALSE (deshalb wird jedes
+//        Bild vorher nach PNG gewandelt, verlustfrei)
+//   ClipboardItem.supports("text/html")  -> true
 //
-// KEIN STILLES SCHEITERN.
-// Nie kommt eine gruene Meldung, ohne dass wirklich etwas kopiert wurde.
-// Geht ein Schritt daneben, bleibt der Zaehler stehen, der Grund steht
-// da, und es wird nichts uebersprungen.
+// DARAUS FOLGEN GENAU ZWEI WEGE, und beide geben EINZELNE Bilder:
+//   1. EINZELN (der sichere Weg): ein Klick, ein Bild, einfuegen,
+//      naechster Klick. Der Knopf sagt immer, wo er steht. Das
+//      funktioniert ueberall, auch im einfachsten Chatfenster.
+//   2. ALLE AUF EINMAL: ein einziger Eintrag vom Typ text/html, in dem
+//      alle Bilder als eigene img-Elemente stehen. Wo man formatierten
+//      Text einfuegen kann (Word, Mail, viele Chats), kommen sie als
+//      MEHRERE einzelne Bilder an, jedes in voller Groesse. Wo nur
+//      reiner Text geht, kommt nichts an - deshalb steht das am Knopf
+//      dran und deshalb bleibt Weg 1 der Hauptknopf.
+//
+// Heruntergeladen wird NICHTS. Karam ausdruecklich: "ohne dass ich etwas
+// runterladen muss."
+//
+// KEIN STILLES SCHEITERN: es kommt nie eine gruene Meldung, ohne dass
+// wirklich kopiert wurde. Geht ein Schritt daneben, bleibt der Zaehler
+// stehen, der Grund steht da, und es wird nichts uebersprungen.
 //
 // EIGENE DATEI, damit sie in einem Stueck wieder verschwinden kann.
 // kombis.js wird nicht angefasst, nur kombis.html laedt diese Datei und
@@ -34,17 +46,6 @@
 
 "use strict";
 
-// Hoechstbreite je Schein im fertigen Blatt. Groesser bringt nichts:
-// die Fotos werden beim Aufnehmen ohnehin auf 1400 px gebracht, und ein
-// Blatt aus zehn Scheinen in voller Groesse waere 14000 px hoch und in
-// keinem Chatfenster mehr zu gebrauchen.
-const BK_BREITE = 640;
-const BK_LUFT = 18;          // Abstand zwischen den Scheinen
-const BK_KOPF = 30;          // Hoehe der Beschriftung ueber jedem Schein
-const BK_RAND = 20;
-
-// Wo ueberall im Kombi-Bau Bilder stehen koennen. Kommt eine Stelle
-// dazu, gehoert sie hierher und sonst nirgendwohin.
 // Nachgesehen: im Kombi-Bau gibt es genau EINEN Ort mit Wettschein-
 // Bildern, naemlich das img in div.s-foto an jeder gebauten Karte.
 // #niedrig enthaelt dieselben Karten, steht aber dauerhaft auf hidden -
@@ -68,8 +69,8 @@ function bkSichtbar(el) {
   return r.width > 0 && r.height > 0;
 }
 
-// Die Beschriftung ueber einem Bild: der Dateiname, den Karam vergeben
-// hat, sonst die Scheinnummer, sonst gar nichts. Nichts erfinden.
+// Die Beschriftung zu einem Bild: der Dateiname, den Karam vergeben hat,
+// sonst der Kopf der Karte, sonst gar nichts. Nichts erfinden.
 function bkTitel(img) {
   const kasten = img.closest(".s-foto") || img.closest("td") || img.parentElement;
   if (kasten) {
@@ -93,8 +94,8 @@ function bkBilderSammeln() {
     for (const img of document.querySelectorAll(ort)) {
       if (!bkSichtbar(img)) continue;
       const q = img.getAttribute("src");
-      // Dasselbe Bild kann an zwei Stellen stehen (Karte und Verlauf).
-      // Zweimal im Blatt waere nur Verwirrung.
+      // Dasselbe Bild kann an zwei Stellen stehen. Zweimal kopieren
+      // waere nur Verwirrung.
       if (gesehen.has(q)) continue;
       gesehen.add(q);
       raus.push({ quelle: q, titel: bkTitel(img) });
@@ -117,70 +118,24 @@ function bkLaden(quelle) {
   });
 }
 
-// Wie viele Spalten? So viele, dass das Blatt nicht zu einem endlosen
-// Streifen wird. Bei drei Scheinen ist eine Spalte richtig, bei zwanzig
-// sind es drei.
-function bkSpalten(anzahl) {
-  if (anzahl <= 3) return 1;
-  if (anzahl <= 8) return 2;
-  return 3;
-}
-
-// Setzt die geladenen Bilder zu EINEM Blatt zusammen.
-function bkBlattBauen(bilder) {
-  const spalten = bkSpalten(bilder.length);
-  // b ist {bild, titel}, das Bild selbst liegt in b.bild. Stand hier
-  // einmal b.naturalHeight, wurde jede Hoehe NaN, das Blatt 680x0 gross
-  // und toBlob gab null zurueck. Im Browser aufgefallen, nicht im Kopf.
-  const hoehen = bilder.map(b =>
-    Math.round(b.bild.naturalHeight * (BK_BREITE / b.bild.naturalWidth)));
-  // Zeilenweise fuellen, die Zeilenhoehe ist die hoechste Karte darin.
-  const zeilen = [];
-  for (let i = 0; i < bilder.length; i += spalten) {
-    const teil = hoehen.slice(i, i + spalten);
-    zeilen.push(Math.max.apply(null, teil));
-  }
-  const breite = BK_RAND * 2 + spalten * BK_BREITE + (spalten - 1) * BK_LUFT;
-  const hoehe = BK_RAND * 2 +
-    zeilen.reduce((s, h) => s + h + BK_KOPF + BK_LUFT, 0) - BK_LUFT;
-
-  const flaeche = document.createElement("canvas");
-  flaeche.width = breite;
-  flaeche.height = hoehe;
-  const stift = flaeche.getContext("2d");
-  stift.fillStyle = "#ffffff";
-  stift.fillRect(0, 0, breite, hoehe);
-
-  let y = BK_RAND;
-  for (let z = 0; z * spalten < bilder.length; z++) {
-    for (let s = 0; s < spalten; s++) {
-      const i = z * spalten + s;
-      if (i >= bilder.length) break;
-      const x = BK_RAND + s * (BK_BREITE + BK_LUFT);
-      const h = hoehen[i];
-      const titel = bilder[i].titel;
-      if (titel) {
-        stift.fillStyle = "#1a2c50";
-        stift.font = "bold 16px Arial, sans-serif";
-        stift.textBaseline = "bottom";
-        stift.fillText(titel, x, y + BK_KOPF - 8, BK_BREITE);
-      }
-      stift.drawImage(bilder[i].bild, x, y + BK_KOPF, BK_BREITE, h);
-      // Ein duenner Rahmen, damit zwei helle Scheine nicht ineinander laufen.
-      stift.strokeStyle = "#8c94a6";
-      stift.lineWidth = 1;
-      stift.strokeRect(x + 0.5, y + BK_KOPF + 0.5, BK_BREITE - 1, h - 1);
-    }
-    y += zeilen[z] + BK_KOPF + BK_LUFT;
-  }
-  return flaeche;
-}
-
 function bkBlob(flaeche) {
   return new Promise((fertig) => {
-    // PNG, nicht JPEG: die Zwischenablage nimmt nur PNG entgegen.
+    // PNG, weil die Zwischenablage image/jpeg ausdruecklich NICHT nimmt
+    // (nachgemessen: ClipboardItem.supports("image/jpeg") ist false).
     flaeche.toBlob((b) => fertig(b), "image/png");
   });
+}
+
+// Ein Bild in voller Groesse als PNG. KEIN Verkleinern: genau das war
+// vorher das Unscharfe.
+async function bkPngVon(quelle) {
+  const b = await bkLaden(quelle);
+  if (!b || !b.naturalWidth) return null;
+  const f = document.createElement("canvas");
+  f.width = b.naturalWidth;
+  f.height = b.naturalHeight;
+  f.getContext("2d").drawImage(b, 0, 0);
+  return await bkBlob(f);
 }
 
 function bkMeldung(text, art) {
@@ -188,71 +143,29 @@ function bkMeldung(text, art) {
   if (art === "warn") alert(text.replace(/<[^>]+>/g, ""));
 }
 
-function bkHerunterladen(blob, name) {
-  const adresse = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = adresse;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(adresse), 4000);
-}
-
 
 // ============================================================
-// EINZELN KOPIEREN - der Weg, den Karam wollte
+// WEG 1: EINZELN
 // ============================================================
-// Karam (16.09.2026): "Wenn ich sage, sechsundzwanzig Bilder kopieren,
-// dass sie einzeln kopiert werden. Ich druecke rein und es kopieren
-// sich sechsundzwanzig einzelne Bilder. Ohne dass ich etwas
-// runterladen muss."
-//
-// WAS GEHT UND WAS NICHT, ehrlich:
-// Die Zwischenablage des Rechners haelt zu jedem Zeitpunkt GENAU EINEN
-// Eintrag. Sechsundzwanzig Bilder gleichzeitig hineinzulegen gibt es
-// nicht, in keinem Browser: jedes wuerde das vorige sofort
-// ueberschreiben, und am Ende haette er nur das letzte. Dazu kommt,
-// dass ein Browser nur kopieren laesst, solange ein Klick "frisch" ist
-// (transient user activation). Zwanzig Kopien in einer Schleife lehnt er
-// nach der ersten ab.
-//
-// Deshalb der Schrittweg: EIN Klick, EIN Bild in der Zwischenablage,
-// einfuegen, naechster Klick. Der Knopf sagt immer, bei welchem Bild er
-// steht (7 von 26). Das ist genau "einzeln kopieren", nur ehrlich
-// darueber, dass die Zwischenablage nicht mehr als eines fasst.
-// Heruntergeladen wird dabei NICHTS.
-//
-// Wer lieber alles auf einmal einfuegt, nimmt den zweiten Knopf: dann
-// werden alle Scheine zu EINEM Blatt zusammengesetzt (bkBlattBauen).
 
 let bkLaeuft = false;
 let bkListe = [];      // [{quelle, titel}] der Durchgang, der gerade laeuft
 let bkIndex = 0;       // welches Bild als naechstes drankommt
 
-// Ein einzelnes Bild in die Zwischenablage. JPEG muss dafuer ueber eine
-// Zeichenflaeche zu PNG werden - die Zwischenablage nimmt nur PNG.
 async function bkEinesKopieren(eintrag) {
-  const b = await bkLaden(eintrag.quelle);
-  if (!b || !b.naturalWidth) return { ok: false, grund: "das Bild liess sich nicht laden" };
-  const f = document.createElement("canvas");
-  f.width = b.naturalWidth;
-  f.height = b.naturalHeight;
-  f.getContext("2d").drawImage(b, 0, 0);
-  const blob = await bkBlob(f);
-  if (!blob) return { ok: false, grund: "das Bild liess sich nicht umwandeln" };
+  const blob = await bkPngVon(eintrag.quelle);
+  if (!blob) return { ok: false, grund: "das Bild liess sich nicht laden" };
   if (!navigator.clipboard || !window.ClipboardItem) {
     return { ok: false, grund: "dieser Browser kann keine Bilder in die Zwischenablage legen" };
   }
   try {
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return { ok: true, blob: blob };
+    return { ok: true };
   } catch (e) {
-    return { ok: false, grund: String(e && e.message ? e.message : e).slice(0, 120), blob: blob };
+    return { ok: false, grund: String(e && e.message ? e.message : e).slice(0, 120) };
   }
 }
 
-// Startet den Durchgang neu und kopiert gleich das erste Bild.
 async function bkEinzelnStart() {
   if (bkLaeuft) return;
   bkListe = bkBilderSammeln();
@@ -280,17 +193,14 @@ async function bkSchritt() {
       bkIndex++;
       const rest = bkListe.length - bkIndex;
       bkMeldung("<b>Bild " + nr + " von " + bkListe.length + "</b> ist in der Zwischenablage" +
-        (eintrag.titel ? " (" + eintrag.titel + ")" : "") + ". Jetzt einfuegen" +
+        (eintrag.titel ? " (" + eintrag.titel + ")" : "") + ", in voller Groesse. Jetzt einfuegen" +
         (rest ? ", dann auf <b>N&auml;chstes Bild</b> dr&uuml;cken." : ". Das war das letzte."),
         "gut");
     } else {
-      // NICHT weiterzaehlen und NICHT heimlich herunterladen. Karam hat
-      // ausdruecklich gesagt: ohne dass er etwas runterladen muss.
-      // Also stehen bleiben, den Grund nennen, und das Herunterladen
-      // als eigenen Knopf anbieten.
+      // NICHT weiterzaehlen. Sonst waere ein Bild uebersprungen und
+      // niemand haette es gemerkt.
       bkMeldung("<b>Bild " + nr + " konnte nicht kopiert werden</b> (" + r.grund +
-        "). Es wurde nichts heruntergeladen und nichts uebersprungen - " +
-        "du stehst weiter bei Bild " + nr + ".", "warn");
+        "). Es wurde nichts uebersprungen - du stehst weiter bei Bild " + nr + ".", "warn");
     }
   } finally {
     bkLaeuft = false;
@@ -311,67 +221,60 @@ function bkFertig() {
   if (zahl) bkMeldung("Fertig, alle " + zahl + " Bilder waren dran.", "gut");
 }
 
-async function bkAlleKopieren() {
+
+// ============================================================
+// WEG 2: ALLE AUF EINMAL, ABER ALS EINZELNE BILDER
+// ============================================================
+// Ein einziger Eintrag vom Typ text/html, in dem jedes Bild ein eigenes
+// img-Element ist. Das ist KEINE Montage: beim Einfuegen entstehen
+// mehrere einzelne Bilder, jedes in voller Groesse.
+// Die Quellen bleiben die Original-Daten-URLs, es wird nichts neu
+// gerechnet und nichts verkleinert.
+
+function bkHtmlBauen(bilder) {
+  // Jedes Bild in einer eigenen Zeile, mit seinem Namen darueber. Der
+  // Absatz dazwischen ist der Grund, warum das Ziel sie als getrennte
+  // Bilder uebernimmt und nicht als eine Zeile.
+  return bilder.map(b =>
+    "<p>" + (b.titel ? "<b>" + b.titel.replace(/[<>&]/g, "") + "</b><br>" : "") +
+    '<img src="' + b.quelle + '"></p>'
+  ).join("\n");
+}
+
+async function bkAlleAufEinmal() {
   if (bkLaeuft) return;
   const stelle = bkBilderSammeln();
   if (!stelle.length) {
-    bkMeldung("Hier ist gerade <b>kein Bild</b> zu sehen. Fotos haengen an den Karten " +
-      "unter &quot;In Arbeit&quot; - ist dort keins, gibt es auch nichts zu kopieren.", "warn");
+    bkMeldung("Hier ist gerade <b>kein Bild</b> zu sehen.", "warn");
+    return;
+  }
+  if (!navigator.clipboard || !window.ClipboardItem) {
+    bkMeldung("Dieser Browser kann nichts in die Zwischenablage legen. " +
+      "Kopiert wurde nichts.", "warn");
     return;
   }
   bkLaeuft = true;
   bkLeisteZeichnen();
   try {
-    const geladen = await Promise.all(stelle.map(x => bkLaden(x.quelle)));
-    const gut = [], kaputt = [];
-    geladen.forEach((b, i) => {
-      if (b && b.naturalWidth > 0) gut.push({ bild: b, titel: stelle[i].titel });
-      else kaputt.push(stelle[i].titel || "ohne Namen");
-    });
-    if (!gut.length) {
-      bkMeldung("<b>Keines der " + stelle.length + " Bilder liess sich laden.</b> " +
-        "Kopiert wurde nichts.", "warn");
-      return;
-    }
-    const blatt = bkBlattBauen(gut);
-    const blob = await bkBlob(blatt);
-    if (!blob) {
-      bkMeldung("Das Blatt liess sich nicht erzeugen. Kopiert wurde nichts.", "warn");
-      return;
-    }
-    const nachsatz = kaputt.length
-      ? " <b>" + kaputt.length + " von " + stelle.length + " Bildern liessen sich nicht laden</b> (" +
-        kaputt.slice(0, 3).join(", ") + (kaputt.length > 3 ? ", ..." : "") +
-        ") und fehlen auf dem Blatt."
-      : "";
-
-    let kopiert = false, grund = "";
-    if (navigator.clipboard && window.ClipboardItem) {
-      try {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        kopiert = true;
-      } catch (e) { grund = String(e && e.message ? e.message : e).slice(0, 120); }
-    } else {
-      grund = "dieser Browser kann keine Bilder in die Zwischenablage legen";
-    }
-
-    if (kopiert) {
-      bkMeldung("<b>" + gut.length + " Bild" + (gut.length === 1 ? "" : "er") +
-        " auf einem Blatt kopiert.</b> Jetzt irgendwo einfuegen." + nachsatz, "gut");
-    } else {
-      bkHerunterladen(blob, "Wettscheine_" + gut.length + ".png");
-      bkMeldung("Die Zwischenablage hat es nicht angenommen (" + (grund || "kein Grund genannt") +
-        "). Das Blatt mit <b>" + gut.length + " Bild" + (gut.length === 1 ? "" : "ern") +
-        "</b> wurde deshalb <b>heruntergeladen</b>." + nachsatz, "warn");
-    }
+    const html = bkHtmlBauen(stelle);
+    const text = stelle.map((b, i) => (i + 1) + ". " + (b.titel || "Wettschein")).join("\n");
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([text], { type: "text/plain" })
+    })]);
+    bkMeldung("<b>" + stelle.length + " Bilder kopiert</b>, jedes einzeln und in voller " +
+      "Groesse. Einfuegen in Word, Mail oder einen Chat, der Bilder im Text kann. " +
+      "Kommt dort nur Text an, nimm den Knopf <b>einzeln kopieren</b> - der geht ueberall.",
+      "gut");
   } catch (e) {
-    bkMeldung("Beim Zusammensetzen ist etwas schiefgegangen: " +
-      String(e && e.message ? e.message : e).slice(0, 140) + ". Kopiert wurde nichts.", "warn");
+    bkMeldung("<b>Nicht kopiert</b> (" + String(e && e.message ? e.message : e).slice(0, 120) +
+      "). Nimm den Knopf <b>einzeln kopieren</b>, der geht immer.", "warn");
   } finally {
     bkLaeuft = false;
     bkLeisteZeichnen();
   }
 }
+
 
 // ---------- Die Leiste ----------
 // Sie zeigt immer denselben Stand wie der Durchgang. Es gibt nur diese
@@ -384,7 +287,6 @@ function bkLeisteZeichnen() {
   let h = "";
 
   if (bkListe.length) {
-    // Ein Durchgang laeuft.
     const fertig = bkIndex >= bkListe.length;
     h += '<span class="bk-stand">' +
       (fertig ? "Alle " + bkListe.length + " Bilder waren dran."
@@ -403,13 +305,18 @@ function bkLeisteZeichnen() {
   } else {
     h += '<button class="haupt" id="bk_knopf" onclick="bkEinzelnStart()"' +
       (bkLaeuft || !zahl ? " disabled" : "") + ' title="' +
-      (zahl ? "Ein Klick je Bild. Die Zwischenablage fasst immer nur eines."
+      (zahl ? "Ein Klick je Bild, jedes in voller Groesse. Geht in jedem Programm."
             : "Im Kombi-Bau ist gerade kein Bild zu sehen.") + '">' +
       (zahl ? "📋 " + zahl + " Bilder einzeln kopieren"
             : "📋 Bilder kopieren (gerade keins)") + "</button>" +
       (zahl > 1
-        ? ' <button onclick="bkAlleKopieren()" title="Alle Scheine zu einem Blatt zusammensetzen">' +
-          "alle auf <b>ein</b> Blatt</button>" : "");
+        ? ' <button onclick="bkAlleAufEinmal()"' + (bkLaeuft ? " disabled" : "") +
+          ' title="Alle auf einmal, als einzelne Bilder. Braucht ein Ziel, das Bilder' +
+          ' im Text kann - Word, Mail, viele Chats.">alle ' + zahl +
+          " auf einmal</button>" +
+          ' <span class="mini bk-hinweis">einzeln geht &uuml;berall; ' +
+          "auf einmal braucht Word, Mail oder einen Chat mit Bildern im Text</span>"
+        : "");
   }
   box.innerHTML = h;
 }

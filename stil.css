@@ -5362,10 +5362,13 @@ button.haupt { box-shadow: var(--g-tiefe-1), inset 0 1px 0 rgba(255, 255, 255, .
    ============================================================ */
 @media screen {
 
-body[data-seite="mein"] .aw-oben {
+/* Zeitraum-Angaben und Filter stehen NEBENEINANDER, der Filter
+   rechts. Am Handy rutscht er darunter. */
+body[data-seite="mein"] .aw-reihe {
   display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+  margin: 8px 0;
 }
-body[data-seite="mein"] .aw-oben > .aw-summe { flex: 1 1 420px; }
+body[data-seite="mein"] .aw-reihe > .aw-spanne { flex: 1 1 340px; margin: 0; }
 body[data-seite="mein"] .aw-filter {
   flex: 1 1 300px; min-width: 260px;
   display: flex; flex-direction: column; gap: 10px;
@@ -5402,7 +5405,7 @@ body[data-seite="mein"] .aw-chip.aw-chipweg { border-style: dashed; }
 body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-top: 6px; }
 
 @media (max-width: 700px) {
-  body[data-seite="mein"] .aw-oben > .aw-summe,
+  body[data-seite="mein"] .aw-reihe > .aw-spanne,
   body[data-seite="mein"] .aw-filter { flex: 1 1 100%; }
   body[data-seite="mein"] .aw-fchips { max-height: 150px; }
   body[data-seite="mein"] .aw-chip { min-height: 36px; font-size: 13px; }
@@ -5410,3 +5413,8 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
 
 }
 /* ---- ENDE AUSWERT-FILTER ---- */
+
+/* Der Hinweis neben den Bilder-Knoepfen (Design-Schicht, loeschbar) */
+@media screen {
+  .bilderleiste .bk-hinweis { flex: 1 1 100%; }
+}
