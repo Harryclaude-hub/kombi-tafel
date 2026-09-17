@@ -49,8 +49,48 @@ function awStichtag() {
   try { return localStorage.getItem(AW_STICHTAG) || AW_STICHTAG_VORGABE; }
   catch (e) { return AW_STICHTAG_VORGABE; }
 }
+// Der ALTE Haken "nur die noch offenen zeigen". Er wird nicht mehr
+// angezeigt und nur noch EINMAL gelesen: als Uebersetzung fuer awZeig(),
+// damit Karams alte Wahl nicht verloren geht (Falle: localStorage-
+// Schluessel mit Altwert - eine neue Vorgabe allein aendert auf seinem
+// Geraet gar nichts).
 function awNurOffen() {
   try { return localStorage.getItem(AW_NUR_OFFEN) !== "nein"; } catch (e) { return true; }
+}
+
+// Karam (17.09.2026): "Ich moechte bitte noch ein Button neben eigener
+// Zeitraum, einmal verloren und einmal gewonnen. Alles, was ich schon
+// eingetragen habe oder du sogar eingetragen hast, kann ich nochmal
+// nachschauen - oder ich kann beides mit anzeigen lassen oder ausblenden."
+// Zwei Schalter statt des alten Hakens: OFFENE stehen immer in der Liste
+// (das ist die Arbeitsliste), gewonnen und verloren kommen einzeln dazu.
+// Beide aus = genau der alte Zustand "nur die offenen".
+const AW_ZEIG = "kt_aw_zeig";
+function awZeig() {
+  try {
+    const roh = localStorage.getItem(AW_ZEIG);
+    if (roh) { const z = JSON.parse(roh); return { gew: !!z.gew, ver: !!z.ver }; }
+  } catch (e) { }
+  // Noch nie benutzt: die alte Wahl uebersetzen. "Alles zeigen" hiess
+  // gewonnen UND verloren sichtbar, der alte Vorgabezustand hiess beides weg.
+  const alles = !awNurOffen();
+  return { gew: alles, ver: alles };
+}
+function awZeigSetzen(z) {
+  try { localStorage.setItem(AW_ZEIG, JSON.stringify({ gew: !!z.gew, ver: !!z.ver })); } catch (e) { }
+}
+function awZeigUm(was) {
+  const z = awZeig();
+  z[was] = !z[was];
+  awZeigSetzen(z);
+  zeichneAuswerten();
+}
+// Gehoert ein Schein mit diesem Stand gerade ins Bild? Unbekannte
+// Staende werden IMMER gezeigt - lieber zeigen als verschweigen.
+function awStandSichtbar(stand, zeig) {
+  if (stand === "gewonnen") return zeig.gew;
+  if (stand === "verloren") return zeig.ver;
+  return true;
 }
 function awZeitraum() {
   try { return JSON.parse(localStorage.getItem(AW_ZEITRAUM) || "null") || { art: "stichtag" }; }
@@ -333,10 +373,10 @@ function awGefiltert() {
 }
 
 function awScheine() {
-  const nurOffen = awNurOffen();
+  const zeig = awZeig();
   const alt = awReihe() === "alt";
   return awGefiltert()
-    .filter(s => !nurOffen || s.stand === "offen")
+    .filter(s => awStandSichtbar(s.stand, zeig))
     .sort((a, b) => {
       const v = String(a.created_at || "").localeCompare(String(b.created_at || ""));
       return alt ? v : -v;
@@ -505,6 +545,16 @@ function awRandZeit(liste, frueh) {
 
 function awKopfHtml(g, liste) {
   const z = awZeitraum();
+  const zeig = awZeig();
+  // Wie viele gewonnene und verlorene gibt es im Zeitraum (samt Person,
+  // Anbieter und Suche)? Die Zahl steht AM Schalter, damit man vor dem
+  // Klick weiss, was er einblenden wuerde.
+  const gefiltert = awGefiltert();
+  let anzGew = 0, anzVer = 0;
+  for (const s of gefiltert) {
+    if (s.stand === "gewonnen") anzGew++;
+    else if (s.stand === "verloren") anzVer++;
+  }
   const knopf = (art, text) => '<button class="aw-zeit' + (z.art === art ? " aktiv" : "") +
     '" onclick="awZeitWaehlen(\'' + art + '\')">' + text + "</button>";
   return '<div class="aw-kopf">' +
@@ -516,6 +566,20 @@ function awKopfHtml(g, liste) {
       knopf("gestern", "Gestern") + knopf("woche", "Letzte 7 Tage") +
       knopf("monat", "Dieser Monat") + knopf("vormonat", "Letzter Monat") +
       knopf("alles", "Die ganze Zeit") + knopf("eigen", "Eigener Zeitraum") +
+      // Die zwei Stand-Schalter, direkt neben "Eigener Zeitraum".
+      // Angeschaltet (gefuellt) = diese Scheine stehen mit in der Liste.
+      '<span class="aw-skgruppe">' +
+        '<button class="aw-zeit aw-sk-gew' + (zeig.gew ? " aktiv" : "") +
+          '" onclick="awZeigUm(\'gew\')" title="' +
+          (zeig.gew ? "Die gewonnenen wieder ausblenden"
+                    : "Die " + anzGew + " gewonnenen mit anzeigen") + '">' +
+          '&#10003; gewonnen <span class="aw-skz" id="aw_skz_gew">' + anzGew + "</span></button>" +
+        '<button class="aw-zeit aw-sk-ver' + (zeig.ver ? " aktiv" : "") +
+          '" onclick="awZeigUm(\'ver\')" title="' +
+          (zeig.ver ? "Die verlorenen wieder ausblenden"
+                    : "Die " + anzVer + " verlorenen mit anzeigen") + '">' +
+          '&#10007; verloren <span class="aw-skz" id="aw_skz_ver">' + anzVer + "</span></button>" +
+      "</span>" +
     "</div>" +
     // Karam (17.09.2026): "Der Filter soll ganz rechts daneben, Zeitraum
     // und so weiter." Also in DIESELBE Zeile wie die Zeitraum-Angaben,
@@ -558,9 +622,10 @@ function awKopfHtml(g, liste) {
         '<label>bis <input type="date" id="aw_bis" value="' + (z.bis || "") +
         '" onchange="awEigenSetzen()"></label></div>'
       : "") +
-    '<div class="aw-zeile"><label><input type="checkbox"' + (awNurOffen() ? " checked" : "") +
-      ' onchange="awNurOffenSetzen(this.checked)"> nur die noch offenen zeigen</label>' +
-      ' &nbsp; <label>Reihenfolge: ' +
+    // Der Haken "nur die noch offenen zeigen" ist WEG: dieselbe Frage
+    // beantworten jetzt die zwei Schalter oben. Zwei Bedienstellen fuer
+    // dasselbe waeren zwei Wahrheiten (Drift-Falle).
+    '<div class="aw-zeile"><label>Reihenfolge: ' +
       '<select onchange="awReiheSetzen(this.value)">' +
         '<option value="neu"' + (awReihe() === "neu" ? " selected" : "") +
           ">neueste zuerst (alte unten)</option>" +
@@ -630,7 +695,8 @@ function awListeHtml(liste) {
           (gefiltert === 1 ? "" : "en") + " rechts oben). " +
           '<button onclick="awFilterAlle()">Filter ganz weg</button> '
         : "") +
-      "Sonst: anderen Zeitraum nehmen, oder den Haken bei \"nur die noch offenen\" weg.</p>";
+      "Sonst: anderen Zeitraum nehmen, oder oben neben den Zeiträumen die Schalter " +
+      "<b>gewonnen</b> und <b>verloren</b> anschalten.</p>";
   }
   // Karam (16.09.2026): "eine Nummerierung, die erste ist 1 und dann geht
   // es so weiter - vor allem wenn ich einen Filter nutze, dass ich mich
@@ -761,10 +827,6 @@ function awStichtagSetzen(wert) {
   try { localStorage.setItem(AW_STICHTAG, wert || AW_STICHTAG_VORGABE); } catch (e) { }
   zeichneAuswerten();
 }
-function awNurOffenSetzen(an) {
-  try { localStorage.setItem(AW_NUR_OFFEN, an ? "ja" : "nein"); } catch (e) { }
-  zeichneAuswerten();
-}
 
 // Gewonnen oder verloren setzen. Es wird NUR diese eine Karte und die
 // Summenzeile neu gezeichnet, nicht der ganze Bereich: bei 150 Scheinen
@@ -784,10 +846,21 @@ async function awStand(id, wert) {
       vorher + "\".", "warn");
     return;
   }
+  // Die 0-Zeilen-Falle: ein an RLS gescheitertes Update kommt OHNE error
+  // zurueck. Ohne diese Pruefung saehe die Karte gruen aus, waehrend in
+  // der Datenbank weiter "offen" steht - beim naechsten Laden waere der
+  // Klick wie nie geschehen.
+  if (!r.data || !r.data.length) {
+    meldungM("<b>Nicht gespeichert.</b> Es wurde keine Zeile geändert - fehlendes " +
+      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + (s.nummer || "?") +
+      " steht weiter auf \"" + vorher + "\".", "warn");
+    return;
+  }
   s.stand = wert;
   s.updated_at = new Date().toISOString();
   awKarteAuffrischen(s);
   awSummeAuffrischen();
+  awStandSchalterAuffrischen();
   // Die grosse Tabelle, die Personen-Kasse und die Badges haengen auch
   // daran. Sie werden nachgezogen, sobald Karam den Reiter wechselt -
   // hier waere ein volles Neuzeichnen zu langsam.
@@ -805,6 +878,11 @@ async function awEcht(id, wert) {
   }
   const r = await supaScheinAendern(id, { echt_zurueck: zahl });
   if (r.error) { meldungM("Nicht gespeichert: " + r.error.message, "warn"); return; }
+  if (!r.data || !r.data.length) {
+    meldungM("<b>Nicht gespeichert.</b> Es wurde keine Zeile geändert - fehlendes " +
+      "Schreibrecht, oder die Kombination ist nicht mehr da.", "warn");
+    return;
+  }
   s.echt_zurueck = zahl;
   awKarteAuffrischen(s);
   awSummeAuffrischen();
@@ -814,13 +892,15 @@ async function awEcht(id, wert) {
 function awKarteAuffrischen(s) {
   const karte = el("aw_" + s.id);
   if (!karte) return;
-  // Steht der Schein nicht mehr im Filter (nur offene), verschwindet die
+  // Blendet der Stand-Schalter diesen Schein gerade aus, verschwindet die
   // Karte - mit einer kurzen Notiz, damit es nicht aussieht, als waere
-  // etwas verloren gegangen.
-  if (awNurOffen() && s.stand !== "offen") {
+  // etwas verloren gegangen, und mit dem Weg, sie wiederzuholen.
+  if (!awStandSichtbar(s.stand, awZeig())) {
     karte.outerHTML = '<div class="aw-weg mini">Nr. ' + (s.nummer || "?") + " auf <b>" +
       (s.stand === "gewonnen" ? "aufgegangen" : "nicht aufgegangen") +
-      "</b> gesetzt. Steht jetzt bei den erledigten.</div>";
+      "</b> gesetzt. Der Schalter <b>" +
+      (s.stand === "gewonnen" ? "gewonnen" : "verloren") +
+      "</b> oben neben den Zeiträumen holt sie wieder ins Bild.</div>";
     return;
   }
   // Die laufende Nummer steht an der Karte, damit sie beim Auffrischen
@@ -839,4 +919,17 @@ function awSummeAuffrischen() {
   const neu = document.createElement("div");
   neu.innerHTML = awSummeHtml(awScheine(), awGrenzen());
   alt.replaceWith(neu.firstElementChild);
+}
+
+// Nach jedem Klick auf gruen oder rot stimmen die Zahlen AN den zwei
+// Stand-Schaltern nicht mehr. Nur die zwei Zahlen nachziehen - die ganze
+// Ansicht neu zu zeichnen wuerde das Weiterarbeiten ausbremsen.
+function awStandSchalterAuffrischen() {
+  let g = 0, v = 0;
+  for (const s of awGefiltert()) {
+    if (s.stand === "gewonnen") g++;
+    else if (s.stand === "verloren") v++;
+  }
+  const eg = el("aw_skz_gew"); if (eg) eg.textContent = g;
+  const ev = el("aw_skz_ver"); if (ev) ev.textContent = v;
 }

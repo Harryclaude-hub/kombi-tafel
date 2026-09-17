@@ -5651,3 +5651,43 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE GLEICHES RASTER ---- */
+
+/* =====================================================================
+   STAND-SCHALTER IM AUSWERTEN (17.09.2026) - reine Design-Schicht
+   Karam: "ein Button neben eigener Zeitraum, einmal verloren und einmal
+   gewonnen ... oder ich kann beides mit anzeigen lassen oder ausblenden."
+   Die Funktion liegt in auswerten.js (awZeig/awZeigUm). Diese Schicht
+   faerbt nur. Bis zur Marke ENDE STAND-SCHALTER loeschen, dann sehen die
+   zwei Schalter aus wie die grauen Zeitraum-Knoepfe daneben.
+   ===================================================================== */
+@media screen {
+  body[data-seite="mein"] #auswerten .aw-skgruppe {
+    display: inline-flex; gap: 6px; margin-left: 14px;
+    padding-left: 14px; border-left: 2px solid #d5dbe3;
+  }
+  body[data-seite="mein"] #auswerten .aw-sk-gew {
+    border: 2px solid #1a7a1a; color: #0a5a0a; background: #f1f8f1;
+  }
+  body[data-seite="mein"] #auswerten .aw-sk-gew.aktiv { background: #1a7a1a; color: #fff; }
+  body[data-seite="mein"] #auswerten .aw-sk-ver {
+    border: 2px solid #a00000; color: #7a0000; background: #fdf2f2;
+  }
+  body[data-seite="mein"] #auswerten .aw-sk-ver.aktiv { background: #a00000; color: #fff; }
+  body[data-seite="mein"] #auswerten .aw-skz {
+    display: inline-block; min-width: 1.6em; padding: 0 5px; margin-left: 4px;
+    border-radius: 999px; background: rgba(0, 0, 0, .10);
+    font-size: 11px; font-weight: 700; text-align: center;
+  }
+  body[data-seite="mein"] #auswerten .aw-sk-gew.aktiv .aw-skz,
+  body[data-seite="mein"] #auswerten .aw-sk-ver.aktiv .aw-skz {
+    background: rgba(255, 255, 255, .25);
+  }
+  /* Am Handy laufen die Zeitraum-Knoepfe um; die Gruppe soll dann nicht
+     an einer Kante kleben, sondern eine eigene Zeile beginnen duerfen. */
+  @media (max-width: 700px) {
+    body[data-seite="mein"] #auswerten .aw-skgruppe {
+      margin-left: 0; padding-left: 0; border-left: 0;
+    }
+  }
+}
+/* ---- ENDE STAND-SCHALTER ---- */
