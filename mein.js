@@ -1553,9 +1553,14 @@ async function tuPersonWeg(scheinId) {
   await zeichneBereich();
 }
 
-async function tuScheinOrdner(id, wert) {
+// Der EINE Schreibweg fuer "diese Kombination gehoert zu dieser Person".
+// Benutzt von der grossen Tabelle (tuScheinOrdner) UND vom Auswerten
+// (awPersonZuordnen in auswerten.js) - ein zweiter Schreibweg waere die
+// Drift-Falle. Gibt true zurueck, wenn wirklich geschrieben wurde; jede
+// Fehlermeldung steht dann schon auf dem Schirm.
+async function scheinOrdnerSchreiben(id, wert) {
   const r = await supaScheinAendern(id, { ordner: wert || null });
-  if (r.error) { meldungM("Nicht zugeordnet: " + r.error.message, "warn"); return; }
+  if (r.error) { meldungM("Nicht zugeordnet: " + r.error.message, "warn"); return false; }
   // Die 0-Zeilen-Falle: ohne diese Pruefung meldet die Seite Erfolg,
   // waehrend RLS das Schreiben abgelehnt hat und die Kombination weiter
   // dort liegt, wo sie lag.
@@ -1563,11 +1568,16 @@ async function tuScheinOrdner(id, wert) {
     meldungM("<b>Nicht zugeordnet.</b> Es wurde keine Zeile geändert - fehlendes " +
       "Schreibrecht, oder die Kombination ist nicht mehr da. Sie steht unverändert " +
       "dort, wo sie war.", "warn");
-    return;
+    return false;
   }
   // Auch eine Zuordnung hier zaehlt als "zuletzt benutzt" fuer die
   // fuenf oben im Kombi-Bau - sonst kennt die Merkliste nur den Kombi-Bau.
   if (wert) personGemerkt(wert);
+  return true;
+}
+
+async function tuScheinOrdner(id, wert) {
+  if (!(await scheinOrdnerSchreiben(id, wert))) return;
   zeichneBereich();
 }
 

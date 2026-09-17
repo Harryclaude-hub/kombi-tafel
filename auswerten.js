@@ -616,18 +616,143 @@ function awPersonGruppeHtml() {
   return h + "</div>";
 }
 
-function awPersonSuchen(wert) {
-  awPersonSuche = String(wert || "");
-  // NUR den Personen-Kasten neu zeichnen. Die ganze Ansicht wuerde das
-  // Suchfeld beim ersten Buchstaben wegwerfen (dieselbe Falle wie bei
-  // obSuchen und der Spielsuche).
+function awPersonKastenAuffrischen() {
   const g = el("aw_pgruppe");
   if (!g) return;
   const neu = document.createElement("div");
   neu.innerHTML = awPersonGruppeHtml();
   g.replaceWith(neu.firstElementChild);
+}
+
+function awPersonSuchen(wert) {
+  awPersonSuche = String(wert || "");
+  // NUR den Personen-Kasten neu zeichnen. Die ganze Ansicht wuerde das
+  // Suchfeld beim ersten Buchstaben wegwerfen (dieselbe Falle wie bei
+  // obSuchen und der Spielsuche).
+  awPersonKastenAuffrischen();
   const f = el("aw_psuche");
   if (f) { f.focus(); try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) { } }
+}
+
+// ---------- Person direkt an der Karte zuordnen ----------
+// Karam (17.09.2026): "Es kann oft sein, dass entweder keine Person
+// zugeordnet ist oder die falsche. Ich will das direkt hier beim
+// Auswerten aendern koennen, ohne die Person zu besuchen."
+// Geschrieben wird ueber scheinOrdnerSchreiben in mein.js - DENSELBEN
+// Weg, den die grosse Tabelle nimmt (mit 0-Zeilen-Wache und Merkliste).
+// Ein eigener Schreibweg hier waere die Drift-Falle.
+let awPwOffen = "";                 // Schein-Kennung des offenen Waehlers
+let awPwSuche = "";                 // nie gemerkt, wie jede Suche hier
+const AW_PW_HOECHSTENS = 12;
+
+function awPersonWahlHtml(s) {
+  return '<div class="aw-pwahl" id="aw_pw_' + s.id + '">' +
+    '<div class="aw-pwkopf"><b>Person zuordnen</b> <span class="mini">- antippen gilt sofort</span>' +
+      '<button class="aw-pwzu" onclick="awPersonWahlUm(\'' + s.id + '\')">schließen</button></div>' +
+    '<input id="aw_pws_' + s.id + '" type="text" inputmode="search" ' +
+      'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+      'placeholder="Person suchen (Name oder Nummer)" value="' + textSicherM(awPwSuche) +
+      '" oninput="awPersonWahlSuchen(\'' + s.id + '\', this.value)">' +
+    '<div class="aw-fchips" id="aw_pwc_' + s.id + '">' + awPersonWahlChips(s) + "</div>" +
+  "</div>";
+}
+
+function awPersonWahlChips(s) {
+  const q = awHart(awPwSuche);
+  let liste = Array.isArray(ordnerListe) ? ordnerListe.slice() : [];
+  // Zuletzt benutzte zuerst - dieselbe Reihenfolge wie ueberall
+  // (personenSortiert in logik.js), keine eigene.
+  if (typeof personenSortiert === "function") liste = personenSortiert(liste, kasseScheine);
+  if (q) liste = liste.filter(o => awHart(o.name || "").indexOf(q) > -1);
+  const mehr = Math.max(0, liste.length - AW_PW_HOECHSTENS);
+  const kurz = liste.slice(0, AW_PW_HOECHSTENS);
+  let h = "";
+  for (const o of kurz) {
+    const an = String(s.ordner || "") === String(o.id);
+    h += '<button class="aw-chip' + (an ? " aktiv" : "") + '" onclick="awPersonZuordnen(\'' +
+      s.id + "','" + String(o.id).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + '\')" title="' +
+      (an ? "ist schon zugeordnet" : "dieser Person zuordnen") + '">' +
+      textSicherM(o.name || "Person") + "</button>";
+  }
+  if (!kurz.length) {
+    h += '<span class="mini">Keine Person passt auf <b>' + textSicherM(awPwSuche.trim()) +
+      "</b>.</span>";
+  }
+  if (mehr) h += '<span class="mini">' + mehr + " weitere - tipp den Namen genauer.</span>";
+  // Abziehen mit Vermerk laeuft ueber DENSELBEN Weg wie der Knopf in der
+  // grossen Tabelle (tuPersonWeg): eigene Rueckfrage mit der Kasse
+  // vorher/nachher, erst Vermerk, dann Person weg.
+  if (s.ordner) {
+    h += '<button class="aw-chip aw-pwweg" onclick="awPersonWeg(\'' + s.id + '\')" ' +
+      'title="Von dieser Person abziehen, mit Vermerk - landet unter Falsch zugeordnet">' +
+      "&#9888; nicht diese Person</button>";
+  }
+  return h;
+}
+
+function awPersonWahlUm(id) {
+  awPwOffen = (awPwOffen === id) ? "" : id;
+  awPwSuche = "";
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (s) awKarteAuffrischen(s);
+  if (awPwOffen) {
+    const f = el("aw_pws_" + id);
+    if (f) f.focus();
+  }
+}
+
+function awPersonWahlSuchen(id, wert) {
+  awPwSuche = String(wert || "");
+  // NUR die Chip-Liste tauschen, das Eingabefeld bleibt stehen - so
+  // geht der Fokus beim Tippen nicht verloren.
+  const k = el("aw_pwc_" + id);
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (k && s) k.innerHTML = awPersonWahlChips(s);
+}
+
+async function awPersonZuordnen(scheinId, ordnerId) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === scheinId);
+  if (!s) return;
+  if (typeof scheinOrdnerSchreiben !== "function") {
+    meldungM("Zuordnen geht hier gerade nicht - die Seite ist unvollständig geladen. " +
+      "Lad sie neu.", "warn");
+    return;
+  }
+  if (String(s.ordner || "") === String(ordnerId || "")) {
+    awPwOffen = ""; awPwSuche = "";
+    awKarteAuffrischen(s);
+    return;
+  }
+  const alterName = s.ordner ? (awPersonName(s.ordner) || "einer anderen Person") : "";
+  if (!(await scheinOrdnerSchreiben(scheinId, ordnerId))) return;
+  s.ordner = ordnerId || null;
+  awPwOffen = ""; awPwSuche = "";
+  meldungM("<b>Nr. " + (s.nummer || "?") + "</b> ist jetzt bei <b>" +
+    textSicherM(awPersonName(ordnerId) || "Person") + "</b>." +
+    (alterName ? " Vorher: " + textSicherM(alterName) + "." : ""), "gut");
+  if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
+  // Ist ein Personenfilter an, gehoert die Karte jetzt womoeglich nicht
+  // mehr in die Liste - dann die ganze Ansicht frisch. Sonst reicht das
+  // Noetige: die Karte, der Personen-Kasten, die Summen.
+  if (awPersonenFilter().length) { zeichneAuswerten(); return; }
+  awKarteAuffrischen(s);
+  awPersonKastenAuffrischen();
+  awSummeAuffrischen();
+}
+
+async function awPersonWeg(scheinId) {
+  if (typeof tuPersonWeg !== "function") {
+    meldungM("Abziehen geht hier gerade nicht - die Seite ist unvollständig geladen. " +
+      "Lad sie neu.", "warn");
+    return;
+  }
+  awPwOffen = ""; awPwSuche = "";
+  // tuPersonWeg fragt selbst nach (mit der Kasse vorher/nachher),
+  // schreibt erst den Vermerk, dann die Person weg, und laedt Mein
+  // Bereich frisch. Danach wird die Auswert-Ansicht aus der frischen
+  // Liste neu gezeichnet.
+  await tuPersonWeg(scheinId);
+  zeichneAuswerten();
 }
 
 function awFilterHtml(imZeitraum) {
@@ -900,7 +1025,19 @@ function awKarteHtml(s, lfd, gesamt) {
         // spaeter anders verhaelt.
         (typeof personKnopfM === "function" ? personKnopfM(s.ordner)
           : textSicherM(person || "ohne Person")) +
+        // Karam (17.09.2026): "direkt daneben ein Button, wo ich eine
+        // andere Person suchen und zuordnen kann - ohne dass ich die
+        // Person besuchen muss."
+        (schreib
+          ? '<button class="aw-pknopf" onclick="awPersonWahlUm(\'' + s.id + '\')" title="' +
+            (s.ordner ? "Eine andere Person zuordnen, direkt hier"
+                      : "Dieser Kombination direkt hier eine Person geben") + '">&#9998; ' +
+            (s.ordner ? "ändern" : "zuordnen") + "</button>"
+          : "") +
       "</div>" +
+      // Der Waehler wird NUR gebaut, wenn er offen ist - bei langen
+      // Listen wuerde er sonst an jeder Karte unsichtbar mitgeschleppt.
+      (schreib && awPwOffen === s.id ? awPersonWahlHtml(s) : "") +
       '<div class="aw-spiele mini">' + spiele.join("<br>") + "</div>" +
       '<div class="aw-geld">' +
         "Einsatz <b>" + awGeld(d.einsatz) + "</b> &middot; Quote <b>" +
