@@ -941,7 +941,10 @@ let obSuche = "";
 // nur 10 Personen, die letzten 10 die man geoeffnet hat oder die mit dem
 // meisten Geld - das kann ich filtern. Und ich will nach links und rechts
 // scrollen, nicht nach unten."
-const OB_WIEVIELE = 10;
+// Wie viele Personen-Karten stehen da? Die Zahl liegt seit 17.09.2026
+// in logik.js (PERSONEN_OBEN = 5) und gilt auch im Kombi-Bau. Faellt
+// logik.js weg, bleibt hier eine sichere Zahl statt undefined.
+const OB_WIEVIELE = (typeof PERSONEN_OBEN === "number") ? PERSONEN_OBEN : 5;
 const OB_SORT = "kt_ob_sort";
 function obSort() {
   try { return localStorage.getItem(OB_SORT) || "zuletzt"; } catch (e) { return "zuletzt"; }
@@ -954,12 +957,31 @@ function obSortSetzen(wert) {
 // Ich habe nur 10 angezeigt, das kann ja nicht sein."
 // Also stehen jetzt ALLE da. Das Kuerzen auf zehn bleibt als Knopf, wenn
 // es ihm doch zu viel wird - aber es ist nicht mehr die Vorgabe.
-const OB_KURZ = "kt_ob_kurz";
-function obAlleZeigenJetzt() {
-  try { return localStorage.getItem(OB_KURZ) !== "ja"; } catch (e) { return true; }
+// Karam (17.09.2026): "Bei den Personen sollen nicht alle angezeigt
+// werden, es sollen nur fuenf angezeigt werden, die fuenf aktuellsten."
+//
+// WARUM EIN NEUER SCHLUESSEL. Am 16.09.2026 stand die Vorgabe auf "alle"
+// (kt_ob_kurz), weil Karam sich ueber zehn beschwert hatte. Auf seinem
+// Geraet steht dieser Schluessel deshalb laengst auf einem Wert. Wuerde
+// hier nur die Vorgabe umgedreht, aenderte sich bei ihm gar nichts - und
+// die Arbeit waere unsichtbar geblieben.
+// Der neue Schluessel faengt leer an, also gilt die neue Vorgabe "kurz".
+// Solange er fehlt, steht dazu EIN Satz da: sonst faellt die Liste von 29
+// auf 5, ohne dass irgendwo steht warum. Seine alte Wahl wird dabei nicht
+// ueberfahren, sie ist nur nicht mehr die Frage - er kann mit einem Klick
+// zurueck, und dann bleibt es so.
+const OB_ANSICHT = "kt_ob_ansicht";    // "kurz" oder "alle"
+function obAnsicht() {
+  try { return localStorage.getItem(OB_ANSICHT) === "alle" ? "alle" : "kurz"; }
+  catch (e) { return "kurz"; }
 }
+// Hat Karam die neue Vorgabe schon einmal bewusst bestaetigt oder geaendert?
+function obAnsichtGewaehlt() {
+  try { return localStorage.getItem(OB_ANSICHT) !== null; } catch (e) { return false; }
+}
+function obAlleZeigenJetzt() { return obAnsicht() === "alle"; }
 function obAlle(an) {
-  try { localStorage.setItem(OB_KURZ, an ? "nein" : "ja"); } catch (e) { }
+  try { localStorage.setItem(OB_ANSICHT, an ? "alle" : "kurz"); } catch (e) { }
   zeichneOrdnerBox(Array.isArray(kasseScheine) ? kasseScheine : []);
 }
 function obSuchen(wert) {
@@ -1175,7 +1197,27 @@ function zeichneOrdnerBox(scheine) {
   // Bei einer Suche wird NICHT gekuerzt: wer sucht, will den Treffer sehen.
   const gesamtTreffer = sichtbar.length;
   const gekuerzt = !q && !obAlleZeigenJetzt() && sichtbar.length > OB_WIEVIELE;
-  if (gekuerzt) sichtbar = sichtbar.slice(0, OB_WIEVIELE);
+  // WER DIE KUERZUNG UEBERLEBT, obwohl er hinten steht:
+  //  - die gerade geoeffnete Person. Sonst waere ihre Karte weg, waehrend
+  //    ihre Kombinationen darunter stehen.
+  //  - jede Person mit einem echten Rechenfehler. Ohne das liest Karam den
+  //    roten Satz "irgendwo ist ein Rechenfehler" und kann die Person nicht
+  //    anklicken, weil ihre Karte nicht mehr da ist - und den Namen kennt
+  //    er nicht, also hilft ihm auch die Suche nicht.
+  // Zugeordnet wird ueber die Kennung, nie ueber den Namen.
+  let dazu = [];
+  if (gekuerzt) {
+    const ersten = sichtbar.slice(0, OB_WIEVIELE);
+    const drin = new Set(ersten.map(o => o.id));
+    for (const o of sichtbar) {
+      if (drin.has(o.id)) continue;
+      const pp = personPruefen(o.id, scheine);
+      const lauterFehler = (pp.rechenfehler || []).length &&
+        !obIstStumm(o.id, pp.probleme || []);
+      if (o.id === ordnerFilter || lauterFehler) dazu.push(o);
+    }
+    sichtbar = ersten.concat(dazu);
+  }
 
   if (!ordnerListe.length) {
     verwalten += '<p class="mini">Noch keine Person angelegt.</p>';
@@ -1188,12 +1230,25 @@ function zeichneOrdnerBox(scheine) {
     verwalten += '<div class="ob-sortzeile"><span class="mini">Reihenfolge:</span> ' +
       sknopf("zuletzt", "Zuletzt geöffnet") + sknopf("geld", "Meistes Geld") +
       sknopf("nummer", "P-Nummer") +
+      // Es steht IMMER da, wie viele nicht gezeigt werden und wie man an
+      // sie herankommt. Nichts verschwindet stillschweigend.
       (gekuerzt
-        ? ' <span class="mini">Es werden ' + OB_WIEVIELE + " von " + ordnerListe.length +
-          ' gezeigt.</span> <button onclick="obAlle(true)">alle ' + ordnerListe.length + " zeigen</button>"
+        ? ' <span class="mini">Es stehen die <b>' + OB_WIEVIELE + "</b> aktuellsten von " +
+          ordnerListe.length + " da" +
+          (dazu.length ? ", dazu <b>" + dazu.length + "</b>, weil dort ein Rechenfehler " +
+            "offen ist oder die Person gerade geöffnet ist" : "") +
+          ". Die anderen sind nicht weg - das Suchfeld oben findet jede.</span> " +
+          '<button onclick="obAlle(true)">alle ' + ordnerListe.length + " zeigen</button>" +
+          // Der einmalige Satz: solange Karam die neue Ansicht nicht selbst
+          // bestaetigt oder umgestellt hat, faellt seine Liste sonst
+          // wortlos von 29 auf 5.
+          (obAnsichtGewaehlt() ? ""
+            : ' <span class="mini warnton">Neu seit 17.09.2026: vorher standen hier alle ' +
+              "Personen. Ein Klick auf &bdquo;alle zeigen&ldquo; holt die alte Ansicht " +
+              "zur&uuml;ck und sie bleibt dann so.</span>")
         : (ordnerListe.length > OB_WIEVIELE
           ? ' <span class="mini">alle ' + ordnerListe.length + " werden gezeigt</span> " +
-            '<button onclick="obAlle(false)">nur die ersten ' + OB_WIEVIELE + " zeigen</button>"
+            '<button onclick="obAlle(false)">nur die ' + OB_WIEVIELE + " aktuellsten zeigen</button>"
           : "")) +
       // Karam: "Den Button bei Personen hinzufuegen, alles auf gelesen
       // markieren - das heisst, bei fertig gehen diese Meldungen weg."

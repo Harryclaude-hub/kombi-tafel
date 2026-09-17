@@ -200,6 +200,20 @@ function personenMerklisteBereinigen(liste) {
 // supaScheineKurz sie liefert). Wer nie dran war, bleibt in der
 // Reihenfolge von personVergleich. Verknuepft wird ueber die Kennung,
 // nie ueber den Namen.
+// Karam (15.09.2026): "Ich moechte, dass nur fuenf Personen angezeigt
+// werden, und zwar die aktuellen - und ein Feld, um Personen zu suchen."
+// Karam (17.09.2026), fuer Mein Bereich noch einmal: "Es sollen nur fuenf
+// angezeigt werden, die fuenf aktuellsten, und man hat doch eine Suchleiste
+// bei den Personen, wo man einfach die Nummer suchen kann."
+//
+// EINE Zahl fuer beide Stellen: den Kombi-Bau (Personen beim Speichern) und
+// Mein Bereich (die Personen-Karten). Vorher stand hier fuenf und dort zehn,
+// und niemand haette gemerkt, dass sich die beiden widersprechen.
+// Alle anderen sind WEITER DA, nur eingeklappt: die Suche findet sie, und
+// "alle zeigen" holt die volle Liste. Niemand wird weggeworfen - eine
+// Person, die man nicht mehr findet, waere schlimmer als eine lange Liste.
+const PERSONEN_OBEN = 5;
+
 function personenSortiert(liste, scheine) {
   const rang = new Map();
   let n = 0;

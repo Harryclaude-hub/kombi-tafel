@@ -1865,12 +1865,33 @@ function zeichneGesetzte() {
       // Dann stimmt der Satz darueber nicht: es steckt KEINE Wette aus der
       // Tabelle drin, und die grauen Beine kommen nicht aus einem anderen
       // Ordner, sondern aus genau diesem. Das gehoert dazugesagt.
-      (gsNurPassende && liste.some(e => !e.unlesbar &&
-        !(e.wetten || []).some(t => t && t.id))
-        ? " Kombinationen <b>ganz ohne Wetten-Kennung</b> (alte Fotoscheine, Kombis von " +
-          "Hand) stehen hier, weil sie zu <b>diesem</b> Ordner gehören - ihre Wetten sind " +
-          "deshalb alle grau."
-        : "") +
+      // Getrennt nach dem WIRKLICHEN Grund. Ein falscher Grund ist
+      // schlimmer als gar keiner, weil man ihm nachgeht: eine Kombination
+      // aus einem Ordner, den es nicht mehr gibt, steht hier NICHT, weil
+      // sie hierher gehoert, sondern weil ueber sie nichts zu sagen ist.
+      (function () {
+        if (!gsNurPassende) return "";
+        let hier = 0, ohneOrdner = 0, fremd = 0;
+        for (const e of liste) {
+          if (e.unlesbar || (e.wetten || []).some(t => t && t.id)) continue;
+          if (!e.satz) ohneOrdner++;
+          else if (!SAETZE.some(x => x.id === e.satz)) fremd++;
+          else hier++;
+        }
+        return (hier
+          ? " <b>" + hier + "</b> Kombination(en) <b>ganz ohne Wetten-Kennung</b> (alte " +
+            "Fotoscheine) stehen hier, weil sie zu <b>diesem</b> Ordner gehören - ihre " +
+            "Wetten sind deshalb alle grau."
+          : "") +
+          (ohneOrdner
+            ? " <b>" + ohneOrdner + "</b> hat gar keinen Ordner (Kombi von Hand) und " +
+              "steht deshalb in jedem."
+            : "") +
+          (fremd
+            ? " <b>" + fremd + "</b> steht hier, weil es den Ordner dazu nicht mehr gibt - " +
+              "darüber lässt sich nichts sagen, also bleibt sie stehen."
+            : "");
+      })() +
       wegText() +
       (wegGefiltert || gsNurPassende ? "" :
         ' <button onclick="gsNurPassendeZeigen()">nur die passenden zeigen</button>') +
@@ -2835,7 +2856,8 @@ function textSicher(t) {
 // WEITER DA, nur eingeklappt: die Suche findet sie, und "alle zeigen"
 // klappt die volle Liste auf. Niemand wird weggeworfen - eine Person, die
 // man nicht mehr findet, waere schlimmer als eine lange Liste.
-const PERSONEN_OBEN = 5;
+// PERSONEN_OBEN liegt seit 17.09.2026 in logik.js, weil mein.js dieselbe
+// Zahl braucht. Hier steht sie deshalb nicht mehr.
 // Die Helfer personNorm, personNummer, personenZuletzt, personGemerkt und
 // personenSortiert liegen seit 15.09.2026 in logik.js, weil mein.js sie
 // auch braucht (Zuordnen, Anlegen). Hier bleibt nur, was der Kasten

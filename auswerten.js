@@ -85,6 +85,102 @@ function awReiheSetzen(art) {
 function awPersonenFilter() { return awListeLesen(AW_PERSONEN); }
 function awAnbieterFilter() { return awListeLesen(AW_ANBIETER); }
 
+// ---------- Die Spielsuche ----------
+// Karam (17.09.2026): "Ich moechte bei Auswerten eine Suchleiste da
+// hinballern. Da kann man die Spiele eingeben. Die ganzen Spiele wurden
+// eigentlich eingetragen. Ich brauche einfach nur eine Suchmaschine.
+// Anstatt dass man immer durchscrollen muss, gibt man einfach den Namen
+// der Spiele, und jede Kombi, die diesen Eintrag oder so einen aehnlichen
+// Namen bei sich traegt, kommt dann hoch."
+//
+// ABSICHTLICH NICHT GEMERKT. Eine Suche, die beim naechsten Oeffnen noch
+// steht, laesst Kombinationen fehlen und niemand weiss warum - dieselbe
+// Ueberlegung wie bei obSuche in mein.js.
+let awSuche = "";
+
+// Beide Seiten laufen durch DIESELBE Verhaertung, deshalb finden sie
+// einander: "Beşiktaş" und "Besiktas", "SC Preußen 06 Münster" und
+// "SC Preussen Munster", "FC Zürich" und "FC Zuerich".
+// Schritt eins: klein, ß zu ss, Zeichen von ihren Haekchen trennen und
+// die Haekchen wegwerfen, alles andere zu Leerzeichen.
+function awNorm(t) {
+  return String(t == null ? "" : t)
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+// Schritt zwei: die deutsche Ersatzschreibung ae/oe/ue faellt mit a/o/u
+// zusammen. Das erzeugt auch unsinnige Formen ("queens" wird "quns"),
+// aber das macht nichts: die SUCHE laeuft durch genau dieselbe Stufe,
+// also treffen sich beide Seiten trotzdem.
+function awHart(t) {
+  return awNorm(t).replace(/ae/g, "a").replace(/oe/g, "o").replace(/ue/g, "u");
+}
+
+// Was ist an einer Kombination durchsuchbar? Die Spiele zuerst, denn
+// danach sucht Karam. Dazu Linie, Anbieter, Nummer und Person - alles,
+// was auf der Karte sichtbar steht. Was man sieht, muss man auch
+// suchen koennen, sonst sucht man vergeblich nach etwas, das dasteht.
+function awSuchText(s) {
+  const d = (s && s.daten) || {};
+  const teile = [];
+  for (const t of (d.wetten || [])) {
+    teile.push(t.spiel || "");
+    teile.push(t.linie || t.wette || "");
+  }
+  teile.push("nr " + (s.nummer || ""));
+  teile.push(d.anbieter || (typeof anbieterName === "function" ? anbieterName(d.kz) : ""));
+  teile.push(awPersonName(s.ordner) || "");
+  return awHart(teile.join(" "));
+}
+
+// Mehrere Woerter sind eine UND-Suche: "girona palmas" findet die Partie,
+// auch wenn dazwischen noch etwas steht.
+function awSuchWorte() {
+  const q = awHart(awSuche);
+  return q ? q.split(" ").filter(Boolean) : [];
+}
+
+function awPasstZurSuche(s, worte) {
+  if (!worte.length) return true;
+  // Eine nicht lesbare Kombination hat keinen Text, der treffen koennte.
+  // Sie wird deshalb NIE weggesucht, sondern bleibt als sichtbarer Rest
+  // stehen - sonst faellt ihr Einsatz aus Umsatz und Gewinn heraus und
+  // die Kacheln zeigten zu wenig Geld, ohne es zu sagen.
+  if ((s.daten || {}).gesperrt) return true;
+  const text = awSuchText(s);
+  return worte.every(w => text.indexOf(w) > -1);
+}
+
+// Trifft dieses eine Bein? Nur fuer die Markierung auf der Karte.
+function awBeinTrifft(t, worte) {
+  if (!worte.length) return false;
+  const text = awHart((t.spiel || "") + " " + (t.linie || t.wette || ""));
+  return worte.some(w => text.indexOf(w) > -1);
+}
+
+function awSuchen(wert) {
+  awSuche = String(wert || "");
+  // NUR Liste, Summenkacheln und die Standzeile neu - nicht die ganze
+  // Ansicht. Sonst waere das Eingabefeld nach dem ersten Buchstaben weg.
+  // Dieselbe Falle wie bei obSuchen in mein.js.
+  const k = el("aw_liste");
+  if (k) k.innerHTML = awListeHtml(awScheine());
+  awSummeAuffrischen();
+  const st = el("aw_suchstand");
+  if (st) st.innerHTML = awSuchStandHtml();
+  const weg = el("aw_suchweg");
+  if (weg) weg.hidden = !awSuche;
+}
+
+function awSucheWeg() {
+  const feld = el("aw_suche");
+  if (feld) feld.value = "";
+  awSuchen("");
+}
+
 // Ein Eintrag um: drin wird raus, raus wird drin.
 function awUmschalten(schluessel, wert) {
   const liste = awListeLesen(schluessel);
@@ -111,6 +207,9 @@ function awAnbieterAlle() { awListeSchreiben(AW_ANBIETER, []); awNeuZeichnen(); 
 function awFilterAlle() {
   awListeSchreiben(AW_PERSONEN, []);
   awListeSchreiben(AW_ANBIETER, []);
+  // "Ganz weg" heisst ganz weg: sonst bliebe die Suche stehen und die
+  // Liste waere nach dem Klick immer noch kuerzer als erwartet.
+  awSuche = "";
   awNeuZeichnen();
 }
 
@@ -202,9 +301,17 @@ function awImZeitraum() {
 function awGefiltert() {
   const personen = awPersonenFilter();
   const anbieter = awAnbieterFilter();
+  // Die Spielsuche sitzt GENAU HIER, in derselben Stufe wie Person und
+  // Anbieter. Eine Stufe tiefer (awScheine) zeigten die Summenkacheln
+  // Umsatz und Gewinn fuer den ganzen Zeitraum, waehrend darunter sieben
+  // Kombinationen stehen - eine Geldzahl, die zu nichts gehoert.
+  // Eine Stufe hoeher (awImZeitraum) sprangen die Personen- und
+  // Anbieter-Chips bei jedem Tastendruck in Anzahl und Reihenfolge.
+  const worte = awSuchWorte();
   return awImZeitraum().filter(s => {
     if (personen.length && personen.indexOf(awPersonVon(s)) < 0) return false;
     if (anbieter.length && anbieter.indexOf(awAnbieterVon(s)) < 0) return false;
+    if (!awPasstZurSuche(s, worte)) return false;
     return true;
   });
 }
@@ -279,6 +386,47 @@ function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
   }
   if (!eintraege.length) h += '<span class="mini">' + leerText + "</span>";
   return h + "</div></div>";
+}
+
+// ---------- Das Suchfeld links unter dem Zeitraum ----------
+// Karam (17.09.2026): "Da gibt es so eine riesen Leerflaeche links unter
+// dem Zeitraum und die Filter." Genau dort steht es jetzt: der
+// Filterkasten rechts ist gut dreimal so hoch wie die Zeitraum-Angaben
+// links, darunter war nichts.
+function awSucheHtml() {
+  return '<div class="aw-suche">' +
+    '<label class="aw-suchlabel" for="aw_suche">&#128269; Spiel suchen</label>' +
+    '<div class="aw-suchzeile">' +
+      '<input id="aw_suche" type="text" inputmode="search" enterkeyhint="search" ' +
+        // Autokorrektur aus: am Handy macht sie aus "besiktas" ein
+        // deutsches Wort, und dann wird etwas anderes gesucht, als da steht.
+        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="z. B. Girona Palmas, Besiktas, Preussen Muenster, oder die Nr." ' +
+        'value="' + textSicherM(awSuche) + '" oninput="awSuchen(this.value)">' +
+      '<button id="aw_suchweg" onclick="awSucheWeg()"' + (awSuche ? "" : " hidden") +
+        ">Suche löschen</button>" +
+    "</div>" +
+    '<div id="aw_suchstand" class="aw-suchstand mini">' + awSuchStandHtml() + "</div>" +
+  "</div>";
+}
+
+// Was die Suche gerade tut, in einem Satz. Ohne ihn waere nach dem
+// Tippen nur eine kuerzere Liste da und kein Grund dafuer.
+function awSuchStandHtml() {
+  const imZeitraum = awImZeitraum();
+  if (!awSuche.trim()) {
+    return "Tippe den Namen einer Mannschaft oder einer Partie. Gesucht wird in den " +
+      "<b>Spielen</b> jeder Kombination, dazu Linie, Anbieter, Nummer und Person. " +
+      "Mehrere Wörter müssen alle vorkommen. Groß- und Kleinschreibung, Umlaute und " +
+      "Bindestriche sind egal.";
+  }
+  const treffer = awGefiltert().length;
+  const gesperrt = awGefiltert().filter(s => (s.daten || {}).gesperrt).length;
+  return "<b>" + treffer + "</b> von " + imZeitraum.length +
+    " Kombinationen im Zeitraum passen auf <b>" + textSicherM(awSuche.trim()) + "</b>." +
+    (gesperrt ? " Davon " + gesperrt + " nicht lesbar - die stehen immer dabei, " +
+      "weil über ihren Inhalt niemand etwas sagen kann." : "") +
+    " Umsatz und Gewinn oben zählen genau diese " + treffer + ".";
 }
 
 function awFilterHtml(imZeitraum) {
@@ -356,6 +504,10 @@ function awKopfHtml(g, liste) {
     // und so weiter." Also in DIESELBE Zeile wie die Zeitraum-Angaben,
     // rechts davon. Am Handy rutscht er darunter.
     '<div class="aw-reihe">' +
+    // Links stehen jetzt ZWEI Kaesten untereinander: die Zeitraum-Angaben
+    // und darunter die Spielsuche. Genau die Flaeche, die neben dem hohen
+    // Filterkasten rechts leer war.
+    '<div class="aw-links">' +
     // Karam (16.09.2026): "bei dem Zeitraum sie nicht untereinander,
     // sondern nebeneinander. Zeitraum, Saetze, Uhrzeit - und da mit der
     // Uhrzeit, also wann es genau gesetzt wurde."
@@ -371,6 +523,8 @@ function awKopfHtml(g, liste) {
         '<span class="aw-spw">' + awRandZeit(liste, true) + "</span></span>" +
       '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
         '<span class="aw-spw">' + awRandZeit(liste, false) + "</span></span>" +
+    "</div>" +
+    awSucheHtml() +
     "</div>" +
     awFilterHtml(awImZeitraum()) +
     "</div>" +
@@ -442,6 +596,17 @@ function awListeHtml(liste) {
     // Warum leer? Wenn ein Filter gesetzt ist, ist DAS fast immer der
     // Grund. Das gehoert dazugesagt, sonst sucht man am falschen Ende.
     const gefiltert = awPersonenFilter().length + awAnbieterFilter().length;
+    // Die Suche ist der haeufigste Grund fuer eine leere Liste und muss
+    // deshalb zuerst dastehen, samt dem Wort, nach dem gesucht wurde.
+    if (awSuche.trim()) {
+      return '<p class="mini">Keine Kombination enthält <b>' +
+        textSicherM(awSuche.trim()) + "</b>" +
+        (gefiltert ? " (dazu ist noch ein <b>Filter</b> gesetzt, " + gefiltert +
+          " Auswahl rechts oben)" : "") + ". " +
+        '<button onclick="awSucheWeg()">Suche löschen</button> ' +
+        '<span class="mini">Geschrieben wird der Name so, wie der Anbieter ihn auf dem ' +
+        "Schein hatte - probier ein einzelnes Wort.</span></p>";
+    }
     return '<p class="mini">Hier ist nichts auszuwerten. ' +
       (gefiltert
         ? "Es ist ein <b>Filter</b> gesetzt (" + gefiltert + " Auswahl" +
@@ -468,8 +633,16 @@ function awKarteHtml(s, lfd, gesamt) {
   }
   const person = awPersonName(s.ordner);
   const zurueck = (typeof echtZurueckWert === "function") ? echtZurueckWert(s) : 0;
+  // Welches Bein hat die Suche getroffen? Markiert wird das GANZE Bein,
+  // nicht ein Stueck Text darin: die Namen sind schon durch textSicherM
+  // gelaufen, und in fertiges HTML nachtraeglich hineinzuschneiden wuerde
+  // genau den Schutz aushebeln, fuer den textSicherM da ist.
+  const worte = awSuchWorte();
   const spiele = (d.wetten || []).map(t =>
-    textSicherM(t.spiel || "") + (t.linie ? " <span class='mini'>(" + textSicherM(t.linie) + ")</span>" : ""));
+    '<span class="aw-spiel' + (awBeinTrifft(t, worte) ? " aw-treff" : "") + '">' +
+    textSicherM(t.spiel || "") +
+    (t.linie ? " <span class='mini'>(" + textSicherM(t.linie) + ")</span>" : "") +
+    "</span>");
   return '<div class="aw-karte aw-' + s.stand + '" id="aw_' + s.id + '"' +
     ' data-lfd="' + (lfd || "") + '" data-gesamt="' + (gesamt || "") + '">' +
     // Das Bild: klein daneben, Klick macht es gross (zeilen.js setzt
