@@ -5715,3 +5715,32 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE PERSONEN-KURZLISTE ---- */
+
+/* =====================================================================
+   ORANGE: GEWONNEN, ABER NICHT DER VOLLE BETRAG (17.09.2026)
+   Karam: "ein orangener Button ... da steht: nicht zur Gaenze gewonnen,
+   das ist dann orange." Funktion in auswerten.js (awTeilGewinn,
+   awTeilSpeichern). Reine Design-Schicht, bis ENDE ORANGE loeschen -
+   dann sieht der Knopf grau aus, tut aber weiter dasselbe.
+   ===================================================================== */
+@media screen {
+  body[data-seite="mein"] #auswerten .aw-orange {
+    min-height: 40px; font-size: 14px; font-weight: bold; border-radius: 9px;
+    border: 2px solid #c86a00; color: #8a4a00; background: #fdf6ee;
+  }
+  body[data-seite="mein"] #auswerten .aw-orange.aktiv { background: #c86a00; color: #fff; }
+  body[data-seite="mein"] #auswerten .aw-karte.aw-teilgewinn { border-left-color: #c86a00; }
+  body[data-seite="mein"] #auswerten .aw-teilmarke {
+    color: #8a4a00; font-weight: bold; margin-bottom: 3px;
+  }
+  body[data-seite="mein"] #auswerten .aw-teilform {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 8px; border: 1px dashed #c86a00; border-radius: 9px; background: #fffaf3;
+  }
+  body[data-seite="mein"] #auswerten .aw-teilform[hidden] { display: none; }
+  body[data-seite="mein"] #auswerten .aw-teilok { min-height: 34px; }
+  @media (max-width: 700px) {
+    body[data-seite="mein"] #auswerten .aw-orange { min-height: 46px; }
+  }
+}
+/* ---- ENDE ORANGE ---- */

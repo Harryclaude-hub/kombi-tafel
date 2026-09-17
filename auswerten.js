@@ -860,7 +860,8 @@ function awKarteHtml(s, lfd, gesamt) {
     textSicherM(t.spiel || "") +
     (t.linie ? " <span class='mini'>(" + textSicherM(t.linie) + ")</span>" : "") +
     "</span>");
-  return '<div class="aw-karte aw-' + s.stand + '" id="aw_' + s.id + '"' +
+  return '<div class="aw-karte aw-' + s.stand + (awTeilGewinn(s) ? " aw-teilgewinn" : "") +
+    '" id="aw_' + s.id + '"' +
     ' data-lfd="' + (lfd || "") + '" data-gesamt="' + (gesamt || "") + '">' +
     // Das Bild: klein daneben, Klick macht es gross (zeilen.js setzt
     // .foto-gross). Ohne Foto steht ein ruhiger Platzhalter, damit die
@@ -908,10 +909,28 @@ function awKarteHtml(s, lfd, gesamt) {
     "</div>" +
     '<div class="aw-tasten">' +
       (schreib
-        ? '<button class="aw-gruen' + (s.stand === "gewonnen" ? " aktiv" : "") +
+        // Gruen ist nur dann gefuellt, wenn es ein VOLLER Gewinn ist -
+        // sonst waeren gruen und orange gleichzeitig an und niemand
+        // wuesste, was gilt.
+        ? '<button class="aw-gruen' +
+            (s.stand === "gewonnen" && !awTeilGewinn(s) ? " aktiv" : "") +
             '" onclick="awStand(\'' + s.id + '\',\'gewonnen\')">&#10003; aufgegangen</button>' +
           '<button class="aw-rot' + (s.stand === "verloren" ? " aktiv" : "") +
             '" onclick="awStand(\'' + s.id + '\',\'verloren\')">&#10007; nicht aufgegangen</button>' +
+          '<button class="aw-orange' + (awTeilGewinn(s) ? " aktiv" : "") +
+            '" onclick="awTeilUm(\'' + s.id + '\')" title="Gewonnen, aber der Anbieter hat ' +
+            'weniger ausgezahlt (etwas gevoidet)? Hier den echten Betrag eintragen.">' +
+            "&#177; weniger gekommen</button>" +
+          '<div class="aw-teilform" id="aw_tf_' + s.id + '" hidden>' +
+            '<label class="mini" for="aw_tfe_' + s.id + '">wirklich gekommen:</label> ' +
+            '<input id="aw_tfe_' + s.id + '" class="einsatz aw-echt" type="text" ' +
+              'inputmode="decimal" value="' +
+              (s.echt_zurueck !== null && s.echt_zurueck !== undefined
+                ? Number(s.echt_zurueck).toFixed(2) : "") +
+              '" placeholder="' + Number(d.moeglich || 0).toFixed(2) + '"> &euro; ' +
+            '<button class="aw-orange aw-teilok" onclick="awTeilSpeichern(\'' + s.id +
+              '\')">so speichern</button>' +
+          "</div>" +
           (s.stand !== "offen"
             ? '<button class="aw-zurueck mini" onclick="awStand(\'' + s.id +
               '\',\'offen\')">nochmal offen</button>'
@@ -926,8 +945,20 @@ function awKarteHtml(s, lfd, gesamt) {
 
 function awErgebnisHtml(s, zurueck, schreib) {
   if (s.stand === "gewonnen") {
-    return "gekommen: " + (schreib
-      ? '<input class="einsatz aw-echt" type="number" step="0.01" value="' +
+    // Karams Fall: gewonnen, aber der Anbieter hat weniger ausgezahlt
+    // (etwas wurde gevoidet). Das steht als ORANGE Zeile dran, mit
+    // beiden Zahlen - sonst sieht ein beschnittener Gewinn aus wie ein
+    // voller und die Differenz faellt niemandem mehr auf.
+    return (awTeilGewinn(s)
+      ? '<div class="aw-teilmarke">nicht zur Gänze gewonnen: <b>' +
+        awGeld(s.echt_zurueck) + "</b> statt möglich " +
+        awGeld((s.daten || {}).moeglich) + "</div>"
+      : "") +
+      "gekommen: " + (schreib
+      // type="text" statt type="number": das Zahlenfeld verschluckt
+      // "250,50" je nach Spracheinstellung stillschweigend (bekannte
+      // Falle). awEcht wandelt das Komma selbst um.
+      ? '<input class="einsatz aw-echt" type="text" inputmode="decimal" value="' +
         Number(zurueck || 0).toFixed(2) + '" onchange="awEcht(\'' + s.id + '\', this.value)"> &euro;'
       : "<b>" + awGeld(zurueck) + "</b>") +
       ((s.echt_zurueck === null || s.echt_zurueck === undefined)
@@ -937,6 +968,79 @@ function awErgebnisHtml(s, zurueck, schreib) {
   return (typeof scheinWartet === "function" && scheinWartet(s))
     ? '<span class="aw-wartet">alle Spiele aus - Ergebnis?</span>'
     : "noch offen";
+}
+
+// ---------- Der dritte Ausgang: gewonnen, aber nicht der volle Betrag ----------
+// Karam (17.09.2026): "Manche Wetten gewinne ich zwar, aber ich bekomme
+// nicht den vollen Betrag - da wird irgendwas gevoidet oder so. Ich
+// moechte da unten einen orangenen Button, darauf klicke ich und kann
+// direkt eintippen, was der eigentlich gewonnene Betrag ist, und dann
+// steht da: nicht zur Gaenze gewonnen, das ist dann orange."
+//
+// Orange ist KEIN eigener Stand in der Datenbank. Der Schein steht auf
+// "gewonnen", der echte Betrag in echt_zurueck - denselben Feldern, mit
+// denen Buchhaltung, Kombi-Konto und Berichte laengst rechnen. Ein
+// dritter Stand haette jede dieser Rechnungen anfassen muessen und
+// waere frueher oder spaeter irgendwo vergessen worden. Orange ist nur
+// die SICHTBARKEIT davon: gewonnen, und echt_zurueck weicht vom
+// Moeglich-Wert ab. Das ist aus den echten Geldzahlen abgeleitet, nicht
+// aus einem Merker, der auseinanderlaufen koennte.
+function awTeilGewinn(s) {
+  if (!s || s.stand !== "gewonnen") return false;
+  if (s.echt_zurueck === null || s.echt_zurueck === undefined) return false;
+  const moeglich = ((s.daten || {}).moeglich) || 0;
+  return Math.abs(Number(s.echt_zurueck) - moeglich) > 0.004;
+}
+
+function awTeilUm(id) {
+  const f = el("aw_tf_" + id);
+  if (!f) return;
+  f.hidden = !f.hidden;
+  if (!f.hidden) {
+    const feld = el("aw_tfe_" + id);
+    if (feld) { feld.focus(); try { feld.select(); } catch (e) { } }
+  }
+}
+
+async function awTeilSpeichern(id) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (!s) return;
+  const feld = el("aw_tfe_" + id);
+  const roh = String(feld ? feld.value : "").trim();
+  const zahl = parseFloat(roh.replace(",", "."));
+  if (roh === "" || isNaN(zahl) || zahl < 0) {
+    meldungM("Das ist kein Betrag: \"" + roh + "\". Nichts gespeichert.", "warn");
+    return;
+  }
+  const vorher = s.stand;
+  // EIN Schreibvorgang fuer Stand UND Betrag. Zwei getrennte koennten
+  // in der Mitte scheitern: dann stuende "gewonnen" mit dem vollen
+  // Moeglich-Wert da - genau die Zahl, die Karam korrigieren wollte.
+  const r = await supaScheinAendern(id, { stand: "gewonnen", echt_zurueck: zahl });
+  if (r.error) {
+    meldungM("Nicht gespeichert: " + r.error.message + " Der Schein steht weiter auf \"" +
+      vorher + "\".", "warn");
+    return;
+  }
+  if (!r.data || !r.data.length) {
+    meldungM("<b>Nicht gespeichert.</b> Es wurde keine Zeile geändert - fehlendes " +
+      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + (s.nummer || "?") +
+      " steht weiter auf \"" + vorher + "\".", "warn");
+    return;
+  }
+  s.stand = "gewonnen";
+  s.echt_zurueck = zahl;
+  s.updated_at = new Date().toISOString();
+  const moeglich = ((s.daten || {}).moeglich) || 0;
+  if (Math.abs(zahl - moeglich) <= 0.004) {
+    // Ehrlich sagen, warum hier nichts orange wird.
+    meldungM("Nr. " + (s.nummer || "?") + ": Der Betrag ist genau der mögliche Gewinn - " +
+      "der Schein steht als ganz normal gewonnen da (grün, nicht orange).", "gut");
+  }
+  awKarteAuffrischen(s);
+  awSummeAuffrischen();
+  awStandSchalterAuffrischen();
+  if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
 }
 
 // ---------- Bedienen ----------
