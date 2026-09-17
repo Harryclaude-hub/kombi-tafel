@@ -99,7 +99,9 @@ async function pkBearbeiten(ordnerId, scheinId) {
       .map(w => ({ spiel: w.spiel || "", wette: w.linie || w.wette || "",
                    an: w.an_zeit || "", quote: (Number(w.quote) || 0) ? String(w.quote) : "" })),
     foto: null, fotoName: alt.foto_name || "", fotoWeg: false,
-    fotoDa: !!alt.foto, gebaut: !!(d.scheinId && !d.handeingabe)
+    // Seit "Bilder erst beim Zeigen" (17.09.2026) kann das Bild noch
+    // ungeholt sein - vorhanden ist es trotzdem (alt.fotoDa).
+    fotoDa: !!(alt.foto || alt.fotoDa), gebaut: !!(d.scheinId && !d.handeingabe)
   };
   pkOffen = { ordnerId: ordnerId, scheinId: scheinId };
   zeichneBereich();

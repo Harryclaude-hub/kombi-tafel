@@ -263,10 +263,32 @@ function mitFehler(liste, r) {
 
 // ---------- Scheine ----------
 
+// Karam (17.09.2026): "Ich will, dass du das Programm so ueberarbeitest,
+// dass es fuer riesengrosse Mengen vorhanden ist. Achte auf Bottlenecks
+// und Lag." Die Spalte foto war mit Abstand das Schwerste am Laden:
+// jedes Bild hunderte Kilobyte, alle auf einmal uebertragen und
+// entschluesselt - die 20 bis 40 Sekunden bis kasseScheine stand. Die
+// Liste kommt deshalb jetzt OHNE Bilder. Welche Scheine eines haben,
+// sagt eine zweite, federleichte Abfrage (nur Kennungen) als fotoDa.
+// Das einzelne Bild holt supaScheinFotoHolen erst, wenn seine Zeile
+// wirklich gezeichnet wird (fotoBildHtml in mein.js).
 async function supaScheineLaden(bereichId) {
-  const r = await supa.from("kt_scheine").select("*")
+  // Die Spaltenliste kommt aus einer Probezeile statt fest hingeschrieben:
+  // eine NEUE Spalte in kt_scheine soll hier nicht stillschweigend fehlen
+  // (Drift-Falle). Leere Tabelle oder Fehler -> alles laden wie frueher.
+  let auswahl = "*";
+  const probe = await supa.from("kt_scheine").select("*").limit(1);
+  if (!probe.error && probe.data && probe.data[0]) {
+    const spalten = Object.keys(probe.data[0]).filter(k => k !== "foto");
+    if (spalten.length) auswahl = spalten.join(",");
+  }
+  const r = await supa.from("kt_scheine").select(auswahl)
     .eq("bereich", bereichId).order("created_at", { ascending: false });
   const liste = r.data || [];
+  // Wer hat ueberhaupt ein Bild? Nur Kennungen, kein Byte Bild.
+  const mitFoto = await supa.from("kt_scheine").select("id")
+    .eq("bereich", bereichId).not("foto", "is", null);
+  const fotoIds = new Set((mitFoto.data || []).map(x => x.id));
   const key = await kryptoBereich(bereichId);
   for (const s of liste) {
     if (s.daten && s.daten.e2e) {
@@ -274,25 +296,23 @@ async function supaScheineLaden(bereichId) {
       try { s.daten = JSON.parse(klar); }
       catch (e) { s.daten = { kz: "?", anbieter: "?", wetten: [], einsatz: 0, quote: 0, moeglich: 0, gesperrt: true }; }
     }
+    // Kam die Probe mit "*" zurueck (leere Tabelle gab keine Spalten her),
+    // kann doch ein verschluesseltes foto mitgekommen sein - dann gilt der
+    // alte Weg samt der Unlesbar-Marke vom 16.09.2026.
     if (s.foto) {
       const klar = await e2eAuf(key, s.foto);
       if (klar && String(klar).startsWith("data:")) { s.foto = klar; }
-      else {
-        // HIER STAND EIN STILLER FEHLER (gefunden 16.09.2026, Karam:
-        // "warum ist nicht ueberall ein Foto dabei?"): liess sich das
-        // Bild nicht entschluesseln, wurde s.foto auf null gesetzt. Am
-        // Bildschirm sah das genauso aus wie "hat nie eines gehabt".
-        // Jetzt bleibt eine Marke daran, damit die Anzeige den
-        // Unterschied sagen kann.
-        s.foto = null;
-        s.fotoUnlesbar = true;
-      }
+      else { s.foto = null; s.fotoUnlesbar = true; }
     }
+    s.fotoDa = !s.foto && fotoIds.has(s.id);
     if (s.notiz) s.notiz = await e2eAuf(key, s.notiz);
     // Der Fotoname traegt praktisch den ganzen Schein (Anbieter, Einsatz,
     // alle Quoten). Frueher stand er offen in der Datenbank.
     if (s.foto_name) s.foto_name = await e2eAuf(key, s.foto_name);
   }
+  // Schlug die Foto-Abfrage fehl, wuerden alle Bilder still als "keins
+  // da" gelten - das gehoert gemeldet, nicht verschwiegen.
+  if (mitFoto.error) liste._fotoListeFehler = String(mitFoto.error.message || "Foto-Abfrage fehlgeschlagen");
   return mitFehler(liste, r);
 }
 
@@ -324,15 +344,21 @@ async function supaScheineKurz(bereichId) {
 // Browser." Die Liste kommt weiter ohne Bilder (supaScheineKurz, das
 // waeren schnell mehrere Megabyte) - das Bild EINER Karte wird erst
 // geholt, wenn es angezeigt werden soll.
+// Vier unterscheidbare Antworten (Regel: drei Zustaende, nie zwei):
+//   {foto, name}      es gibt ein Bild und es ist lesbar
+//   null              der Schein hat wirklich keines
+//   {unlesbar: true}  Bild da, aber Schluessel fehlt oder Inhalt kaputt
+//   {fehler: "..."}   die Abfrage selbst ging schief (Netz, Rechte)
 async function supaScheinFotoHolen(id) {
   const r = await supa.from("kt_scheine").select("id, bereich, foto, foto_name")
     .eq("id", id).maybeSingle();
-  if (r.error || !r.data || !r.data.foto) return null;
+  if (r.error) return { fehler: String(r.error.message || "Abfrage fehlgeschlagen") };
+  if (!r.data || !r.data.foto) return null;
   const key = await kryptoBereich(r.data.bereich);
-  if (!key) return null;
+  if (!key) return { unlesbar: true };
   let foto = await e2eAuf(key, r.data.foto);
   // Kaputt oder falscher Schluessel: lieber kein Bild als ein kaputtes.
-  if (!foto || !String(foto).startsWith("data:")) return null;
+  if (!foto || !String(foto).startsWith("data:")) return { unlesbar: true };
   const name = r.data.foto_name ? await e2eAuf(key, r.data.foto_name) : "";
   return { foto: foto, name: name || "Wettschein" };
 }

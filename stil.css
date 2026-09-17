@@ -5820,3 +5820,27 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE ANWESENDE ---- */
+
+/* =====================================================================
+   BILDER ERST BEIM ZEIGEN (17.09.2026) - reine Design-Schicht
+   Die Lade-, Kaputt- und Nochmal-Stellen der Schein-Bilder (fotoBildHtml
+   in mein.js). Bis ENDE BILDLADER loeschen - dann sind die Platzhalter
+   nackter Text, geladen wird trotzdem.
+   ===================================================================== */
+@media screen {
+  .fotoplatz { display: inline-block; }
+  .fotoladt {
+    display: inline-block; min-width: 64px; padding: 10px 6px;
+    border: 1px dashed #b9c2cd; border-radius: 7px; color: #5a6673;
+    text-align: center; background: #f6f8fa;
+  }
+  .fotokaputt {
+    display: inline-block; padding: 8px 6px; border: 1px dashed #b35a00;
+    border-radius: 7px; color: #8a4a00; text-align: center; background: #fdf6ee;
+  }
+  .fotoholen {
+    padding: 6px 8px; border: 1px solid #a00000; border-radius: 7px;
+    color: #7a0000; background: #fdf2f2; cursor: pointer;
+  }
+}
+/* ---- ENDE BILDLADER ---- */

@@ -514,7 +514,9 @@ function exKombinationen() {
       s.stand || "",
       (s.stand === "gewonnen" && zurueck !== null) ? zurueck : null,
       d.handeingabe ? "von Hand" : "",
-      s.foto ? "ja" : "nein",
+      // fotoDa: Bild liegt in der Datenbank, ist nur noch nicht geholt
+      // (Bilder erst beim Zeigen, 17.09.2026). Fuer die Liste zaehlt es.
+      (s.foto || s.fotoDa || s.fotoUnlesbar) ? "ja" : "nein",
       String(s.notiz || "").replace(/\s+/g, " ").trim(),
       d.satz || ""
     ]);
@@ -566,12 +568,38 @@ function exKombinationen() {
 // an, dann das Datum: so stimmt die Reihenfolge im Windows-Ordner. Die
 // Liste, welches Bild zu welcher Kombination gehoert, liegt als Excel
 // mit im ZIP, nicht als zweiter Download.
-function exFotos() {
+async function exFotos() {
   if (!exBereit()) return;
   const alle = exScheine();
+  // Seit "Bilder erst beim Zeigen" (17.09.2026) liegen die meisten
+  // Bilder beim Seitenaufbau noch nicht im Speicher, nur die Marke
+  // fotoDa. Fuers ZIP werden sie JETZT geholt - und wer sich nicht
+  // holen laesst, wird gezaehlt und am Ende benannt. Sonst fehlte er
+  // still im Ordner, und niemand wuesste es.
+  const nachzuladen = alle.filter(s => s.fotoDa && !s.foto);
+  let holFehler = 0;
+  if (nachzuladen.length && typeof supaScheinFotoHolen === "function") {
+    let geholt = 0;
+    for (const s of nachzuladen) {
+      const r = await supaScheinFotoHolen(s.id);
+      if (r && r.foto) { s.foto = r.foto; if (r.name) s.foto_name = r.name; }
+      else if (r && r.unlesbar) { s.fotoUnlesbar = true; s.fotoDa = false; }
+      else if (r && r.fehler) holFehler++;
+      else s.fotoDa = false;
+      geholt++;
+      if (geholt % 10 === 0 || geholt === nachzuladen.length) {
+        exMeldung("Hole Bilder aus der Datenbank: " + geholt + " von " +
+          nachzuladen.length + "...", "gut");
+      }
+    }
+  }
   const mit = alle.filter(s => s.foto && String(s.foto).startsWith("data:"));
   const ohne = alle.length - mit.length;
-  if (!mit.length) { exMeldung("Es ist kein Foto gespeichert.", "warn"); return; }
+  if (!mit.length) {
+    exMeldung("Es ist kein Foto gespeichert" +
+      (holFehler ? " (" + holFehler + " ließen sich nicht laden)" : "") + ".", "warn");
+    return;
+  }
   exMeldung("Packe " + mit.length + " Fotos zusammen, das dauert einen Moment...", "gut");
 
   const dateien = [], liste = [], vergeben = new Set();
@@ -627,12 +655,14 @@ function exFotos() {
       "Der Dateiname faengt mit der festen Nummer der Kombination an, dann das Datum.\r\n" +
       "Welches Bild zu welcher Kombination gehoert, steht in Fotos_Liste.xlsx.\r\n\r\n" +
       (kaputt ? kaputt + " Bild(er) liessen sich nicht lesen und fehlen hier.\r\n" : "") +
+      (holFehler ? holFehler + " Bild(er) liessen sich nicht aus der Datenbank holen und fehlen hier.\r\n" : "") +
       (ohne ? ohne + " Kombination(en) haben gar kein Foto.\r\n" : "")
     });
     exSpeichern(exZip(dateien), "Fotos_" + exHeute() + ".zip");
     exMeldung("<b>" + anzahl + " Fotos</b> gepackt (" + (bytes / 1048576).toFixed(1) +
       " MB): <b>Fotos_" + exHeute() + ".zip</b>." +
       (kaputt ? " " + kaputt + " Bild(er) waren nicht lesbar und fehlen." : "") +
+      (holFehler ? " <b>" + holFehler + " Bild(er) ließen sich nicht laden und fehlen im ZIP.</b>" : "") +
       (ohne ? " " + ohne + " Kombination(en) haben kein Foto." : ""), "gut");
   });
 }

@@ -455,6 +455,93 @@ const MB_BLOECKE = [
 let kasseVeraltet = false;
 function kasseScheineGeaendert() { kasseVeraltet = true; }
 
+// ---------- Bilder erst beim Zeigen (17.09.2026) ----------
+// Karam: "riesengrosse Mengen, achte auf Bottlenecks und Lag." Die
+// Scheine kommen seitdem OHNE Bilder aus der Datenbank (supaScheineLaden
+// markiert nur fotoDa). Jedes Bild wird erst geholt, wenn seine Zeile
+// wirklich gezeichnet ist - einmal, hoechstens drei gleichzeitig, und
+// jeder Fehlschlag steht sichtbar an der Stelle des Bildes.
+const FOTO_GLEICHZEITIG = 3;
+const fotoWarte = [];
+const fotoAngefordert = new Set();
+let fotoLaeuft = 0;
+
+// DER eine Erzeuger fuer das kleine Bild an Zeilen und Karten. Wer ein
+// Schein-Bild zeigen will, ruft das hier - keine zweite Fassung bauen.
+function fotoBildHtml(s, extraKlasse) {
+  const halter = (innen) => '<span class="fotoplatz" data-fotoid="' + s.id + '">' + innen + "</span>";
+  if (s.foto && String(s.foto).startsWith("data:")) {
+    return halter('<img src="' + textSicherM(s.foto) + '" class="minifoto' +
+      (extraKlasse ? " " + extraKlasse : "") + '" alt="Wettschein Nr. ' + (s.nummer || "") +
+      '" title="Antippen macht das Bild groß">');
+  }
+  if (s.fotoUnlesbar) return halter('<span class="mini fotokaputt">Foto da,<br>nicht lesbar</span>');
+  if (s.fotoFehler) {
+    return halter('<button class="mini fotoholen" onclick="fotoNochmal(\'' + s.id + '\')" ' +
+      'title="' + textSicherM(String(s.fotoFehler).slice(0, 120)) + '">Bild kam nicht - nochmal</button>');
+  }
+  if (s.fotoDa) {
+    fotoAnfordern(s.id);
+    return halter('<span class="mini fotoladt">Bild lädt&hellip;</span>');
+  }
+  return halter("");
+}
+
+// Hat dieser Schein irgendetwas, das die Bild-Stelle zeigen soll?
+function fotoErwartet(s) {
+  return !!(s && (s.foto || s.fotoDa || s.fotoUnlesbar || s.fotoFehler));
+}
+
+function fotoAnfordern(id) {
+  if (fotoAngefordert.has(id)) return;
+  fotoAngefordert.add(id);
+  fotoWarte.push(id);
+  // Nicht mitten im Zeichnen laden - erst wenn der Aufbau durch ist.
+  setTimeout(fotoNaechstes, 0);
+}
+
+function fotoNochmal(id) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (s) { s.fotoFehler = ""; s.fotoDa = true; fotoFlicken(s); }
+  fotoAngefordert.delete(id);
+  fotoAnfordern(id);
+}
+
+async function fotoNaechstes() {
+  if (fotoLaeuft >= FOTO_GLEICHZEITIG) return;
+  const id = fotoWarte.shift();
+  if (!id) return;
+  fotoLaeuft++;
+  try {
+    const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+    if (!s || s.foto) return;
+    const r = await supaScheinFotoHolen(id);
+    if (r && r.foto) { s.foto = r.foto; if (r.name) s.foto_name = r.name; s.fotoFehler = ""; }
+    else if (r && r.unlesbar) { s.fotoUnlesbar = true; s.fotoDa = false; }
+    else if (r && r.fehler) {
+      // Netz oder Rechte: NICHT wie "kein Bild" aussehen lassen. Die
+      // Stelle bekommt einen Nochmal-Knopf mit dem Grund als Tipp.
+      s.fotoFehler = r.fehler;
+      s.fotoDa = false;
+    }
+    else { s.fotoDa = false; }        // es gibt wirklich keines (mehr)
+    fotoFlicken(s);
+  } finally {
+    fotoLaeuft--;
+    if (fotoWarte.length) setTimeout(fotoNaechstes, 0);
+  }
+}
+
+// Alle sichtbaren Stellen dieses Scheins auf den neuen Stand bringen -
+// dieselbe Kombination kann in Tabelle UND Auswerten gleichzeitig stehen.
+function fotoFlicken(s) {
+  document.querySelectorAll('.fotoplatz[data-fotoid="' + s.id + '"]').forEach(k => {
+    const neu = document.createElement("span");
+    neu.innerHTML = fotoBildHtml(s);
+    if (neu.firstElementChild) k.replaceWith(neu.firstElementChild);
+  });
+}
+
 // Profil, Freunde & Teilen und Chat sind seit dem 02.09. KEINE Bloecke
 // mehr, sondern eigene Ansichten hinter den Knoepfen oben.
 const MB_ANSICHTEN = ["profil", "freunde", "chat"];
@@ -1654,6 +1741,14 @@ async function zeichneBereich() {
   anmerkungenListe = await supaAnmerkungenLaden(aktiverBereich.id);
   zeichneLadefehlerWeg();
   kasseScheine = scheine;
+  // Schlug nur die kleine "wer hat ein Bild?"-Abfrage fehl, fehlen alle
+  // Bilder - das wird gesagt, sonst saehe es aus wie "nie eines gehabt".
+  if (scheine._fotoListeFehler) {
+    meldungM("<b>Bilder-Abfrage fehlgeschlagen.</b> Die Kombinationen sind da, aber " +
+      "welche ein Foto haben, ließ sich nicht feststellen (" +
+      textSicherM(String(scheine._fotoListeFehler).slice(0, 100)) +
+      "). Seite neu laden holt die Bilder.", "warn");
+  }
   // Ergebnisse: Eingabetafel zeichnen und alles Offene durchrechnen.
   // NACH dem Fuellen von kasseScheine, sonst rechnet es auf der alten
   // Liste. ergebnisseAuswerten schuetzt sich selbst gegen Schleifen.
@@ -1812,8 +1907,10 @@ function zeichneScheineDb(scheine) {
       // muessen als TEXT eingesetzt werden, nie als HTML (siehe textSicherM).
       "<td class='mini'>" + (d.wetten || []).map(t =>
         textSicherM(t.spiel) + " (" + textSicherM(t.linie) + ")").join("<br>") +
-      (s.foto ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
-        '<div><img src="' + textSicherM(s.foto) + '" class="minifoto"></div>' : "") +
+      (fotoErwartet(s)
+        ? '<div class="fotoname mini">' + textSicherM(s.foto_name || "") + "</div>" +
+          "<div>" + fotoBildHtml(s) + "</div>"
+        : "") +
       (dopp[s.id]
         ? '<div class="doppelmark">' + (dopp[s.id].spaeter
             ? "&#9888; doppelt gespeichert (" + dopp[s.id].platz + ". von " +
@@ -1914,6 +2011,14 @@ async function tuKopieren(id) {
   if (s.daten && s.daten.gesperrt) {
     meldungM("Nicht kopiert: dieser Schein liess sich nicht entschlüsseln (Schlüssel fehlt).", "warn");
     return;
+  }
+  // Die Liste kommt seit 17.09.2026 ohne Bilder. Fuers Kopieren wird das
+  // Bild jetzt geholt - sonst kaeme die Kopie still ohne Foto an.
+  if (s.fotoDa && !s.foto) {
+    const bild = await supaScheinFotoHolen(s.id);
+    if (bild && bild.foto) { s.foto = bild.foto; s.foto_name = bild.name; }
+    else if (!confirm("Das Foto dieser Kombination ließ sich gerade nicht laden.\n" +
+      "Trotzdem OHNE Bild kopieren?")) return;
   }
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
   meldungM(r.error ? "Kopieren fehlgeschlagen: " + r.error.message
@@ -2199,7 +2304,7 @@ function kombiUebersichtHtml(ordnerId, scheine) {
       "<td>" + (d.einsatz || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + (d.moeglich || 0).toFixed(2) + " &euro;</td>" +
       "<td>" + s.stand + (scheinWartet(s) ? ' <span class="fertigbadge">Ergebnis?</span>' : "") + "</td>" +
-      "<td>" + (s.foto ? '<img src="' + textSicherM(s.foto) + '" class="minifoto">' : '<span class="mini">-</span>') + "</td>" +
+      "<td>" + (fotoErwartet(s) ? fotoBildHtml(s) : '<span class="mini">-</span>') + "</td>" +
       "<td>" + (darfSchreiben() && typeof pkBearbeiten === "function"
         ? "<button title='Diese Kombination bearbeiten' " +
           "onclick=\"pkBearbeiten('" + ordnerId + "', '" + s.id + "')\">&#9998;</button> " +
@@ -3335,7 +3440,13 @@ async function fotosNachtragen() {
     return;
   }
   const alle = Array.isArray(kasseScheine) ? kasseScheine : [];
-  const fehlen = alle.filter(s => !s.foto);
+  // ACHTUNG seit "Bilder erst beim Zeigen" (17.09.2026): ein Schein mit
+  // fotoDa HAT ein Bild in der Datenbank, es ist nur noch nicht geholt.
+  // Er darf hier NICHT als "fehlt" gelten - der Nachtrag wuerde sonst
+  // das echte Bild mit einem Geraete-Bild ueberschreiben. Die UNLESBAREN
+  // bleiben absichtlich drin: die Schleife unten zaehlt sie getrennt und
+  // laesst sie in Ruhe (continue), genau wie bisher.
+  const fehlen = alle.filter(s => !s.foto && !s.fotoDa && !s.fotoFehler);
   if (!fehlen.length) {
     meldungM("Bei allen " + alle.length + " Kombinationen ist ein Bild da. Nichts nachzutragen.", "gut");
     return;
@@ -3409,11 +3520,9 @@ function kkFotoHtml(x) {
   for (const id of (x.ids || [])) {
     const s = liste.find(y => y.id === id);
     if (!s) continue;
-    if (s.foto && String(s.foto).startsWith("data:")) {
-      h += '<img class="minifoto kk-foto" src="' + textSicherM(s.foto) +
-        '" alt="Wettschein Nr. ' + (s.nummer || "") +
-        '" title="Nr. ' + (s.nummer || "?") + ' - antippen macht das Bild groß">';
-    } else if (s.fotoUnlesbar) kaputt++;
+    if (s.fotoUnlesbar) { kaputt++; continue; }
+    // Bild, Lade-Platzhalter oder Nochmal-Knopf: der EINE Erzeuger.
+    if (fotoErwartet(s)) h += fotoBildHtml(s, "kk-foto");
   }
   if (kaputt) h += '<div class="kk-fotokaputt mini">' + kaputt +
     " Foto(s) nicht lesbar</div>";

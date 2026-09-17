@@ -992,14 +992,21 @@ function awKarteHtml(s, lfd, gesamt) {
     // .foto-gross). Ohne Foto steht ein ruhiger Platzhalter, damit die
     // Karten nicht unterschiedlich breit werden.
     '<div class="aw-bild">' +
-      (s.foto
-        ? '<img class="minifoto" src="' + textSicherM(s.foto) + '" alt="Wettschein Nr. ' +
-          (s.nummer || "") + '" title="Antippen macht das Bild groß">'
-        // Ein Foto, das sich nicht entschluesseln liess, ist NICHT
-        // dasselbe wie gar keines. Vorher sah beides gleich aus.
-        : (s.fotoUnlesbar
-          ? '<div class="aw-keinbild aw-fotokaputt mini">Foto da,<br>nicht lesbar</div>'
-          : '<div class="aw-keinbild mini">kein Foto</div>')) +
+      // Bild, Lade-Platzhalter, Nochmal-Knopf oder Unlesbar-Marke kommen
+      // aus dem EINEN Erzeuger in mein.js (fotoBildHtml, seit "Bilder
+      // erst beim Zeigen" am 17.09.2026). Nur "hat wirklich keines"
+      // behaelt hier den ruhigen Platzhalter, damit die Karten nicht
+      // unterschiedlich breit werden.
+      (typeof fotoBildHtml === "function" && typeof fotoErwartet === "function"
+        ? (fotoErwartet(s)
+          ? fotoBildHtml(s)
+          : '<div class="aw-keinbild mini">kein Foto</div>')
+        : (s.foto
+          ? '<img class="minifoto" src="' + textSicherM(s.foto) + '" alt="Wettschein Nr. ' +
+            (s.nummer || "") + '" title="Antippen macht das Bild groß">'
+          : (s.fotoUnlesbar
+            ? '<div class="aw-keinbild aw-fotokaputt mini">Foto da,<br>nicht lesbar</div>'
+            : '<div class="aw-keinbild mini">kein Foto</div>'))) +
       // Karam: "bei den Kombis immer so einen kleinen Button, Foto
       // hinzufuegen." Auch hier, direkt unter dem Platz fuers Bild.
       (typeof fotoKnopfHtml === "function" ? fotoKnopfHtml(s.id, true) : "") +
