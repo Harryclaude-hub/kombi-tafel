@@ -361,12 +361,23 @@ function beineAus(daten) {
 
 // nummer ist Karams feste Scheinnummer. Die Spalte gab es schon, wurde
 // aber nie gefuellt - deshalb stand im Chat-Anhang immer "K-?".
-async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, nummer) {
+// wann ist ein Ausnahmefall und bleibt fast immer leer: dann setzt die
+// Datenbank created_at auf jetzt, und das ist bei einem frisch gesetzten
+// Schein richtig. Wer einen ALTEN Schein nachtraegt, muss den Zeitpunkt
+// aber mitgeben koennen - die ganze Buchhaltung, die Tagesansicht und
+// das Auswerten filtern ueber created_at, nicht ueber daten.zeit. Ohne
+// das laege ein Schein vom 25.08. im Auswerten unter dem heutigen Tag.
+async function supaScheinAnlegen(bereichId, daten, foto, fotoName, ordnerId, nummer, wann) {
   const u = await supaNutzer();
   const key = await kryptoBereich(bereichId);
   if (!key) return { error: { message: OHNE_SCHLUESSEL } };
+  const zeit = {};
+  if (wann) {
+    const d = new Date(wann);
+    if (!isNaN(d.getTime())) { zeit.created_at = d.toISOString(); zeit.updated_at = d.toISOString(); }
+  }
   return await supa.from("kt_scheine").insert({
-    bereich: bereichId, angelegt_von: u.id,
+    bereich: bereichId, angelegt_von: u.id, ...zeit,
     daten: key ? { e2e: await e2eZu(key, JSON.stringify(daten)) } : daten,
     foto: foto ? await e2eZu(key, foto) : null,
     foto_name: fotoName ? await e2eZu(key, fotoName) : null,

@@ -40,6 +40,14 @@
 // erkennt der zweite Durchgang, was schon da ist.
 function altScheinId(s) { return "ALT-" + s.datum + "-" + s.nr; }
 
+// Karam (17.09.2026): "Du erstellst den Ordner. Das Datum ist 25. bis
+// 28. August 2026. Und die sind halt einfach die aeltesten Kombis, die
+// es gibt." Der Ordner wird beim Anlegen mit erzeugt, er muss nichts
+// vorbereiten. Die Kennung faengt mit dem 25.08. an, damit er in jeder
+// nach Datum sortierten Liste ganz unten steht - als aeltester.
+const ALT_SATZ = "2026-08-25-alt";
+const ALT_SATZ_TITEL = "Alte Scheine 25. bis 28.08.2026";
+
 let altBilder = {};        // Dateiname -> Daten-URL
 let altAuswahl = null;     // Set der angehakten Nummern, null = noch nicht gebaut
 
@@ -180,6 +188,20 @@ async function altAnlegen() {
       "Buchhaltung mit. Sie stehen alle auf offen - gewonnen oder\n" +
       "verloren traegst du selbst ein.")) return;
 
+  // Erst den Ordner. Schlaegt das fehl, wird trotzdem weitergemacht -
+  // die Scheine sind wichtiger als ihre Ueberschrift -, aber es steht
+  // am Ende dabei.
+  let ordnerText = "";
+  if (typeof supaSatzAnlegen === "function") {
+    try {
+      const r = await supaSatzAnlegen(ALT_SATZ, ALT_SATZ_TITEL);
+      if (r && r.error) ordnerText = " Der Ordner liess sich nicht anlegen (" +
+        textSicherM(String(r.error.message).slice(0, 60)) + "), die Scheine stehen trotzdem da.";
+    } catch (e) {
+      ordnerText = " Der Ordner liess sich nicht anlegen, die Scheine stehen trotzdem da.";
+    }
+  }
+
   // Was liegt schon da? Ueber die feste Kennung, nicht ueber Betraege.
   const schon = new Set();
   for (const x of (kasseScheine || [])) {
@@ -198,7 +220,7 @@ async function altAnlegen() {
       zeit: new Date(x.datum + "T12:00:00").toISOString(),
       scheinId: id,
       kz: x.kz,
-      satz: "",
+      satz: ALT_SATZ,        // der Ordner "Alte Scheine 25. bis 28.08.2026"
       nummer: null,
       anbieter: (typeof anbieterName === "function" ? anbieterName(x.kz) : x.kz),
       einsatz: x.ein,
@@ -215,8 +237,12 @@ async function altAnlegen() {
       altfoto: x.foto
     };
     const bild = altBilder[x.foto] || null;
+    // Der letzte Wert ist der Zeitpunkt: created_at MUSS auf den alten
+    // Tag gesetzt werden. Buchhaltung, Tagesansicht und Auswerten filtern
+    // darueber; ohne ihn laegen die Scheine alle unter dem heutigen Tag.
     const r = await supaScheinAnlegen(aktiverBereich.id, daten, bild,
-      bild ? x.foto : null, null, null);      // ordner null = KEINE Person
+      bild ? x.foto : null, null, null,       // ordner null = KEINE Person
+      daten.zeit);
     if (r && r.error) {
       schief.push("Nr. " + x.nr + ": " + String(r.error.message).slice(0, 60));
       continue;
@@ -225,7 +251,7 @@ async function altAnlegen() {
     schon.add(id);
   }
 
-  let text = "<b>" + neu + " von " + liste.length + " Scheinen angelegt.</b>";
+  let text = "<b>" + neu + " von " + liste.length + " Scheinen angelegt.</b>" + ordnerText;
   if (uebersprungen) text += " " + uebersprungen + " waren schon da und wurden uebersprungen.";
   if (schief.length) {
     text += " <b>" + schief.length + " NICHT angelegt:</b> " + textSicherM(schief.slice(0, 3).join("; "));
