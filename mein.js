@@ -1109,12 +1109,17 @@ function zeichneOrdnerBox(scheine) {
   if (!box) return;
   const zahl = {};
   const wartend = {};
-  let ohne = 0, ohneWartend = 0;
+  let ohne = 0, ohneWartend = 0, ohneLos = 0, losWartend = 0;
   for (const s of scheine) {
     const fertig = scheinWartet(s);
     if (s.ordner) {
       zahl[s.ordner] = (zahl[s.ordner] || 0) + 1;
       if (fertig) wartend[s.ordner] = (wartend[s.ordner] || 0) + 1;
+    } else if (personLosgeloest(s)) {
+      // Abgezogene zaehlen NICHT als "ohne Person": sonst stuende auf dem
+      // Knopf eine Zahl, die groesser ist als die Liste dahinter.
+      ohneLos++;
+      if (fertig) losWartend++;
     } else {
       ohne++;
       if (fertig) ohneWartend++;
@@ -1133,13 +1138,39 @@ function zeichneOrdnerBox(scheine) {
     if (alle && !obIstStumm(o.id, pp.probleme || [])) stummZahl += alle;
     if ((pp.rechenfehler || []).length && !obIstStumm(o.id, pp.probleme || [])) irgendwoWarnung = true;
   }
+  // Karam (17.09.2026): "Ich will, dass es dafuer auch einen eigenen
+  // Filter gibt, dass man sie wieder sucht und findet."
+  // "Ohne Person" und "Falsch zugeordnet" sind zwei VERSCHIEDENE Dinge:
+  // das eine war nie zugeordnet, das andere hat Karam mit Absicht
+  // abgezogen. In einem Topf forderte ihn die Seite weiter auf, genau das
+  // zuzuordnen, was er gerade absichtlich nicht zuordnet.
+  // Gegenprobe (Regel 5): dieselbe Zahl auf einem zweiten Weg gezaehlt.
+  // Weichen sie ab, stimmt eine der beiden Schleifen nicht mehr, und das
+  // soll auffallen, bevor es eine Geldzahl betrifft.
+  const losZahl = scheine.filter(personLosgeloest).length;
+  const ohneEcht = ohne;
   const filter = '<div class="ordnerfilter">' +
     '<button class="' + (ordnerFilter === "alle" ? "aktiv" : "") +
       '" onclick="tuOrdnerFilter(\'alle\')">Alle Kombinationen (' + scheine.length + ")</button> " +
     '<button class="' + (ordnerFilter === "ohne" ? "aktiv" : "") +
-      '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohne + ")" +
+      '" onclick="tuOrdnerFilter(\'ohne\')">Ohne Person (' + ohneEcht + ")" +
     (ohneWartend ? ' <span class="fertigbadge">' + ohneWartend + " fertig</span>" : "") +
-    "</button></div>";
+    "</button>" +
+    // Die Gegenprobe steht auf dem Schirm, nicht nur im Kopf: zaehlt die
+    // Schleife oben etwas anderes als der Filter unten, ist eine der
+    // beiden falsch - und das darf nicht stumm bleiben.
+    (ohneLos !== losZahl
+      ? ' <span class="mini warnton">Achtung: zwei Wege z&auml;hlen hier ' +
+        "verschieden (" + ohneLos + " gegen " + losZahl + "). Bitte melden.</span>"
+      : "") +
+    (losZahl
+      ? ' <button class="' + (ordnerFilter === "weg" ? "aktiv" : "") +
+        '" onclick="tuOrdnerFilter(\'weg\')" title="Von einer Person abgezogen, weil sie ' +
+        'dort falsch lag">&#9888; Falsch zugeordnet (' + losZahl + ")" +
+        (losWartend ? ' <span class="fertigbadge">' + losWartend + " fertig</span>" : "") +
+        "</button>"
+      : "") +
+    "</div>";
 
   // ---- Personen als Raster, 4 bis 5 je Zeile ----
   // Karam (16.09.2026): "Bei der Personenanzeige will ich, dass jeder Name
@@ -1339,7 +1370,13 @@ function zeichneOrdnerBox(scheine) {
       "Person geht sich nicht aus. Person anklicken und nachsehen. Alles andere sind nur " +
       "Hinweise und stehen hinter dem Knopf daneben.</p>" : "") +
     (ohne > 0 ? '<p class="mini"><b>' + ohne + " Kombination" + (ohne === 1 ? "" : "en") +
-      " ohne Person</b> - bitte unten in der Tabelle zuordnen.</p>" : "");
+      " ohne Person</b> - bitte unten in der Tabelle zuordnen.</p>" : "") +
+    // Die abgezogenen sind KEINE Aufforderung: Karam hat sie mit Absicht
+    // von einer Person weggenommen. Sie bekommen einen eigenen, ruhigen
+    // Satz mit dem Weg dorthin.
+    (losZahl ? '<p class="mini">&#9888; <b>' + losZahl + " Kombination(en)</b> hast du von " +
+      "einer Person abgezogen, weil sie dort falsch lagen. Sie z&auml;hlen bei keiner " +
+      "Person mit. " + '<button onclick="tuOrdnerFilter(\'weg\')">Diese anzeigen</button></p>' : "");
 }
 
 function tuOrdnerFilter(wert) {
@@ -1387,9 +1424,130 @@ async function tuOrdnerLoeschen(id) {
   zeichneBereich();
 }
 
+// Eine Kombination, die Karam ausdruecklich von einer falschen Person
+// ABGEZOGEN hat. Sie hat keine Person mehr, traegt aber den Vermerk, bei
+// welcher sie war - daran erkennt sie der eigene Filter wieder.
+function personLosgeloest(s) {
+  return !!(s && !s.ordner && s.daten && s.daten.personWeg);
+}
+
+// WELCHE KOMBINATIONEN ZEIGT DIE TABELLE GERADE? Genau eine Stelle
+// beantwortet das. Vorher stand dieselbe Kette zweimal im Code
+// (zeichneBereich und tuAnbieterFilter). Ein dritter Wert waere in der
+// einen Liste angekommen und in der anderen nicht.
+function scheineNachOrdnerFilter(scheine) {
+  const liste = Array.isArray(scheine) ? scheine : [];
+  if (ordnerFilter === "alle") return liste;
+  // "ohne" heisst: war nie zugeordnet. Die abgezogenen stehen in ihrem
+  // eigenen Topf, sonst waere die Aufforderung "bitte zuordnen" bei
+  // genau denen falsch, bei denen Karam es gerade absichtlich nicht tut.
+  if (ordnerFilter === "ohne") return liste.filter(s => !s.ordner && !personLosgeloest(s));
+  if (ordnerFilter === "weg") return liste.filter(personLosgeloest);
+  return liste.filter(s => s.ordner === ordnerFilter);
+}
+
+// Karam (17.09.2026): "Es kann gut sein, dass ich vielleicht der Person
+// einen falschen Verlauf hinzugefuegt habe. Man klickt dann drauf und
+// schreibt: diese Kombi ist nicht bei dieser Person. Und dann gibt es
+// einen eigenen Ordner fuer Kombis, die einfach ohne Person sind, aber
+// vorher bei der falschen Person waren. Ich will, dass es dafuer auch
+// einen eigenen Filter gibt."
+//
+// KEIN echter kt_ordner. Ein echter Ordner haette wieder ein Guthaben
+// und eine Kasse, und das Geld laege nur woanders falsch. Es ist ein
+// Zustand am Schein selbst: keine Person mehr, dazu der Vermerk, bei
+// welcher er war - mit KENNUNG und Namen (Regel 2), denn Namen aendern
+// sich, Kennungen nicht.
+//
+// ZWEI SCHREIBVORGAENGE, und die Reihenfolge ist Absicht. Der Vermerk
+// liegt in daten und ist verschluesselt, der Ordner ist eine eigene
+// Spalte. Erst der Vermerk, dann der Ordner: geht der zweite Schritt
+// schief, ist der Schein zwar markiert, haengt aber noch an seiner
+// Person - sichtbar falsch, aber kein Geld verschoben. Andersherum
+// waere er ohne Person und ohne Vermerk, also unauffindbar.
+async function tuPersonWeg(scheinId) {
+  if (!darfSchreiben()) {
+    meldungM("Dazu fehlt dir das Schreibrecht in diesem Bereich.", "warn"); return;
+  }
+  const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
+  const s = scheine.find(x => x.id === scheinId);
+  if (!s) { meldungM("Diese Kombination ist nicht mehr da. Lad die Seite neu.", "warn"); return; }
+  if (!s.ordner) { meldungM("Diese Kombination hat gar keine Person.", "warn"); return; }
+  const alteId = s.ordner;
+  const alterName = ordnerNameM(alteId) || "Person";
+  const d = s.daten || {};
+  if (d.gesperrt) {
+    meldungM("Diese Kombination ist auf diesem Gerät nicht lesbar. Ohne ihren Inhalt " +
+      "darf hier nichts geschrieben werden - sonst wäre er danach weg.", "warn");
+    return;
+  }
+  // Gegengerechnet wird auf DEMSELBEN Weg, den die Personen-Kasse nimmt:
+  // personPruefen einmal mit und einmal ohne diesen Schein. Keine eigene
+  // Rechnung, die spaeter von der Kasse abweichen koennte.
+  const vorher = personPruefen(alteId, scheine);
+  const nachher = personPruefen(alteId, scheine.filter(x => x.id !== scheinId));
+  const eur = (x) => Number(x || 0).toFixed(2) + " Euro";
+  if (!confirm(
+      "Diese Kombination von " + alterName + " abziehen?\n\n" +
+      "   Nr. " + (s.nummer || "?") + ", Einsatz " + eur(d.einsatz) +
+        ", Stand " + s.stand + "\n\n" +
+      "So aendert sich die Kasse von " + alterName + ":\n" +
+      "   bei Anbietern:   " + eur(vorher.beiAnbietern) + "  ->  " + eur(nachher.beiAnbietern) + "\n" +
+      "   im Spiel:        " + eur(vorher.imSpiel) + "  ->  " + eur(nachher.imSpiel) + "\n" +
+      "   unterm Strich:   " + eur(vorher.bilanz) + "  ->  " + eur(nachher.bilanz) + "\n\n" +
+      "Sie hat danach KEINE Person und steht unter\n" +
+      "\"Falsch zugeordnet\". In der Buchhaltung und im Excel\n" +
+      "zaehlt sie weiter mit, dort unter \"ohne Person\".\n\n" +
+      "Umkehrbar: in der Tabelle einfach wieder eine Person waehlen.")) return;
+
+  // Schritt 1: der Vermerk, verschluesselt. Gelesen wird der Schein
+  // dafuer FRISCH aus der Datenbank (supaScheinHolen) und nicht aus dem
+  // Speicher der Seite: schreibt man den alten Stand zurueck, waere jede
+  // Aenderung verloren, die inzwischen von einem anderen Geraet kam.
+  const holen = await supaScheinHolen(scheinId);
+  if (holen.fehler) {
+    meldungM("<b>Nicht abgezogen.</b> " + textSicherM(holen.fehler) +
+      " Die Kombination haengt unverändert an " + textSicherM(alterName) + ".", "warn");
+    return;
+  }
+  const neu = Object.assign({}, holen.daten || d);
+  neu.personWeg = { id: alteId, name: alterName, wann: new Date().toISOString() };
+  const r1 = await supaScheinDatenSchreiben(scheinId, holen.key, neu);
+  if (r1.error || !r1.data || !r1.data.length) {
+    meldungM("<b>Nicht abgezogen.</b> Der Vermerk liess sich nicht speichern" +
+      (r1.error ? " (" + textSicherM(String(r1.error.message).slice(0, 80)) + ")" : "") +
+      ". Die Kombination haengt unverändert an " + textSicherM(alterName) + ".", "warn");
+    return;
+  }
+  // Schritt 2: die Person weg.
+  const r2 = await supaScheinAendern(scheinId, { ordner: null });
+  if (r2.error || !r2.data || !r2.data.length) {
+    meldungM("<b>Halb erledigt.</b> Der Vermerk steht, die Person aber noch dran" +
+      (r2.error ? " (" + textSicherM(String(r2.error.message).slice(0, 80)) + ")" : "") +
+      ". Nr. " + (s.nummer || "?") + " zählt weiter bei " + textSicherM(alterName) +
+      " mit. Nochmal drücken versucht es erneut.", "warn");
+    await zeichneBereich();
+    return;
+  }
+  meldungM("<b>Nr. " + (s.nummer || "?") + " von " + textSicherM(alterName) +
+    " abgezogen.</b> " + eur(d.einsatz) + " zählen ab jetzt nicht mehr in ihrer Kasse. " +
+    "Zu finden über den Knopf <b>Falsch zugeordnet</b> oben. Wieder zuordnen geht " +
+    "jederzeit über die Personen-Auswahl in der Zeile.", "gut");
+  await zeichneBereich();
+}
+
 async function tuScheinOrdner(id, wert) {
   const r = await supaScheinAendern(id, { ordner: wert || null });
   if (r.error) { meldungM("Nicht zugeordnet: " + r.error.message, "warn"); return; }
+  // Die 0-Zeilen-Falle: ohne diese Pruefung meldet die Seite Erfolg,
+  // waehrend RLS das Schreiben abgelehnt hat und die Kombination weiter
+  // dort liegt, wo sie lag.
+  if (!r.data || !r.data.length) {
+    meldungM("<b>Nicht zugeordnet.</b> Es wurde keine Zeile geändert - fehlendes " +
+      "Schreibrecht, oder die Kombination ist nicht mehr da. Sie steht unverändert " +
+      "dort, wo sie war.", "warn");
+    return;
+  }
   // Auch eine Zuordnung hier zaehlt als "zuletzt benutzt" fuer die
   // fuenf oben im Kombi-Bau - sonst kennt die Merkliste nur den Kombi-Bau.
   if (wert) personGemerkt(wert);
@@ -1459,7 +1617,10 @@ async function zeichneBereich() {
   const ladefehler = scheine._fehler || ordnerNeu._fehler;
   if (ladefehler) { zeichneLadefehler(ladefehler); return; }
   ordnerListe = ordnerNeu;
-  if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" &&
+  // "weg" ist wie "alle" und "ohne" KEIN kt_ordner, sondern ein
+  // Filterzustand. Ohne ihn hier spraenge der Knopf bei jedem
+  // Neuzeichnen auf "alle" zurueck.
+  if (ordnerFilter !== "alle" && ordnerFilter !== "ohne" && ordnerFilter !== "weg" &&
       !ordnerListe.some(o => o.id === ordnerFilter)) ordnerFilter = "alle";
   personBuchungen = await supaPersonBuchungenLaden(aktiverBereich.id);
   personDatenKarte = await supaPersonDatenLaden(aktiverBereich.id);
@@ -1490,9 +1651,7 @@ async function zeichneBereich() {
   }
   zeichnePersonenKasse(scheine);
   zeichnePruefung(scheine);
-  const gefiltert = (ordnerFilter === "alle") ? scheine
-    : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
-    : scheine.filter(s => s.ordner === ordnerFilter);
+  const gefiltert = scheineNachOrdnerFilter(scheine);
   zeichneKontoDb(gefiltert);
   zeichneScheineDb(gefiltert);
   // Steht die Tagesuebersicht gerade offen, muss sie die neuen Zahlen sehen.
@@ -1600,14 +1759,31 @@ function zeichneScheineDb(scheine) {
     "<th>Einsatz</th><th>Möglich</th><th>Wirklich bekommen</th><th>Stand</th><th>Notiz</th><th></th></tr></thead><tbody>";
   for (const s of scheine) {
     const d = s.daten;
-    const ordnerZelle = schreib
+    // Karam (17.09.2026): "Neben der Person ein Button, wo man eine Person
+    // wechseln kann." Er steht direkt unter der Auswahl und nur dann, wenn
+    // es ueberhaupt eine Person gibt, die falsch sein koennte.
+    // Bewusst NICHT in personKnopfM: das ist der geteilte Chip fuer ALLE
+    // Tabellen, und ein Schreibknopf haette dort nichts verloren.
+    const wegMarke = personLosgeloest(s)
+      ? '<div class="pweg-marke mini">war bei <b>' +
+        textSicherM((s.daten.personWeg && s.daten.personWeg.name) || "?") + "</b></div>"
+      : "";
+    const ordnerZelle = (schreib
       ? "<select onchange=\"tuScheinOrdner('" + s.id + "', this.value)\">" +
         "<option value=''" + (!s.ordner ? " selected" : "") + ">ohne Person</option>" +
         ordnerListe.map(o => "<option value='" + o.id + "'" + (s.ordner === o.id ? " selected" : "") +
-          ">" + textSicherM(o.name) + "</option>").join("") + "</select>"
-      : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?") : "<span class='mini'>ohne</span>");
+          ">" + textSicherM(o.name) + "</option>").join("") + "</select>" +
+        (s.ordner
+          ? '<div><button class="pweg-knopf mini" onclick="tuPersonWeg(\'' + s.id + '\')" ' +
+            'title="Diese Kombination geh&ouml;rt nicht zu dieser Person">nicht diese Person</button></div>'
+          : "")
+      : (s.ordner ? textSicherM(ordnerNameM(s.ordner) || "?")
+                  : "<span class='mini'>ohne</span>")) + wegMarke;
     const zklassen = [];
-    if (!s.ordner) zklassen.push("ohneordner");
+    // Abgezogene bekommen eine EIGENE Zeilenfarbe: sie sehen sonst aus
+    // wie nie zugeordnete, und genau das sind sie nicht.
+    if (personLosgeloest(s)) zklassen.push("wegzeile");
+    else if (!s.ordner) zklassen.push("ohneordner");
     if (scheinWartet(s)) zklassen.push("fertigzeile");
     const gr = gruppen[stammIdM(d.scheinId)];
     if (gr && !gr.voll) zklassen.push("unterziel");
@@ -5157,9 +5333,7 @@ function tuAnbieterFilter(kz) {
   // Nur die Liste neu, nicht der ganze Bereich: gleiche Filterkette wie
   // in zeichneBereich (erst Person, dann drinnen Voll/Unter+Anbieter).
   const scheine = Array.isArray(kasseScheine) ? kasseScheine : [];
-  const gefiltert = (ordnerFilter === "alle") ? scheine
-    : (ordnerFilter === "ohne") ? scheine.filter(s => !s.ordner)
-    : scheine.filter(s => s.ordner === ordnerFilter);
+  const gefiltert = scheineNachOrdnerFilter(scheine);
   zeichneKontoDb(gefiltert);
   zeichneScheineDb(gefiltert);
 }

@@ -215,6 +215,22 @@ function awFilterAlle() {
 
 // Die beiden Merkmale eines Scheins, immer auf dieselbe Art gelesen.
 function awPersonVon(s) { return s && s.ordner ? String(s.ordner) : ""; }
+
+// In WELCHE Schublade gehoert dieser Schein beim Personenfilter?
+// Drei Antworten: eine Kennung, "weg" (von einer falschen Person
+// abgezogen) oder "" (war nie zugeordnet).
+// Karam (17.09.2026): "Ich will, dass es dafuer auch einen eigenen Filter
+// gibt." Ohne die eigene Schublade laegen die Abgezogenen unter "keine
+// Person" und waeren im Auswerten nicht mehr auffindbar.
+// Der Zaehler und der Filter fragen BEIDE hier - sonst zeigte der Chip
+// eine Zahl, die die Liste darunter nicht hat.
+const AW_LOS = "weg";
+function awPersonFach(s) {
+  const id = awPersonVon(s);          // die eine Stelle, die "hat Person?" beantwortet
+  if (id) return id;
+  if (s && s.daten && s.daten.personWeg) return AW_LOS;
+  return "";
+}
 function awAnbieterVon(s) {
   const d = (s && s.daten) || {};
   return d.kz ? String(d.kz) : "";
@@ -309,7 +325,7 @@ function awGefiltert() {
   // Anbieter-Chips bei jedem Tastendruck in Anzahl und Reihenfolge.
   const worte = awSuchWorte();
   return awImZeitraum().filter(s => {
-    if (personen.length && personen.indexOf(awPersonVon(s)) < 0) return false;
+    if (personen.length && personen.indexOf(awPersonFach(s)) < 0) return false;
     if (anbieter.length && anbieter.indexOf(awAnbieterVon(s)) < 0) return false;
     if (!awPasstZurSuche(s, worte)) return false;
     return true;
@@ -433,7 +449,7 @@ function awFilterHtml(imZeitraum) {
   // Zaehlen, was es gibt.
   const zaehlP = {}, zaehlA = {};
   for (const s of imZeitraum) {
-    const p = awPersonVon(s), a = awAnbieterVon(s);
+    const p = awPersonFach(s), a = awAnbieterVon(s);
     zaehlP[p] = (zaehlP[p] || 0) + 1;
     zaehlA[a] = (zaehlA[a] || 0) + 1;
   }
@@ -444,7 +460,8 @@ function awFilterHtml(imZeitraum) {
 
   const personen = Object.keys(zaehlP).map(p => ({
     wert: p,
-    text: p ? (awPersonName(p) || "Person " + String(p).slice(0, 6)) : "keine Person",
+    text: p === AW_LOS ? "\u26a0 falsch zugeordnet"
+        : (p ? (awPersonName(p) || "Person " + String(p).slice(0, 6)) : "keine Person"),
     zahl: zaehlP[p],
     fehlt: zaehlP[p] === 0
   })).sort((a, b) => b.zahl - a.zahl ||

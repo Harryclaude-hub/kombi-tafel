@@ -5529,3 +5529,37 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE SPIELSUCHE ---- */
+
+/* ============================================================
+   FALSCH ZUGEORDNETE KOMBINATIONEN (Design-Schicht, LOESCHBAR)
+   Karam (17.09.2026): "Neben der Person ein Button, wo man eine Person
+   wechseln kann." Der Knopf muss ruhig aussehen: er zieht Geld von einer
+   Person ab, das darf nicht wie ein Nebenknopf wirken, aber auch nicht
+   wie ein Loeschknopf - rueckgaengig ist es jederzeit.
+   ============================================================ */
+@media screen {
+  .pweg-knopf {
+    margin-top: 4px;
+    padding: 3px 8px;
+    border: 1px solid #b35a00;
+    border-radius: 999px;
+    background: #fff8ef;
+    color: #8a4600;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .pweg-knopf:hover { background: #ffeeda; }
+  .pweg-marke {
+    margin-top: 4px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f3e8ff;
+    color: #5b2a86;
+    display: inline-block;
+  }
+  /* Die Zeile einer abgezogenen Kombination: derselbe ruhige Ton wie
+     "ohne Person", aber mit einem Balken, damit man sie unterscheidet. */
+  tr.wegzeile td { background: #faf5ff; }
+  tr.wegzeile td:first-child { box-shadow: inset 3px 0 0 #7a4a9e; }
+}
+/* ---- ENDE FALSCH ZUGEORDNET ---- */
