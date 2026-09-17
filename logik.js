@@ -280,6 +280,40 @@ function satzDekoSetzen(id, feld, wert) {
   zeichneOrdnerLeiste();
 }
 
+// ---------- Ordner suchen: EINE Stelle fuer alle ----------
+// Karam (17.09.2026): "Sonst muss ich bei der Suchleiste daneben den
+// Ordner suchen, den ich jetzt spielen moechte."
+// Der Titel ist deutsch geschrieben ("Fotos vom 24.08.2026"), die Kennung
+// technisch ("2026-08-24"). Wer "24.08" tippt, muss trotzdem die Kennung
+// treffen, und wer "2026-08" tippt, den Titel. Deshalb laeuft beides
+// zusaetzlich als Ziffernfolge in den Suchtext, einmal mit Luecken und
+// einmal am Stueck.
+// HIER STAND EIN FEHLER: die Suche in der Ordnerleiste verglich mit
+// includes() ohne Kleinschreibung. "fotos" fand nichts, "Fotos" fand
+// alles - und es sah aus, als waere der Ordner weg.
+// Die Notiz liegt im localStorage, also nur auf DIESEM Geraet. Wer am
+// Handy nach einer Notiz vom Rechner sucht, findet sie nicht; das steht
+// deshalb unter dem Suchfeld.
+function satzSuchtext(s) {
+  if (!s) return "";
+  const roh = String(s.titel || "") + " " + String(s.id || "") + " " +
+    String((satzDeko(s.id) || {}).notiz || "");
+  return (roh + " " + roh.replace(/\D+/g, " ") + " " +
+    roh.replace(/\D+/g, "")).toLowerCase();
+}
+
+// Mehrere Woerter sind eine UND-Suche: "24 08" findet dasselbe wie "24.08".
+function satzPasst(s, suche) {
+  const q = String(suche || "").trim().toLowerCase();
+  if (!q) return true;
+  const text = satzSuchtext(s);
+  return q.split(/\s+/).every(w => {
+    if (text.indexOf(w) > -1) return true;
+    const z = w.replace(/\D+/g, "");
+    return z ? text.indexOf(z) > -1 : false;
+  });
+}
+
 let ordnerPanelOffen = "";   // "" | "anpassen" | "wechseln"
 
 function ordnerPanel(art) {
@@ -359,7 +393,7 @@ function zeichneOrdnerLeiste() {
         (id === SATZ_ALLE ? " (offen)" : "") + "</button>";
     const filter = (document.getElementById("ordner_suche") || { value: "" }).value.trim();
     for (const x of SAETZE.slice().reverse()) {
-      if (filter && !x.id.includes(filter) && !x.titel.includes(filter)) continue;
+      if (!satzPasst(x, filter)) continue;
       const d = satzDeko(x.id);
       html += '<button class="ordnerwahl' + (x.id === id ? " aktiv" : "") +
         '" style="border-color:' + (d.farbe || "#1a2c50") + '" ' +

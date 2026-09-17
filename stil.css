@@ -5418,3 +5418,71 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
 @media screen {
   .bilderleiste .bk-hinweis { flex: 1 1 100%; }
 }
+
+/* ============================================================
+   ORDNER ODER ZEITRAUM - die Auswahl ueber der Bau-Tabelle
+   (Design-Schicht, LOESCHBAR. Faellt sie weg, stehen Reiter,
+   Suchfeld und Satz schlicht untereinander und arbeiten weiter.)
+   Karam (17.09.2026): "Ich kann einen Ordner aussuchen oder einen
+   Zeitraum." Die drei Reiter muessen auf einen Blick sagen, welcher
+   gilt - deshalb der kraeftige Farbunterschied, nicht nur ein Rahmen.
+   ============================================================ */
+@media screen {
+  .ow-kasten {
+    border: 1px solid color-mix(in srgb, var(--kenn, #1a2c50) 45%, #fff);
+    border-radius: var(--g-rund, 12px);
+    background: #fff;
+    padding: 10px 12px;
+    margin: 0 0 10px;
+    box-shadow: var(--g-tiefe-1, 0 1px 2px rgba(16, 28, 48, .06));
+  }
+  .ow-reiter-zeile { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ow-reiter {
+    flex: 0 1 auto;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid color-mix(in srgb, var(--kenn, #1a2c50) 35%, #fff);
+    border-radius: 999px;
+    background: #f6f8fc;
+    color: #22314c;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .ow-reiter:hover { background: #eef2f9; }
+  .ow-reiter.aktiv {
+    background: var(--kenn, #1a2c50);
+    border-color: var(--kenn, #1a2c50);
+    color: #fff;
+  }
+  .ow-panel {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e6eaf2;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .ow-suche { flex: 1 1 260px; min-width: 0; }
+  .ow-panel .ordnerliste { flex: 1 1 100%; }
+  .ow-satz {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: #f3f6fb;
+    color: #33405a;
+    line-height: 1.5;
+  }
+  .ow-warn {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    border: 1px solid #b35a00;
+    background: #fff8ef;
+    color: #8a4600;
+    line-height: 1.5;
+  }
+  /* Handy: die Reiter nebeneinander, aber jeder darf umbrechen. */
+  @media (max-width: 700px) {
+    .ow-reiter { flex: 1 1 100%; text-align: left; }
+    .ow-suche { flex: 1 1 100%; }
+  }
+}
+/* ---- ENDE ORDNER ODER ZEITRAUM ---- */

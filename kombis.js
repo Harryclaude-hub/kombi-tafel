@@ -975,6 +975,7 @@ function meldung(text, art) {
 
 function zeichne_() {
   zeichneOrdnerLeiste();
+  zeichneOrdnerWahl();
   zeichneGesetzte();
   zeichneEigenbau();
   // Auf "Mein Bereich" gibt es keine Schein-Elemente: dort nur Konto und Verlauf zeichnen.
@@ -1967,12 +1968,16 @@ function ebFiltern() {
   // Beide: die Gesetzt-Liste haengt seit heute daran, WELCHE Wetten in
   // der Tabelle stehen. Zeichnete man nur die Tabelle, zeigte die Liste
   // darunter weiter den alten Zeitraum - zwei Wahrheiten auf einer Seite.
+  // Auch die Auswahl oben: sie sagt in einem Satz, was gerade gilt.
+  // Zeichnete man sie nicht mit, staende dort der alte Zustand.
+  zeichneOrdnerWahl();
   zeichneEigenbau();          // nichts wird nachgeladen, nur neu gezeichnet
   zeichneGesetzte();
 }
 
 function ebAllesZeigen() {
   ebVon = ""; ebBis = ""; ebNurOffen = false;
+  zeichneOrdnerWahl();
   zeichneEigenbau();
   zeichneGesetzte();
 }
@@ -2007,6 +2012,209 @@ function ebSichtbareIds() {
   const m = new Set();
   for (const w of ebSichtbareWetten().liste) m.add(String(w.id));
   return m;
+}
+
+// ============================================================
+// ORDNER ODER ZEITRAUM - die Auswahl ueber der grossen Tabelle
+// ============================================================
+// Karam (17.09.2026): "Beim Kombibau moechte ich da, wo ich die ganze
+// Tabelle habe, eine Auswahl haben. Ich kann einen Ordner aussuchen oder
+// einen Zeitraum. Wenn ich gerade einen aktiven Ordner habe, dann suche
+// ich mir den aus, das ist der Default-Ordner, wenn ich nichts anderes
+// aussuche. Sonst muss ich bei der Suchleiste daneben den Ordner suchen,
+// den ich jetzt spielen moechte. Oder ich suche mir einen Zeitraum, und
+// dann fallen die Ordner aus."
+//
+// DREI ZUSTAENDE, ABER KEIN VIERTER SPEICHER.
+// Die Lage wird aus dem abgeleitet, was ohnehin schon gilt: "kt_satz" und
+// die beiden Datumsfelder. Ein eigener gespeicherter "Modus" koennte dem
+// widersprechen, was die Tabelle wirklich zeigt - und dann staende auf
+// dem Schirm etwas anderes, als unten in der Liste steht.
+//
+// Der Zeitraum UEBERSTIMMT den Ordner nur, er aendert ihn nie. Genau das
+// meint Karam mit "dann fallen die Ordner aus": ebSichtbareWetten nimmt
+// bei gesetztem Zeitraum WETTEN.slice(), also alle Ordner. Nimmt er den
+// Zeitraum weg, ist er wieder in seinem Ordner.
+//
+// Das Suchfeld steht NICHT in #eigenbau. zeichneEigenbau ersetzt dort
+// alles, und bei jedem Tastendruck wuerde die ganze Tabelle neu gebaut
+// und der Fokus spraenge aus dem Feld.
+let owSuche = "";          // absichtlich NICHT gemerkt, wie obSuche in mein.js
+let owOffen = "";          // "" | "ordner" | "zeit"
+
+function owLage() {
+  const id = (typeof aktiverSatzId === "function") ? aktiverSatzId() : null;
+  if (ebZeitraumAn()) return { art: "zeit", satz: id };
+  if (id === SATZ_ALLE) return { art: "alle", satz: id };
+  return { art: "ordner", satz: id };
+}
+
+function owReiter(art) {
+  const lage = owLage();
+  if (art === "alle") {
+    if (lage.satz !== SATZ_ALLE) { satzWaehlen(SATZ_ALLE); return; }  // laedt neu
+    owOffen = (owOffen === "ordner") ? "" : "ordner";
+  } else if (art === "ordner") {
+    // Der Heimatknopf: steht ein Zeitraum, nimmt ein Tipp ihn weg und man
+    // ist zurueck im eigenen Ordner.
+    if (ebZeitraumAn()) { owZeitWeg(); return; }
+    owOffen = (owOffen === "ordner") ? "" : "ordner";
+  } else {
+    owOffen = (owOffen === "zeit") ? "" : "zeit";
+  }
+  zeichneOrdnerWahl();
+}
+
+// Zeitraum weg, Ordner zurueck. Bewusst NICHT ebAllesZeigen(): das
+// schaltet zusaetzlich "nur noch offene Spiele" aus, und dieser Haken ist
+// eine eigene Entscheidung von Karam. Ihn stillschweigend mitzukippen
+// waere eine Aenderung, die er nicht verlangt hat.
+function owZeitWeg() {
+  ebVon = ""; ebBis = "";
+  zeichneOrdnerWahl();
+  zeichneEigenbau();
+  zeichneGesetzte();
+}
+
+// Nur die Liste neu, nie den ganzen Kasten: sonst ist das Suchfeld nach
+// dem ersten Buchstaben weg. Dieselbe Falle wie bei obSuchen in mein.js.
+function owSuchen(wert) {
+  owSuche = String(wert || "");
+  const k = document.getElementById("ow_liste");
+  if (k) k.innerHTML = owListeHtml();
+  const z = document.getElementById("ow_treffer");
+  if (z) z.innerHTML = owTrefferText();
+}
+
+function owTreffer() {
+  return SAETZE.slice().reverse().filter(x => satzPasst(x, owSuche));
+}
+
+function owTrefferText() {
+  if (!owSuche) return SAETZE.length + " Ordner";
+  const n = owTreffer().length;
+  return n + " von " + SAETZE.length + " passen auf die Suche";
+}
+
+function owListeHtml() {
+  const id = aktiverSatzId();
+  const treffer = owTreffer();
+  if (!treffer.length) {
+    return '<p class="mini">Kein Ordner gefunden. Tippfehler? Er ist nicht weg, ' +
+      "nur nicht getroffen. Notizen findest du nur auf dem Gerät, auf dem du sie " +
+      "geschrieben hast.</p>";
+  }
+  return treffer.map(x => {
+    const d = (typeof satzDeko === "function") ? satzDeko(x.id) : {};
+    const n = WETTEN.filter(w => wettenSatz(w) === x.id).length;
+    return '<button class="ordnerwahl' + (x.id === id ? " aktiv" : "") +
+      '" style="border-color:' + (d.farbe || "#1a2c50") + '" ' +
+      'onclick="satzWaehlen(\'' + x.id + '\')">' +
+      (d.emoji ? d.emoji + " " : "") + textSicher(x.titel) +
+      ' <span class="mini">' + n + " Wetten</span>" +
+      (x.id === id ? " (offen)" : "") + "</button>";
+  }).join("");
+}
+
+// Ein ganzer Satz, der sagt, was gerade gilt. Karam hat heute zweimal
+// nicht verstanden, warum er etwas sieht - der Zustand muss dastehen,
+// nicht erraten werden.
+function owLageSatz() {
+  const lage = owLage();
+  const tag = (t) => t ? t.split("-").reverse().join(".") : "";
+  if (lage.art === "zeit") {
+    return "Du siehst den <b>Zeitraum " +
+      (ebVon ? tag(ebVon) : "Anfang") + " bis " + (ebBis ? tag(ebBis) : "offen") +
+      "</b> aus <b>allen " + SAETZE.length + " Ordnern</b>. Dein Ordner <b>" +
+      textSicher(satzTitelVon(lage.satz)) + "</b> gilt hier nicht - er ist zurück, " +
+      "sobald du den Zeitraum wegnimmst.";
+  }
+  if (lage.art === "alle") {
+    return "Du siehst <b>alle " + SAETZE.length + " Ordner zusammen</b>, " +
+      WETTEN.length + " Wetten.";
+  }
+  const n = satzWetten().length;
+  const offen = satzWetten().filter(w => !istVorbei(anstossFeld(w))).length;
+  return "Du siehst <b>einen Ordner: " + textSicher(satzTitelVon(lage.satz)) +
+    "</b>. " + n + " Wetten, " + offen + " noch offen. Kein Zeitraum gesetzt.";
+}
+
+// Was ist angehakt, und aus wie vielen Ordnern? Sobald mehr als ein
+// Ordner auf dem Schirm ist, kann eine Kombination unbemerkt aus zwei
+// Ordnern zusammengebaut werden. Das ist Geld, also muss es dastehen.
+function owHakenWarnung() {
+  const lage = owLage();
+  if (lage.art === "ordner") return "";
+  let haken = [];
+  try {
+    haken = [...document.querySelectorAll(".eb-wahl:checked")]
+      .map(c => String(c.value).split("|")[0]);
+  } catch (e) { return ""; }
+  if (!haken.length) return "";
+  const ordner = new Set();
+  for (const id of haken) {
+    const w = wetteNachId(id);
+    if (w) ordner.add(wettenSatz(w));
+  }
+  if (ordner.size < 2) return "";
+  return '<div class="ow-warn mini"><b>Achtung:</b> von den ' + haken.length +
+    " angehakten Zeilen kommen die Spiele aus <b>" + ordner.size +
+    " verschiedenen Ordnern</b>. Das darf so sein, es ist nur selten gewollt - " +
+    "in der Tabelle steht bei jeder Zeile, aus welchem Ordner sie kommt.</div>";
+}
+
+function zeichneOrdnerWahl() {
+  const box = document.getElementById("ordnerwahl");
+  if (!box) return;
+  if (!SAETZE.length) {
+    box.innerHTML = '<div class="ow-kasten mini">Noch kein Foto-Ordner eingelesen.</div>';
+    return;
+  }
+  const lage = owLage();
+  const heim = (lage.satz && lage.satz !== SATZ_ALLE)
+    ? satzTitelVon(lage.satz) : "Ordner wählen";
+  const reiter = (art, text, an) =>
+    '<button class="ow-reiter' + (an ? " aktiv" : "") +
+    '" onclick="owReiter(\'' + art + '\')">' + text + "</button>";
+
+  let html = '<div class="ow-kasten">' +
+    '<div class="ow-reiter-zeile">' +
+      reiter("ordner", "&#128193; " + textSicher(heim), lage.art === "ordner") +
+      reiter("alle", "&#128218; ALLE " + SAETZE.length + " Ordner", lage.art === "alle") +
+      reiter("zeit", "&#128197; Zeitraum", lage.art === "zeit") +
+    "</div>";
+
+  if (owOffen === "ordner") {
+    html += '<div class="ow-panel">' +
+      '<input id="ow_suche" class="ow-suche" placeholder="Ordner suchen: 24.08, 2026-09, oder ein Wort" ' +
+        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+        'value="' + textSicher(owSuche) + '" oninput="owSuchen(this.value)">' +
+      ' <span id="ow_treffer" class="mini">' + owTrefferText() + "</span>" +
+      '<div class="ordnerliste" id="ow_liste">' + owListeHtml() + "</div></div>";
+  }
+
+  if (owOffen === "zeit" || lage.art === "zeit") {
+    // DIESELBEN Felder wie bisher, nur an einer anderen Stelle: ebFiltern
+    // sucht sie ueber ihre Kennung, nicht ueber ihren Platz. Sie stehen
+    // jetzt nur noch HIER, nicht mehr zusaetzlich an der Tabelle - zwei
+    // Felder mit derselben Kennung waeren ein Fehler, den niemand sieht.
+    html += '<div class="ow-panel"><b>Abpfiff</b> ' +
+      '<label>von <input type="date" id="eb_von" value="' + textSicher(ebVon) +
+        '" onchange="ebFiltern()"></label> ' +
+      '<label>bis <input type="date" id="eb_bis" value="' + textSicher(ebBis) +
+        '" onchange="ebFiltern()"></label> ' +
+      '<label><input type="checkbox" id="eb_nuroffen"' + (ebNurOffen ? " checked" : "") +
+        ' onchange="ebFiltern()"> nur noch offene Spiele</label>' +
+      (ebZeitraumAn()
+        ? ' <button onclick="owZeitWeg()">Zeitraum weg, zurück zum Ordner</button>'
+        : ' <span class="mini">Sobald hier ein Datum steht, sucht die Tabelle in ' +
+          "ALLEN Ordnern.</span>") +
+      "</div>";
+  }
+
+  html += '<div class="ow-satz mini">' + owLageSatz() + "</div>" +
+    '<div id="ow_haken">' + owHakenWarnung() + "</div></div>";
+  box.innerHTML = html;
 }
 
 function zeichneEigenbau() {
@@ -2132,16 +2340,13 @@ function zeichneEigenbau() {
       '<button class="haupt" onclick="eigenbauAnlegen()">&#129513; Aus der Auswahl bauen</button> ' +
       '<span id="eb_zaehler" class="mini">nichts angehakt</span>' +
     "</div>" +
-    // Zeitraum-Leiste: Abpfiff von / bis, dazu der Schalter "nur offene".
+    // Die Zeitraum-FELDER stehen seit 17.09.2026 oben in der Auswahl
+    // (zeichneOrdnerWahl), damit Ordner und Zeitraum an EINER Stelle
+    // gewaehlt werden. Zwei Felder mit derselben Kennung waeren ein
+    // Fehler, den niemand sieht: getElementById nimmt immer nur das
+    // erste. Hier bleiben nur die Hinweise, die zur TABELLE gehoeren.
     '<div class="tb-leiste tb-zeitraum">' +
-      "<b>Abpfiff</b> " +
-      '<label>von <input type="date" id="eb_von" value="' + textSicher(ebVon) +
-        '" onchange="ebFiltern()"></label> ' +
-      '<label>bis <input type="date" id="eb_bis" value="' + textSicher(ebBis) +
-        '" onchange="ebFiltern()"></label> ' +
-      '<label><input type="checkbox" id="eb_nuroffen"' + (ebNurOffen ? " checked" : "") +
-        ' onchange="ebFiltern()"> nur noch offene Spiele</label> ' +
-      (gefiltert ? '<button onclick="ebAllesZeigen()">alles zeigen</button>' : "") +
+      (gefiltert ? '<button onclick="ebAllesZeigen()">alles zeigen</button> ' : "") +
       (kontoFehlt ? '<span class="mini warnton"> Die gesetzten Kombinationen aus dem Konto ' +
         "konnten nicht geladen werden. Die Spalte &quot;gesetzt&quot; zeigt nur, was auf " +
         "diesem Gerät liegt, und ist damit unvollständig.</span>" : "") +
@@ -2194,6 +2399,11 @@ function zeichneEigenbau() {
 // Zeigt laufend, was angehakt ist - und warnt sofort bei zwei Zeilen
 // desselben Spiels, statt erst beim Bauen.
 function ebZaehlen() {
+  // Die Warnung oben haengt an den Haken: nur SIE wird aufgefrischt, nicht
+  // der ganze Kasten - sonst waere ein offenes Suchfeld nach jedem Haken
+  // wieder leer.
+  const hk = document.getElementById("ow_haken");
+  if (hk) hk.innerHTML = owHakenWarnung();
   const feld = document.getElementById("eb_zaehler");
   if (!feld) return;
   const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
