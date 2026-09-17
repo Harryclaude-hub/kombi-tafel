@@ -1,4 +1,14 @@
 // ============================================================
+// SEIT 17.09.2026 NICHT MEHR GELADEN.
+// Karam: "Personen aus einer Liste abgleichen und anlegen und die 38
+// alten Scheine - diese beiden Sections bitte entfernen. Ich habe
+// schon die Scheine, die sind schon da."
+// Diese Datei (Personen-Abgleich aus einer Liste) hat ihre Arbeit getan.
+// Sie ist mit Absicht NICHT geloescht: wer sie wieder braucht, haengt
+// in mein.html eine script-Zeile hin und in mein.js den Kasten.
+// Solange sie nicht geladen wird, laeuft hier nichts.
+// ============================================================
+// ============================================================
 // PERSONEN AUS DER LISTE ABGLEICHEN UND ANLEGEN
 //
 // Karam (16.09.2026): "Ich moechte, dass du alle Personen aus der

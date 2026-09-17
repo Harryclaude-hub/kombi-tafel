@@ -1,4 +1,14 @@
 // ============================================================
+// SEIT 17.09.2026 NICHT MEHR GELADEN.
+// Karam: "Personen aus einer Liste abgleichen und anlegen und die 38
+// alten Scheine - diese beiden Sections bitte entfernen. Ich habe
+// schon die Scheine, die sind schon da."
+// Diese Datei (die von den 38 Fotos abgelesenen Zahlen) hat ihre Arbeit getan.
+// Sie ist mit Absicht NICHT geloescht: wer sie wieder braucht, haengt
+// in mein.html eine script-Zeile hin und in mein.js den Kasten.
+// Solange sie nicht geladen wird, laeuft hier nichts.
+// ============================================================
+// ============================================================
 // DIE 38 ALTEN SCHEINE VOM 25. BIS 28.08.2026
 // ============================================================
 // Karam (17.09.2026): "Hier sind 38 Fotos. Die sind zwischen dem 25. und

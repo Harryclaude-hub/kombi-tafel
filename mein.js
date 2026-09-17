@@ -240,12 +240,12 @@ gesetzt hast. Jede Kombination gehört zu einer Person. <b>Nicht verwechseln:</b
 Foto-Ordner oben auf der Kombi-Tafel sind für alle gleich und ändern sich nur, wenn ein
 Admin neue Fotos bringt. Personen gehören nur dir.</p>
 <div id="ordnerbox"></div>
-<div id="personenimport"></div>
-<div id="altimport"></div>
 <div id="personenkasse"></div>
+<div id="kontobereich">
 <h2>&#127974; Konto dieses Bereichs</h2>
 <div id="konto_db"></div>
 <div id="importkasten"></div>
+</div>
 <h2 id="scheine_titel">Kombinationen</h2>
 <div id="verlaufschalter" class="vf-schalter"></div>
 <div id="scheine_db"></div>
@@ -1379,6 +1379,23 @@ function zeichneOrdnerBox(scheine) {
       "Person mit. " + '<button onclick="tuOrdnerFilter(\'weg\')">Diese anzeigen</button></p>' : "");
 }
 
+// Karam (17.09.2026): "Wenn ich eine Person oeffne, wenn ich auf ihren
+// Namen klicke, das erste was dann kommt ist die Person und dann alle
+// Kombinationen drunter."
+// Dazwischen stand "Konto dieses Bereichs" - das Konto des ganzen
+// Bereichs, das mit dieser einen Person nichts zu tun hat. Es wird nicht
+// versteckt (es verschwindet nichts), sondern nach unten gesetzt, solange
+// ein Filter offen ist. Ohne Filter steht es wieder an seinem Platz.
+function kontoBereichEinordnen() {
+  const blk = el("blk_kombis"), kb = el("kontobereich"), titel = el("scheine_titel");
+  if (!blk || !kb || !titel) return;
+  if (ordnerFilter === "alle") {
+    if (kb.nextElementSibling !== titel) blk.insertBefore(kb, titel);
+  } else if (blk.lastElementChild !== kb) {
+    blk.appendChild(kb);
+  }
+}
+
 function tuOrdnerFilter(wert) {
   ordnerFilter = wert;
   // Wer geoeffnet wird, steht beim naechsten Mal vorne in "zuletzt
@@ -1635,25 +1652,15 @@ async function zeichneBereich() {
   zeichneAnbieterKopf();
   zeichneGesperrtWarnung(scheine);
   zeichneOrdnerBox(scheine);
-  // Der Abgleich mit Karams Konten-Liste (personen-import.js, loeschbar).
-  // Faellt die Datei weg, bleibt der Kasten einfach leer.
-  if (typeof piPanelHtml === "function" && el("personenimport")) {
-    // Nur neu zeichnen, wenn der Kasten noch leer ist: sonst waere der
-    // eingefuegte Text nach jedem Zeichnen weg.
-    const k = el("personenimport");
-    if (!k.innerHTML) k.innerHTML = piPanelHtml();
-  }
-  // Die 38 alten Scheine vom 25. bis 28.08.2026 (altimport.js, loeschbar).
-  // Faellt die Datei weg, bleibt der Kasten leer.
-  if (typeof altPanelHtml === "function" && el("altimport")) {
-    const k = el("altimport");
-    if (!k.innerHTML) { k.innerHTML = altPanelHtml(); altZeichnen(); }
-  }
+  // Der Personen-Abgleich und der Kasten mit den 38 alten Scheinen sind am
+  // 17.09.2026 auf Karams Wunsch aus dieser Ansicht genommen worden: die
+  // Scheine sind angelegt, die Personen stehen. Siehe mein.html.
   zeichnePersonenKasse(scheine);
   zeichnePruefung(scheine);
   const gefiltert = scheineNachOrdnerFilter(scheine);
   zeichneKontoDb(gefiltert);
   zeichneScheineDb(gefiltert);
+  kontoBereichEinordnen();
   // Steht die Tagesuebersicht gerade offen, muss sie die neuen Zahlen sehen.
   if (mbAktiverBlock() === "tag" && typeof zeichneTagesuebersicht === "function")
     zeichneTagesuebersicht();
@@ -2350,16 +2357,34 @@ function zeichnePersonenKasse(scheine) {
 
   // ---------- Neue Buchung ----------
   if (schreib) {
-    html += '<div class="kassenformular"><b>Neue Buchung:</b> ' +
-      '<input type="date" id="pk_datum" value="' + heuteDatum() + '"> ' +
-      '<select id="pk_weg">' + KASSE_WEGE.map(w => "<option value='" + w[0] + "'>" + w[1] + "</option>").join("") + "</select> " +
-      '<select id="pk_art" onchange="pkArtWechsel()">' + KASSE_ARTEN.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
-      '<select id="pk_anbieter" style="display:none">' + KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") + "</select> " +
-      '<input type="number" id="pk_betrag" step="0.01" min="0" class="einsatz" placeholder="Betrag"> &euro; ' +
-      '<input id="pk_notiz" placeholder="Notiz (freiwillig)"> ' +
+    // Dieselbe Rasterform wie die Personendaten: jedes Feld hat seine
+    // Beschriftung darueber und dieselbe Breite. Vorher standen sechs
+    // Eingaben ohne Beschriftung in einer Zeile hintereinander, und beim
+    // Umbrechen rutschte alles durcheinander.
+    html += '<div class="kassenformular"><h4>&#10133; Neue Buchung</h4>' +
+      '<div class="feldraster">' +
+      '<label class="feld"><span class="feld-titel">Datum</span>' +
+        '<input type="date" id="pk_datum" value="' + heuteDatum() + '"></label>' +
+      '<label class="feld"><span class="feld-titel">Zahlungsweg</span><select id="pk_weg">' +
+        KASSE_WEGE.map(w => "<option value='" + w[0] + "'>" + w[1] + "</option>").join("") +
+        "</select></label>" +
+      '<label class="feld"><span class="feld-titel">Was</span>' +
+        '<select id="pk_art" onchange="pkArtWechsel()">' +
+        KASSE_ARTEN.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") +
+        "</select></label>" +
+      '<label class="feld" id="pk_anbieter_feld" style="display:none">' +
+        '<span class="feld-titel">Anbieter</span><select id="pk_anbieter">' +
+        KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") +
+        "</select></label>" +
+      '<label class="feld"><span class="feld-titel">Betrag (&euro;)</span>' +
+        '<input type="number" id="pk_betrag" step="0.01" min="0" placeholder="0,00"></label>' +
+      '<label class="feld"><span class="feld-titel">Notiz (freiwillig)</span>' +
+        '<input id="pk_notiz" placeholder="z. B. bar übergeben"></label>' +
+      "</div>" +
+      '<div class="feld-leiste">' +
       '<button class="haupt" id="pk_knopf" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button>' +
-      '<div class="mini">Tipp: <b>auf eigenes Konto ausgezahlt</b> heißt, das Geld verlässt das System - ' +
-      "es steht nicht mehr zum Wetten bereit, bleibt aber in der Rechnung sichtbar.</div></div>";
+      '<span class="mini">Tipp: <b>auf eigenes Konto ausgezahlt</b> heißt, das Geld verlässt das System - ' +
+      "es steht nicht mehr zum Wetten bereit, bleibt aber in der Rechnung sichtbar.</span></div></div>";
   }
 
   // ---------- Buchungsliste ----------
@@ -2452,7 +2477,12 @@ function pkArtWechsel() {
   // Anbieter nur bei Ein-/Auszahlung ZUM oder VOM Anbieter
   const art = el("pk_art").value;
   const braucht = (art === "zum_anbieter" || art === "vom_anbieter");
-  el("pk_anbieter").style.display = braucht ? "" : "none";
+  // Seit 17.09.2026 steht das Feld in einem Raster und traegt seine
+  // Beschriftung mit. Versteckt wird deshalb das ganze Feld, nicht nur
+  // die Auswahl - sonst bliebe das Wort "Anbieter" ohne Feld stehen und
+  // risse eine Luecke ins Raster.
+  const feld = el("pk_anbieter_feld") || el("pk_anbieter");
+  if (feld) feld.style.display = braucht ? "" : "none";
 }
 
 async function tuPersonBuchen(ordnerId) {
@@ -4518,21 +4548,34 @@ function personDatenLesen(ordnerId) {
 
 function personDatenHtml(person, schreib) {
   const d = personDatenLesen(person.id);
+  // Karam (17.09.2026): "Diese unsymmetrischen Feldanzeigen - ich will
+  // wirklich, dass bei Personen vor allem diese Datenangaben alles
+  // symmetrisch ist. Vorname, Nachname. Das darf nicht alles so
+  // durcheinander sein. Alles klar abgetrennt, gleiche Abstaende,
+  // gleich lang."
+  // Deshalb ein RASTER mit gleich breiten Spalten (feldraster), kein
+  // umbrechender Fluss mehr: dort wurde jedes Feld so breit, wie gerade
+  // Platz war, und die letzte Zeile zog sich auseinander.
+  // Die Beschriftung steht in einem eigenen Element, nicht hinter einem
+  // <br>: nur so koennen alle Eingabefelder auf derselben Hoehe beginnen,
+  // auch wenn ein Titel zweizeilig wird.
   let h = '<h4>&#128100; Personendaten</h4><div class="persondaten">';
-  h += '<div class="persondaten-felder">';
+  h += '<div class="feldraster">';
   for (const [feld, titel, typ] of PERSON_FELDER) {
     const wert = textSicherM(d[feld] || "");
     const id = "pd_" + feld;
+    const aus = schreib ? "" : " disabled";
+    let eingabe;
     if (typ === "textarea") {
-      h += '<label class="pd-feld pd-breit">' + titel + '<br><textarea id="' + id + '"' +
-        (schreib ? "" : " disabled") + ">" + wert + "</textarea></label>";
+      eingabe = '<textarea id="' + id + '"' + aus + ">" + wert + "</textarea>";
     } else if (typ === "password") {
-      h += '<label class="pd-feld">' + titel + '<br><input id="' + id + '" type="password" value="' + wert + '"' +
-        (schreib ? "" : " disabled") + " autocomplete=\"off\"> " + augeHtml(id) + "</label>";
+      eingabe = '<span class="feld-eingabe"><input id="' + id + '" type="password" value="' +
+        wert + '"' + aus + ' autocomplete="off">' + augeHtml(id) + "</span>";
     } else {
-      h += '<label class="pd-feld">' + titel + '<br><input id="' + id + '" type="' + typ + '" value="' + wert + '"' +
-        (schreib ? "" : " disabled") + "></label>";
+      eingabe = '<input id="' + id + '" type="' + typ + '" value="' + wert + '"' + aus + ">";
     }
+    h += '<label class="feld' + (typ === "textarea" ? " feld-breit" : "") + '">' +
+      '<span class="feld-titel">' + titel + "</span>" + eingabe + "</label>";
   }
   h += "</div>";
   if (schreib) {
