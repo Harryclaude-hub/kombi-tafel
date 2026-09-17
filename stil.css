@@ -5691,3 +5691,27 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE STAND-SCHALTER ---- */
+
+/* =====================================================================
+   PERSONEN-KURZLISTE IM AUSWERTEN (17.09.2026) - reine Design-Schicht
+   Karam: "nur die letzten drei, die ich geoeffnet habe, und nur eine
+   Suchleiste." Die Funktion liegt in auswerten.js (awPersonGruppeHtml).
+   Bis zur Marke ENDE PERSONEN-KURZLISTE loeschen.
+   ===================================================================== */
+@media screen {
+  body[data-seite="mein"] #auswerten .aw-psuchzeile {
+    display: flex; gap: 6px; margin: 4px 0 8px;
+  }
+  body[data-seite="mein"] #auswerten .aw-psuchzeile input {
+    flex: 1 1 auto; min-width: 0; padding: 7px 10px;
+    border: 1px solid #b9c2cd; border-radius: 7px; font-size: 14px;
+  }
+  body[data-seite="mein"] #auswerten .aw-psuchweg {
+    flex: 0 0 auto; padding: 4px 10px; border: 1px solid #b9c2cd;
+    border-radius: 7px; background: #f3f5f8; cursor: pointer;
+  }
+  body[data-seite="mein"] #auswerten .aw-pmehr {
+    margin-top: 6px; color: #5a6673;
+  }
+}
+/* ---- ENDE PERSONEN-KURZLISTE ---- */

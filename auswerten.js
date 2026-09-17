@@ -250,6 +250,7 @@ function awFilterAlle() {
   // "Ganz weg" heisst ganz weg: sonst bliebe die Suche stehen und die
   // Liste waere nach dem Klick immer noch kuerzer als erwartet.
   awSuche = "";
+  awPersonSuche = "";
   awNeuZeichnen();
 }
 
@@ -418,6 +419,24 @@ function zeichneAuswerten() {
 // Eine Auswahl, die es im Zeitraum nicht mehr gibt, bleibt trotzdem
 // stehen und wird gezeigt - sonst waere sie still verschwunden und
 // Karam suchte, warum die Liste leer ist.
+// EIN Chip, von Personen- UND Anbieter-Kasten benutzt - der Knopf darf
+// sich nie an zwei Stellen verschieden verhalten.
+function awChipHtml(e, an, umFn) {
+  // EINFACHE Anfuehrungszeichen im Aufruf, das Attribut selbst haengt
+  // in doppelten. Hier stand JSON.stringify, und das liefert doppelte:
+  // daraus wurde onclick="awPersonUm("pA")". Das Attribut endete beim
+  // zweiten Anfuehrungszeichen, der Klick tat gar nichts, und es sah
+  // aus, als gaebe es den Filter nicht. Im Browser durch echtes
+  // Klicken gefunden, nicht durch Lesen.
+  const ruf = umFn + "('" + String(e.wert).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')";
+  return '<button class="aw-chip' + (an ? " aktiv" : "") + (e.fehlt ? " aw-chipweg" : "") +
+    '" onclick="' + textSicherM(ruf) + '" title="' +
+    (e.tipp ? textSicherM(e.tipp)
+      : (e.fehlt ? "gewählt, kommt in diesem Zeitraum aber nicht vor"
+                 : e.zahl + " Kombination(en) in diesem Zeitraum")) + '">' +
+    textSicherM(e.text) + ' <span class="aw-chipz">' + e.zahl + "</span></button>";
+}
+
 function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
   const aus = gewaehlt.length === 0;
   let h = '<div class="aw-fgruppe"><div class="aw-ftitel">' + titel +
@@ -426,19 +445,7 @@ function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
     '<div class="aw-fchips">' +
     '<button class="aw-chip' + (aus ? " aktiv" : "") + '" onclick="' + alleFn + '()">alle</button>';
   for (const e of eintraege) {
-    const an = gewaehlt.indexOf(e.wert) >= 0;
-    // EINFACHE Anfuehrungszeichen im Aufruf, das Attribut selbst haengt
-    // in doppelten. Hier stand JSON.stringify, und das liefert doppelte:
-    // daraus wurde onclick="awPersonUm("pA")". Das Attribut endete beim
-    // zweiten Anfuehrungszeichen, der Klick tat gar nichts, und es sah
-    // aus, als gaebe es den Filter nicht. Im Browser durch echtes
-    // Klicken gefunden, nicht durch Lesen.
-    const ruf = umFn + "('" + String(e.wert).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "')";
-    h += '<button class="aw-chip' + (an ? " aktiv" : "") + (e.fehlt ? " aw-chipweg" : "") +
-      '" onclick="' + textSicherM(ruf) + '" title="' +
-      (e.fehlt ? "gewählt, kommt in diesem Zeitraum aber nicht vor"
-               : e.zahl + " Kombination(en) in diesem Zeitraum") + '">' +
-      textSicherM(e.text) + ' <span class="aw-chipz">' + e.zahl + "</span></button>";
+    h += awChipHtml(e, gewaehlt.indexOf(e.wert) >= 0, umFn);
   }
   if (!eintraege.length) h += '<span class="mini">' + leerText + "</span>";
   return h + "</div></div>";
@@ -485,28 +492,156 @@ function awSuchStandHtml() {
     " Umsatz und Gewinn oben zählen genau diese " + treffer + ".";
 }
 
-function awFilterHtml(imZeitraum) {
-  // Zaehlen, was es gibt.
-  const zaehlP = {}, zaehlA = {};
-  for (const s of imZeitraum) {
-    const p = awPersonFach(s), a = awAnbieterVon(s);
+// ---------- Der Personen-Kasten: die letzten drei, dazu eine Suche ----------
+// Karam (17.09.2026): "Ich moechte, dass ich bei den Personen nicht alle
+// Personen angezeigt bekomme, sondern nur die letzten drei, die ich
+// geoeffnet habe, und nur eine Suchleiste - das erspart mir einfach
+// Platz bei der Suche."
+// Die letzten drei kommen aus personenZuletzt() in logik.js - DERSELBEN
+// Merkliste, die auch Mein Bereich und der Kombi-Bau benutzen. Sichtbar
+// bleiben ausserdem IMMER: jede gewaehlte Person (ein aktiver Filter,
+// den man nicht sieht, waere eine kuerzere Liste ohne Grund) und die
+// zwei Sonderfaecher "keine Person" und "falsch zugeordnet" (dort liegt
+// Geld, das noch niemandem zugerechnet ist). Alle anderen findet die
+// Suche, und wie viele das sind, steht ausdruecklich da.
+// Die Suche wird ABSICHTLICH nicht gemerkt - dieselbe Ueberlegung wie
+// bei der Spielsuche: eine stehengebliebene Suche laesst Personen fehlen.
+let awPersonSuche = "";
+const AW_PERSONEN_KURZ = 3;
+
+function awPersonZaehlen() {
+  const zaehlP = {};
+  for (const s of awImZeitraum()) {
+    const p = awPersonFach(s);
     zaehlP[p] = (zaehlP[p] || 0) + 1;
-    zaehlA[a] = (zaehlA[a] || 0) + 1;
   }
-  const gewP = awPersonenFilter(), gewA = awAnbieterFilter();
+  const gewP = awPersonenFilter();
   // Gewaehltes, das im Zeitraum nicht vorkommt, trotzdem aufnehmen.
   for (const p of gewP) if (!(p in zaehlP)) zaehlP[p] = 0;
-  for (const a of gewA) if (!(a in zaehlA)) zaehlA[a] = 0;
+  return { zaehlP: zaehlP, gewP: gewP };
+}
 
-  const personen = Object.keys(zaehlP).map(p => ({
-    wert: p,
-    text: p === AW_LOS ? "\u26a0 falsch zugeordnet"
-        : (p ? (awPersonName(p) || "Person " + String(p).slice(0, 6)) : "keine Person"),
-    zahl: zaehlP[p],
-    fehlt: zaehlP[p] === 0
-  })).sort((a, b) => b.zahl - a.zahl ||
-    (typeof personVergleich === "function" ? personVergleich(a.text, b.text)
-                                           : a.text.localeCompare(b.text)));
+function awPersonEintrag(wert, zahl, gewaehlt) {
+  return {
+    wert: wert,
+    text: wert === AW_LOS ? "⚠ falsch zugeordnet"
+        : (wert ? (awPersonName(wert) || "Person " + String(wert).slice(0, 6)) : "keine Person"),
+    zahl: zahl || 0,
+    fehlt: !!gewaehlt && !zahl,
+    tipp: (!gewaehlt && !zahl)
+      ? "in diesem Zeitraum keine Kombination - anklicken filtert trotzdem" : ""
+  };
+}
+
+function awPersonGruppeHtml() {
+  const z = awPersonZaehlen();
+  const zaehlP = z.zaehlP, gewP = z.gewP;
+  const q = awHart(awPersonSuche);
+  const gewaehltIst = w => gewP.indexOf(w) >= 0;
+  let eintraege = [];
+  let versteckt = 0;
+  if (q) {
+    // Gesucht wird ueber ALLE Personen des Bereichs, nicht nur die im
+    // Zeitraum - Karam sucht ja gerade eine, die nicht vorn steht.
+    // Dieselbe Verhaertung wie die Spielsuche: Umlaute, Gross/Klein,
+    // Bindestriche egal.
+    for (const w of Object.keys(zaehlP)) {
+      if (!w || w === AW_LOS) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
+    }
+    for (const o of (Array.isArray(ordnerListe) ? ordnerListe : [])) {
+      eintraege.push(awPersonEintrag(String(o.id), zaehlP[String(o.id)] || 0,
+        gewaehltIst(String(o.id))));
+    }
+    eintraege = eintraege.filter(e => awHart(e.text).indexOf(q) > -1);
+  } else {
+    const zeigen = new Set(gewP);
+    zeigen.add("");
+    zeigen.add(AW_LOS);
+    let n = 0;
+    const liste = Array.isArray(ordnerListe) ? ordnerListe : [];
+    for (const id of (typeof personenZuletzt === "function" ? personenZuletzt() : [])) {
+      if (n >= AW_PERSONEN_KURZ) break;
+      if (liste.some(o => String(o.id) === String(id)) && !zeigen.has(String(id))) {
+        zeigen.add(String(id));
+        n++;
+      }
+    }
+    for (const w of Object.keys(zaehlP)) {
+      if (zeigen.has(w)) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
+      else versteckt++;
+    }
+    // Die letzten drei stehen auch dann da, wenn sie im Zeitraum leer
+    // sind - sonst waere "zuletzt geoeffnet" mal da und mal nicht.
+    for (const w of zeigen) {
+      if (w && w !== AW_LOS && !(w in zaehlP)) {
+        eintraege.push(awPersonEintrag(w, 0, gewaehltIst(w)));
+      }
+    }
+  }
+  eintraege.sort((a, b) => b.zahl - a.zahl || a.text.localeCompare(b.text, "de"));
+
+  const aus = gewP.length === 0;
+  let h = '<div class="aw-fgruppe" id="aw_pgruppe"><div class="aw-ftitel">&#128100; Person' +
+    (aus ? ' <span class="mini">(alle)</span>'
+         : ' <span class="aw-fzahl">' + gewP.length + " gewählt</span>") + "</div>" +
+    '<div class="aw-psuchzeile">' +
+      '<input id="aw_psuche" type="text" inputmode="search" ' +
+        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="Person suchen (Name oder Nummer)" value="' + textSicherM(awPersonSuche) +
+        '" oninput="awPersonSuchen(this.value)">' +
+      (awPersonSuche
+        ? '<button class="aw-psuchweg" onclick="awPersonSuchen(\'\')" ' +
+          'title="Personen-Suche löschen">&#10005;</button>' : "") +
+    "</div>" +
+    '<div class="aw-fchips">' +
+    '<button class="aw-chip' + (aus ? " aktiv" : "") + '" onclick="awPersonenAlle()">alle</button>';
+  for (const e of eintraege) h += awChipHtml(e, gewaehltIst(e.wert), "awPersonUm");
+  if (!eintraege.length) {
+    h += '<span class="mini">' + (q
+      ? "Keine Person passt auf <b>" + textSicherM(awPersonSuche.trim()) + "</b>."
+      : "In diesem Zeitraum liegt keine Kombination.") + "</span>";
+  }
+  h += "</div>";
+  // Was gerade NICHT dasteht, steht ausdruecklich dabei - eine kurze
+  // Liste ohne diesen Satz saehe aus, als gaebe es die anderen nicht.
+  if (q) {
+    h += '<div class="mini aw-pmehr">' + eintraege.length + " Person" +
+      (eintraege.length === 1 ? "" : "en") + " passt" + (eintraege.length === 1 ? "" : "en") +
+      " auf <b>" + textSicherM(awPersonSuche.trim()) + "</b>.</div>";
+  } else if (versteckt) {
+    h += '<div class="mini aw-pmehr">' + versteckt + " weitere " +
+      (versteckt === 1 ? "Person ist" : "Personen sind") +
+      " über die Suche zu finden.</div>";
+  }
+  return h + "</div>";
+}
+
+function awPersonSuchen(wert) {
+  awPersonSuche = String(wert || "");
+  // NUR den Personen-Kasten neu zeichnen. Die ganze Ansicht wuerde das
+  // Suchfeld beim ersten Buchstaben wegwerfen (dieselbe Falle wie bei
+  // obSuchen und der Spielsuche).
+  const g = el("aw_pgruppe");
+  if (!g) return;
+  const neu = document.createElement("div");
+  neu.innerHTML = awPersonGruppeHtml();
+  g.replaceWith(neu.firstElementChild);
+  const f = el("aw_psuche");
+  if (f) { f.focus(); try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) { } }
+}
+
+function awFilterHtml(imZeitraum) {
+  // Zaehlen, was es an Anbietern gibt. Die Personen zaehlt der
+  // Personen-Kasten selbst (awPersonZaehlen) - eine zweite Zaehlung
+  // hier waere die Drift-Falle.
+  const zaehlA = {};
+  for (const s of imZeitraum) {
+    const a = awAnbieterVon(s);
+    zaehlA[a] = (zaehlA[a] || 0) + 1;
+  }
+  const gewA = awAnbieterFilter();
+  // Gewaehltes, das im Zeitraum nicht vorkommt, trotzdem aufnehmen.
+  for (const a of gewA) if (!(a in zaehlA)) zaehlA[a] = 0;
 
   const anbieter = Object.keys(zaehlA).map(a => ({
     wert: a,
@@ -515,10 +650,9 @@ function awFilterHtml(imZeitraum) {
     fehlt: zaehlA[a] === 0
   })).sort((a, b) => b.zahl - a.zahl || a.text.localeCompare(b.text));
 
-  const etwasAn = gewP.length || gewA.length;
+  const etwasAn = awPersonenFilter().length || gewA.length;
   return '<div class="aw-filter">' +
-    awFilterGruppe("&#128100; Person", personen, gewP, "awPersonUm", "awPersonenAlle",
-      "In diesem Zeitraum liegt keine Kombination.") +
+    awPersonGruppeHtml() +
     awFilterGruppe("&#127978; Anbieter", anbieter, gewA, "awAnbieterUm", "awAnbieterAlle",
       "In diesem Zeitraum liegt keine Kombination.") +
     (etwasAn
