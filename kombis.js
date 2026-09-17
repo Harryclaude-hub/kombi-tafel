@@ -1757,10 +1757,39 @@ function gsOhneOrdner(e) {
   for (const t of (e.wetten || [])) if (t && t.satz) return false;
   return true;
 }
+// Traegt einen Ordner, aber KEINEN, den es in SAETZE noch gibt.
+// Karams Fund (17.09., Nacht): so eine Kombination (Nr. 2 aus dem
+// geloeschten Ordner 2026-08-29-mittag) stand als einzige Zeile in
+// jedem frisch geoeffneten Ordner. Sie lebt jetzt im eigenen Fach
+// "Ordner geloescht" statt ueberall.
+function gsOrdnerWeg(e) {
+  if (gsOhneOrdner(e)) return false;
+  const da = (x) => !!x && (Array.isArray(SAETZE) ? SAETZE : []).some(s2 => s2.id === x);
+  if (da(e.satz)) return false;
+  for (const t of (e.wetten || [])) if (t && da(t.satz)) return false;
+  return true;
+}
 
 // Der zuklappbare Waehler ueber der Gesetzt-Liste. Zu: ein Knopf und
 // EIN Satz, was gerade gilt. Auf: Faecher (passend, alles, ohne Ordner,
 // jeder Foto-Ordner mit Anzahl) und das Setz-Datum von/bis.
+// Der Warnkasten fuer unlesbare Kombinationen: sie stehen seit Karams
+// Nacht-Fund (17.09.) nicht mehr als Zeile in jedem Ordner, aber
+// verschwinden duerfen sie NIE - ohne diese Warnung koennte dieselbe
+// Kombination ein zweites Mal gesetzt werden. Der Kasten haengt an
+// jeder Ansicht, in der sie nicht selbst als Zeilen stehen.
+function gsUnlesbarKasten(ausAllen) {
+  if (gsWahl.art === "alle" || gsWahl.art === "unlesbar") return "";
+  const zahl = (ausAllen || []).filter(e => e.unlesbar).length;
+  if (!zahl) return "";
+  return '<div class="warnkern gs-unlesbarkasten">&#9888; <b>' + zahl +
+    " Kombination" + (zahl === 1 ? "" : "en") + " im Konto " +
+    (zahl === 1 ? "ist" : "sind") + " auf diesem Gerät nicht lesbar.</b> " +
+    "Sie können zu JEDEM Ordner gehören und zählen als gesetzt - Einsatz unbekannt, " +
+    "alle Summen ohne sie. " +
+    '<button onclick="gsArt(\'unlesbar\')">ansehen</button></div>';
+}
+
 function gsWahlHtml(ausAllen) {
   // Was ein Klick zeigen WUERDE: gezaehlt wird mit dem aktiven
   // Zeitfenster, denn das gilt in jedem Fach.
@@ -1774,6 +1803,8 @@ function gsWahlHtml(ausAllen) {
   };
   const basis = (ausAllen || []).filter(e => !e.unlesbar && imZeit(e));
   const ohneZahl = basis.filter(gsOhneOrdner).length;
+  const wegZahl = basis.filter(gsOrdnerWeg).length;
+  const unlesbarZahl = (ausAllen || []).filter(e => e.unlesbar).length;
 
   const zeit = (gsWahl.von || gsWahl.bis)
     ? " Gesetzt " + (gsWahl.von ? "ab <b>" + gsWahl.von + "</b>" : "") +
@@ -1783,6 +1814,8 @@ function gsWahlHtml(ausAllen) {
   const lage =
     (gsWahl.art === "alle" ? "Gezeigt wird <b>alles</b> aus allen Ordnern."
     : gsWahl.art === "ohne" ? "Gezeigt werden nur Kombinationen <b>ohne Ordner</b> (Handeinträge und Screenshot-Kombis)."
+    : gsWahl.art === "weg" ? "Gezeigt werden nur Kombinationen aus <b>gelöschten Ordnern</b>."
+    : gsWahl.art === "unlesbar" ? "Gezeigt werden nur die <b>nicht lesbaren</b> Kombinationen."
     : gsWahl.art === "ordner" ? "Gezeigt wird nur der Ordner <b>" +
         textSicher(typeof satzTitelVon === "function" ? satzTitelVon(gsWahl.satz) : gsWahl.satz) + "</b>."
     : "Gezeigt wird, was zur <b>Tabelle oben</b> passt.") + zeit;
@@ -1798,7 +1831,13 @@ function gsWahlHtml(ausAllen) {
     let chips =
       chip(gsWahl.art === "passend", "gsNurPassendeZeigen()", "zur Tabelle passend", null) +
       chip(gsWahl.art === "alle", "gsArt('alle')", "alles", basis.length) +
-      chip(gsWahl.art === "ohne", "gsArt('ohne')", "ohne Ordner", ohneZahl);
+      chip(gsWahl.art === "ohne", "gsArt('ohne')", "ohne Ordner", ohneZahl) +
+      // Die zwei Rest-Faecher stehen nur da, wenn es sie braucht - ein
+      // leeres Fach waere ein Knopf ohne Sinn.
+      (wegZahl || gsWahl.art === "weg"
+        ? chip(gsWahl.art === "weg", "gsArt('weg')", "Ordner gelöscht", wegZahl) : "") +
+      (unlesbarZahl || gsWahl.art === "unlesbar"
+        ? chip(gsWahl.art === "unlesbar", "gsArt('unlesbar')", "nicht lesbar", unlesbarZahl) : "");
     for (const s of (Array.isArray(SAETZE) ? SAETZE : [])) {
       if (s.id === SATZ_ALLE) continue;
       const zahl = basis.filter(e => gsImOrdnerStreng(e, s.id)).length;
@@ -1878,7 +1917,16 @@ function zeichneGesetzte() {
   // ("ohne Ordner") und werden im Passend-Modus gezaehlt ausgeblendet -
   // nie still (Regel 4).
   const grundWeg = (e) => {
-    if (e.unlesbar) return "";               // darf nie verschwinden
+    // Unlesbare Kombinationen: sie KOENNEN zu jedem Ordner gehoeren.
+    // Frueher standen sie deshalb als Zeile in JEDEM Ordner - Karams
+    // zweite Quelle fuer "was macht die hier?". Jetzt haben sie ihr
+    // eigenes Fach und einen unuebersehbaren Warnkasten ueber der
+    // Liste (gsUnlesbarKasten) - verschwinden tun sie also NIE, sie
+    // stehen nur nicht mehr als Karteileiche zwischen den echten.
+    if (e.unlesbar) {
+      return (gsWahl.art === "alle" || gsWahl.art === "unlesbar") ? "" : "unlesbar";
+    }
+    if (gsWahl.art === "unlesbar") return "andererOrdner";
     // Das Setz-Datum (gsWahl.von/bis) gilt in JEDER Art. Verglichen
     // wird ueber e.zeit - den Moment des Speicherns, NICHT ueber
     // ebZeitPasst (das fragt ebNurOffen mit, die bekannte Falle).
@@ -1890,6 +1938,7 @@ function zeichneGesetzte() {
     }
     if (gsWahl.art === "alle") return "";
     if (gsWahl.art === "ohne") return gsOhneOrdner(e) ? "" : "andererOrdner";
+    if (gsWahl.art === "weg") return gsOrdnerWeg(e) ? "" : "andererOrdner";
     if (gsWahl.art === "ordner") {
       return gsImOrdnerStreng(e, gsWahl.satz) ? "" : "andererOrdner";
     }
@@ -1905,14 +1954,14 @@ function zeichneGesetzte() {
     // GANZ ohne Ordner: frueher "ueberall zeigen", seit heute das
     // eigene Fach (siehe oben) - der Zaehler unten nennt sie.
     if (gsOhneOrdner(e)) return "ohneOrdner";
-    // Ein Ordner, den es in SAETZE gar nicht gibt, ist kein Urteil wert:
-    // altimport.js legt die Scheine ausdruecklich auch dann an, wenn sich
-    // der Ordner nicht anlegen liess.
-    if (e.satz && !SAETZE.some(x => x.id === e.satz)) return "";
+    // Ordner geloescht (Karams Nacht-Fund, Nr. 2 aus 2026-08-29-mittag):
+    // frueher "kein Urteil, stehenlassen" - und damit in JEDEM Ordner.
+    // Jetzt das eigene Fach, gezaehlt statt still.
+    if (gsOrdnerWeg(e)) return "ordnerWeg";
     return eintragImOrdner(e.satz, e.wetten, satzJetzt) ? "" : "ohneKennung";
   };
-  const weg = { keinTreffer: 0, ohneKennung: 0, ohneOrdner: 0,
-    andererOrdner: 0, zeit: 0, ohneZeit: 0, euro: 0 };
+  const weg = { keinTreffer: 0, ohneKennung: 0, ohneOrdner: 0, ordnerWeg: 0,
+    andererOrdner: 0, zeit: 0, ohneZeit: 0, unlesbar: 0, euro: 0 };
   const alle = [];
   for (const e of ausAllen) {
     const g = grundWeg(e);
@@ -1920,8 +1969,12 @@ function zeichneGesetzte() {
     weg[g]++;
     weg.euro += Number(e.einsatz) || 0;
   }
+  // Unlesbare zaehlen NICHT in die Euro-Summe (ihr Einsatz ist auf
+  // diesem Geraet unbekannt) und laufen ueber den eigenen Warnkasten,
+  // nicht ueber den Ausgeblendet-Satz.
+  weg.euro -= 0;   // (unlesbare tragen ohnehin keinen lesbaren einsatz)
   const wegGefiltert = weg.keinTreffer + weg.ohneKennung + weg.ohneOrdner +
-    weg.andererOrdner + weg.zeit + weg.ohneZeit;
+    weg.ordnerWeg + weg.andererOrdner + weg.zeit + weg.ohneZeit;
   // Derselbe Satz an JEDER Stelle, an der etwas ausgeblendet ist - sonst
   // haengt es vom Zufall ab, welchen Zweig Karam gerade vor sich hat.
   // Mit Geld dahinter: sichtbare Summe plus ausgeblendete Summe ergibt
@@ -1935,6 +1988,8 @@ function zeichneGesetzte() {
       (weg.ohneKennung ? " " + weg.ohneKennung + " aus einem anderen Ordner (alte Fotoscheine)," : "") +
       (weg.ohneOrdner ? " <b>" + weg.ohneOrdner + " ganz ohne Ordner</b> (Handeinträge und " +
         "Screenshot-Kombis - eigenes Fach im Ordner-Wähler)," : "") +
+      (weg.ordnerWeg ? " <b>" + weg.ordnerWeg + " aus einem Ordner, den es nicht mehr " +
+        "gibt</b> (eigenes Fach im Ordner-Wähler)," : "") +
       (weg.andererOrdner ? " " + weg.andererOrdner + " in anderen Ordnern," : "") +
       (weg.zeit ? " " + weg.zeit + " außerhalb des gewählten Zeitraums," : "") +
       (weg.ohneZeit ? " " + weg.ohneZeit + " ohne Setz-Zeit (dem Zeitraum nicht zuzuordnen)," : "") +
@@ -1951,7 +2006,7 @@ function zeichneGesetzte() {
     // ist, samt der Zusage "zeigt alle" - und die waere dann gelogen.
     // Der Waehler steht AUCH hier - aus einem leeren Fach muss man
     // wieder herauskommen.
-    box.innerHTML = gsWahlHtml(ausAllen) +
+    box.innerHTML = gsWahlHtml(ausAllen) + gsUnlesbarKasten(ausAllen) +
       '<p class="mini">' + ((typeof bauAnbieterFilter !== "undefined" && bauAnbieterFilter)
       ? "Bei " + textSicher(anbieterName(bauAnbieterFilter)) + " ist hier nichts gesetzt (" +
         alle.length + " bei anderen Anbietern ausgeblendet - Karte oben nochmal antippen zeigt die übrigen)."
@@ -2040,7 +2095,7 @@ function zeichneGesetzte() {
       '<td class="gs-wetten">' + wetten + "</td></tr>";
   }
   box.innerHTML =
-    gsWahlHtml(ausAllen) +
+    gsWahlHtml(ausAllen) + gsUnlesbarKasten(ausAllen) +
     '<div class="tabellenrand"><table class="tb-tafel gs-tafel"><thead><tr>' +
       "<th>Nr.</th><th>Anbieter</th><th>Einsatz</th><th>Quote</th><th>möglich</th>" +
       "<th>Person</th><th>Wetten</th></tr></thead><tbody>" + zeilen +
@@ -2070,22 +2125,20 @@ function zeichneGesetzte() {
       // sie hierher gehoert, sondern weil ueber sie nichts zu sagen ist.
       (function () {
         if (gsWahl.art !== "passend") return "";
-        let hier = 0, fremd = 0;
+        // Ohne Ordner und aus geloeschten Ordnern stehen seit 17.09.
+        // in ihren eigenen Faechern - hier bleibt nur der Fall "gehoert
+        // wirklich zu DIESEM Ordner, aber ohne Wetten-Kennung".
+        let hier = 0;
         for (const e of liste) {
           if (e.unlesbar || (e.wetten || []).some(t => t && t.id)) continue;
-          if (!e.satz) continue;   // steht seit 17.09. abends im eigenen Fach
-          if (!SAETZE.some(x => x.id === e.satz)) fremd++;
-          else hier++;
+          if (!e.satz) continue;
+          if (SAETZE.some(x => x.id === e.satz)) hier++;
         }
-        return (hier
+        return hier
           ? " <b>" + hier + "</b> Kombination(en) <b>ganz ohne Wetten-Kennung</b> (alte " +
             "Fotoscheine) stehen hier, weil sie zu <b>diesem</b> Ordner gehören - ihre " +
             "Wetten sind deshalb alle grau."
-          : "") +
-          (fremd
-            ? " <b>" + fremd + "</b> steht hier, weil es den Ordner dazu nicht mehr gibt - " +
-              "darüber lässt sich nichts sagen, also bleibt sie stehen."
-            : "");
+          : "";
       })() +
       wegText() +
       (gsWahl.art !== "passend"
