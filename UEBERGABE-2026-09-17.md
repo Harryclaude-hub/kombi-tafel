@@ -1,7 +1,10 @@
 # Kombi-Tafel - Übergabe vom 17.09.2026
 
-Stand am Ende dieses Tages: Fassung **`20260917j`**, Commit **`86d18a6`**,
+Stand am Ende dieses Tages: Fassung **`20260917s`**, Commit **`bea17f7`**,
 alles committet und nach `origin/main` gepusht, Arbeitsbaum sauber.
+**Ganz unten steht ein NACHTRAG vom Abend** (zweite Sitzung desselben
+Tages, Fassungen k bis s) - der gehört mitgelesen, vor allem der neue
+Ort der Test-Suiten und die neuen Fallen.
 
 Dieser Text fasst **einen einzigen Arbeitstag** zusammen. Die Grundlagen des
 Projekts stehen in **[UEBERGABE.md](UEBERGABE.md)** (1313 Zeilen, Stand 11.09.) -
@@ -435,3 +438,117 @@ kein Fehler.
 3. Die Suiten einmal laufen lassen, damit du den grünen Ausgangspunkt kennst.
 4. Erst dann anfangen. Und **nach jedem fertigen Stück**:
    `node naechste-fassung.js --setzen`, committen, pushen.
+
+---
+---
+
+# NACHTRAG vom Abend des 17.09.2026 (zweite Sitzung, k bis s)
+
+Neuer Stand: Fassung **`20260917s`**, Commit **`bea17f7`**, alles gepusht,
+live gegengeprüft. Der Prüf-Punkt oben ("es muss 86d18a6 sein") gilt
+nicht mehr - jetzt muss es `bea17f7` sein.
+
+## Die Test-Suiten sind UMGEZOGEN
+
+```
+C:\Users\Home\AppData\Local\Temp\claude\C--Users-Home-kombi-tafel\
+  adca38dc-097a-40c8-b5bf-c78d5823db52\scratchpad\t_*.js
+```
+
+Alle alten Suiten wurden dorthin kopiert und dort weitergepflegt.
+**28 Dateien, alle grün.** Neu dazugekommen: `t_awpersonen.js`,
+`t_awzuordnen.js`, `t_tafelweg.js`, `t_bilder.js`, `t_bloecke.js`,
+`t_anbid.js`. Wie gehabt: `t_logik.js` aus dem Repo-Ordner starten,
+`t_export.js`/`t_xlsx.js` brauchen eine Datei als Argument.
+
+## Was der Abend gebaut hat (je ein Commit, k bis s)
+
+- **k** Auswerten: Schalter **gewonnen/verloren** neben dem Zeitraum
+  (statt des Hakens "nur die noch offenen"; alter Geräte-Wert wird über
+  den neuen Schlüssel `kt_aw_zeig` übersetzt). Dazu 0-Zeilen-Wachen in
+  `awStand`/`awEcht` nachgezogen.
+- **l** Auswerten: Personen-Kurzliste (ABENDS WIEDER GEKIPPT, siehe s).
+- **m** Auswerten: **dritter Ausgang in Orange** - "nicht zur Gänze
+  gewonnen". KEIN eigener Stand: `stand=gewonnen` + `echt_zurueck` in
+  EINEM Schreibvorgang; orange ist die Sichtbarkeit der Abweichung vom
+  Möglich-Wert. Das "gekommen"-Feld ist jetzt `type=text
+  inputmode=decimal` (Komma-Falle).
+- **n** Auswerten: **Person direkt an der Karte** suchen und zuordnen.
+  Der EINE Schreibweg heißt jetzt `scheinOrdnerSchreiben` (mein.js),
+  `tuScheinOrdner` und `awPersonZuordnen` teilen ihn. "Nicht diese
+  Person" ruft `tuPersonWeg` weiter.
+- **o** Kombinationen: **Ergebnisse-Eingabetafel aus** über den Schalter
+  `ERG_TAFEL_AN = false` in ergebnisse.js (Code komplett da, eine Zeile
+  Selbstsuche-Bilanz bleibt sichtbar). In der Tabelle: Verlust als roter
+  Betrag statt Strich, orange Marke aus DERSELBEN Funktion
+  `awTeilGewinn`, rote Differenzzeile heißt neutral "weniger als
+  möglich" (nicht mehr "Gebühren").
+- **p** Kombi-Bau: in der Gesetzt-Liste sind **anwesende Einsätze
+  markiert** (nur über die Wetten-Kennung), Zähl-Marke "2 von 3 aus
+  dieser Tabelle", Klick springt per `gsZuWette` zur Zeile (orange
+  Blitz-Umrandung, 4 s).
+- **q** **Bilder erst beim Zeigen**: `supaScheineLaden` lädt OHNE die
+  foto-Spalte (Spaltenliste aus einer Probezeile; zweite leichte
+  Abfrage markiert `fotoDa`). `fotoBildHtml` in mein.js ist der EINE
+  Bild-Erzeuger (Tabelle, Personen-Kasse, Kombi-Konto, Auswerten),
+  lädt höchstens 3 gleichzeitig nach, Fehlschlag = Nochmal-Knopf mit
+  Grund. Export-ZIP lädt fehlende Bilder mit Fortschritt nach,
+  Foto-Nachtrag zählt `fotoDa` nicht als "fehlt" (hätte echte Bilder
+  überschrieben!), tuKopieren holt das Bild vor dem Kopieren.
+- **r** **Blockweises Zeichnen**: Auswerten 150er-, große Tabelle und
+  Gesetzt-Liste 200er-Blöcke. Gezählt/gesucht/summiert wird IMMER über
+  alles; jeder Schnitt steht mit Zahl und zwei Knöpfen da.
+- **s** Vier Stücke: (1) Suche bei 10.000 von 636 ms auf **26 ms** je
+  Anschlag (Suchtext-Speicher `_suchtext` am Schein; awGefiltert bekommt
+  die Basis hereingereicht, Marke `_istGefiltert` schützt die Summen).
+  (2) Personen-Kasten im Auswerten: **ALLE Personen, zwei Reihen, quer
+  scrollen** (Karams Kehrtwende vom Abend; gelöschte, aber gewählte
+  Kennungen bleiben als Chip sichtbar - Resttopf). (3) **Anbieter-ID**:
+  `daten.anbieterId` (VERSCHLÜSSELT), Zeile steht IMMER da ("keine"
+  ist eine Aussage), eintippbar im Auswerten (frisch holen ->
+  `supaScheinDatenSchreiben`) und an der Bau-Karte (`sid_`-Feld ->
+  `baueVerlaufsEintrag`), durchsuchbar. (4) **Logos**: die sieben
+  offiziellen Seiten-Symbole liegen in `logos/` (Karams ausdrücklicher
+  Wunsch, Herkunft in LIESMICH.txt), Name steht NEBEN dem Logo,
+  ak-Karten tragen ihr Symbol per CSS; dazu die Qualitätsschicht
+  (Kontrast, Tabellenköpfe, Fokusringe, Touch-Höhen).
+
+## Neue Fallen dieses Abends
+
+1. **Unteragenten können am Sitzungs-Limit sterben.** Ein 8-Agenten-
+   Workflow ist komplett mit "session limit" gescheitert - Hauptlauf
+   lief weiter. Erst prüfen, dann delegieren.
+2. **`getElementById`-Fakes zerlegen kein HTML.** `zeichneAuswerten`
+   schreibt in `#auswerten`; der gestellte `#aw_liste`-Knoten bleibt
+   leer. Im Test dort lesen, wo wirklich geschrieben wird.
+3. **Verstecktes Fenster = eingefrorene Screenshots.** Die Browser-
+   Vorschau liefert leere Bilder, wenn das Pane verdeckt ist. Messen
+   mit `getBoundingClientRect`/`getComputedStyle`, nicht mit Bildern.
+4. **`.aw-keinbild .mini` sah aus wie der Kontrast-Fehler.** Der blasse
+   Wert kam vom Platzhalter, nicht von der .mini-Regel - erst die
+   RICHTIGE Stelle messen, dann urteilen.
+5. **Quelltext-Anker in Suiten reißen bei Refactorings.** Nach dem
+   Durchreichen der Filter-Basis mussten fünf Anker in t_zwei/t_suche
+   nachgezogen werden - rote Anker heißt oft "Signatur geändert", nicht
+   "Fehler".
+6. **preview_start sucht launch.json im Sitzungs-Startordner.** Nach
+   einem Ordnerwechsel eine Kopie mit ABSOLUTEN Pfaden dort ablegen.
+
+## Offen nach diesem Abend
+
+- **Automatisches Auslesen der Anbieter-ID aus dem Foto.** Bewusst
+  nicht gebaut: die Screenshots sind Ende-zu-Ende verschlüsselt (ohne
+  Karams Schlüssel kann niemand hineinschauen), und die Texterkennung
+  scheinlesen.js/Tesseract ist seit längerem bewusst abgeschaltet.
+  Nächster Schritt braucht Karam am echten Gerät: je Anbieter zeigen,
+  WO die ID auf dem Schein steht (zwei, drei Beispiele reichen), dann
+  gezielte Auslese in die vorhandene OCR und live messen.
+- **Karams Buchhaltungs-Fehler**: er sagte "ich hätte noch ein paar
+  Fehler gefunden", hat sie aber noch nicht genannt. Nachfragen.
+- **Mein Bereich Personen-Karten** stehen weiter auf 5 (PERSONEN_OBEN).
+  Die Kehrtwende "alle, zwei Reihen, quer" wurde NUR im Auswerten
+  umgesetzt - wenn er es auch dort will, ist es ein kleines Stück.
+- Personen-Kassen-Tabelle je Person hat noch keinen Block-Schnitt
+  (erst relevant, wenn EINE Person tausende Kombinationen hat).
+- Alt-Punkte unverändert: ergebnis-scan Version 3 (Pins), TURN,
+  doppelte Fotos der 36 Altscheine, Eingabetafel-Rückholschalter.
