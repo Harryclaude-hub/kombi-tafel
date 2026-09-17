@@ -1,6 +1,6 @@
 # Kombi-Tafel - Übergabe vom 17.09.2026
 
-Stand am Ende dieses Tages: Fassung **`20260917t`**, Commit **`e398d12`**,
+Stand am Ende dieses Tages: Fassung **`20260917u`**, Commit **`67ef659`**,
 alles committet und nach `origin/main` gepusht, Arbeitsbaum sauber.
 **Ganz unten steht ein NACHTRAG vom Abend** (zweite Sitzung desselben
 Tages, Fassungen k bis s) - der gehört mitgelesen, vor allem der neue
@@ -594,6 +594,15 @@ Karams zweites Abend-Paket, alles gepusht, 30 Suiten grün (neu:
   "P-1117" (Namen sind verschlüsselt, von außen nicht prüfbar).
 - **Logo-Chips** sind jetzt ruhig weiß mit Kante (Karams "komischer
   Hintergrund" war die Markenfarbe HINTER dem Symbol).
+
+- **Gesetzt-Liste (Fassung u):** Karams Bug behoben - Einträge OHNE
+  Ordner (Handeinträge, Screenshot-Kombis) standen in JEDEM Ordner
+  (eintragImOrdner-Freibrief). Sie leben jetzt im Fach „ohne Ordner"
+  des neuen zuklappbaren Wählers (gsWahl in kombis.js: passend / alles
+  / ohne Ordner / je Foto-Ordner streng, plus Setz-Datum von/bis über
+  e.zeit - NICHT ebZeitPasst). Jeder Ausblende-Grund hat seinen Satz,
+  Unlesbare stehen in jedem Fach, t_gesetzt §11 und t_drei sind
+  nachgezogen.
 
 ## Offen nach dem zweiten Nachtrag
 
