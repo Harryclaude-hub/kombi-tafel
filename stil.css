@@ -4394,22 +4394,27 @@ body[data-seite="mein"] a.s-person.s-person-fehlt:hover { background: #8a5a12; }
 body[data-seite="mein"] td a.s-person { min-height: 26px; padding: 3px 10px; font-size: 12px; }
 
 /* ---- 6e. Anbieter-Logos ----
-   Liegt logos/<kuerzel>.png, zeigt die Marke das Logo statt des Namens.
-   Fehlt die Datei, nimmt logik.js die Klasse "mit-logo" wieder weg und
-   der Name steht da wie bisher - deshalb haengt hier alles an dieser
-   einen Klasse. Reine Optik: ohne diesen Block sieht man Logo UND Namen
-   nebeneinander, es geht nichts verloren. */
+   Liegt logos/<kuerzel>.png, zeigt die Marke das Logo. Fehlt die Datei,
+   nimmt logik.js die Klasse "mit-logo" wieder weg und der Name steht da
+   wie bisher - deshalb haengt hier alles an dieser einen Klasse.
+   Karam (17.09.2026): "Ich moechte, dass du bei den Anbietern immer den
+   Originallogo nutzt, mit den Namen." Also Logo UND Name, nicht mehr
+   das Logo allein. Reine Optik, es geht ohne diesen Block nichts
+   verloren. */
 .marke.mit-logo {
-  display: inline-flex; align-items: center; gap: 0;
-  padding: 3px 8px; line-height: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 6px; line-height: 1.1;
 }
-.marke.mit-logo .anb-logo { display: block; height: 20px; width: auto; max-width: 96px; }
-.marke.mit-logo .anb-name { display: none; }
+.marke.mit-logo .anb-logo {
+  display: block; height: 18px; width: auto; max-width: 96px;
+  border-radius: 4px;
+}
+.marke.mit-logo .anb-name { display: inline; font-weight: 700; }
 /* Ohne Logo: das Kuerzel-Zeichen und der Name wie bisher. */
 .marke:not(.mit-logo) .anb-logo { display: none; }
 .marke.mit-logo::before { content: none; }
 /* In den grossen Auswert-Karten darf das Logo etwas hoeher sein. */
-body[data-seite="mein"] #auswerten .marke.mit-logo .anb-logo { height: 24px; max-width: 120px; }
+body[data-seite="mein"] #auswerten .marke.mit-logo .anb-logo { height: 22px; max-width: 120px; }
 
 /* ---- 6d. Kombi-Konto: Foto neben der Nummer, Tasten statt Menue ---- */
 body[data-seite="mein"] #buchhaltung .kk-nr { white-space: nowrap; }
@@ -5713,6 +5718,17 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   body[data-seite="mein"] #auswerten .aw-pmehr {
     margin-top: 6px; color: #5a6673;
   }
+  /* Karam (17.09.2026, spaeter): "am besten alle - zwei Reihen, und ich
+     will seitlich scrollen statt runter." Zwei Reihen, Quer-Lauf, die
+     Chips fuellen spaltenweise auf. */
+  body[data-seite="mein"] #auswerten #aw_pgruppe .aw-fchips {
+    display: grid; grid-auto-flow: column;
+    grid-template-rows: repeat(2, minmax(0, auto));
+    grid-auto-columns: max-content;
+    gap: 6px; overflow-x: auto; overflow-y: hidden;
+    max-height: none; padding-bottom: 6px;
+    overscroll-behavior-x: contain;
+  }
 }
 /* ---- ENDE PERSONEN-KURZLISTE ---- */
 
@@ -5859,3 +5875,101 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   .aw-mehr button, .mb-mehr button { min-height: 34px; }
 }
 /* ---- ENDE BLOECKE ---- */
+
+/* =====================================================================
+   QUALITAET MEIN BEREICH (17.09.2026) - reine Design-Schicht
+   Karam: "alles viel qualitativer im Kontrast, die Buttons muessen
+   besser dastehen, die Abstaende, die Symmetrie muss passen." Nur
+   Farben, Abstaende, Schaerfe - kein Rechenweg, keine Struktur.
+   Bis zur Marke ENDE QUALITAET loeschen.
+   ===================================================================== */
+@media screen {
+  /* 1. Kontrast: das kleine Grau war auf Weiss zu blass zum Lesen. */
+  body[data-seite="mein"] .mini { color: #44506a; }
+  body[data-seite="mein"] .aw-ku,
+  body[data-seite="mein"] .aw-suchstand { color: #44506a; }
+
+  /* 2. Tabellen: Kopfzeile klar getrennt, Zeile unterm Zeiger sichtbar. */
+  body[data-seite="mein"] #blk_kombis table thead th,
+  body[data-seite="mein"] #buchhaltung table thead th {
+    background: #edf1f6; color: #17233c;
+    border-bottom: 2px solid #c3ccd9;
+  }
+  body[data-seite="mein"] #scheine_db tbody tr:hover td,
+  body[data-seite="mein"] #buchhaltung tbody tr:hover td {
+    box-shadow: inset 0 0 0 200px rgba(26, 44, 80, .045);
+  }
+
+  /* 3. Knoepfe: gleiche Mindesthoehe, klarer Druckpunkt, sichtbarer
+     Tastatur-Fokus - die neuen Schalter von heute eingeschlossen. */
+  body[data-seite="mein"] #auswerten .aw-zeit { min-height: 34px; }
+  body[data-seite="mein"] button:focus-visible,
+  body[data-seite="kombis"] button:focus-visible {
+    outline: 3px solid #1a2c50; outline-offset: 2px;
+  }
+
+  /* 4. Ruhige, gleiche Abstaende zwischen den grossen Abschnitten. */
+  body[data-seite="mein"] #blk_kombis > h2,
+  body[data-seite="mein"] #blk_kombis > div { margin-top: 14px; }
+  body[data-seite="mein"] #blk_kombis > h2:first-child { margin-top: 0; }
+
+  /* 5. Anbieter-Karten oben: das Original-Symbol vor dem Namen.
+     Fehlt eine Datei, bleibt einfach der Name - kein Loch, kein Fehler. */
+  body[data-seite="mein"] .ak-karte .ak-name::before {
+    content: ""; display: inline-block; width: 18px; height: 18px;
+    margin-right: 6px; vertical-align: -3px; border-radius: 4px;
+    background-size: contain; background-repeat: no-repeat; background-position: center;
+  }
+  body[data-seite="mein"] .ak-karte.ak-alle .ak-name::before { display: none; }
+  body[data-seite="mein"] .ak-karte.ak-st .ak-name::before { background-image: url("logos/st.png"); }
+  body[data-seite="mein"] .ak-karte.ak-iw .ak-name::before { background-image: url("logos/iw.png"); }
+  body[data-seite="mein"] .ak-karte.ak-bw .ak-name::before { background-image: url("logos/bw.png"); }
+  body[data-seite="mein"] .ak-karte.ak-b3 .ak-name::before { background-image: url("logos/b3.png"); }
+  body[data-seite="mein"] .ak-karte.ak-ad .ak-name::before { background-image: url("logos/ad.png"); }
+  body[data-seite="mein"] .ak-karte.ak-bt .ak-name::before { background-image: url("logos/bt.png"); }
+  body[data-seite="mein"] .ak-karte.ak-mb .ak-name::before { background-image: url("logos/mb.png"); }
+}
+/* ---- ENDE QUALITAET ---- */
+
+/* =====================================================================
+   ANBIETER-ID (17.09.2026) - reine Design-Schicht
+   Karam: "Es gibt noch eine ID. Vorhanden, nicht vorhanden, oder ich
+   tippe sie extra rein - immer mit anzeigen." Funktion in auswerten.js
+   (awIdSpeichern), kombis.js (Feld an der Karte) und mein.js (Zeile in
+   der Tabelle). Bis ENDE ANBIETER-ID loeschen.
+   ===================================================================== */
+@media screen {
+  body[data-seite="mein"] .anbid { margin-top: 3px; }
+  body[data-seite="mein"] .anbid b,
+  body[data-seite="mein"] .aw-anbid b {
+    font-family: ui-monospace, Consolas, monospace; letter-spacing: .3px;
+  }
+  body[data-seite="mein"] .anbid-fehlt,
+  body[data-seite="mein"] .aw-anbid-fehlt { color: #7a8698; }
+  body[data-seite="mein"] #auswerten .aw-anbid-knopf {
+    min-height: 26px; padding: 1px 9px; border-radius: 999px;
+    border: 1px solid #8a94a6; background: #f3f5f8; cursor: pointer; font-size: 12px;
+  }
+  body[data-seite="mein"] #auswerten .aw-idform {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-top: 4px; padding: 8px; border: 1px dashed #8a94a6;
+    border-radius: 9px; background: #f8fafc;
+  }
+  body[data-seite="mein"] #auswerten .aw-idform[hidden] { display: none; }
+  body[data-seite="mein"] #auswerten .aw-idform input {
+    flex: 1 1 180px; min-width: 0; padding: 6px 9px;
+    border: 1px solid #b9c2cd; border-radius: 7px;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  body[data-seite="kombis"] .anbid-zeile { margin: 6px 0 2px; }
+  body[data-seite="kombis"] .anbid-feld {
+    width: 230px; max-width: 100%; padding: 5px 8px;
+    border: 1px solid #b9c2cd; border-radius: 7px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+  }
+  /* Am Handy braucht der kleine Knopf eine Daumen-Hoehe. */
+  @media (max-width: 700px) {
+    body[data-seite="mein"] #auswerten .aw-anbid-knopf { min-height: 36px; padding: 4px 12px; }
+  }
+}
+/* ---- ENDE ANBIETER-ID ---- */

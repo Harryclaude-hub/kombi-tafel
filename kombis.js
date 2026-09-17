@@ -1225,6 +1225,16 @@ function scheinHtml(s, z, gesetzt) {
         'value="' + gewinnWert(s, z, gesamt) + '" title="Was der Anbieter als möglichen Gewinn anzeigt. Vorbelegt ist die Schätzung nach Gebühr - trag ein, was wirklich dasteht." ' +
         'oninput="gewinnGeaendert(\x27' + s.id + '\x27, this.value, ' + gesamt + ', ' + gesamtRoh + ')"> &euro;' +
       ' <span class="mini gebuehr" id="geb_' + s.id + '">' + gebuehrText(einsatzWert(s, z), gewinnWert(s, z, gesamt), gesamtRoh) + "</span>" +
+      // Karam (17.09.2026): "Jede einzelne Wette hat eine ID beim
+      // Anbieter - die will ich beim Auswerten suchen koennen." Das Feld
+      // ist freiwillig; was hier steht, geht mit in den Verlauf
+      // (baueVerlaufsEintrag) und ist ab dann ueberall sichtbar und
+      // durchsuchbar. type=text: IDs koennen Buchstaben tragen.
+      '<div class="mini anbid-zeile">Anbieter-ID vom Schein: ' +
+        '<input type="text" class="anbid-feld" id="sid_' + s.id + '" ' +
+        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="steht auf dem Wettschein, z. B. 1234567890" ' +
+        'title="Die Kennung, unter der der Anbieter diesen Schein fuehrt. Freiwillig - hilft spaeter beim Wiederfinden."></div>' +
       '<button class="merken' + (imVerlauf ? ' schonda' : '') + '" ' +
         'onclick="scheinMerken(\'' + s.id + '\')">' +
         (imVerlauf ? 'nochmal in den Verlauf' : 'In den Verlauf') + '</button>' +
@@ -2738,6 +2748,10 @@ function baueVerlaufsEintrag(scheinId) {
   eintrag.brutto = rund2(einsatz * gesamtRoh);
   if (isFinite(gewinn) && gewinn > 0) eintrag.moeglich = rund2(gewinn);
   eintrag.gebuehr = rund2(eintrag.brutto - eintrag.moeglich);
+  // Die Anbieter-ID vom Feld an der Karte (17.09.2026). Immer als Text
+  // dabei, auch leer - "keine ID" ist eine Aussage, kein fehlendes Feld.
+  const idFeld = document.getElementById("sid_" + scheinId);
+  eintrag.anbieterId = idFeld ? String(idFeld.value).trim() : "";
   // Frueher hing hier die Foto-Auswertung mit dran. Das Foto wird jetzt
   // nur noch mitgenommen, nicht mehr gelesen.
   return { s: s, eintrag: eintrag,

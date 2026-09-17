@@ -1924,6 +1924,10 @@ function zeichneScheineDb(scheine) {
             : "steht " + dopp[s.id].zahl + "-mal im Verlauf - <b>das hier ist der erste</b>") +
           "</div>"
         : "") +
+      // Karam (17.09.2026): die Anbieter-ID steht IMMER dabei, auch als
+      // "keine" - vorhanden, nicht vorhanden oder eingetippt (Auswerten).
+      "<div class='mini anbid" + (d.anbieterId ? "" : " anbid-fehlt") + "'>Anbieter-ID: " +
+        (d.anbieterId ? "<b>" + textSicherM(d.anbieterId) + "</b>" : "keine") + "</div>" +
       anmerkungenBlock(s) + "</td>" +
       "<td><b>" + (d.quote || 0).toFixed(2) + "</b></td><td>" + einsatzZelle(s, schreib) +
         luecken(gruppen[stammIdM(d.scheinId)]) + "</td>" +

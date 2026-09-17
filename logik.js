@@ -115,9 +115,11 @@ function wannText(wann) {
 // Laden fehl, faellt das Bild weg und die Marke zeigt sich wieder.
 // Kein Netz noetig, keine fremde Adresse, kein Nachladen im Hintergrund.
 //
-// WARUM HIER KEINE LOGOS MITGELIEFERT WERDEN: die Logos der Wettanbieter
-// sind deren Marken. Sie gehoeren nicht in dieses Verzeichnis, solange
-// Karam sie nicht selbst hineinlegt. Wie, steht in logos/LIESMICH.txt.
+// Seit dem 17.09.2026 liegen in logos/ die offiziellen Seiten-Symbole
+// der sieben Anbieter (Karam: "immer den Originallogo nutzen, mit den
+// Namen"). Der Rueckfall auf die farbige Marke bleibt: eine geloeschte
+// oder kaputte Datei kostet nur das Bild, nie den Namen. Einzelheiten
+// und Austausch: logos/LIESMICH.txt.
 function anbieterMarkeHtml(kz, name, klasse) {
   const text = String(name || kz || "?");
   const sicher = text.replace(/&/g, "&amp;").replace(/</g, "&lt;")

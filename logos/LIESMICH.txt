@@ -29,11 +29,21 @@ Dann steht dort weiter die farbige Marke mit dem Namen, so wie bisher.
 Es geht nichts kaputt und es fehlt nichts. Du kannst also einzeln
 nachlegen, Anbieter fuer Anbieter.
 
-WARUM HIER KEINE LOGOS MITGELIEFERT WERDEN
-Die Logos gehoeren den Wettanbietern. Sie in dieses Verzeichnis zu legen
-und auf GitHub zu veroeffentlichen, waere eine Verbreitung fremder
-Marken. Deshalb legt sie nur Karam selbst hinein, und nur solche, die er
-verwenden darf.
+STAND 17.09.2026
+Auf Karams ausdruecklichen Wunsch ("immer den Originallogo nutzen, mit
+den Namen") liegen hier jetzt die offiziellen Seiten-Symbole der sieben
+Anbieter: die quadratischen Symbole ihrer eigenen Internetseiten
+(stake.com, interwetten.com, bwin.com, bet365.com, admiral.at,
+betway.com, merkur-bets.de), geholt ueber den Favicon-Dienst von
+Google, je unter 3 KB. Der Name steht seit demselben Tag IMMER daneben
+(stil.css, Block 6e). Wer schoenere breite Wortmarken hat, tauscht die
+Dateien einfach aus - Regeln oben. Loeschen einer Datei schadet nie:
+dann steht wieder die farbige Marke mit dem Namen da.
+
+ZUM RECHTLICHEN
+Die Symbole benennen die Anbieter, bei denen wirklich gesetzt wird -
+mehr tut diese Seite mit ihnen nicht. Wenn ein Anbieter das nicht will,
+Datei loeschen, Fassung hochziehen, fertig.
 
 NACH DEM HINEINLEGEN
 Die Fassungsnummer hochziehen, sonst zeigt der Browser das alte Bild:

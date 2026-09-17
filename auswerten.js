@@ -163,7 +163,17 @@ function awHart(t) {
 // danach sucht Karam. Dazu Linie, Anbieter, Nummer und Person - alles,
 // was auf der Karte sichtbar steht. Was man sieht, muss man auch
 // suchen koennen, sonst sucht man vergeblich nach etwas, das dasteht.
+//
+// Der fertige Text wird AM SCHEIN gemerkt (Karam 17.09.2026: die Suche
+// muss auch bei 10.000 fluessig bleiben - das Verhaerten aller Texte
+// bei jedem Tastendruck war der Fresser, gemessen 636 ms je Anschlag).
+// Der Speicher lebt nur auf den Objekten im Arbeitsspeicher: jedes
+// Neuladen des Bereichs baut die Objekte neu, also faengt er leer an.
+// Aendert sich die PERSON am Schein (Zuordnen direkt hier), passt der
+// gemerkte Text nicht mehr - deshalb haengt er an der Ordner-Kennung.
 function awSuchText(s) {
+  const person = String(s.ordner || "");
+  if (s._suchtext !== undefined && s._suchtextPerson === person) return s._suchtext;
   const d = (s && s.daten) || {};
   const teile = [];
   for (const t of (d.wetten || [])) {
@@ -171,9 +181,16 @@ function awSuchText(s) {
     teile.push(t.linie || t.wette || "");
   }
   teile.push("nr " + (s.nummer || ""));
+  // Karam (17.09.2026): "eine besondere Nummer, die immer was mit der
+  // Wette zu tun hat, dass ich die Screenshots beim Anbieter sehen und
+  // hier beim Auswerten suchen kann." Die Anbieter-ID ist durchsuchbar.
+  // Wer sie aendert (awIdSpeichern), wirft den gemerkten Text weg.
+  teile.push(String(d.anbieterId || ""));
   teile.push(d.anbieter || (typeof anbieterName === "function" ? anbieterName(d.kz) : ""));
   teile.push(awPersonName(s.ordner) || "");
-  return awHart(teile.join(" "));
+  s._suchtext = awHart(teile.join(" "));
+  s._suchtextPerson = person;
+  return s._suchtext;
 }
 
 // Mehrere Woerter sind eine UND-Suche: "girona palmas" findet die Partie,
@@ -208,11 +225,16 @@ function awSuchen(wert) {
   // NUR Liste, Summenkacheln und die Standzeile neu - nicht die ganze
   // Ansicht. Sonst waere das Eingabefeld nach dem ersten Buchstaben weg.
   // Dieselbe Falle wie bei obSuchen in mein.js.
+  // Zeitraum und Filter werden EINMAL gerechnet und durchgereicht -
+  // vorher liefen sie je Tastendruck viermal ueber alle Scheine
+  // (gemessen bei 10.000: 636 ms je Anschlag).
+  const imZ = awImZeitraum();
+  const gefiltert = awGefiltert(imZ);
   const k = el("aw_liste");
-  if (k) k.innerHTML = awListeHtml(awScheine());
-  awSummeAuffrischen();
+  if (k) k.innerHTML = awListeHtml(awScheine(gefiltert));
+  awSummeAuffrischen(gefiltert);
   const st = el("aw_suchstand");
-  if (st) st.innerHTML = awSuchStandHtml();
+  if (st) st.innerHTML = awSuchStandHtml(gefiltert, imZ);
   const weg = el("aw_suchweg");
   if (weg) weg.hidden = !awSuche;
 }
@@ -357,7 +379,7 @@ function awImZeitraum() {
   });
 }
 
-function awGefiltert() {
+function awGefiltert(imZeitraum) {
   const personen = awPersonenFilter();
   const anbieter = awAnbieterFilter();
   // Die Spielsuche sitzt GENAU HIER, in derselben Stufe wie Person und
@@ -367,18 +389,26 @@ function awGefiltert() {
   // Eine Stufe hoeher (awImZeitraum) sprangen die Personen- und
   // Anbieter-Chips bei jedem Tastendruck in Anzahl und Reihenfolge.
   const worte = awSuchWorte();
-  return awImZeitraum().filter(s => {
+  // Die Basis darf hereingereicht werden: beim Tippen wuerde sonst jede
+  // Stufe denselben Zeitraum viermal neu rechnen (10.000 mal new Date).
+  const r = (imZeitraum || awImZeitraum()).filter(s => {
     if (personen.length && personen.indexOf(awPersonFach(s)) < 0) return false;
     if (anbieter.length && anbieter.indexOf(awAnbieterVon(s)) < 0) return false;
     if (!awPasstZurSuche(s, worte)) return false;
     return true;
   });
+  // Die Marke sagt awSummeHtml: DIESE Liste ist wirklich die gefilterte
+  // Stufe. Eine stand-gefilterte Liste (awScheine) traegt sie nicht und
+  // wird dort nie als Summen-Grundlage genommen - sonst fehlten in den
+  // Kacheln die ausgeblendeten Gewonnenen und Verlorenen.
+  r._istGefiltert = true;
+  return r;
 }
 
-function awScheine() {
+function awScheine(gefiltert) {
   const zeig = awZeig();
   const alt = awReihe() === "alt";
-  return awGefiltert()
+  return (gefiltert || awGefiltert())
     .filter(s => awStandSichtbar(s.stand, zeig))
     .sort((a, b) => {
       const v = String(a.created_at || "").localeCompare(String(b.created_at || ""));
@@ -477,7 +507,7 @@ function awFilterGruppe(titel, eintraege, gewaehlt, umFn, alleFn, leerText) {
 // dem Zeitraum und die Filter." Genau dort steht es jetzt: der
 // Filterkasten rechts ist gut dreimal so hoch wie die Zeitraum-Angaben
 // links, darunter war nichts.
-function awSucheHtml() {
+function awSucheHtml(gefiltert) {
   return '<div class="aw-suche">' +
     '<label class="aw-suchlabel" for="aw_suche">&#128269; Spiel suchen</label>' +
     '<div class="aw-suchzeile">' +
@@ -490,22 +520,23 @@ function awSucheHtml() {
       '<button id="aw_suchweg" onclick="awSucheWeg()"' + (awSuche ? "" : " hidden") +
         ">Suche löschen</button>" +
     "</div>" +
-    '<div id="aw_suchstand" class="aw-suchstand mini">' + awSuchStandHtml() + "</div>" +
+    '<div id="aw_suchstand" class="aw-suchstand mini">' + awSuchStandHtml(gefiltert) + "</div>" +
   "</div>";
 }
 
 // Was die Suche gerade tut, in einem Satz. Ohne ihn waere nach dem
 // Tippen nur eine kuerzere Liste da und kein Grund dafuer.
-function awSuchStandHtml() {
-  const imZeitraum = awImZeitraum();
+function awSuchStandHtml(gefiltert, imZ) {
   if (!awSuche.trim()) {
     return "Tippe den Namen einer Mannschaft oder einer Partie. Gesucht wird in den " +
-      "<b>Spielen</b> jeder Kombination, dazu Linie, Anbieter, Nummer und Person. " +
-      "Mehrere Wörter müssen alle vorkommen. Groß- und Kleinschreibung, Umlaute und " +
-      "Bindestriche sind egal.";
+      "<b>Spielen</b> jeder Kombination, dazu Linie, Anbieter, <b>Anbieter-ID</b>, " +
+      "Nummer und Person. Mehrere Wörter müssen alle vorkommen. Groß- und " +
+      "Kleinschreibung, Umlaute und Bindestriche sind egal.";
   }
-  const treffer = awGefiltert().length;
-  const gesperrt = awGefiltert().filter(s => (s.daten || {}).gesperrt).length;
+  const imZeitraum = imZ || awImZeitraum();
+  const g = (gefiltert && gefiltert._istGefiltert) ? gefiltert : awGefiltert(imZeitraum);
+  const treffer = g.length;
+  const gesperrt = g.filter(s => (s.daten || {}).gesperrt).length;
   return "<b>" + treffer + "</b> von " + imZeitraum.length +
     " Kombinationen im Zeitraum passen auf <b>" + textSicherM(awSuche.trim()) + "</b>." +
     (gesperrt ? " Davon " + gesperrt + " nicht lesbar - die stehen immer dabei, " +
@@ -513,22 +544,17 @@ function awSuchStandHtml() {
     " Umsatz und Gewinn oben zählen genau diese " + treffer + ".";
 }
 
-// ---------- Der Personen-Kasten: die letzten drei, dazu eine Suche ----------
-// Karam (17.09.2026): "Ich moechte, dass ich bei den Personen nicht alle
-// Personen angezeigt bekomme, sondern nur die letzten drei, die ich
-// geoeffnet habe, und nur eine Suchleiste - das erspart mir einfach
-// Platz bei der Suche."
-// Die letzten drei kommen aus personenZuletzt() in logik.js - DERSELBEN
-// Merkliste, die auch Mein Bereich und der Kombi-Bau benutzen. Sichtbar
-// bleiben ausserdem IMMER: jede gewaehlte Person (ein aktiver Filter,
-// den man nicht sieht, waere eine kuerzere Liste ohne Grund) und die
-// zwei Sonderfaecher "keine Person" und "falsch zugeordnet" (dort liegt
-// Geld, das noch niemandem zugerechnet ist). Alle anderen findet die
-// Suche, und wie viele das sind, steht ausdruecklich da.
+// ---------- Der Personen-Kasten: ALLE, zwei Reihen, quer scrollen ----------
+// Karam (17.09.2026, frueher am Tag): nur die letzten drei geoeffneten.
+// Karam (17.09.2026, spaeter): "Ich brauche, dass ein bisschen mehr
+// Personen angezeigt werden, nicht nur die ersten paar, sondern am
+// besten alle. Zwei Reihen, und statt dass alles runtergeht, will ich
+// seitlich scrollen." Also: ALLE Personen stehen da, die Suchleiste
+// bleibt zum schnellen Eingrenzen, und die zwei Reihen mit Quer-Lauf
+// macht die Design-Schicht (stil.css, PERSONEN-KURZLISTE).
 // Die Suche wird ABSICHTLICH nicht gemerkt - dieselbe Ueberlegung wie
 // bei der Spielsuche: eine stehengebliebene Suche laesst Personen fehlen.
 let awPersonSuche = "";
-const AW_PERSONEN_KURZ = 3;
 
 function awPersonZaehlen() {
   const zaehlP = {};
@@ -559,46 +585,27 @@ function awPersonGruppeHtml() {
   const zaehlP = z.zaehlP, gewP = z.gewP;
   const q = awHart(awPersonSuche);
   const gewaehltIst = w => gewP.indexOf(w) >= 0;
+  // ALLE Personen des Bereichs, dazu die Sonderfaecher "keine Person"
+  // und "falsch zugeordnet", jede mit ihrer Zahl im Zeitraum. Wer im
+  // Zeitraum nichts hat, steht mit 0 da - anklicken filtert trotzdem.
   let eintraege = [];
-  let versteckt = 0;
-  if (q) {
-    // Gesucht wird ueber ALLE Personen des Bereichs, nicht nur die im
-    // Zeitraum - Karam sucht ja gerade eine, die nicht vorn steht.
-    // Dieselbe Verhaertung wie die Spielsuche: Umlaute, Gross/Klein,
-    // Bindestriche egal.
-    for (const w of Object.keys(zaehlP)) {
-      if (!w || w === AW_LOS) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
-    }
-    for (const o of (Array.isArray(ordnerListe) ? ordnerListe : [])) {
-      eintraege.push(awPersonEintrag(String(o.id), zaehlP[String(o.id)] || 0,
-        gewaehltIst(String(o.id))));
-    }
-    eintraege = eintraege.filter(e => awHart(e.text).indexOf(q) > -1);
-  } else {
-    const zeigen = new Set(gewP);
-    zeigen.add("");
-    zeigen.add(AW_LOS);
-    let n = 0;
-    const liste = Array.isArray(ordnerListe) ? ordnerListe : [];
-    for (const id of (typeof personenZuletzt === "function" ? personenZuletzt() : [])) {
-      if (n >= AW_PERSONEN_KURZ) break;
-      if (liste.some(o => String(o.id) === String(id)) && !zeigen.has(String(id))) {
-        zeigen.add(String(id));
-        n++;
-      }
-    }
-    for (const w of Object.keys(zaehlP)) {
-      if (zeigen.has(w)) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
-      else versteckt++;
-    }
-    // Die letzten drei stehen auch dann da, wenn sie im Zeitraum leer
-    // sind - sonst waere "zuletzt geoeffnet" mal da und mal nicht.
-    for (const w of zeigen) {
-      if (w && w !== AW_LOS && !(w in zaehlP)) {
-        eintraege.push(awPersonEintrag(w, 0, gewaehltIst(w)));
-      }
-    }
+  const bekannt = new Set((Array.isArray(ordnerListe) ? ordnerListe : [])
+    .map(o => String(o.id)));
+  for (const w of Object.keys(zaehlP)) {
+    if (!w || w === AW_LOS) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
+    // Eine Kennung, die es in der Personenliste nicht (mehr) gibt -
+    // geloeschte Person oder alter Filter - bleibt trotzdem sichtbar.
+    // Ein aktiver Filter, den man nicht sieht, waere eine kuerzere
+    // Liste ohne Grund (sichtbarer Resttopf, Regel 4).
+    else if (!bekannt.has(w)) eintraege.push(awPersonEintrag(w, zaehlP[w], gewaehltIst(w)));
   }
+  for (const o of (Array.isArray(ordnerListe) ? ordnerListe : [])) {
+    eintraege.push(awPersonEintrag(String(o.id), zaehlP[String(o.id)] || 0,
+      gewaehltIst(String(o.id))));
+  }
+  // Die Suche grenzt ein - dieselbe Verhaertung wie die Spielsuche:
+  // Umlaute, Gross/Klein, Bindestriche egal.
+  if (q) eintraege = eintraege.filter(e => awHart(e.text).indexOf(q) > -1);
   eintraege.sort((a, b) => b.zahl - a.zahl || a.text.localeCompare(b.text, "de"));
 
   const aus = gewP.length === 0;
@@ -623,16 +630,12 @@ function awPersonGruppeHtml() {
       : "In diesem Zeitraum liegt keine Kombination.") + "</span>";
   }
   h += "</div>";
-  // Was gerade NICHT dasteht, steht ausdruecklich dabei - eine kurze
+  // Waehrend gesucht wird, steht dabei, wie viele passen - eine kuerzere
   // Liste ohne diesen Satz saehe aus, als gaebe es die anderen nicht.
   if (q) {
     h += '<div class="mini aw-pmehr">' + eintraege.length + " Person" +
       (eintraege.length === 1 ? "" : "en") + " passt" + (eintraege.length === 1 ? "" : "en") +
       " auf <b>" + textSicherM(awPersonSuche.trim()) + "</b>.</div>";
-  } else if (versteckt) {
-    h += '<div class="mini aw-pmehr">' + versteckt + " weitere " +
-      (versteckt === 1 ? "Person ist" : "Personen sind") +
-      " über die Suche zu finden.</div>";
   }
   return h + "</div>";
 }
@@ -761,6 +764,58 @@ async function awPersonZuordnen(scheinId, ordnerId) {
   awSummeAuffrischen();
 }
 
+// ---------- Die Anbieter-ID: eintippen und aendern ----------
+// Karam (17.09.2026): "Jede einzelne Wette hat eine ID beim Anbieter.
+// Die ist entweder vorhanden oder nicht vorhanden, oder ich tippe sie
+// extra rein." Sie liegt VERSCHLUESSELT in daten.anbieterId - sie
+// verraet, wo und was gesetzt wurde, und gehoert deshalb nicht in eine
+// offene Spalte. Geschrieben wird wie bei jedem daten-Feld: frisch
+// holen, aendern, neu verschluesselt zurueck (supaScheinDatenSchreiben).
+function awIdUm(id) {
+  const f = el("aw_idf_" + id);
+  if (!f) return;
+  f.hidden = !f.hidden;
+  if (!f.hidden) {
+    const feld = el("aw_ide_" + id);
+    if (feld) { feld.focus(); try { feld.select(); } catch (e) { } }
+  }
+}
+
+async function awIdSpeichern(id) {
+  const s = (Array.isArray(kasseScheine) ? kasseScheine : []).find(x => x.id === id);
+  if (!s) return;
+  if (s.daten && s.daten.gesperrt) {
+    meldungM("Diese Kombination ist auf diesem Gerät nicht lesbar - ohne ihren Inhalt " +
+      "darf hier nichts geschrieben werden.", "warn");
+    return;
+  }
+  const feld = el("aw_ide_" + id);
+  const wert = String(feld ? feld.value : "").trim();
+  // Frisch holen, nie den Seitenstand zurueckschreiben - sonst waere
+  // jede Aenderung verloren, die inzwischen von einem anderen Geraet kam.
+  const holen = await supaScheinHolen(id);
+  if (holen.fehler) {
+    meldungM("Anbieter-ID nicht gespeichert: " + textSicherM(String(holen.fehler).slice(0, 100)), "warn");
+    return;
+  }
+  const neu = Object.assign({}, holen.daten || s.daten || {});
+  neu.anbieterId = wert;
+  const r = await supaScheinDatenSchreiben(id, holen.key, neu);
+  if (r.error || !r.data || !r.data.length) {
+    meldungM("<b>Anbieter-ID nicht gespeichert.</b> " +
+      (r.error ? textSicherM(String(r.error.message).slice(0, 100))
+               : "Es wurde keine Zeile geändert (Schreibrecht?)."), "warn");
+    return;
+  }
+  s.daten = Object.assign({}, s.daten, { anbieterId: wert });
+  delete s._suchtext;          // die ID ist durchsuchbar, der alte Text luegt jetzt
+  meldungM(wert
+    ? "Anbieter-ID von Nr. " + (s.nummer || "?") + " gespeichert: <b>" + textSicherM(wert) + "</b>"
+    : "Anbieter-ID von Nr. " + (s.nummer || "?") + " entfernt.", "gut");
+  awKarteAuffrischen(s);
+  if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
+}
+
 async function awPersonWeg(scheinId) {
   if (typeof tuPersonWeg !== "function") {
     meldungM("Abziehen geht hier gerade nicht - die Seite ist unvollständig geladen. " +
@@ -885,7 +940,7 @@ function awKopfHtml(g, liste) {
       '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
         '<span class="aw-spw">' + awRandZeit(liste, false) + "</span></span>" +
     "</div>" +
-    awSucheHtml() +
+    awSucheHtml(gefiltert) +
     "</div>" +
     awFilterHtml(awImZeitraum()) +
     "</div>" +
@@ -912,7 +967,7 @@ function awKopfHtml(g, liste) {
         '<option value="alt"' + (awReihe() === "alt" ? " selected" : "") +
           ">älteste zuerst</option>" +
       "</select></label></div>" +
-    awSummeHtml(liste, g);
+    awSummeHtml(gefiltert, g);
 }
 
 // Die Summenzeile: Umsatz und Gewinn fuer den Zeitraum.
@@ -920,12 +975,14 @@ function awKopfHtml(g, liste) {
 // sind weder gewonnen noch verloren - sie stehen getrennt als "im Spiel".
 // Wuerde man sie als Verlust rechnen, saehe jeder Tag zuerst schrecklich
 // aus und waere es nicht.
-function awSummeHtml(liste, g) {
-  // Dieselbe Menge wie die Liste darunter, nur ohne "nur die offenen":
+function awSummeHtml(gefiltert, g) {
+  // Dieselbe Menge wie die Liste darunter, nur ohne die Stand-Schalter:
   // die Kacheln sollen ja gerade zeigen, wie viele offen, gewonnen und
   // verloren sind. Person und Anbieter wirken aber sehr wohl - sonst
   // stuende ueber einer gefilterten Liste eine ungefilterte Summe.
-  const imZeitraum = awGefiltert();
+  // Der Aufrufer DARF die schon gerechnete Menge hereinreichen (beim
+  // Tippen zaehlt jede gesparte Runde ueber 10.000 Scheine).
+  const imZeitraum = (gefiltert && gefiltert._istGefiltert) ? gefiltert : awGefiltert();
   let umsatz = 0, zurueck = 0, offenEinsatz = 0, nOffen = 0, nGew = 0, nVer = 0, unlesbar = 0;
   for (const s of imZeitraum) {
     const d = s.daten || {};
@@ -1083,6 +1140,28 @@ function awKarteHtml(s, lfd, gesamt) {
         "Einsatz <b>" + awGeld(d.einsatz) + "</b> &middot; Quote <b>" +
         Number(d.quote || 0).toFixed(2) + "</b> &middot; möglich <b>" + awGeld(d.moeglich) + "</b>" +
       "</div>" +
+      // Karam (17.09.2026): "Es gibt noch eine ID. Die ist entweder
+      // vorhanden oder nicht vorhanden - oder ich tippe sie extra rein.
+      // Das muss immer mit angezeigt werden." Deshalb steht die Zeile
+      // IMMER da, auch wenn sie nur "keine" sagt.
+      '<div class="aw-anbid mini">Anbieter-ID: ' +
+        (d.anbieterId
+          ? "<b>" + textSicherM(d.anbieterId) + "</b>"
+          : '<span class="aw-anbid-fehlt">keine</span>') +
+        (schreib
+          ? ' <button class="aw-anbid-knopf" onclick="awIdUm(\'' + s.id + '\')">' +
+            (d.anbieterId ? "ändern" : "eintippen") + "</button>"
+          : "") +
+      "</div>" +
+      (schreib
+        ? '<div class="aw-idform" id="aw_idf_' + s.id + '" hidden>' +
+          '<label class="mini" for="aw_ide_' + s.id + '">ID vom Wettschein des Anbieters:</label> ' +
+          '<input id="aw_ide_' + s.id + '" type="text" inputmode="text" ' +
+            'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+            'value="' + textSicherM(d.anbieterId || "") + '" placeholder="z. B. 1234567890"> ' +
+          '<button onclick="awIdSpeichern(\'' + s.id + '\')">so speichern</button>' +
+        "</div>"
+        : "") +
     "</div>" +
     '<div class="aw-tasten">' +
       (schreib
@@ -1326,13 +1405,14 @@ function awKarteAuffrischen(s) {
   karte.replaceWith(neu.firstElementChild);
 }
 
-function awSummeAuffrischen() {
+function awSummeAuffrischen(gefiltert) {
   const box = el("auswerten");
   if (!box) return;
   const alt = box.querySelector(".aw-summe");
   if (!alt) return;
   const neu = document.createElement("div");
-  neu.innerHTML = awSummeHtml(awScheine(), awGrenzen());
+  neu.innerHTML = awSummeHtml(
+    (gefiltert && gefiltert._istGefiltert) ? gefiltert : awGefiltert(), awGrenzen());
   alt.replaceWith(neu.firstElementChild);
 }
 
