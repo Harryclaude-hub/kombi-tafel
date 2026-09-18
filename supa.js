@@ -813,11 +813,13 @@ async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, 
   // Welche Felder zu welcher Art gehoeren, prueft auch die Datenbank.
   // Hier steht dasselbe noch einmal, damit ein Tippfehler nicht erst
   // dort auffaellt: "stand_weg" hat keinen Anbieter, "stand_anbieter"
-  // keinen Zahlungsweg.
+  // und "einge_anbieter" (eingezahlt von Hand nachgetragen, Karam
+  // 18.09.2026) haben keinen Zahlungsweg.
   const nurWeg = (art === "erhalten" || art === "ausgezahlt" || art === "stand_weg");
+  const ohneWeg = (art === "stand_anbieter" || art === "einge_anbieter");
   return await supa.from("kt_person_zahlungen").insert({
     bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
-    weg: art === "stand_anbieter" ? null : weg,
+    weg: ohneWeg ? null : weg,
     art: art, anbieter: nurWeg ? null : anbieter,
     betrag: betrag, notiz: await e2eZu(key, notiz || "") || ""
   });

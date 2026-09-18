@@ -402,7 +402,7 @@ function exKontostaende() {
       spalten: [{ titel: "Spalte", breite: 16 }, { titel: "Was darin steht", breite: 95 }],
       zeilen: [
         ["Stand", "Zeitpunkt, zu dem diese Datei geschrieben wurde: " + stand],
-        ["Eingezahlt", "Was bei diesem Anbieter eingezahlt wurde (Personen-Kasse, zum Anbieter eingezahlt)."],
+        ["Eingezahlt", "Was bei diesem Anbieter eingezahlt wurde (Personen-Kasse: zum Anbieter eingezahlt, plus von Hand nachgetragene Einzahlungen)."],
         ["Zurueckgeholt", "Was vom Anbieter wieder herausgeholt wurde."],
         ["Gesetzt", "Summe der Einsaetze aller Kombinationen dieser Person bei diesem Anbieter."],
         ["Gewonnen", "Was gewonnene Kombinationen zurueckgebracht haben: wirklich bekommen, sonst der Moeglich-Wert."],
