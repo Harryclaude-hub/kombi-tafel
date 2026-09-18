@@ -6079,3 +6079,31 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE GS-WAHL ---- */
+
+/* =====================================================================
+   SCHWEBENDE KURZ-MELDUNG (18.09.2026) - reine Design-Schicht
+   Karam: "Mach die Benachrichtigung nicht oben angeheftet - es scrollt
+   jedes Mal ganz nach oben." Gute Meldungen erscheinen als Zeile unten
+   am Schirm (meldungKurz in mein.js), Warnungen springen weiter oben
+   ins Bild. Bis zur Marke ENDE KURZMELDUNG loeschen - dann steht die
+   Kurz-Zeile nackt unten links, gescrollt wird trotzdem nicht mehr.
+   ===================================================================== */
+@media screen {
+  #meldung_kurz {
+    position: fixed; left: 50%; transform: translateX(-50%) translateY(12px);
+    bottom: 18px; z-index: 1400;
+    max-width: min(92vw, 560px); padding: 10px 16px;
+    background: #14361c; color: #fff; border: 2px solid #1a7a1a;
+    border-radius: 12px; box-shadow: 0 6px 18px rgba(10, 20, 12, .35);
+    font-size: 14px; line-height: 1.35;
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  #meldung_kurz.da { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #meldung_kurz b { color: #d6f5d6; }
+  /* Am Handy ueber der Fussleiste (leiste.js, 72px + Sicherheitsrand). */
+  @media (max-width: 700px) {
+    #meldung_kurz { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  }
+}
+/* ---- ENDE KURZMELDUNG ---- */

@@ -29,11 +29,38 @@ function meldungM(text, art) {
   box.className = (art === "warn") ? "warnkern" : "merk";
   box.innerHTML = text;
   box.style.display = "block";
-  // Der Kasten sitzt ganz OBEN auf der Seite. Am Handy steht man beim
-  // Anlegen aber weit unten - die Meldung erschien dann ausserhalb des
-  // Bildschirms, und es sah aus, als passiere gar nichts. Deshalb wird
-  // jetzt immer dorthin gescrollt.
-  try { box.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { }
+  // Der Kasten sitzt ganz OBEN auf der Seite. Frueher wurde IMMER
+  // dorthin gescrollt, damit am Handy keine Meldung unsichtbar bleibt.
+  // Karam (18.09.2026): "Mach diese Benachrichtigung nicht oben
+  // angeheftet - es scrollt jedes Mal ganz nach oben, wenn ich eine
+  // Kombi zuordne. Ich will nicht hin- und hergeschmissen werden."
+  // Deshalb springt jetzt NUR noch eine WARNUNG ins Bild - ein
+  // uebersehener Fehler ist teurer als ein Sprung. Gute Meldungen
+  // erscheinen kurz als schwebende Zeile unten am Schirm (man bleibt,
+  // wo man ist), der volle Text bleibt oben zum Nachlesen stehen.
+  if (art === "warn") {
+    try { box.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { }
+    return;
+  }
+  meldungKurz(text);
+}
+
+// Die schwebende Kurz-Zeile unten. Sie nimmt keine Klicks an und geht
+// von selbst wieder weg - sie soll bestaetigen, nicht im Weg stehen.
+let meldungKurzTimer = null;
+function meldungKurz(text) {
+  let t = el("meldung_kurz");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "meldung_kurz";
+    document.body.appendChild(t);
+  }
+  t.innerHTML = text;
+  t.classList.add("da");
+  if (meldungKurzTimer) clearTimeout(meldungKurzTimer);
+  meldungKurzTimer = setTimeout(() => {
+    try { t.classList.remove("da"); } catch (e) { }
+  }, 3500);
 }
 // Das Zeitformat lebt seit 15.09.2026 nur noch in logik.js (wannText):
 // "15.09.2026 14:02", mit Jahr. Vorher stand es hier und an sieben
