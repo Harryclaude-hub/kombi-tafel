@@ -2584,7 +2584,15 @@ function zeichneEigenbau() {
     }
 
   let zeilen = "", offen = 0;
+  // Karam (18.09.2026): "In der Kombi-Bau-Tabelle immer eine Nummerierung,
+  // 1, 2, 3 - jeder EINSATZ eine Nummer, nicht jede Linie. Diese Zahl
+  // bedeutet gar nichts, nur fuer die Tabellenanzeige."
+  // Also die vierte Zahl-Falle gleich mit ansagen (UEBERGABE Punkt 5):
+  // das hier ist WEDER s.nr noch anzeigeNr noch die feste nummer. Sie
+  // laeuft bei jedem Zeichnen neu von 1 und haengt an nichts.
+  let lfdNr = 0;
   for (const w of alle) {
+    lfdNr++;
     const vorbei = istVorbei(anstossFeld(w));
     const anzahl = Array.isArray(w.o) ? w.o.length : 0;
     for (let i = 0; i < anzahl; i++) {
@@ -2602,6 +2610,9 @@ function zeichneEigenbau() {
       const stil = hintergrundFuer(karte, treffer);
       zeilen += '<tr class="' + (vorbei ? "tb-vorbei" : "") + (i ? " tb-weiter" : "") + '"' +
         (stil ? ' style="' + stil + '"' : "") + ">" +
+        // Die laufende Nummer nur an der ERSTEN Zeile eines Einsatzes -
+        // weitere Linien desselben Spiels sind derselbe Einsatz.
+        '<td class="tb-lfd">' + (i ? "" : lfdNr) + "</td>" +
         '<td class="tb-marken">' + kzs.map(anbieterZeichen).join("") + "</td>" +
         '<td class="tb-wahl"><input type="checkbox" class="eb-wahl" value="' + w.id + "|" + i + '"' +
           (vorbei ? " disabled" : "") + ' onchange="ebZaehlen()"></td>' +
@@ -2666,6 +2677,11 @@ function zeichneEigenbau() {
     // statt der Liga - also genau die Spalte, die die Ordner unterscheidet.
     '<div class="tabellenrand"><table class="tb-tafel' +
       (alleOrdner ? " tb-mitordner" : "") + '"><thead><tr>' +
+      // ACHTUNG Spaltenfolge: die Handy-Regel in stil.css blendet die
+      // Liga ueber th/td:nth-child aus - wer hier Spalten einschiebt,
+      // zieht dort die Nummern nach (so wie am 18.09. fuer diese Spalte
+      // geschehen: Liga ist seither Spalte 5 bzw. 6).
+      '<th class="tb-lfd" title="Laufende Nummer, nur zum Zählen der Einsätze - sie bedeutet nichts und läuft bei jedem Neuzeichnen wieder ab 1">#</th>' +
       '<th class="tb-marken" title="Bei welchen Anbietern diese Wette schon gesetzt ist">wo</th>' +
       "<th></th><th>Anstoß</th>" + (alleOrdner ? "<th>Ordner</th>" : "") +
       "<th>Liga</th><th>Spiel</th><th>Wette</th>" +
@@ -2675,7 +2691,8 @@ function zeichneEigenbau() {
                     : '<br><span class="mini">alle Ordner</span>') + "</th>" +
       "</tr></thead><tbody>" +
       zeilen + "</tbody></table></div>" +
-    '<p class="mini">' + offen + " Wettmöglichkeiten offen. Jede Linie eines Spiels steht als " +
+    '<p class="mini"><b>' + alle.length + " Einsätze</b> in der Tabelle (die Nummern links), " +
+      offen + " Wettmöglichkeiten offen. Jede Linie eines Spiels steht als " +
       "eigene Zeile - du setzt nur eine davon. <b>Quote</b> ist die linke Spalte aus dem Foto, " +
       "<b>Mindest</b> die rechte. Ein <b>*</b> heißt: für diese Zeile stand im Foto keine " +
       "Mindestquote, es gilt der Ersatzwert " + ersatzMind.toFixed(2) + ". " +

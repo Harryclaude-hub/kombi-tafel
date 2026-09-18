@@ -2908,17 +2908,18 @@ button.merken.schonda { background: #f4f6fa; color: #55627a; border-color: #c3c9
   white-space: nowrap; font-weight: 600; }
 @media (max-width: 700px) {
   .tb-tafel th, .tb-tafel td { padding: 3px 4px; font-size: .9em; }
-  /* Liga-Spalte am Handy weg. Seit 01.09. mit Zeichen-Spalte vorne ist das
-     Spalte 4, und NUR in der Bau-Tabelle: in der Gesetzt-Liste (gleiche
-     Klasse) waere Spalte 3 der Einsatz.
-     Steht eine Ordner-Spalte dazwischen (tb-mitordner, Mehrordner-Ansicht),
-     ist die Liga Spalte 5. Die Ordner-Spalte selbst darf NIE verschwinden:
-     ohne sie stehen am Handy zwei gleich benannte Spiele aus zwei Tagen
-     untereinander und sehen gleich aus. */
-  #eigenbau .tb-tafel:not(.tb-mitordner) th:nth-child(4),
-  #eigenbau .tb-tafel:not(.tb-mitordner) td:nth-child(4) { display: none; }
-  #eigenbau .tb-tafel.tb-mitordner th:nth-child(5),
-  #eigenbau .tb-tafel.tb-mitordner td:nth-child(5) { display: none; }
+  /* Liga-Spalte am Handy weg, und NUR in der Bau-Tabelle: in der
+     Gesetzt-Liste (gleiche Klasse) waere dieselbe Nummer eine
+     Geld-Spalte. Seit 18.09.2026 steht ganz vorne die Zaehl-Spalte #
+     (kombis.js, zeichneEigenbau) - die Liga ist damit Spalte 5, mit
+     Ordner-Spalte (tb-mitordner) Spalte 6. Wer dort Spalten einschiebt,
+     zieht diese Nummern nach. Die Ordner-Spalte selbst darf NIE
+     verschwinden: ohne sie stehen am Handy zwei gleich benannte Spiele
+     aus zwei Tagen untereinander und sehen gleich aus. */
+  #eigenbau .tb-tafel:not(.tb-mitordner) th:nth-child(5),
+  #eigenbau .tb-tafel:not(.tb-mitordner) td:nth-child(5) { display: none; }
+  #eigenbau .tb-tafel.tb-mitordner th:nth-child(6),
+  #eigenbau .tb-tafel.tb-mitordner td:nth-child(6) { display: none; }
 }
 
 /* Liste der gesetzten Kombinationen im Kombi-Bau (30.08.2026) */
@@ -6107,3 +6108,18 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE KURZMELDUNG ---- */
+
+/* =====================================================================
+   ZAEHL-SPALTE IM KOMBI-BAU (18.09.2026) - reine Design-Schicht
+   Karam: "einfach eine Nummerierung 1, 2, 3 - die Zahl bedeutet gar
+   nichts, nur fuer die Tabellenanzeige." Funktion in kombis.js
+   (zeichneEigenbau, lfdNr). Bis ENDE ZAEHLSPALTE loeschen.
+   ===================================================================== */
+@media screen {
+  #eigenbau .tb-tafel .tb-lfd {
+    text-align: right; color: #7a8698; font-size: 11.5px; font-weight: 700;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    width: 2.2em; padding-right: 4px;
+  }
+}
+/* ---- ENDE ZAEHLSPALTE ---- */
