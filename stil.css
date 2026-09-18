@@ -6123,3 +6123,52 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE ZAEHLSPALTE ---- */
+
+/* =====================================================================
+   HANDY-POLITUR AUSWERTEN (18.09.2026) - reine Design-Schicht
+   Karam (mit Handy-Bild): "Suchleiste ganz nach unten, Personen nur
+   zwei Zeilen und seitlich scrollen, Buttons richtig, Qualitaet und
+   Kontrast." Funktion unberuehrt - nur Anordnung, Laufrichtung und
+   Groessen. Bis zur Marke ENDE HANDY-POLITUR loeschen.
+   ===================================================================== */
+@media screen {
+  /* Die Spielsuche ist jetzt das DRITTE Kind der aw-reihe (auswerten.js,
+     18.09.) und liegt in voller Breite unter Zeitraum und Filtern. */
+  body[data-seite="mein"] .aw-reihe > .aw-suche { flex: 1 1 100%; }
+
+  @media (max-width: 700px) {
+    /* Zeitraum-Knoepfe und Stand-Schalter: zwei Reihen, seitlich
+       scrollen - statt eines sechs Zeilen hohen Blocks. */
+    body[data-seite="mein"] #auswerten .aw-zeiten {
+      display: grid; grid-auto-flow: column;
+      grid-template-rows: repeat(2, minmax(0, auto));
+      grid-auto-columns: max-content;
+      gap: 6px; overflow-x: auto; padding-bottom: 6px;
+      overscroll-behavior-x: contain;
+    }
+    body[data-seite="mein"] #auswerten .aw-skgruppe { display: contents; }
+    body[data-seite="mein"] #auswerten .aw-zeit { min-height: 42px; }
+
+    /* AUCH der Anbieter-Kasten laeuft in zwei Reihen quer - dasselbe
+       Muster wie die Personen (aw_pgruppe hat es schon). */
+    body[data-seite="mein"] #auswerten .aw-fchips {
+      display: grid; grid-auto-flow: column;
+      grid-template-rows: repeat(2, minmax(0, auto));
+      grid-auto-columns: max-content;
+      gap: 6px; overflow-x: auto; overflow-y: hidden;
+      max-height: none; padding-bottom: 6px;
+      overscroll-behavior-x: contain;
+    }
+
+    /* Die vier Summen-Kacheln als 2x2 statt uebereinander. */
+    body[data-seite="mein"] #auswerten .aw-summe {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+
+    /* Daumen-Hoehen fuer die kleinen Knoepfe an der Karte. */
+    body[data-seite="mein"] #auswerten .aw-zurueck,
+    body[data-seite="mein"] #auswerten .aw-pknopf,
+    body[data-seite="mein"] #auswerten .aw-anbid-knopf { min-height: 40px; }
+  }
+}
+/* ---- ENDE HANDY-POLITUR ---- */

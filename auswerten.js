@@ -515,7 +515,9 @@ function awSucheHtml(gefiltert) {
         // Autokorrektur aus: am Handy macht sie aus "besiktas" ein
         // deutsches Wort, und dann wird etwas anderes gesucht, als da steht.
         'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
-        'placeholder="z. B. Girona Palmas, Besiktas, Preussen Muenster, oder die Nr." ' +
+        // Kurz genug fuers Handy - der alte Beispiel-Satz wurde dort
+        // abgeschnitten (Karams Bild vom 18.09.).
+        'placeholder="z. B. Girona, Besiktas, oder die Nr." ' +
         'value="' + textSicherM(awSuche) + '" oninput="awSuchen(this.value)">' +
       '<button id="aw_suchweg" onclick="awSucheWeg()"' + (awSuche ? "" : " hidden") +
         ">Suche löschen</button>" +
@@ -528,10 +530,10 @@ function awSucheHtml(gefiltert) {
 // Tippen nur eine kuerzere Liste da und kein Grund dafuer.
 function awSuchStandHtml(gefiltert, imZ) {
   if (!awSuche.trim()) {
-    return "Tippe den Namen einer Mannschaft oder einer Partie. Gesucht wird in den " +
-      "<b>Spielen</b> jeder Kombination, dazu Linie, Anbieter, <b>Anbieter-ID</b>, " +
-      "Nummer und Person. Mehrere Wörter müssen alle vorkommen. Groß- und " +
-      "Kleinschreibung, Umlaute und Bindestriche sind egal.";
+    // EIN Satz statt vier - am Handy frass der alte Absatz einen halben
+    // Schirm (Karam, 18.09.).
+    return "Findet Spiele, Linie, Anbieter, <b>Anbieter-ID</b>, Nummer und Person - " +
+      "mehrere Wörter müssen alle vorkommen, Umlaute und Groß/Klein sind egal.";
   }
   const imZeitraum = imZ || awImZeitraum();
   const g = (gefiltert && gefiltert._istGefiltert) ? gefiltert : awGefiltert(imZeitraum);
@@ -1090,9 +1092,14 @@ function awKopfHtml(g, liste) {
       '<span class="aw-sp"><span class="aw-spt">Letzter gesetzt</span>' +
         '<span class="aw-spw">' + awRandZeit(liste, false) + "</span></span>" +
     "</div>" +
-    awSucheHtml(gefiltert) +
     "</div>" +
     awFilterHtml(awImZeitraum()) +
+    // Karam (18.09.2026, mit Handy-Bild): "Mach die Suchleiste mal ganz
+    // nach unten, vor allem bei der Handy-Version." Die Spielsuche steht
+    // deshalb UNTER den Filterkaesten, in voller Breite, direkt ueber
+    // den Summen-Kacheln - vorher klemmte sie zwischen Zeitraum und
+    // Personen und schob am Handy alles auseinander.
+    awSucheHtml(gefiltert) +
     "</div>" +
     (z.art === "stichtag"
       ? '<div class="aw-zeile"><label>Stichtag (Stand deiner Excel-Liste): ' +
