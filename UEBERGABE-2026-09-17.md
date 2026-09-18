@@ -7,7 +7,7 @@ Tages, Fassungen k bis s) - der gehört mitgelesen, vor allem der neue
 Ort der Test-Suiten und die neuen Fallen.
 
 Dieser Text fasst **einen einzigen Arbeitstag** zusammen. Die Grundlagen des
-Projekts stehen in **[UEBERGABE.md](UEBERGABE.md)** (1313 Zeilen, Stand 11.09.) -
+Projekts stehen in **[UEBERGABE-GRUNDLAGEN.md](UEBERGABE-GRUNDLAGEN.md)** (Stand 11.09.; UEBERGABE.md ist seit 18.09. die kurze Startseite) -
 lies die zuerst, wenn du das Projekt nicht kennst. Hier steht nur, was seitdem
 passiert ist und was du daraus mitnehmen musst.
 
@@ -434,7 +434,7 @@ kein Fehler.
 ## 7. Der erste Schritt im neuen Chat
 
 1. `git log --oneline -10` und `git status` - es muss `86d18a6` und sauber sein.
-2. `UEBERGABE.md` lesen (Grundlagen), dann diese Datei.
+2. `UEBERGABE.md` (Startseite) lesen, dann `UEBERGABE-GRUNDLAGEN.md`, dann diese Datei.
 3. Die Suiten einmal laufen lassen, damit du den grünen Ausgangspunkt kennst.
 4. Erst dann anfangen. Und **nach jedem fertigen Stück**:
    `node naechste-fassung.js --setzen`, committen, pushen.
