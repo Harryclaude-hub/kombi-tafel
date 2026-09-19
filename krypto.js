@@ -351,6 +351,24 @@ async function e2eAuf(key, s) {
   return key ? "[verschlüsselt - Schlüssel passt nicht]" : "[verschlüsselt - Schlüssel fehlt]";
 }
 
+// Karam (19.09.2026): "Mein Kollege sieht den 1117er als verschluesselt.
+// Verschluesselung sicher lassen, aber jeder, mit dem ich den Bereich
+// teile, soll alles mit meiner Benennung sehen."
+// Der Fall dahinter: ein Text wurde mit einem ALTEN Bereichsschluessel
+// verschluesselt. Dieses Geraet liest ihn noch (Archiv oben, Regel 3),
+// Gaeste des Bereichs haben das Archiv nicht und sehen nur die
+// [verschluesselt]-Zeile. Diese Funktion erkennt genau solche Texte,
+// damit der Aufrufer sie mit dem AKTUELLEN Schluessel neu schreibt.
+async function e2eNurAltLesbar(key, s) {
+  if (typeof s !== "string" || !s.startsWith(E2E_ZEICHEN)) return false;
+  const teile = s.slice(E2E_ZEICHEN.length).split(":");
+  if (key && await kryAesAuf(key, teile[0], teile[1]) !== null) return false;
+  for (const alt of await kryptoAltSchluessel()) {
+    if (await kryAesAuf(alt, teile[0], teile[1]) !== null) return true;
+  }
+  return false;
+}
+
 // ---------- Schluessel auf diesem Geraet nachtragen ----------
 // Faelle: neues Geraet, geleerter Browser-Speicher, App neu installiert.
 // Der Safe liegt auf dem Server - er braucht nur das Passwort. Stimmt das

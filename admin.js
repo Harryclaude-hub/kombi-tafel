@@ -71,13 +71,27 @@ async function startAdmin() {
 der Ordner entsteht dann von selbst), <b>Fotos hineinlegen</b>, <b>einlesen</b> und die Zeilen
 <b>abarbeiten</b>. Jeder Ordner ist für ALLE Nutzer gleich; nur der aktivierte Ordner wird
 auf Kombi-Tafel, Kombi-Bau und Original-Tabelle angezeigt. Ordner mischen sich nie.</p>
-<div class="kern"><b>Neuen Ordner anlegen:</b>
-  <input type="date" id="neusatz_datum">
-  <input id="neusatz_zusatz" placeholder="Zusatz, z.B. abend" size="12">
-  <input id="neusatz_titel" placeholder="Titel (leer = Fotos vom Datum)" size="24">
-  <button class="haupt" onclick="tuSatzNeu()">&#10133; Ordner anlegen</button>
-  <p class="mini">Am selben Tag mehrere Ordner? Dann einen <b>Zusatz</b> eintragen
-  (zum Beispiel "frueh" und "abend"). Ohne Zusatz heisst der Ordner einfach nach dem Datum.</p></div>
+<div class="kern neuordner"><b>Neuen Ordner anlegen:</b>
+  <div class="feldraster">
+    <label class="feld"><span class="feld-titel">Datum</span>
+      <input type="date" id="neusatz_datum"></label>
+    <label class="feld"><span class="feld-titel">Zusatz (z. B. abend)</span>
+      <input id="neusatz_zusatz" placeholder="leer = nur das Datum"></label>
+    <label class="feld"><span class="feld-titel">Titel</span>
+      <input id="neusatz_titel" placeholder="leer = Fotos vom Datum"></label>
+  </div>
+  <div class="feld-leiste">
+    <button class="haupt" onclick="tuSatzNeu()">&#10133; Ordner anlegen</button>
+    <span class="mini">Am selben Tag mehrere Ordner? Dann einen <b>Zusatz</b> eintragen
+    (zum Beispiel "frueh" und "abend").</span>
+  </div>
+  <label class="ziehfeld" ondragover="tuSatzDrag(event,true)" ondragleave="tuSatzDrag(event,false)"
+    ondrop="tuSatzDrop(event,'')">&#128247; <b>Fotos hier hineinziehen</b> - oder klicken zum Auswählen.
+    <span class="mini">Sie landen im Ordner zum Datum oben (samt Zusatz); gibt es ihn noch nicht,
+    entsteht er von selbst und das Einlesen startet.</span>
+    <input type="file" accept="image/*" multiple style="display:none" onchange="tuSatzDropFeld(this)">
+  </label>
+</div>
 <p><input id="satz_suche" placeholder="&#128269; Ordner suchen: Datum oder Titel eintippen..."
   size="40" oninput="satzSuche(this.value)"></p>
 <div id="adm_ordner"><p class="mini">Lädt...</p></div>
@@ -86,6 +100,14 @@ auf Kombi-Tafel, Kombi-Bau und Original-Tabelle angezeigt. Ordner mischen sich n
 auch in geteilten Bereichen. Der Knopf will zur Sicherheit zweimal gedrückt werden.
 Admins ernennst du mit "zum Admin machen" - auch das fragt zweimal.</p>
 <div id="adm_user"></div>`;
+  // Das Datum steht gleich auf heute - die Ziehflaeche oben braucht es,
+  // und meistens gehoeren die Fotos zum heutigen Ordner.
+  const heuteFeld = elA("neusatz_datum");
+  if (heuteFeld && !heuteFeld.value) {
+    const d = new Date();
+    heuteFeld.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+      "-" + String(d.getDate()).padStart(2, "0");
+  }
   await zeichneOrdner();
   await adminUserliste();
 }
@@ -134,6 +156,10 @@ async function zeichneOrdner() {
     const istOffen = offen === s.id;
     html += '<details class="ordnerwerk' + (istOffen ? " werkoffen" : "") + '" id="satzdetails_' + sicherA(s.id) +
       '" data-such="' + sicherA((s.titel + " " + s.id).toLowerCase()) + '"' + (istOffen ? " open" : "") +
+      // Jeder Ordner-Kasten ist ein Ziehziel (19.09.2026): Fotos direkt
+      // auf den Ordner fallen lassen laedt sie GENAU DORT hinein.
+      ' ondragover="tuSatzDrag(event,true)" ondragleave="tuSatzDrag(event,false)"' +
+      ' ondrop="tuSatzDrop(event,\'' + sicherA(s.id) + '\')"' +
       ' ontoggle="if(this.open)satzFotosLaden(\'' + sicherA(s.id) + '\')">' +
       "<summary><b>&#128193; " + sicherA(s.titel) + "</b> " +
       (istOffen ? '<span class="fertigbadge">offener Ordner</span> ' : "") +
@@ -165,23 +191,18 @@ async function zeichneOrdner() {
         : '<p class="mini">Noch keine Wetten - Fotos einlesen oder von Hand anlegen.</p>') +
       "</div></details>";
   }
-  if (rest.length) {
-    html += '<div class="restordner"><b>' + rest.length + " weitere Ordner</b> " +
-      '<span class="mini">(hier nur als Zeile, zum Bearbeiten auf die eigene Seite)</span>';
-    for (const s of rest) {
-      const meine = wetten.filter(w => w.satz === s.id);
-      const fotos = uploads.filter(u => u.satz_datum === s.id);
-      html += '<a class="restzeile" data-such="' +
-        sicherA((s.titel + " " + s.id).toLowerCase()) + '" href="ordner.html#satzdetails_' +
-        encodeURIComponent(s.id) + '">&#128193; ' + sicherA(s.titel) +
-        (offen === s.id ? ' <span class="fertigbadge">offener Ordner</span>' : "") +
-        ' <span class="mini">' + meine.length + " Wetten, " + fotos.length + " Fotos</span></a>";
-    }
-    html += "</div>";
-  }
+  // Karam (19.09.2026): "Ich will nicht, dass die weiteren Ordner klein
+  // angezeigt werden, sondern einfach ein Button, um alle restlichen
+  // Ordner anzuzeigen - da oeffnet sich eine eigene Page." Die Einzeiler
+  // sind weg; damit die Suche oben trotzdem ehrlich bleibt, merkt sie
+  // sich die restlichen Ordner und meldet Treffer (satzSuche).
   if (!alleZeigen) {
-    html += '<p><a href="ordner.html"><button class="haupt">&#128193; Alle ' +
-      saetze.length + " Ordner auf einer eigenen Seite</button></a></p>";
+    window._admRestSuch = rest.map(s => ({ t: (s.titel + " " + s.id).toLowerCase() }));
+    html += '<div class="restordner">' +
+      (rest.length ? "<b>" + rest.length + " weitere Ordner</b> stehen auf der eigenen Seite. " : "") +
+      '<a href="ordner.html"><button class="haupt">&#128193; Alle ' +
+      saetze.length + " Ordner auf einer eigenen Seite</button></a>" +
+      '<span id="rest_hinweis" class="mini"></span></div>';
   }
   box.innerHTML = html;
 }
@@ -219,9 +240,10 @@ function fotoZuNeuemOrdnerHtml() {
   const d = new Date();
   const heute = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
     String(d.getDate()).padStart(2, "0");
-  return '<p><label>Datum: <input type="date" id="satz_datum" value="' + heute + '"></label> ' +
-    '<label class="fotoknopf">&#128247; Fotos hochladen' +
-    '<input type="file" accept="image/*" multiple style="display:none" onchange="tuSatzFotos(this)"></label></p>';
+  return '<div class="kern neuordner"><p><label>Datum: <input type="date" id="satz_datum" value="' + heute + '"></label></p>' +
+    '<label class="ziehfeld" ondragover="tuSatzDrag(event,true)" ondragleave="tuSatzDrag(event,false)" ' +
+    'ondrop="tuSatzDrop(event,\'\')">&#128247; <b>Fotos hier hineinziehen</b> - oder klicken zum Auswählen.' +
+    '<input type="file" accept="image/*" multiple style="display:none" onchange="tuSatzFotos(this)"></label></div>';
 }
 
 // Alte Namen weiterhin bedienbar (aeltere Aufrufe im Code)
@@ -231,9 +253,56 @@ async function adminSaetze() { return zeichneOrdner(); }
 async function tuSatzFotos(input, satzId) {
   const feld = elA("satz_datum");
   const datum = satzId || (feld ? feld.value : "");
-  if (!datum) { meldungA("Bitte zuerst das Datum des Ordners wählen.", "warn"); return; }
   const dateien = Array.from(input.files || []);
   input.value = "";
+  await tuSatzDateien(dateien, datum);
+}
+
+// Karam (19.09.2026): "Kannst du bitte eine Drag-und-Drop-Moeglichkeit
+// geben." Ziehen und Fallenlassen nimmt DENSELBEN Weg wie der
+// Hochladen-Knopf (tuSatzDateien) - eine Logik, mehrere Eingaenge.
+function tuSatzDrag(ev, an) {
+  ev.preventDefault();
+  const ziel = ev.currentTarget;
+  if (ziel && ziel.classList) ziel.classList[an ? "add" : "remove"]("ziehziel");
+}
+
+async function tuSatzDrop(ev, satzId) {
+  ev.preventDefault();
+  tuSatzDrag(ev, false);
+  const alle = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  const dateien = alle.filter(d => /^image\//.test(d.type));
+  if (!dateien.length) {
+    meldungA("Da war kein Bild dabei - bitte Fotos (JPG oder PNG) hineinziehen.", "warn");
+    return;
+  }
+  if (dateien.length < alle.length) {
+    meldungA((alle.length - dateien.length) + " Datei(en) waren keine Bilder und bleiben draußen.", "warn");
+  }
+  await tuSatzDateien(dateien, satzId || neuOrdnerKennung());
+}
+
+// Das Ziehfeld oben hat auch einen Klick-Weg (Dateiwahl) - gleiche Kennung.
+async function tuSatzDropFeld(input) {
+  const dateien = Array.from(input.files || []);
+  input.value = "";
+  await tuSatzDateien(dateien, neuOrdnerKennung());
+}
+
+// Die Ordner-Kennung aus den Feldern oben: Datum plus Zusatz - GENAU
+// dieselbe Regel wie beim Knopf "Ordner anlegen" (tuSatzNeu nutzt sie mit).
+function neuOrdnerKennung() {
+  const feld = elA("neusatz_datum") || elA("satz_datum");
+  const datum = feld ? feld.value : "";
+  if (!datum) return "";
+  const zusatzFeld = elA("neusatz_zusatz");
+  const zusatz = zusatzFeld ? zusatzFeld.value.trim().toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20) : "";
+  return zusatz ? datum + "-" + zusatz : datum;
+}
+
+async function tuSatzDateien(dateien, datum) {
+  if (!datum) { meldungA("Bitte zuerst das Datum des Ordners wählen.", "warn"); return; }
   if (!dateien.length) return;
   // WARUM DAS IN ZWEI SCHRITTEN LAEUFT (14.09.2026):
   // Frueher wurde je Foto sofort entschieden. Lag ein Foto in diesem
@@ -1104,6 +1173,16 @@ function satzSuche(wert) {
   for (const el2 of document.querySelectorAll("[data-such]")) {
     el2.style.display = (!s || el2.dataset.such.includes(s)) ? "" : "none";
   }
+  // Ehrlich bleiben (19.09.2026): die restlichen Ordner stehen nicht mehr
+  // als Zeilen auf dieser Seite. Trifft die Suche einen von ihnen, steht
+  // das hier - sonst saehe es so aus, als gaebe es den Ordner gar nicht.
+  const hin = elA("rest_hinweis");
+  if (hin) {
+    const treffer = s ? (window._admRestSuch || []).filter(x => x.t.includes(s)).length : 0;
+    hin.innerHTML = treffer
+      ? " &middot; <b>" + treffer + " Treffer</b> liegt/liegen bei den restlichen Ordnern - der Knopf daneben zeigt sie"
+      : "";
+  }
 }
 
 // Ein Klick macht diesen Ordner überall zum offenen Ordner
@@ -1125,11 +1204,10 @@ async function tuSatzNeu() {
   const datum = elA("neusatz_datum").value;
   if (!datum) { meldungA("Bitte ein Datum wählen.", "warn"); return; }
   // Der Zusatz macht aus einem Datum mehrere Ordner: 2026-08-27-abend.
-  // Nur Buchstaben, Ziffern und Bindestrich, damit die Kennung sauber bleibt.
+  // Die Regel steht EINMAL in neuOrdnerKennung (auch das Ziehfeld nutzt sie).
   const zusatzFeld = elA("neusatz_zusatz");
-  const zusatz = zusatzFeld ? zusatzFeld.value.trim().toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20) : "";
-  const kennung = zusatz ? datum + "-" + zusatz : datum;
+  const zusatz = zusatzFeld ? zusatzFeld.value.trim() : "";
+  const kennung = neuOrdnerKennung();
   const t = elA("neusatz_titel").value.trim();
   const d = datum.split("-");
   const titel = t || ("Fotos vom " + d[2] + "." + d[1] + "." + d[0] + (zusatz ? " (" + zusatz + ")" : ""));

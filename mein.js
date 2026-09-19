@@ -533,7 +533,10 @@ function kasseScheineGeaendert() { kasseVeraltet = true; }
 // markiert nur fotoDa). Jedes Bild wird erst geholt, wenn seine Zeile
 // wirklich gezeichnet ist - einmal, hoechstens drei gleichzeitig, und
 // jeder Fehlschlag steht sichtbar an der Stelle des Bildes.
-const FOTO_GLEICHZEITIG = 3;
+// 19.09.2026: von 3 auf 6 - mit dem Foto-Merker (bildlager.js) sind die
+// meisten Anfragen oertlich und sofort da; nur neue Bilder gehen uebers
+// Netz, und davon vertraegt Supabase sechs nebeneinander problemlos.
+const FOTO_GLEICHZEITIG = 6;
 const fotoWarte = [];
 const fotoAngefordert = new Set();
 let fotoLaeuft = 0;
@@ -1811,6 +1814,14 @@ async function zeichneBereich() {
   // Daten weg. Genau dieses Bild gab es hier schon einmal.
   const ladefehler = scheine._fehler || ordnerNeu._fehler;
   if (ladefehler) { zeichneLadefehler(ladefehler); return; }
+  // Selbstheilung sichtbar machen (19.09.2026): wurde ein Name mit dem
+  // aktuellen Schluessel neu geschrieben, soll Karam das wissen - genau
+  // dieser Fall ("1117er ist beim Kollegen verschluesselt") war unsichtbar.
+  if (ordnerNeu._geheilt) {
+    meldungM("<b>" + ordnerNeu._geheilt + " Personen-Name" + (ordnerNeu._geheilt === 1 ? "" : "n") +
+      " neu verschlüsselt.</b> Alle, mit denen du den Bereich teilst, können " +
+      (ordnerNeu._geheilt === 1 ? "ihn" : "sie") + " jetzt wieder lesen.", "gut");
+  }
   ordnerListe = ordnerNeu;
   // "weg" ist wie "alle" und "ohne" KEIN kt_ordner, sondern ein
   // Filterzustand. Ohne ihn hier spraenge der Knopf bei jedem

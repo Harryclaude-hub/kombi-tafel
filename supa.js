@@ -383,22 +383,48 @@ async function supaScheineKurz(bereichId) {
 //   {unlesbar: true}  Bild da, aber Schluessel fehlt oder Inhalt kaputt
 //   {fehler: "..."}   die Abfrage selbst ging schief (Netz, Rechte)
 async function supaScheinFotoHolen(id) {
+  // Tempo (Karam, 19.09.2026): erst der oertliche Foto-Merker
+  // (bildlager.js) - er haelt DENSELBEN Geheimtext wie der Server.
+  // Liest er sich sauber, faellt die Netz-Abfrage weg. Liest er sich
+  // NICHT sauber, entscheidet wie immer der Server.
+  if (typeof fotoMerkHolen === "function") {
+    const merk = await fotoMerkHolen(id);
+    if (merk && merk.foto) {
+      const mKey = await kryptoBereich(merk.bereich);
+      if (mKey) {
+        const mFoto = await e2eAuf(mKey, merk.foto);
+        if (mFoto && String(mFoto).startsWith("data:")) {
+          const mName = merk.name ? await e2eAuf(mKey, merk.name) : "";
+          return { foto: mFoto, name: mName || "Wettschein" };
+        }
+      }
+    }
+  }
   const r = await supa.from("kt_scheine").select("id, bereich, foto, foto_name")
     .eq("id", id).maybeSingle();
   if (r.error) return { fehler: String(r.error.message || "Abfrage fehlgeschlagen") };
-  if (!r.data || !r.data.foto) return null;
+  if (!r.data || !r.data.foto) {
+    // Auf dem Server ist kein Bild (mehr): ein alter Merker waere eine Luege.
+    if (typeof fotoMerkWeg === "function") fotoMerkWeg(id);
+    return null;
+  }
   const key = await kryptoBereich(r.data.bereich);
   if (!key) return { unlesbar: true };
   let foto = await e2eAuf(key, r.data.foto);
   // Kaputt oder falscher Schluessel: lieber kein Bild als ein kaputtes.
   if (!foto || !String(foto).startsWith("data:")) return { unlesbar: true };
   const name = r.data.foto_name ? await e2eAuf(key, r.data.foto_name) : "";
+  // Fuers naechste Laden merken - den Geheimtext, nie den Klartext.
+  if (typeof fotoMerkSetzen === "function") {
+    fotoMerkSetzen(id, { bereich: r.data.bereich, foto: r.data.foto, name: r.data.foto_name || "" });
+  }
   return { foto: foto, name: name || "Wettschein" };
 }
 
 // Das Bild einer gespeicherten Kombination wieder entfernen. Die
 // Kombination selbst bleibt, nur Bild und Bildname fallen weg.
 async function supaScheinFotoLoeschen(id) {
+  if (typeof fotoMerkWeg === "function") fotoMerkWeg(id);
   return await supa.from("kt_scheine")
     .update({ foto: null, foto_name: null }).eq("id", id).select("id");
 }
@@ -497,6 +523,8 @@ async function supaErgebnisSpeichern(felder) {
 }
 
 async function supaScheinAendern(id, felder) {
+  // Aendert sich das Foto, darf kein alter Merker es ueberdecken.
+  if (felder && ("foto" in felder) && typeof fotoMerkWeg === "function") fotoMerkWeg(id);
   // select() macht die 0-Zeilen-Falle sichtbar (RLS-Lektion, siehe unten)
   return await supa.from("kt_scheine").update(felder).eq("id", id).select("id");
 }
@@ -516,6 +544,8 @@ async function supaScheinFotoNachtragen(bereichId, id, foto, name) {
   if (!foto || !String(foto).startsWith("data:")) {
     return { error: { message: "Das ist kein Bild." } };
   }
+  // Neues Bild auf dem Server: der alte Merker waere jetzt falsch.
+  if (typeof fotoMerkWeg === "function") fotoMerkWeg(id);
   return await supa.from("kt_scheine").update({
     foto: await e2eZu(key, foto),
     foto_name: await e2eZu(key, name || "Wettschein")
@@ -523,6 +553,7 @@ async function supaScheinFotoNachtragen(bereichId, id, foto, name) {
 }
 
 async function supaScheinLoeschen(id) {
+  if (typeof fotoMerkWeg === "function") fotoMerkWeg(id);
   // select() macht die 0-Zeilen-Falle sichtbar (dieselbe Lektion wie bei
   // supaScheinAendern): ohne select kommt weder ein Fehler noch eine
   // Zeilenzahl zurueck, und ein an den Rechten gescheitertes Loeschen
@@ -740,7 +771,24 @@ async function supaOrdnerLaden(bereichId) {
     .eq("bereich", bereichId).order("created_at", { ascending: true });
   const liste = r.data || [];
   const key = await kryptoBereich(bereichId);
-  for (const o of liste) o.name = await e2eAuf(key, o.name);
+  // Selbstheilung (Karam, 19.09.2026, Fall 1117er): ein Name, den nur
+  // noch das Schluessel-Archiv DIESES Geraets lesen kann, wird sofort
+  // mit dem aktuellen Bereichsschluessel neu geschrieben - dann sehen
+  // ihn auch alle Gaeste des Bereichs wieder. Die Verschluesselung
+  // selbst bleibt unangetastet.
+  let geheilt = 0;
+  for (const o of liste) {
+    const roh = o.name;
+    o.name = await e2eAuf(key, roh);
+    if (key && typeof e2eNurAltLesbar === "function" &&
+        typeof o.name === "string" && o.name.indexOf("[verschlüsselt") < 0 &&
+        await e2eNurAltLesbar(key, roh)) {
+      const w = await supa.from("kt_ordner").update({ name: await e2eZu(key, o.name) })
+        .eq("id", o.id).select("id");
+      if (!w.error && w.data && w.data.length) geheilt++;
+    }
+  }
+  if (geheilt) liste._geheilt = geheilt;
   // Nach P-Nummer (P-2 vor P-10), nicht als Text - Karams Personen heissen
   // "P-7". personVergleich liegt in logik.js; auf einer Seite ohne logik.js
   // bleibt die alte Textsortierung, statt dass das Laden abstuerzt.

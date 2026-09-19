@@ -168,3 +168,44 @@ function localStorageBelegung() {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", los);
   else los();
 })();
+
+// ---------- Foto-Merker fuer GESPEICHERTE Scheine (19.09.2026) ----------
+// Karam: "Oefter, wenn ich die Seite neu lade oder das Programm neu
+// oeffne, brauche ich ein paar Minuten, bis alle Fotos wieder angezeigt
+// werden. Ich will, dass es wirklich schneller und fluessiger laeuft."
+// Das Bildlager oben haelt UNVERSCHLUESSELTE Bilder von Karten, die noch
+// nicht gespeichert sind. Der Foto-Merker hier ist etwas anderes: er
+// merkt sich je Schein-Kennung den VERSCHLUESSELTEN foto-Text aus
+// kt_scheine - exakt den Geheimtext, der auch auf dem Server liegt.
+// Beim naechsten Laden faellt nur noch das Entschluesseln an
+// (Millisekunden) statt einer Netz-Abfrage je Bild. Sicherheit
+// unveraendert: auf der Platte liegt nichts Lesbares.
+// Faellt IndexedDB aus, liefert alles hier null und die App laeuft wie
+// vorher uebers Netz - der Merker ist NUR eine Abkuerzung.
+// Aufgeraeumt wird er dort, wo Fotos geschrieben oder geloescht werden
+// (supa.js), und "Frisch laden" am Logo leert ihn ganz.
+const FOTOMERK_DB = "kt_fotomerk";
+
+function fotoMerkTun(art, arbeit) {
+  return new Promise((fertig) => {
+    try {
+      const a = indexedDB.open(FOTOMERK_DB, 1);
+      a.onupgradeneeded = () => {
+        if (!a.result.objectStoreNames.contains("fotos")) a.result.createObjectStore("fotos");
+      };
+      a.onerror = () => fertig(null);
+      a.onsuccess = () => {
+        try {
+          const t = a.result.transaction("fotos", art);
+          const x = arbeit(t.objectStore("fotos"));
+          x.onsuccess = () => { a.result.close(); fertig(x.result); };
+          x.onerror = () => { a.result.close(); fertig(null); };
+        } catch (e) { fertig(null); }
+      };
+    } catch (e) { fertig(null); }
+  });
+}
+function fotoMerkHolen(id) { return fotoMerkTun("readonly", l => l.get(String(id))); }
+function fotoMerkSetzen(id, satz) { return fotoMerkTun("readwrite", l => l.put(satz, String(id))); }
+function fotoMerkWeg(id) { return fotoMerkTun("readwrite", l => l.delete(String(id))); }
+function fotoMerkLeeren() { return fotoMerkTun("readwrite", l => l.clear()); }

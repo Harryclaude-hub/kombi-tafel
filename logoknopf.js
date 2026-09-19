@@ -92,6 +92,15 @@
 
     m.querySelector(".lm-frisch").addEventListener("click", function () {
       var seite = location.pathname.split("/").pop() || "original.html";
+      // Frisch heisst frisch: auch der oertliche Foto-Merker wird
+      // geleert (19.09.2026), damit ein ausgetauschtes Bild sicher
+      // vom Server kommt.
+      try {
+        if (typeof fotoMerkLeeren === "function") {
+          fotoMerkLeeren().then(function () { location.replace(seite + "?frisch=" + Date.now()); });
+          return;
+        }
+      } catch (e) { }
       location.replace(seite + "?frisch=" + Date.now());
     });
     m.querySelector(".lm-boni").addEventListener("click", function () {

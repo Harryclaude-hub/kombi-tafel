@@ -6184,3 +6184,32 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   .aw-sk-ohne.aktiv { background: #5b2a86; border-color: #5b2a86; color: #fff; }
 }
 /* ==== ENDE SCHICHT FAELLIG-FILTER ==== */
+
+/* ==== SCHICHT ADMIN-POLITUR (19.09.2026) ====
+   Karam: "Drag und Drop, und diesen Bereich ein bisschen ueberarbeiten,
+   da sind ein paar Sachen uebereinander." Nur Anordnung und die
+   Ziehflaechen-Optik - keine Funktion. Loeschbar. */
+@media screen {
+  .neuordner { margin-bottom: 14px; }
+  .neuordner .feldraster { margin-top: 10px; }
+  .ziehfeld {
+    display: block; margin-top: 12px; padding: 22px 14px;
+    border: 2px dashed #9aabc9; border-radius: 10px;
+    text-align: center; cursor: pointer; background: #f7f9fd;
+  }
+  .ziehfeld .mini { display: block; margin-top: 6px; }
+  .ziehfeld.ziehziel, details.ordnerwerk.ziehziel {
+    border-color: #1a2c50; background: rgba(26, 44, 80, 0.08);
+    box-shadow: 0 0 0 3px rgba(26, 44, 80, 0.25);
+  }
+  .werkleiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .werkleiste button, .werkleiste .fotoknopf { margin: 0; }
+  .scankasten > * { margin-top: 10px; }
+  .scankasten .scanauftrag { max-height: 260px; overflow: auto; }
+  .scanschritte li { margin-bottom: 12px; }
+  .restordner { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+}
+@media screen and (max-width: 700px) {
+  .ziehfeld { padding: 14px 10px; }
+}
+/* ==== ENDE SCHICHT ADMIN-POLITUR ==== */
