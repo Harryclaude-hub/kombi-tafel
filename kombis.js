@@ -2992,10 +2992,33 @@ function baueVerlaufsEintrag(scheinId) {
 // Jetzt ist AENDERN der erste Vorschlag. Der zweite Eintrag bleibt
 // moeglich, aber nur nach einer eigenen, deutlichen Rueckfrage.
 //
-// KEINE NEUE RECHNUNG: die neuen Zahlen kommen aus baueVerlaufsEintrag,
-// also aus genau denselben zwei Feldern an der Karte (Einsatz und
-// moeglicher Gewinn), aus denen auch ein neuer Eintrag entsteht.
+// Karam (19.09.2026): "Die Quote, die im Verlauf ist, soll fuer immer
+// gleich bleiben, die ich dort eingetragen habe - ausser ich gehe in
+// diese Kombi rein und aendere das dort bei ihr. Die Quoten aendern
+// sich regelmaessig." Beim AENDERN wird deshalb NUR noch der Einsatz
+// neu; Quote, Wetten und Anbieter des alten Eintrags bleiben stehen
+// (frueher ueberschrieb dieser Weg auch die Quote mit der aktuellen
+// Karten-Quote - genau das hat ihm die Vergangenheit verbogen).
+// Geaendert wird die Quote nur noch direkt am Eintrag im Auswerten.
+// Der Anbieter hat seinen eigenen Weg: verlaufAnbieterNachziehen.
 // ============================================================
+
+// Die eine Rechnung fuer beide Speicherorte (Geraet und Konto):
+// moeglich und brutto wachsen im selben Verhaeltnis wie der Einsatz,
+// damit ein von Hand eingetragener Anbieter-Gewinn sein Verhaeltnis
+// behaelt. Ohne alten Wert rechnet die alte Quote.
+function aenderNurEinsatz(alt, neuEinsatz) {
+  const altEinsatz = Number(alt.einsatz) || 0;
+  const f = altEinsatz > 0 ? (neuEinsatz / altEinsatz) : null;
+  const moeglich = (f !== null && Number(alt.moeglich))
+    ? rund2(Number(alt.moeglich) * f)
+    : rund2(neuEinsatz * (Number(alt.quote) || 0));
+  const brutto = (f !== null && Number(alt.brutto))
+    ? rund2(Number(alt.brutto) * f)
+    : rund2(neuEinsatz * (Number(alt.quoteRoh) || Number(alt.quote) || 0));
+  return { einsatz: neuEinsatz, moeglich: moeglich, brutto: brutto,
+           gebuehr: rund2(brutto - moeglich) };
+}
 function scheinSchonDaFragen(scheinId, drin, einsatz) {
   const wo = drin.woher === "konto" ? "in deinem Konto" : "auf diesem Gerät";
   const alt = Number(drin.einsatz) || 0;
@@ -3010,7 +3033,7 @@ function scheinSchonDaFragen(scheinId, drin, einsatz) {
         "   OK        = ändern. Es bleibt EINE Buchung, nur die Zahl wird neu.\n" +
         "   Abbrechen = nicht ändern (danach wirst du gefragt, ob du sie\n" +
         "               wirklich ein zweites Mal daneben speichern willst).")) {
-      scheinAendernStattDoppelt(scheinId, drin);
+      scheinAendernStattDoppelt(scheinId, drin, einsatz);
       return false;
     }
   }
@@ -3022,10 +3045,12 @@ function scheinSchonDaFragen(scheinId, drin, einsatz) {
     "   Abbrechen = gar nichts tun");
 }
 
-async function scheinAendernStattDoppelt(scheinId, drin) {
-  const b = baueVerlaufsEintrag(scheinId);
-  if (!b) { meldung("Nicht geändert: diese Karte gibt es nicht mehr.", "warn"); return; }
-  const n = b.eintrag;
+async function scheinAendernStattDoppelt(scheinId, drin, einsatz) {
+  // BEWUSST kein baueVerlaufsEintrag mehr: der brachte die AKTUELLE
+  // Karten-Quote mit (und verbrauchte nebenbei eine feste Nummer).
+  // Geaendert wird nur der Einsatz - siehe Karams Regel oben.
+  const neuEinsatz = Number(einsatz) || 0;
+  if (!(neuEinsatz > 0)) { meldung("Nicht geändert: es fehlt der Einsatz.", "warn"); return; }
 
   // ---- Auf diesem Geraet ----
   if (drin.woher !== "konto") {
@@ -3033,13 +3058,11 @@ async function scheinAendernStattDoppelt(scheinId, drin) {
     const i = v.findIndex(e => e.scheinId === scheinId);
     if (i < 0) { meldung("Nicht geändert: der Eintrag ist nicht mehr da.", "warn"); return; }
     const altBetrag = Number(v[i].einsatz) || 0;
-    // Stand, Notiz, Zeit und Nummer bleiben - geaendert wird nur, was
-    // an der Karte steht.
-    v[i] = Object.assign({}, v[i], { kz: n.kz, anbieter: n.anbieter,
-      einsatz: n.einsatz, quote: n.quote, moeglich: n.moeglich,
-      quoteRoh: n.quoteRoh, brutto: n.brutto, gebuehr: n.gebuehr, wetten: n.wetten });
+    // Stand, Notiz, Zeit, Nummer, QUOTE und WETTEN bleiben - geaendert
+    // wird nur der Einsatz samt moeglich/brutto im selben Verhaeltnis.
+    v[i] = Object.assign({}, v[i], aenderNurEinsatz(v[i], neuEinsatz));
     if (!speichereVerlauf(v)) return;    // speichereVerlauf sagt selbst Bescheid
-    meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + n.einsatz.toFixed(2) +
+    meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + neuEinsatz.toFixed(2) +
       " Euro. Er steht weiter <b>einmal</b> im Verlauf.", "gut");
     zeichneVerlauf(); zeichneKonto();
     if (typeof zeichneGesetzte === "function") zeichneGesetzte();
@@ -3060,9 +3083,9 @@ async function scheinAendernStattDoppelt(scheinId, drin) {
   if (holen.fehler) { meldung("Nicht geändert: " + textSicher(holen.fehler), "warn"); return; }
   const alt = holen.daten || {};
   const altBetrag = Number(alt.einsatz) || 0;
-  const daten = Object.assign({}, alt, { kz: n.kz, anbieter: n.anbieter,
-    einsatz: n.einsatz, quote: n.quote, moeglich: n.moeglich,
-    quoteRoh: n.quoteRoh, brutto: n.brutto, gebuehr: n.gebuehr, wetten: n.wetten });
+  // Auch hier: nur der Einsatz. Quote und Wetten des Eintrags bleiben,
+  // wie sie beim Setzen gespeichert wurden.
+  const daten = Object.assign({}, alt, aenderNurEinsatz(alt, neuEinsatz));
   const r = await supaScheinDatenSchreiben(drin.dbId, holen.key, daten);
   if (r.error) { meldung("Nicht geändert: " + textSicher(String(r.error.message).slice(0, 140)), "warn"); return; }
   // Die 0-Zeilen-Falle: an den Rechten gescheitert sieht aus wie geschafft.
@@ -3075,9 +3098,9 @@ async function scheinAendernStattDoppelt(scheinId, drin) {
     try {
       const a = await supaAnmerken(holen.bereich, drin.dbId,
         "Einsatz beim erneuten Speichern geändert: " + altBetrag.toFixed(2) +
-        " -> " + n.einsatz.toFixed(2) + " Euro (statt zweitem Eintrag)");
+        " -> " + neuEinsatz.toFixed(2) + " Euro (statt zweitem Eintrag)");
       if (a && a.error) {
-        meldung("Eintrag geändert auf " + n.einsatz.toFixed(2) +
+        meldung("Eintrag geändert auf " + neuEinsatz.toFixed(2) +
           " Euro. Die Anmerkung dazu ließ sich nicht speichern.", "warn");
         await kontoScheineLaden(); zeichneKonto();
         if (typeof zeichnePanel === "function") zeichnePanel();
@@ -3085,7 +3108,7 @@ async function scheinAendernStattDoppelt(scheinId, drin) {
       }
     } catch (e) { }
   }
-  meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + n.einsatz.toFixed(2) +
+  meldung("Eintrag geändert: " + altBetrag.toFixed(2) + " -> " + neuEinsatz.toFixed(2) +
     " Euro. Er steht weiter <b>einmal</b> im Konto und zählt in der Buchhaltung einmal.", "gut");
   await kontoScheineLaden();
   zeichneKonto();
@@ -3096,6 +3119,25 @@ async function scheinAendernStattDoppelt(scheinId, drin) {
 function scheinMerken(scheinId) {
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
   if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
+  // Karam (19.09.2026): "Ab jetzt muss wirklich bei jeder neuen Kombi
+  // der Anstoss bekannt sein - das wird eben angegeben." Ohne die Zeit
+  // weiss spaeter niemand, wann der Schein faellig ist (Filter
+  // "ueberfaellig" und "ohne Anstoss" im Auswerten). Harte Pruefung
+  // VOR dem Speichern, kein stilles Durchrutschen.
+  const zM = liesZustand();
+  const sM = zM.scheine.find(x => x.id === scheinId);
+  if (sM) {
+    const ohneZeit = sM.wetten
+      .map(e => wetteNachId(e.id))
+      .filter(w => w && !anstossFeld(w))
+      .map(w => textSicher(w.spiel));
+    if (ohneZeit.length) {
+      meldung("<b>Nicht gespeichert: ohne Anstoßzeit kommt keine neue Kombination " +
+        "mehr in den Verlauf.</b> Bitte zuerst in der Tafel die Anstoßzeit eintragen bei: <b>" +
+        ohneZeit.join("</b>, <b>") + "</b>.", "warn");
+      return;
+    }
+  }
   // Doppelt gespeichert heisst doppelt in der Buchhaltung. Karam nennt
   // genau das als Grund fuer den Loeschknopf: "haben wir da doppelt
   // reingemacht". Deshalb wird zuerst ANDERN angeboten (siehe oben).

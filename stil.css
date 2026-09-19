@@ -6172,3 +6172,15 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   }
 }
 /* ---- ENDE HANDY-POLITUR ---- */
+
+/* ==== SCHICHT FAELLIG-FILTER (19.09.2026) ====
+   Karam: "alle noch nicht ausgewerteten, die eigentlich schon
+   abgelaufen sind - und die, wo der Anstoss nicht bekannt ist."
+   Nur die Farben der zwei neuen Fach-Schalter im Auswerten.
+   Loeschbar: ohne diese Schicht sehen die Schalter aus wie die
+   Zeitraum-Knoepfe, funktionieren aber genauso. */
+@media screen {
+  .aw-sk-fael.aktiv { background: #b38600; border-color: #b38600; color: #fff; }
+  .aw-sk-ohne.aktiv { background: #5b2a86; border-color: #5b2a86; color: #fff; }
+}
+/* ==== ENDE SCHICHT FAELLIG-FILTER ==== */

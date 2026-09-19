@@ -85,6 +85,33 @@ function awZeigUm(was) {
   awZeigSetzen(z);
   zeichneAuswerten();
 }
+// Karam (19.09.2026): "eine Filterfunktion, wo ich alle noch nicht
+// ausgewerteten suchen kann, die eigentlich schon abgelaufen sind -
+// und die, wo der Anstoss noch nicht ganz bekannt ist."
+// Zwei Fach-Schalter neben gewonnen/verloren:
+//   ueberfaellig = offen und alle Spiele sind aus (scheinWartet aus
+//                  mein.js: Anstoss plus Spieldauer-Puffer)
+//   ohne Anstoss = offen und mindestens ein Spiel ohne bekannte
+//                  Anstosszeit (scheinEnde liefert dann null)
+// BEWUSST nicht im localStorage: ein vergessener Filter wuerde sonst
+// tagelang still Scheine verstecken.
+let awNurWas = "";
+function awNurUm(was) {
+  awNurWas = (awNurWas === was) ? "" : was;
+  zeichneAuswerten();
+}
+function awIstUeberfaellig(s) {
+  return typeof scheinWartet === "function" && scheinWartet(s);
+}
+function awOhneAnstoss(s) {
+  if (s.stand !== "offen" || typeof scheinEnde !== "function") return false;
+  return scheinEnde(s) === null;
+}
+function awNurPasst(s) {
+  if (awNurWas === "faellig") return awIstUeberfaellig(s);
+  if (awNurWas === "ohnezeit") return awOhneAnstoss(s);
+  return true;
+}
 // Gehoert ein Schein mit diesem Stand gerade ins Bild? Unbekannte
 // Staende werden IMMER gezeigt - lieber zeigen als verschweigen.
 function awStandSichtbar(stand, zeig) {
@@ -409,7 +436,7 @@ function awScheine(gefiltert) {
   const zeig = awZeig();
   const alt = awReihe() === "alt";
   return (gefiltert || awGefiltert())
-    .filter(s => awStandSichtbar(s.stand, zeig))
+    .filter(s => awStandSichtbar(s.stand, zeig) && awNurPasst(s))
     .sort((a, b) => {
       const v = String(a.created_at || "").localeCompare(String(b.created_at || ""));
       return alt ? v : -v;
@@ -1037,10 +1064,14 @@ function awKopfHtml(g, liste) {
   // Anbieter und Suche)? Die Zahl steht AM Schalter, damit man vor dem
   // Klick weiss, was er einblenden wuerde.
   const gefiltert = awGefiltert();
-  let anzGew = 0, anzVer = 0;
+  let anzGew = 0, anzVer = 0, anzFael = 0, anzOhne = 0;
   for (const s of gefiltert) {
     if (s.stand === "gewonnen") anzGew++;
     else if (s.stand === "verloren") anzVer++;
+    else if (s.stand === "offen") {
+      if (awIstUeberfaellig(s)) anzFael++;
+      if (awOhneAnstoss(s)) anzOhne++;
+    }
   }
   const knopf = (art, text) => '<button class="aw-zeit' + (z.art === art ? " aktiv" : "") +
     '" onclick="awZeitWaehlen(\'' + art + '\')">' + text + "</button>";
@@ -1066,6 +1097,18 @@ function awKopfHtml(g, liste) {
           (zeig.ver ? "Die verlorenen wieder ausblenden"
                     : "Die " + anzVer + " verlorenen mit anzeigen") + '">' +
           '&#10007; verloren <span class="aw-skz" id="aw_skz_ver">' + anzVer + "</span></button>" +
+        // Die zwei Fach-Schalter (19.09.2026): angeschaltet zeigt die
+        // Liste NUR noch dieses Fach. Zaehler wie bei gewonnen/verloren.
+        '<button class="aw-zeit aw-sk-fael' + (awNurWas === "faellig" ? " aktiv" : "") +
+          '" onclick="awNurUm(\'faellig\')" title="' +
+          (awNurWas === "faellig" ? "Wieder alle zeigen"
+            : "Nur die " + anzFael + " offenen zeigen, deren Spiele schon aus sind - das Ergebnis fehlt") + '">' +
+          '&#9203; überfällig <span class="aw-skz">' + anzFael + "</span></button>" +
+        '<button class="aw-zeit aw-sk-ohne' + (awNurWas === "ohnezeit" ? " aktiv" : "") +
+          '" onclick="awNurUm(\'ohnezeit\')" title="' +
+          (awNurWas === "ohnezeit" ? "Wieder alle zeigen"
+            : "Nur die " + anzOhne + " offenen zeigen, bei denen die Anstoßzeit fehlt") + '">' +
+          '&#10067; ohne Anstoß <span class="aw-skz">' + anzOhne + "</span></button>" +
       "</span>" +
     "</div>" +
     // Karam (17.09.2026): "Der Filter soll ganz rechts daneben, Zeitraum
