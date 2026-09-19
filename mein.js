@@ -186,7 +186,7 @@ function begruessungZeigen() {
 document.addEventListener("DOMContentLoaded", () => setTimeout(begruessungZeigen, 900));
 
 async function tuVergessen() {
-  const mail = prompt("Deine E-Mail-Adresse (die vom Konto):");
+  const mail = await eingabeFrage("Deine E-Mail-Adresse (die vom Konto):");
   if (!mail) return;
   const r = await supaPasswortVergessen(mail.trim());
   meldungM(r.fehler ? r.fehler :
@@ -1675,7 +1675,7 @@ async function tuPersonWeg(scheinId) {
   const vorher = personPruefen(alteId, scheine);
   const nachher = personPruefen(alteId, scheine.filter(x => x.id !== scheinId));
   const eur = (x) => Number(x || 0).toFixed(2) + " Euro";
-  if (!confirm(
+  if (!await nachfrage(
       "Diese Kombination von " + alterName + " abziehen?\n\n" +
       "   Nr. " + (s.nummer || "?") + ", Einsatz " + eur(d.einsatz) +
         ", Stand " + s.stand + "\n\n" +
@@ -2101,7 +2101,7 @@ async function tuLoeschen(id) {
     (d.anbieter || "?") + ", " + Number(d.einsatz || 0).toFixed(2) + " Euro, Quote " +
     Number(d.quote || 0).toFixed(2) + "\n" + spiele + "\n\n" +
     "Das laesst sich nicht rueckgaengig machen.";
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
   const r = await supaScheinLoeschen(id);
   if (r && r.error) {
     meldungM("NICHT geloescht: " + textSicherM(String(r.error.message).slice(0, 140)), "warn");
@@ -2129,7 +2129,7 @@ async function tuKopieren(id) {
   if (s.fotoDa && !s.foto) {
     const bild = await supaScheinFotoHolen(s.id);
     if (bild && bild.foto) { s.foto = bild.foto; s.foto_name = bild.name; }
-    else if (!confirm("Das Foto dieser Kombination ließ sich gerade nicht laden.\n" +
+    else if (!await nachfrage("Das Foto dieser Kombination ließ sich gerade nicht laden.\n" +
       "Trotzdem OHNE Bild kopieren?")) return;
   }
   const r = await supaScheinAnlegen(ich.id, s.daten, s.foto, s.foto_name);
@@ -2340,6 +2340,10 @@ function scheinEnde(s) {
     if (!e) return null;                        // Zeit unbekannt: nicht werten
     if (!ende || e > ende) ende = e;
   }
+  // Kombis aus Screenshot (Karam, 19.09.2026): keine einzelnen Wetten,
+  // aber ein eingetragenes Ablauf-Datum - das zaehlt wie der letzte
+  // Anstoss (samt Puffer), damit "ueberfaellig" und "fertig" greifen.
+  if (!ende && s.daten && s.daten.ablauf) ende = abpfiffZeit(s.daten.ablauf);
   return ende;
 }
 
@@ -2364,8 +2368,13 @@ function standMarke(s) {
 function kasseZeit(d) { return wannText(d); }   // ein Format, siehe zeitM
 
 // Was in Ansicht UND PDF gezeigt wird, je Person gemerkt (z. B. kein Neteller)
+// Karam (19.09.2026): "Die Zahlungswege entfernen, die brauchen wir
+// nicht mehr - aber Wettanbieter lassen." Der Block "wege" ist deshalb
+// raus. Der RECHENWEG bleibt unangetastet: personPruefen rechnet die
+// Wege weiter mit (alte Buchungen!), und die Statistik-Zeile "Liegt
+// noch auf den Zahlungswegen" zeigt die Summe weiter an.
 const KASSE_BLOECKE = [["daten", "Personendaten"], ["statistik", "Statistik"], ["fluss", "Geldfluss"],
-  ["wege", "Zahlungswege"], ["anbieter", "Wettanbieter"],
+  ["anbieter", "Wettanbieter"],
   ["kombis", "Kombinationen"], ["buchungen", "Buchungsliste"]];
 
 function kasseZeigen(ordnerId) {
@@ -2405,10 +2414,11 @@ function personGewinn(ordnerId, scheine) {
 // Stand, Foto - und wie viele Teile zusammen zum Ziel gehören.
 function kombiUebersichtHtml(ordnerId, scheine) {
   const meine = scheine.filter(s => s.ordner === ordnerId);
-  if (!meine.length) return '<p class="mini">Noch keine Kombinationen bei dieser Person.</p>' +
-    (darfSchreiben() && typeof pkNeu === "function"
-      ? '<p><button onclick="pkNeu(\'' + ordnerId + '\')">&#10133; Kombination von Hand anlegen</button></p>'
-      : "") +
+  // Karam (19.09.2026): der Knopf "Kombination von Hand anlegen" ist
+  // raus - "dafuer habe ich Kombis aus Screenshot". pkFormularHtml
+  // bleibt, es traegt weiter das Voll-Formular im Auswerten.
+  if (!meine.length) return '<p class="mini">Noch keine Kombinationen bei dieser Person. ' +
+    'Nachtragen geht über <b>Kombi aus Screenshot</b>.</p>' +
     (typeof pkFormularHtml === "function" ? pkFormularHtml(ordnerId) : "");
   const einsatz = meine.reduce((p, s) => p + (s.daten.einsatz || 0), 0);
   const offen = meine.filter(s => s.stand === "offen").length;
@@ -2418,10 +2428,6 @@ function kombiUebersichtHtml(ordnerId, scheine) {
     '<p class="mini"><b>Gesamteinsatz ' + einsatz.toFixed(2) + " &euro;</b> - " + offen + " offen, " +
     '<span class="gruen">' + gew + " gewonnen</span>, <span class=\"rot\">" + ver + " verloren</span>. " +
     "Ein Schein hat drei Wetten; setzt du 400 &euro;, zählen die 400 &euro; für die ganze Kombination.</p>" +
-    (darfSchreiben() && typeof pkNeu === "function"
-      ? '<p><button onclick="pkNeu(\'' + ordnerId + '\')">&#10133; Kombination von Hand anlegen</button> ' +
-        '<span class="mini">für ältere Kombinationen, die nicht über den Kombi-Bau gelaufen sind</span></p>'
-      : "") +
     '<div class="tabellenrand"><table><thead><tr><th>Wann</th><th>Anbieter</th><th>Spiele</th>' +
     "<th>Quote</th><th>Einsatz</th><th>möglich</th><th>Stand</th><th>Foto</th><th></th></tr></thead><tbody>";
   for (const s of meine) {
@@ -2553,28 +2559,12 @@ function zeichnePersonenKasse(scheine) {
     html += "<h4>&#128260; Geldfluss</h4>" + geldflussHtml(p, zg) + geldflussVerlaufHtml(p, schreib);
   }
 
-  // ---------- Zahlungswege ----------
-  if (blockAn(zg, "wege")) {
-    html += "<h4>&#128179; Zahlungswege</h4>" +
-      '<div class="kassewahl mini">';
-    for (const [w, nameW] of KASSE_WEGE) {
-      html += '<label><input type="checkbox"' + (zg.wege[w] !== false ? " checked" : "") +
-        ' onchange="tuKasseZeigen(\'' + person.id + "','wege','" + w + '\', this.checked)"> ' + nameW + "</label> ";
-    }
-    html += "</div><table><thead><tr><th>Zahlungsweg</th><th>erhalten</th><th>zum Anbieter</th>" +
-      "<th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th>" +
-      (schreib ? "<th>wirklich drauf</th>" : "") + "</tr></thead><tbody>";
-    for (const [w, nameW] of KASSE_WEGE) {
-      if (zg.wege[w] === false) continue;
-      const x = p.wege[w];
-      html += "<tr><td>" + nameW + korrekturMarke(x.korrektur) + "</td><td>" + x.erhalten.toFixed(2) + " &euro;</td>" +
-        "<td>" + x.hin.toFixed(2) + " &euro;</td><td>" + x.zurueck.toFixed(2) + " &euro;</td>" +
-        "<td>" + (x.raus || 0).toFixed(2) + " &euro;</td>" +
-        "<td class='" + (x.stand < -0.004 ? "rot" : "") + "'><b>" + x.stand.toFixed(2) + " &euro;</b></td>" +
-        (schreib ? "<td>" + standFeld(person.id, "weg", w, x.stand) + "</td>" : "") + "</tr>";
-    }
-    html += "</tbody></table>" + standErklaerung(schreib);
-  }
+  // ---------- Zahlungswege: Block entfernt ----------
+  // Karam (19.09.2026): "Die Zahlungswege entfernen, die brauchen wir
+  // nicht mehr." Der ganze Tabellen-Block ist raus (er stand hier bis
+  // Fassung 20260919b - im Git-Verlauf jederzeit zurueckholbar).
+  // personPruefen rechnet die Wege weiter, die Statistik zeigt die
+  // Summe, und alte Buchungen bleiben in der Buchungsliste sichtbar.
 
   // ---------- Wettanbieter ----------
   if (blockAn(zg, "anbieter")) {
@@ -2604,7 +2594,24 @@ function zeichnePersonenKasse(scheine) {
         (schreib ? "<td>" + eingeFeld(person.id, kz, a.einge) + "</td>" +
           "<td>" + standFeld(person.id, "anbieter", kz, a.guthaben) + "</td>" : "") + "</tr>";
     }
-    html += "</tbody></table>" + pkRechnerHtml(person.id, p, zg);
+    // Karam (19.09.2026): "unten dann immer die Gesamtsummen, ein
+    // bisschen dunkler." Die Summe geht ueber ALLE Anbieter, auch die
+    // per Haken ausgeblendeten - sonst fehlte Geld, ohne dass es
+    // jemand sieht (die dunkle Zeile sagt es dazu).
+    const su = { einge: 0, geholt: 0, einsatz: 0, imSpiel: 0, moeglichOffen: 0, gewonnen: 0, guthaben: 0 };
+    for (const [kz] of KASSE_ANBIETER) {
+      const a = p.anbieter[kz];
+      for (const f of Object.keys(su)) su[f] += a[f] || 0;
+    }
+    html += '</tbody><tfoot><tr class="ak-summe"><td><b>Zusammen</b> <span class="mini">(alle Anbieter)</span></td>' +
+      "<td><b>" + su.einge.toFixed(2) + " &euro;</b></td><td><b>" + su.geholt.toFixed(2) + " &euro;</b></td>" +
+      "<td><b>" + su.einsatz.toFixed(2) + " &euro;</b></td><td><b>" + su.imSpiel.toFixed(2) + " &euro;</b></td>" +
+      "<td><b>" + su.moeglichOffen.toFixed(2) + " &euro;</b></td><td><b>" + su.gewonnen.toFixed(2) + " &euro;</b></td>" +
+      "<td></td><td></td><td><b>" + su.guthaben.toFixed(2) + " &euro;</b></td>" +
+      (schreib ? "<td></td><td></td>" : "") + "</tr></tfoot>";
+    // Der Schnell-Rechner stand hier bis 20260919b - Karam: "diesen
+    // Schnellrechner einfach entfernen, brauche ich nicht."
+    html += "</table>" + standErklaerung(schreib);
   }
 
   // ---------- Kombinationen ----------
@@ -2615,7 +2622,9 @@ function zeichnePersonenKasse(scheine) {
     const meineK = scheine.filter(s => s.ordner === person.id);
     html += '<div class="pk-kombihinweis mini">&#127919; ' + meineK.length +
       ' Kombination(en) dieser Person - stehen unten unter <b>Kombinationen</b> (Person-Filter oben nutzen).' +
-      (schreib ? ' <button onclick="pkNeu(\'' + person.id + '\')">&#10133; Alte Kombination von Hand nachtragen</button>' : '') +
+      // Karam (19.09.2026): der Nachtrag-Knopf ist raus - "dafuer habe
+      // ich Kombis aus Screenshot".
+      (schreib ? ' <span class="mini">Nachtragen: über <b>Kombi aus Screenshot</b>.</span>' : '') +
       '</div>';
     if (pkOffen && pkOffen.ordnerId === person.id && !pkOffen.scheinId) html += pkFormularHtml(person.id);
   }
@@ -2819,18 +2828,8 @@ function tuKassePdf(ordnerId) {
       "</table>";
   }
 
-  if (blockAn(zg, "wege")) {
-    h += "<h2>Zahlungswege</h2><table><tr><th>Zahlungsweg</th><th>erhalten</th>" +
-      "<th>zum Anbieter</th><th>zurück</th><th>ausgezahlt</th><th>Stand jetzt</th></tr>";
-    for (const [w, nameW] of KASSE_WEGE) {
-      if (zg.wege[w] === false) continue;
-      const x = p.wege[w];
-      h += "<tr><td>" + nameW + "</td><td>" + x.erhalten.toFixed(2) + "</td><td>" + x.hin.toFixed(2) +
-        "</td><td>" + x.zurueck.toFixed(2) + "</td><td>" + (x.raus || 0).toFixed(2) +
-        "</td><td><b>" + x.stand.toFixed(2) + "</b></td></tr>";
-    }
-    h += "</table>";
-  }
+  // Zahlungswege auch im PDF entfernt (Karam, 19.09.2026) - die Summe
+  // steht weiter in der Statistik-Zeile "Liegt auf den Zahlungswegen".
 
   if (blockAn(zg, "anbieter")) {
     h += "<h2>Wettanbieter</h2><table><tr><th>Anbieter</th><th>rein</th><th>raus</th>" +
@@ -3469,7 +3468,7 @@ async function tuGruppeStand(keyKodiert, wert) {
     return s && s.stand !== wert;
   });
   if (!offeneIds.length) { zeichneBereich(); return; }
-  if (!confirm(
+  if (!await nachfrage(
       "Die ganze Kombination auf \"" + wert + "\" setzen?\n\n" +
       "   Teile:          " + offeneIds.length + " von " + g.teile + "\n" +
       "   Gesamteinsatz:  " + g.einsatz.toFixed(2) + " Euro\n" +
@@ -4403,10 +4402,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const box = document.getElementById("ordnerbox");
     if (box) box.scrollIntoView({ block: "center" });
     if (typeof meldungM === "function") {
-      meldungM("<b>Kombi von Hand eintragen:</b> oben die <b>Person</b> anklicken, " +
-        "dann steht bei ihr der Knopf <b>Alte Kombination von Hand nachtragen</b>. " +
-        "Einsatz, Quote und Gewinn reichen, ein Foto ist freiwillig, und du kannst " +
-        "die Wetten auch ganz weglassen.", "gut");
+      // Seit 19.09.2026 laeuft das Nachtragen ueber den Screenshot-Block.
+      meldungM("<b>Kombi von Hand eintragen:</b> das geht über den Block " +
+        "<b>Kombi aus Screenshot</b> - Einsatz, Multiplikator und Gewinn reichen, " +
+        "ein Foto ist freiwillig, die Person wählst du direkt dort.", "gut");
     }
   }, 1200);
 });
@@ -4947,7 +4946,7 @@ async function tuPersonDokument(ordnerId, eingabe) {
 }
 
 async function tuPersonDokumentWeg(ordnerId, pfadWert) {
-  if (!confirm("Diese Datei wirklich löschen?")) return;
+  if (!await nachfrage("Diese Datei wirklich löschen?")) return;
   const d = personDatenAusFeldern(ordnerId);
   d.dokumente = (d.dokumente || []).filter(m => m.pfad !== pfadWert);
   const s = await supaPersonDatenSpeichern(aktiverBereich.id, ordnerId, d);
@@ -5295,7 +5294,7 @@ async function tuEingezahltSetzen(ordnerId, kz, jetzt) {
     "Das zählt NICHT als Gewinn. Achtung: \"liegt dort\" ändert sich um " +
     "denselben Betrag mit - stimmt der echte Kontostand danach nicht, trag ihn " +
     "daneben bei \"wirklich drauf\" ein.\n\nEintragen?";
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
   const heute = new Date();
   const datum = heute.getFullYear() + "-" + String(heute.getMonth() + 1).padStart(2, "0") +
     "-" + String(heute.getDate()).padStart(2, "0");
@@ -5369,7 +5368,7 @@ async function tuStandSetzen(ordnerId, art, schluessel, jetzt) {
     (diff > 0 ? "Es kommen " + diff.toFixed(2) + " Euro dazu."
               : "Es gehen " + Math.abs(diff).toFixed(2) + " Euro weg.") + "\n\n" +
     "Das zählt NICHT als Gewinn - unterm Strich bleibt gleich.\n\nEintragen?";
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
   const heute = new Date();
   const datum = heute.getFullYear() + "-" + String(heute.getMonth() + 1).padStart(2, "0") +
     "-" + String(heute.getDate()).padStart(2, "0");
@@ -5541,7 +5540,7 @@ async function tuEinsatz(id, wert) {
     ? Math.round(moeglichAlt * (zahl / alt) * 100) / 100
     : Math.round(zahl * quote * 100) / 100;
 
-  if (!confirm(
+  if (!await nachfrage(
     "Einsatz dieser Kombination ändern?\n\n" +
     "   bisher:  " + alt.toFixed(2) + " Euro\n" +
     "   neu:     " + zahl.toFixed(2) + " Euro\n\n" +
@@ -5726,7 +5725,7 @@ function anbieterDetailHtml(kz, a) {
     'den echten Stand eintragen - der Unterschied wird als Korrektur-Buchung gespeichert und gilt ab sofort &uuml;berall. ' +
     'Bei <b>wirklich eingezahlt</b> tr&auml;gst du genauso die echte Einzahl-Summe ein; auch das ist eine Buchung, ' +
     'z&auml;hlt nicht als Gewinn und hebt &bdquo;rechnerisch drauf&ldquo; mit an. ' +
-    'Alte Kombinationen tr&auml;gst du in der Personen-Kasse mit <b>von Hand nachtragen</b> ein; ' +
+    'Alte Kombinationen tr&auml;gst du &uuml;ber <b>Kombi aus Screenshot</b> nach; ' +
     'gewonnen/verloren stellst du unten am Schein um.</p></div>';
   return html;
 }

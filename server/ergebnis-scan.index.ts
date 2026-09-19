@@ -185,20 +185,27 @@ Deno.serve(async (req: Request) => {
       z.gefunden++;
     }
 
-    // 4. Kombinationen entscheiden - derselbe Weg wie die Probe
-    //    (scheinEntscheiden). Der Wechsel passiert NUR, solange der
-    //    Schein noch "offen" ist (Wache gegen gleichzeitige Handaenderung).
+    // 4. Kombinationen entscheiden - ABGESCHALTET.
+    //    Karam (19.09.2026): "Ich will, dass nichts mehr automatisch
+    //    ausgewertet wird, nur noch manuell." Der Server SUCHT weiter
+    //    Ergebnisse (Schritt 3, sie stehen dann in kt_ergebnisse und
+    //    im Auswerten bereit), aber er stellt keinen Schein mehr auf
+    //    gewonnen oder verloren. Der alte Weg bleibt hinter dem
+    //    Schalter stehen, falls Karam ihn wieder anmachen will.
+    const AUTO_AUSWERTEN = false;
     const jeBereich = new Map<string, { gew: (number | string)[]; ver: (number | string)[] }>();
-    for (const s of scheine) {
-      const e = scheinEntscheiden(s.beine, ergKarte);
-      if (!e.neu) continue;
-      const u = await admin.from("kt_scheine").update({ stand: e.neu })
-        .eq("id", s.id).eq("stand", "offen").select("id");
-      if (u.error || !u.data || !u.data.length) continue;
-      if (e.neu === "gewonnen") z.gewonnen++; else z.verloren++;
-      const m = jeBereich.get(s.bereich) || { gew: [], ver: [] };
-      m[e.neu === "gewonnen" ? "gew" : "ver"].push(s.nummer || "?");
-      jeBereich.set(s.bereich, m);
+    if (AUTO_AUSWERTEN) {
+      for (const s of scheine) {
+        const e = scheinEntscheiden(s.beine, ergKarte);
+        if (!e.neu) continue;
+        const u = await admin.from("kt_scheine").update({ stand: e.neu })
+          .eq("id", s.id).eq("stand", "offen").select("id");
+        if (u.error || !u.data || !u.data.length) continue;
+        if (e.neu === "gewonnen") z.gewonnen++; else z.verloren++;
+        const m = jeBereich.get(s.bereich) || { gew: [], ver: [] };
+        m[e.neu === "gewonnen" ? "gew" : "ver"].push(s.nummer || "?");
+        jeBereich.set(s.bereich, m);
+      }
     }
 
     // 5. Push: an die Geraete des Bereichs-Besitzers UND an die

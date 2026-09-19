@@ -314,7 +314,7 @@ async function piAnlegen() {
   if (!piPlan || !piPlan.fehlt.length) return;
   const ziel = el("pi_ergebnis");
   const wieViele = piPlan.fehlt.length;
-  if (!confirm("Es werden " + wieViele + " neue Personen angelegt.\n\n" +
+  if (!await nachfrage("Es werden " + wieViele + " neue Personen angelegt.\n\n" +
       "Es wird nichts gelöscht und nichts überschrieben. Weiter?")) return;
 
   let gemacht = 0;
@@ -508,7 +508,7 @@ function piRestHtml(fehlen, ohneAnbieter) {
 async function piStaendeEintragen() {
   if (!piStandPlan.length) return;
   const wieViele = piStandPlan.length;
-  if (!confirm("Es werden " + wieViele + " Korrektur-Buchungen eingetragen, datiert auf den " +
+  if (!await nachfrage("Es werden " + wieViele + " Korrektur-Buchungen eingetragen, datiert auf den " +
       "Stichtag.\n\nEs wird nichts gelöscht und nichts überschrieben. Weiter?")) return;
   const datum = piStichtag().slice(0, 10);
   let gemacht = 0;

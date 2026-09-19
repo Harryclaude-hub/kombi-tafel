@@ -196,7 +196,7 @@ async function altAnlegen() {
   const s = altSumme(liste);
   const ohneBild = liste.filter(x => !altBilder[x.foto]).length;
 
-  if (!confirm("Diese " + s.anzahl + " Scheine jetzt anlegen?\n\n" +
+  if (!await nachfrage("Diese " + s.anzahl + " Scheine jetzt anlegen?\n\n" +
       "   Einsatz zusammen:  " + s.einsatz.toFixed(2) + " Euro\n" +
       "   Moeglicher Gewinn: " + s.gewinn.toFixed(2) + " Euro\n" +
       (ohneBild ? "   OHNE BILD:         " + ohneBild + " Schein(e)\n" : "") +

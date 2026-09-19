@@ -63,6 +63,11 @@ function zeichneSchnell() {
         '<input id="se_quote" type="text" inputmode="decimal" placeholder="z. B. 12,5" oninput="seRechnen()"></div>' +
       '<div class="feld"><span class="feld-titel">Möglicher Gewinn (&euro;)</span>' +
         '<input id="se_moeglich" type="text" inputmode="decimal" placeholder="leer = Einsatz &times; Multiplikator"></div>' +
+      // Karam (19.09.2026): "dass man das Anstoßdatum, wann es faellig
+      // ist, hinzufuegen kann." Damit greifen wartet/ueberfaellig auch
+      // hier - ohne Datum landet der Schein im Fach "ohne Anstoß".
+      '<div class="feld"><span class="feld-titel">Anstoß des letzten Spiels (wann fällig)</span>' +
+        '<input id="se_anstoss" type="datetime-local"></div>' +
       '<div class="feld"><span class="feld-titel">Anbieter-ID (freiwillig)</span>' +
         '<input id="se_anbid" type="text" autocomplete="off" spellcheck="false" placeholder="steht auf dem Wettschein"></div>' +
       '<div class="feld"><span class="feld-titel">Person (freiwillig)</span>' +
@@ -70,6 +75,9 @@ function zeichneSchnell() {
     "</div>" +
     '<div class="se-fuss">' +
       '<button class="haupt" onclick="seSpeichern()">In den Verlauf - zum Auswerten</button>' +
+      // Karam (19.09.2026): "ein Button, alle Kombis aus Screenshots -
+      // oeffnet sich eine Page, wo man alle sieht."
+      '<a href="screenshots.html"><button type="button">&#128248; Alle Kombis aus Screenshots</button></a>' +
       '<span class="mini" id="se_stand"></span>' +
     "</div>" +
     "</div>";
@@ -81,7 +89,7 @@ function seKzWaehlen(kz) {
   // Nur die Chips tauschen wuerde reichen - aber die Felder behalten
   // ihre Werte, weil sie beim Zeichnen nicht angefasst werden? Nein:
   // zeichneSchnell baut alles neu. Also Werte retten und zurueckschreiben.
-  const merken = ["se_einsatz", "se_quote", "se_moeglich", "se_anbid", "se_person"]
+  const merken = ["se_einsatz", "se_quote", "se_moeglich", "se_anstoss", "se_anbid", "se_person"]
     .map(id => [id, el(id) ? el(id).value : ""]);
   zeichneSchnell();
   for (const [id, wert] of merken) if (el(id)) el(id).value = wert;
@@ -147,15 +155,27 @@ async function seSpeichern() {
   const anbId = String(el("se_anbid") ? el("se_anbid").value : "").trim();
   const personId = String(el("se_person") ? el("se_person").value : "");
   const personName = personId ? (ordnerNameM(personId) || "Person") : "";
+  const ablauf = String(el("se_anstoss") ? el("se_anstoss").value : "").trim();
+  // Die EIGENE Nummer der Screenshot-Kombis (Karam, 19.09.2026): eine
+  // eigene Reihe S-1, S-2, ... - hergeleitet aus der hoechsten schon
+  // gespeicherten S-Nummer, nicht aus einem Geraete-Zaehler, damit zwei
+  // Geraete nicht dieselbe vergeben.
+  let snr = 0;
+  for (const s of (Array.isArray(kasseScheine) ? kasseScheine : [])) {
+    const alt = s.daten ? parseInt(s.daten.snr, 10) : NaN;
+    if (isFinite(alt) && alt > snr) snr = alt;
+  }
+  snr += 1;
 
   // Dieselbe ACHTUNG wie bei der Handeingabe (personkombi.js): eine
   // Kombination ohne einzelne Wetten kann kein Automat je auswerten.
-  if (!confirm("Diese Kombination speichern?\n\n" +
+  if (!await nachfrage("Diese Kombination speichern als S-" + snr + "?\n\n" +
       "   Anbieter:  " + name + "\n" +
       "   Einsatz:   " + einsatz.toFixed(2) + " Euro\n" +
       "   Quote:     " + quote.toFixed(2) + (gerechnet === "Multiplikator" ? "  (gerechnet)" : "") + "\n" +
       "   Möglich:   " + moeglich.toFixed(2) + " Euro" + (gerechnet === "möglich" ? "  (gerechnet)" : "") + "\n" +
       "   Person:    " + (personName || "ohne") + "\n" +
+      "   Fällig:    " + (ablauf ? ablauf.replace("T", " ") : "ohne Anstoß (landet im Fach \"ohne Anstoß\")") + "\n" +
       "   Bild:      " + (seFoto ? "ja" : "nein") + "\n" +
       (anbId ? "   Anbieter-ID: " + anbId + "\n" : "") +
       "\nACHTUNG, sie hat KEINE einzelnen Wetten:\n" +
@@ -173,7 +193,11 @@ async function seSpeichern() {
     quote: quote, moeglich: moeglich,
     wetten: [], stand: "offen", notiz: "",
     handeingabe: true, ohneNachweis: true,
-    anbieterId: anbId
+    anbieterId: anbId,
+    // Herkunft und eigene Nummer (19.09.2026): quelle macht die Kombis
+    // auf screenshots.html auffindbar, snr ist die S-Nummer, ablauf das
+    // Faellig-Datum (scheinEnde in mein.js nimmt es als letzten Anstoss).
+    quelle: "screenshot", snr: snr, ablauf: ablauf || ""
   };
   const r = await supaScheinAnlegen(aktiverBereich.id, daten, seFoto,
     seFoto ? seFotoName : null, personId || null, null);
@@ -181,9 +205,9 @@ async function seSpeichern() {
     meldungM("Nicht angelegt: " + textSicherM(String(r.error.message).slice(0, 140)), "warn");
     return;
   }
-  meldungM("<b>Kombination angelegt</b> (" + textSicherM(name) + ", " + einsatz.toFixed(2) +
+  meldungM("<b>Kombination S-" + snr + " angelegt</b> (" + textSicherM(name) + ", " + einsatz.toFixed(2) +
     " &euro;)" + (personName ? " bei " + textSicherM(personName) : "") +
-    ". Sie steht jetzt im <b>Auswerten</b>.", "gut");
+    ". Sie steht jetzt im <b>Auswerten</b> und auf der Seite <b>Alle Kombis aus Screenshots</b>.", "gut");
   seFoto = null; seFotoName = "";
   zeichneSchnell();
   // Alles andere (Konto, Kacheln, Auswerten) rechnet mit der frischen

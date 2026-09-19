@@ -285,11 +285,11 @@ function pkRechnen() {
 
 function pkZeileDazu() { pkMerken(); pkStand.wetten.push(pkZeileLeer()); zeichneBereich(); }
 
-function pkZeileWeg(i) {
+async function pkZeileWeg(i) {
   pkMerken();
   const z = pkStand.wetten[i];
   const beschriftet = z && (z.spiel || z.wette || z.quote);
-  if (beschriftet && !confirm("Diese Wette aus der Kombination nehmen?\n\n" +
+  if (beschriftet && !await nachfrage("Diese Wette aus der Kombination nehmen?\n\n" +
       (z.spiel || "(ohne Spiel)") + " " + (z.wette || "") + " " + (z.quote || ""))) return;
   pkStand.wetten.splice(i, 1);
   if (!pkStand.wetten.length) pkStand.wetten.push(pkZeileLeer());
@@ -335,8 +335,8 @@ function pkFotoWaehlen(eingabe) {
   });
 }
 
-function pkFotoWeg() {
-  if (!confirm("Das Foto von dieser Kombination entfernen?")) return;
+async function pkFotoWeg() {
+  if (!await nachfrage("Das Foto von dieser Kombination entfernen?")) return;
   pkMerken();
   pkStand.foto = null; pkStand.fotoName = ""; pkStand.fotoWeg = true;
   zeichneBereich();
@@ -404,7 +404,7 @@ async function pkSpeichern() {
   // wenigstens gegen das geprueft, was schon im Bereich liegt.
   if (nummer !== null) {
     const belegt = (kasseScheine || []).filter(x => x.nummer === nummer && x.id !== pkOffen.scheinId);
-    if (belegt.length && !confirm(
+    if (belegt.length && !await nachfrage(
         "Die Scheinnummer " + nummer + " gibt es hier schon " + belegt.length + "-mal.\n\n" +
         "Nach dieser Nummer suchst du später. Zwei Kombinationen mit derselben " +
         "Nummer lassen sich dann nicht mehr auseinanderhalten.\n\n" +
@@ -434,7 +434,7 @@ async function pkSpeichern() {
     : "";
 
   if (neu) {
-    if (!confirm("Diese Kombination bei der Person anlegen?\n\n" + uebersicht + ohneText +
+    if (!await nachfrage("Diese Kombination bei der Person anlegen?\n\n" + uebersicht + ohneText +
         "\n\nSie zählt ab sofort in Konto, Personenkasse und Buchhaltung mit.")) return;
     const daten = {
       zeit: zeit.toISOString(),
@@ -475,7 +475,7 @@ async function pkSpeichern() {
       "   Quote:    " + altQuote.toFixed(2) + "  ->  " + quote.toFixed(2) + "\n" +
       "   Möglich:  " + (Number(alt.moeglich) || 0).toFixed(2) + "  ->  " + moeglich.toFixed(2) + " Euro";
   }
-  if (!confirm("Änderungen an dieser Kombination speichern?\n\n" + uebersicht + geld +
+  if (!await nachfrage("Änderungen an dieser Kombination speichern?\n\n" + uebersicht + geld +
       "\n\nDiese Zahlen gehen in Konto, Personenkasse und Buchhaltung ein.")) return;
 
   // Der verschluesselte Block: alles Alte bleibt stehen, nur die Felder,

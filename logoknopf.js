@@ -34,8 +34,10 @@
     ["original.html", "📋 Original-Tabelle"],
     ["kombis.html", "🎯 Kombi-Bau"],
     ["mein.html", "📒 Mein Bereich"],
-    ["schule.html", "📖 Handbuch"],
-    ["hilfe.html", "❓ Erklärungen"]
+    // Seit 19.09.2026 EINE Seite (Karam: "Erklaerungen und Handbuch
+    // zusammenfuegen"); schule.html leitet nur noch weiter.
+    ["hilfe.html", "📖 Handbuch"],
+    ["screenshots.html", "📸 Kombis aus Screenshots"]
   ];
 
   function zu() {

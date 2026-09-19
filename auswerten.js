@@ -208,6 +208,9 @@ function awSuchText(s) {
     teile.push(t.linie || t.wette || "");
   }
   teile.push("nr " + (s.nummer || ""));
+  // Die eigene S-Nummer der Screenshot-Kombis (19.09.2026), in beiden
+  // Schreibweisen: "s-12" und "s12" treffen.
+  if (d.snr) teile.push("s-" + d.snr + " s" + d.snr);
   // Karam (17.09.2026): "eine besondere Nummer, die immer was mit der
   // Wette zu tun hat, dass ich die Screenshots beim Anbieter sehen und
   // hier beim Auswerten suchen kann." Die Anbieter-ID ist durchsuchbar.
@@ -441,6 +444,15 @@ function awScheine(gefiltert) {
       const v = String(a.created_at || "").localeCompare(String(b.created_at || ""));
       return alt ? v : -v;
     });
+}
+
+// Die Nummer eines Scheins als Text (Karam, 19.09.2026): Kombis aus
+// Screenshot haben keine feste Bau-Nummer, sondern ihre EIGENE
+// S-Nummer (daten.snr) - die zaehlt in einer eigenen Reihe.
+function awNrText(s) {
+  if (s && s.nummer) return String(s.nummer);
+  if (s && s.daten && s.daten.snr) return "S-" + s.daten.snr;
+  return "?";
 }
 
 function awPersonName(id) {
@@ -780,7 +792,7 @@ async function awPersonZuordnen(scheinId, ordnerId) {
   if (!(await scheinOrdnerSchreiben(scheinId, ordnerId))) return;
   s.ordner = ordnerId || null;
   awPwOffen = ""; awPwSuche = "";
-  meldungM("<b>Nr. " + (s.nummer || "?") + "</b> ist jetzt bei <b>" +
+  meldungM("<b>Nr. " + awNrText(s) + "</b> ist jetzt bei <b>" +
     textSicherM(awPersonName(ordnerId) || "Person") + "</b>." +
     (alterName ? " Vorher: " + textSicherM(alterName) + "." : ""), "gut");
   if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
@@ -812,7 +824,8 @@ function awZuKombi(scheinId) {
   // Die feste Nummer ist der beste Griff; ohne sie der erste Spielname.
   const d = s.daten || {};
   awSuche = s.nummer ? ("nr " + s.nummer)
-    : ((d.wetten && d.wetten[0] && d.wetten[0].spiel) || "");
+    : (d.snr ? ("s-" + d.snr)
+    : ((d.wetten && d.wetten[0] && d.wetten[0].spiel) || ""));
   if (typeof mbBlockZeigen === "function") mbBlockZeigen("auswerten");
   zeichneAuswerten();
   const karte = el("aw_" + scheinId);
@@ -821,7 +834,7 @@ function awZuKombi(scheinId) {
     setTimeout(() => { try { karte.classList.remove("aw-blitz"); } catch (e) { } }, 4000);
     try { karte.scrollIntoView({ block: "center" }); } catch (e) { }
   } else {
-    meldungM("Nr. " + (s.nummer || "?") + " ist im Auswerten gerade nicht im Bild - " +
+    meldungM("Nr. " + awNrText(s) + " ist im Auswerten gerade nicht im Bild - " +
       "die Suche oben zeigt, wonach gesucht wurde.", "warn");
   }
 }
@@ -891,7 +904,7 @@ async function awAnbieterSetzen(scheinId, kz) {
   s.daten = Object.assign({}, s.daten, { kz: kz, anbieter: name });
   delete s._suchtext;               // der Anbieter steht im Suchtext
   awAwOffen = "";
-  meldungM("<b>Nr. " + (s.nummer || "?") + "</b> hängt jetzt bei <b>" + textSicherM(name) +
+  meldungM("<b>Nr. " + awNrText(s) + "</b> hängt jetzt bei <b>" + textSicherM(name) +
     "</b> (vorher " + textSicherM((typeof anbieterName === "function" && anbieterName(vorher)) || vorher || "?") +
     "). Einsatz, Quote und möglicher Gewinn sind unverändert.", "gut");
   if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
@@ -989,8 +1002,8 @@ async function awIdSpeichern(id) {
   s.daten = Object.assign({}, s.daten, { anbieterId: wert });
   delete s._suchtext;          // die ID ist durchsuchbar, der alte Text luegt jetzt
   meldungM(wert
-    ? "Anbieter-ID von Nr. " + (s.nummer || "?") + " gespeichert: <b>" + textSicherM(wert) + "</b>"
-    : "Anbieter-ID von Nr. " + (s.nummer || "?") + " entfernt.", "gut");
+    ? "Anbieter-ID von Nr. " + awNrText(s) + " gespeichert: <b>" + textSicherM(wert) + "</b>"
+    : "Anbieter-ID von Nr. " + awNrText(s) + " entfernt.", "gut");
   awKarteAuffrischen(s);
   if (typeof kasseScheineGeaendert === "function") kasseScheineGeaendert();
 }
@@ -1260,7 +1273,7 @@ function awKarteHtml(s, lfd, gesamt) {
   const schreib = (typeof darfSchreiben === "function") ? darfSchreiben() : false;
   if (d.gesperrt) {
     return '<div class="aw-karte aw-unlesbar" id="aw_' + s.id + '">' +
-      '<div class="aw-text"><b>Nr. ' + (s.nummer || "?") + "</b> " +
+      '<div class="aw-text"><b>Nr. ' + awNrText(s) + "</b> " +
       '<span class="s-warn">nicht lesbar - der Schlüssel für diesen Bereich fehlt auf diesem Gerät</span></div></div>';
   }
   const person = awPersonName(s.ordner);
@@ -1308,7 +1321,7 @@ function awKarteHtml(s, lfd, gesamt) {
         // die feste ist die, unter der er in der Buchhaltung steht.
         (lfd ? '<span class="aw-lfd" title="Der ' + lfd + ". von " + gesamt +
           ' in diesem Zeitraum">' + lfd + "/" + gesamt + "</span> " : "") +
-        "<b>Nr. " + (s.nummer || "?") + "</b> " +
+        "<b>Nr. " + awNrText(s) + "</b> " +
         (typeof markeM === "function" ? markeM(d.kz) : textSicherM(d.kz || "")) + " " +
         // Karam (17.09.2026): "Ich kann bitte auch den Anbieter aendern."
         (schreib
@@ -1518,7 +1531,7 @@ async function awTeilSpeichern(id) {
   }
   if (!r.data || !r.data.length) {
     meldungM("<b>Nicht gespeichert.</b> Es wurde keine Zeile geändert - fehlendes " +
-      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + (s.nummer || "?") +
+      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + awNrText(s) +
       " steht weiter auf \"" + vorher + "\".", "warn");
     return;
   }
@@ -1528,7 +1541,7 @@ async function awTeilSpeichern(id) {
   const moeglich = ((s.daten || {}).moeglich) || 0;
   if (Math.abs(zahl - moeglich) <= 0.004) {
     // Ehrlich sagen, warum hier nichts orange wird.
-    meldungM("Nr. " + (s.nummer || "?") + ": Der Betrag ist genau der mögliche Gewinn - " +
+    meldungM("Nr. " + awNrText(s) + ": Der Betrag ist genau der mögliche Gewinn - " +
       "der Schein steht als ganz normal gewonnen da (grün, nicht orange).", "gut");
   }
   awKarteAuffrischen(s);
@@ -1584,7 +1597,7 @@ async function awStand(id, wert) {
   // Klick wie nie geschehen.
   if (!r.data || !r.data.length) {
     meldungM("<b>Nicht gespeichert.</b> Es wurde keine Zeile geändert - fehlendes " +
-      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + (s.nummer || "?") +
+      "Schreibrecht, oder die Kombination ist nicht mehr da. Nr. " + awNrText(s) +
       " steht weiter auf \"" + vorher + "\".", "warn");
     return;
   }
@@ -1628,7 +1641,7 @@ function awKarteAuffrischen(s) {
   // Karte - mit einer kurzen Notiz, damit es nicht aussieht, als waere
   // etwas verloren gegangen, und mit dem Weg, sie wiederzuholen.
   if (!awStandSichtbar(s.stand, awZeig())) {
-    karte.outerHTML = '<div class="aw-weg mini">Nr. ' + (s.nummer || "?") + " auf <b>" +
+    karte.outerHTML = '<div class="aw-weg mini">Nr. ' + awNrText(s) + " auf <b>" +
       (s.stand === "gewonnen" ? "aufgegangen" : "nicht aufgegangen") +
       "</b> gesetzt. Der Schalter <b>" +
       (s.stand === "gewonnen" ? "gewonnen" : "verloren") +

@@ -324,7 +324,7 @@ async function tuSatzDateien(dateien, datum) {
   const schonDaZahl = bilder.filter(b => b.schonDa).length;
   let trotzdem = false;
   if (schonDaZahl) {
-    trotzdem = confirm(
+    trotzdem = await nachfrage(
       (schonDaZahl === bilder.length
         ? "Diese " + schonDaZahl + " Foto(s) liegen im Ordner " + datum + " schon."
         : schonDaZahl + " der " + bilder.length + " Fotos liegen im Ordner " + datum + " schon.") +

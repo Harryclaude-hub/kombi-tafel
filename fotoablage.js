@@ -103,7 +103,7 @@ async function fotoAblageEinrichten() {
     return { ok: false, grund: "Kein Ordner gewaehlt." };
   }
   const vorschlag = fotoAblagePfad();
-  const pfad = window.prompt(
+  const pfad = await eingabeFrage(
     "Wie heisst dieser Ordner vollstaendig auf dem Laptop?\n" +
     "Genau diesen Pfad bekommt Claude genannt, damit er die Bilder findet.",
     vorschlag);

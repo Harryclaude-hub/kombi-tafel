@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kombis aus Screenshots</title>
+<link rel="stylesheet" href="stil.css?v=20260919c">
+<link rel="icon" href="logo.svg">
+</head>
+<body>
+<div class="huelle">
+  <h1>&#128248; Alle Kombis aus Screenshots</h1>
+  <p class="mini">Jede Kombination, die über <b>Kombi aus Screenshot</b> (oder als Handeingabe ohne
+  einzelne Wetten) angelegt wurde - mit ihrer eigenen <b>S-Nummer</b>. Bearbeitet wird wie immer
+  im <b>Auswerten</b>: dort einfach die S-Nummer in die Suche tippen.</p>
+
+  <div id="lage" class="kern">Wird geladen...</div>
+
+  <p>
+    <a href="mein.html"><button class="haupt">&#8592; zurück zu Mein Bereich</button></a>
+    <button onclick="alleHolen()">&#128260; neu laden</button>
+  </p>
+
+  <div id="ss_liste"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="krypto.js?v=20260919c"></script>
+<script src="bildlager.js?v=20260919c"></script>
+<script src="supa.js?v=20260919c"></script>
+<script>
+"use strict";
+// Reine ANZEIGE-Seite (Karam, 19.09.2026): "ein Button, alle Kombis aus
+// Screenshots - oeffnet sich eine Page, wo man alle sieht." Hier wird
+// nichts geaendert und nichts gerechnet - nur gelesen. Gezeigt wird der
+// EIGENE Bereich (derselbe, mit dem Mein Bereich startet).
+
+function sicherS(t) {
+  return String(t === null || t === undefined ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+function geldS(x) { return Number(x || 0).toFixed(2) + " &euro;"; }
+function zeitS(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return sicherS(String(iso).replace("T", " "));
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") +
+    "." + d.getFullYear() + " " + String(d.getHours()).padStart(2, "0") + ":" +
+    String(d.getMinutes()).padStart(2, "0");
+}
+
+// Welche Kombination gehoert hierher? Neue tragen quelle: "screenshot";
+// aeltere aus demselben Block erkennt man an Handeingabe OHNE einzelne
+// Wetten (genau die Form, die der Schnell-Eintrag seit 17.09. schreibt).
+function istScreenshotKombi(s) {
+  const d = s.daten || {};
+  if (d.quelle === "screenshot") return true;
+  return !!d.handeingabe && !!d.ohneNachweis && !(d.wetten || []).length;
+}
+
+let ssScheine = [];
+
+async function alleHolen() {
+  const lage = document.getElementById("lage");
+  const kasten = document.getElementById("ss_liste");
+  kasten.innerHTML = "";
+  lage.className = "kern";
+  lage.textContent = "Wird geladen...";
+  if (!window.supa) { lage.className = "warnkern"; lage.textContent = "Die Datenbank-Bibliothek konnte nicht laden. Bitte Seite neu laden."; return; }
+  const u = await supaNutzer();
+  if (!u) {
+    lage.className = "warnkern";
+    lage.innerHTML = "Du bist nicht angemeldet. <a href=\"mein.html\"><b>Zuerst in Mein Bereich anmelden</b></a>, dann hierher zurück.";
+    return;
+  }
+  const scheine = await supaScheineLaden(u.id);
+  if (scheine._fehler) {
+    lage.className = "warnkern";
+    lage.innerHTML = "<b>Nicht geladen:</b> " + sicherS(scheine._fehler) + " Es wird nichts angezeigt, damit es nicht wie \"keine Kombis\" aussieht.";
+    return;
+  }
+  const ordner = await supaOrdnerLaden(u.id);
+  const nm = {};
+  for (const o of (ordner || [])) nm[o.id] = o.name;
+
+  const unlesbar = scheine.filter(s => s.daten && s.daten.gesperrt).length;
+  ssScheine = scheine.filter(istScreenshotKombi)
+    .sort((a, b) => String((b.daten && b.daten.zeit) || b.created_at || "")
+      .localeCompare(String((a.daten && a.daten.zeit) || a.created_at || "")));
+
+  lage.innerHTML = "<b>" + ssScheine.length + " Kombination" + (ssScheine.length === 1 ? "" : "en") +
+    " aus Screenshots</b> in deinem Bereich." +
+    (unlesbar ? " <span class='mini'>(" + unlesbar + " Kombination(en) insgesamt sind auf diesem Gerät nicht lesbar und können hier fehlen.)</span>" : "");
+
+  if (!ssScheine.length) {
+    kasten.innerHTML = '<div class="kern">Noch keine. Angelegt wird im Block ' +
+      '<b>Kombi aus Screenshot</b> in <a href="mein.html"><b>Mein Bereich</b></a>.</div>';
+    return;
+  }
+  let html = "";
+  for (const s of ssScheine) {
+    const d = s.daten || {};
+    const nr = d.snr ? "S-" + d.snr : (s.nummer ? "Nr. " + s.nummer : "ohne Nummer");
+    const standKl = s.stand === "gewonnen" ? "e-gew" : (s.stand === "verloren" ? "e-ver" : "");
+    html += '<div class="schein"><div class="s-kopf"><b>' + sicherS(nr) + "</b> &middot; " +
+      sicherS(d.anbieter || d.kz || "?") +
+      (s.ordner && nm[s.ordner] ? " &middot; " + sicherS(nm[s.ordner]) : " &middot; ohne Person") +
+      ' <span class="' + standKl + '"><b>' + sicherS(s.stand || "?") + "</b>" +
+      (s.stand === "gewonnen" && s.echt_zurueck != null ? " / " + geldS(s.echt_zurueck) : "") + "</span>" +
+      '<span class="mini"> &nbsp;gespeichert ' + zeitS(d.zeit || s.created_at) +
+      " &middot; fällig: " + (d.ablauf ? zeitS(d.ablauf) : "<b>ohne Anstoß</b>") + "</span></div>" +
+      '<div class="mini">Einsatz <b>' + geldS(d.einsatz) + "</b> &middot; Quote <b>" +
+      Number(d.quote || 0).toFixed(2) + "</b> &middot; möglich <b>" + geldS(d.moeglich) + "</b>" +
+      (d.anbieterId ? " &middot; Anbieter-ID <b>" + sicherS(d.anbieterId) + "</b>" : "") +
+      (d.notiz ? " &middot; Notiz: " + sicherS(d.notiz) : "") + "</div>" +
+      '<div class="s-foto" id="ssf_' + sicherS(s.id) + '">' +
+      (s.foto ? '<img src="' + sicherS(s.foto) + '" alt="Screenshot">'
+        : (s.fotoDa ? '<span class="mini">Bild lädt...</span>' : '<span class="mini">ohne Bild</span>')) +
+      "</div></div>";
+  }
+  kasten.innerHTML = html;
+  bilderNachladen();
+}
+
+// Bilder einzeln nachziehen, hoechstens vier gleichzeitig - dank dem
+// Foto-Merker (bildlager.js) sind die meisten sofort da.
+async function bilderNachladen() {
+  const warten = ssScheine.filter(s => !s.foto && s.fotoDa);
+  let laeuft = 0, i = 0;
+  return new Promise((fertig) => {
+    const naechstes = async () => {
+      if (i >= warten.length && laeuft === 0) return fertig();
+      while (laeuft < 4 && i < warten.length) {
+        const s = warten[i++];
+        laeuft++;
+        supaScheinFotoHolen(s.id).then(r => {
+          laeuft--;
+          const ziel = document.getElementById("ssf_" + s.id);
+          if (ziel) {
+            if (r && r.foto) ziel.innerHTML = '<img src="' + sicherS(r.foto) + '" alt="Screenshot">';
+            else if (r && r.unlesbar) ziel.innerHTML = '<span class="mini">Bild nicht lesbar (Schlüssel)</span>';
+            else if (r && r.fehler) ziel.innerHTML = '<span class="mini">Bild nicht geladen: ' + sicherS(r.fehler) + "</span>";
+            else ziel.innerHTML = '<span class="mini">ohne Bild</span>';
+          }
+          naechstes();
+        });
+      }
+    };
+    naechstes();
+  });
+}
+
+alleHolen();
+</script>
+</body>
+</html>

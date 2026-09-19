@@ -112,7 +112,25 @@ function nrMerken(n) {
 //  anfaengt, waere das ein Verstellen ohne Anlass.)
 
 function nrNaechste() {
-  const n = nrStand() + 1;
+  // Karam (19.09.2026): "Es darf nie wieder vorkommen, dass Nummern
+  // doppelt vorkommen." Der Zaehler war rein oertlich - ein zweites
+  // Geraet kannte ihn nicht und vergab dieselbe Nummer noch einmal
+  // (so entstand Nr. 399 doppelt). Jetzt zaehlen IMMER auch die
+  // hoechsten Nummern der geladenen Konto-Scheine und des oertlichen
+  // Verlaufs mit. Rest-Luecke: zwei Geraete, die in derselben Minute
+  // speichern, ohne neu geladen zu haben - dokumentiert, nicht still.
+  let hoechste = nrStand();
+  for (const s of (Array.isArray(kontoScheine) ? kontoScheine : [])) {
+    const n = parseInt(s.nummer, 10);
+    if (isFinite(n) && n > hoechste) hoechste = n;
+  }
+  try {
+    for (const e of (liesVerlauf() || [])) {
+      const n = parseInt(e.nummer, 10);
+      if (isFinite(n) && n > hoechste) hoechste = n;
+    }
+  } catch (e) { }
+  const n = hoechste + 1;
   nrMerken(n);
   return n;
 }
@@ -2762,7 +2780,7 @@ function schonGesetztGleich(kz, wetten) {
   return null;
 }
 
-function eigenbauAnlegen() {
+async function eigenbauAnlegen() {
   const wahl = [...document.querySelectorAll(".eb-wahl:checked")].map(c => c.value);
   // Karam (15.09.2026): eine angehakte Zeile ergibt eine Einzelwette,
   // mehrere eine Kombination. Vorher war bei einer Zeile Schluss.
@@ -2786,7 +2804,7 @@ function eigenbauAnlegen() {
   const kz = (kzFeld && kzFeld.value) || KT_ANBIETER_RANG[0];
   // Schon genau so gesetzt? Dann erst fragen (mit Nummer), nie stumm doppeln.
   const gleich = schonGesetztGleich(kz, wetten);
-  if (gleich && !confirm("ACHTUNG: Genau diese Kombination (gleiche Wetten und Linien) ist bei " +
+  if (gleich && !await nachfrage("ACHTUNG: Genau diese Kombination (gleiche Wetten und Linien) ist bei " +
     anbieterName(kz) + " schon GESETZT" + (gleich.nummer ? " - als Nr. " + gleich.nummer : "") +
     ".\n\nWirklich noch einmal anlegen?")) return;
   const z = liesZustand() || baueAlles();
@@ -2815,7 +2833,7 @@ function fotoNochGebraucht(scheinId) {
   return false;
 }
 
-function kombiLoeschen(scheinId) {
+async function kombiLoeschen(scheinId) {
   const z = liesZustand();
   if (!z || !z.scheine) return;
   const s = z.scheine.find(x => x.id === scheinId);
@@ -2854,7 +2872,7 @@ function kombiLoeschen(scheinId) {
       "sie ein ZWEITES MAL verbauen.\n\n" + frage;
   }
 
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
 
   const raus = new Set(weg.map(x => x.id));
   z.scheine = z.scheine.filter(x => !raus.has(x.id));
@@ -3019,7 +3037,7 @@ function aenderNurEinsatz(alt, neuEinsatz) {
   return { einsatz: neuEinsatz, moeglich: moeglich, brutto: brutto,
            gebuehr: rund2(brutto - moeglich) };
 }
-function scheinSchonDaFragen(scheinId, drin, einsatz) {
+async function scheinSchonDaFragen(scheinId, drin, einsatz) {
   const wo = drin.woher === "konto" ? "in deinem Konto" : "auf diesem Gerät";
   const alt = Number(drin.einsatz) || 0;
   const kopf = "Diese Kombination steht schon im Verlauf" +
@@ -3028,7 +3046,7 @@ function scheinSchonDaFragen(scheinId, drin, einsatz) {
 
   // Gleicher Betrag: da gibt es nichts zu aendern, nur die harte Frage.
   if (Math.abs(alt - einsatz) >= 0.005) {
-    if (confirm(kopf +
+    if (await nachfrage(kopf +
         "Den vorhandenen Eintrag auf " + einsatz.toFixed(2) + " Euro ÄNDERN?\n\n" +
         "   OK        = ändern. Es bleibt EINE Buchung, nur die Zahl wird neu.\n" +
         "   Abbrechen = nicht ändern (danach wirst du gefragt, ob du sie\n" +
@@ -3037,7 +3055,7 @@ function scheinSchonDaFragen(scheinId, drin, einsatz) {
       return false;
     }
   }
-  return confirm(kopf +
+  return await nachfrage(kopf +
     "Wirklich ein ZWEITES Mal speichern?\n\n" +
     "Dann steht sie zweimal im Verlauf und zählt in der Buchhaltung mit " +
     einsatz.toFixed(2) + " Euro doppelt.\n\n" +
@@ -3116,7 +3134,7 @@ async function scheinAendernStattDoppelt(scheinId, drin, einsatz) {
   if (typeof zeichnePanel === "function") zeichnePanel();
 }
 
-function scheinMerken(scheinId) {
+async function scheinMerken(scheinId) {
   const einsatz = parseFloat(document.getElementById("e_" + scheinId).value) || 0;
   if (!einsatz) { meldung("Bitte zuerst einen Einsatz eintragen.", "warn"); return; }
   // Karam (19.09.2026): "Ab jetzt muss wirklich bei jeder neuen Kombi
@@ -3142,7 +3160,7 @@ function scheinMerken(scheinId) {
   // genau das als Grund fuer den Loeschknopf: "haben wir da doppelt
   // reingemacht". Deshalb wird zuerst ANDERN angeboten (siehe oben).
   const drin = schonGesetzt(scheinId);
-  if (drin && !scheinSchonDaFragen(scheinId, drin, einsatz)) return;
+  if (drin && !(await scheinSchonDaFragen(scheinId, drin, einsatz))) return;
   // Eingeloggt? Dann ist die Konto-Ordner-Frage PFLICHT (Karams Regel:
   // jede Kombination muss zugeordnet sein). Ohne Konto wie bisher lokal.
   if (typeof supaNutzer === "function" && window.supa) {
@@ -3558,7 +3576,7 @@ function standAendern(i, wert) {
 }
 // MIT RUECKFRAGE: hier steht eine gesetzte Kombination mit echtem Geld.
 // Frueher loeschte der Knopf sofort, und rueckgaengig ging gar nichts.
-function verlaufLoeschen(i) {
+async function verlaufLoeschen(i) {
   const v = liesVerlauf();
   const x = v[i];
   if (!x) return;
@@ -3569,7 +3587,7 @@ function verlaufLoeschen(i) {
     (Array.isArray(x.wetten) ? x.wetten.map(t => t.spiel).join("\n") : "") + "\n\n" +
     "Gemerkt am " + wann.toLocaleString("de-AT") + ".\n" +
     "Das laesst sich nicht rueckgaengig machen.";
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
   v.splice(i, 1);
   if (!speichereVerlauf(v)) return;
   meldung("Kombination aus dem Verlauf geloescht. <b>Achtung:</b> in deinem Konto " +
@@ -3590,11 +3608,11 @@ function textSicherK2(t) {
 // Ohne Automatikbau raeumt dieser Knopf nur noch auf: er wirft die selbst
 // gebauten Kombinationen weg und liest die Tabelle frisch. Deshalb fragt er
 // vorher nach - es sind Karams eigene Scheine, keine geratenen.
-function neuBauen() {
+async function neuBauen() {
   if (!KT_AUTOBAU) {
     const z0 = liesZustand();
     const eigene = (z0 && z0.scheine ? z0.scheine : []).filter(s => s.art === "eigen");
-    if (eigene.length && !confirm("Das wirft deine " + eigene.length +
+    if (eigene.length && !await nachfrage("Das wirft deine " + eigene.length +
         " selbst gebaute(n) Kombination(en) weg und liest die Tabelle frisch ein. " +
         "Schon gespeicherte Kombinationen im Verlauf bleiben. Wirklich?")) return;
   }
@@ -4140,7 +4158,7 @@ async function bauVerlaufAngleichen() {
 
   const zeilen = ab.map(x => "   " + (x.nummer ? "Nr. " + x.nummer + "   " : "") +
     anbieterName(x.verlauf) + "   ->   " + anbieterName(x.karte)).join("\n");
-  if (!confirm("Im Verlauf steht bei " + ab.length + " Kombination(en) ein anderer Anbieter " +
+  if (!await nachfrage("Im Verlauf steht bei " + ab.length + " Kombination(en) ein anderer Anbieter " +
       "als auf der Karte im Bau:\n\n" + zeilen + "\n\n" +
       "Der Verlauf wird auf den Anbieter der Karte umgestellt - auf diesem Gerät und im " +
       "Konto der Person.\n\n" +
@@ -4172,7 +4190,7 @@ async function bauVerlaufAngleichen() {
   zeichne_();
 }
 
-function panelOffeneLoeschen() {
+async function panelOffeneLoeschen() {
   const z = liesZustand();
   if (!z || !z.scheine || !z.scheine.length) {
     meldung("Im Bau steht nichts, was man löschen könnte.", "warn"); return;
@@ -4205,7 +4223,7 @@ function panelOffeneLoeschen() {
     "- die Wetten werden wieder frei und beim nächsten Mischen neu verteilt\n\n" +
     "Löschen?";
 
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
 
   const raus = new Set(weg.map(s => s.id));
   z.scheine = z.scheine.filter(s => !raus.has(s.id));
@@ -4232,7 +4250,7 @@ function panelOffeneLoeschen() {
 // dieselbe Kombination geht beim naechsten Anbieter selten genauso durch.
 // Deshalb wird NEU gebaut, nicht kopiert. Die schon gesetzten bleiben
 // unberuehrt, das macht restNeuMischen ohnehin.
-function panelRestMischen() {
+async function panelRestMischen() {
   const p = panelZahlen();
   if (!p.unter.anzahl) { meldung("Es fehlt nirgends etwas.", "gut"); return; }
   const frage = "Bei " + p.unter.anzahl + " Kombination(en) fehlen zusammen " +
@@ -4240,7 +4258,7 @@ function panelRestMischen() {
     "Ich mische die noch nicht gesetzten Wetten neu, damit du das Geld anders " +
     "unterbringen kannst. Die schon gesetzten Kombinationen bleiben unberührt.\n\n" +
     "Neu mischen?";
-  if (!confirm(frage)) return;
+  if (!await nachfrage(frage)) return;
   restNeuMischen();
 }
 
@@ -4427,7 +4445,7 @@ function mischZielGeaendert() {
   if (kasten) kasten.innerHTML = mischGrenzenHtml(mischZielLesen());
 }
 
-function mischOhnePaare(kzWahl) {
+async function mischOhnePaare(kzWahl) {
   const e = einstellungenLesen();
   const z = liesZustand() || baueAlles();
   const gesetzt = gesetzteEintraege().filter(g => !g.unlesbar);
@@ -4467,7 +4485,7 @@ function mischOhnePaare(kzWahl) {
   if (!kz1) {
     const wahlText = kzMoeglich.map((kz, i) =>
       (i + 1) + " = " + anbieterName(kz) + " (" + topfJeKz[kz].size + " gesetzte Einsätze)").join("\n");
-    const a = prompt("Welchen Anbieter mischen?\n\nEs wird NUR dieser eine Topf gemischt - " +
+    const a = await eingabeFrage("Welchen Anbieter mischen?\n\nEs wird NUR dieser eine Topf gemischt - " +
       "die dort gesetzten Einsätze untereinander. Die anderen Anbieter bleiben, wie sie sind.\n\n" +
       wahlText + "\n\nNummer eingeben:", "1");
     if (a === null) return;
@@ -4506,7 +4524,7 @@ function mischOhnePaare(kzWahl) {
       "-mal (" + offenN + " unter dem Ziel)";
   }).join("\n  ");
   const gedeckelt = kzListe.filter(kz => ziel > maxJeKz[kz]);
-  if (!confirm("Kombis neu mischen bei " + anbieterName(kz1) +
+  if (!await nachfrage("Kombis neu mischen bei " + anbieterName(kz1) +
     " - KEIN Spiel-Paar je zweimal:\n\n" +
     "- Dein Ziel: jeder Einsatz insgesamt " + ziel + "-mal\n" +
     (gedeckelt.length
@@ -5004,7 +5022,7 @@ async function verlaufEintragLoeschen(dbId, zeit) {
   if (!e) { meldung("Diese Kombination steht nicht mehr im Verlauf.", "warn"); return; }
   const wer = personName(e.ordner);
 
-  if (!confirm(
+  if (!await nachfrage(
       "Diese Kombination aus dem Verlauf löschen?\n\n" +
       "   " + (e.nummer ? "Nr. " + e.nummer + "  " : "") + (e.anbieter || "?") +
       "  " + Number(e.einsatz).toFixed(2) + " Euro" +

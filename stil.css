@@ -6213,3 +6213,161 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   .ziehfeld { padding: 14px 10px; }
 }
 /* ==== ENDE SCHICHT ADMIN-POLITUR ==== */
+
+/* ==== SCHICHT ANBIETER-FARBEN (19.09.2026) ====
+   Karam: "Jeder einzelne Anbieter eine komplett eigene Farbe, die mit
+   dem Anbieter was zu tun hat - drei hatten gruen, das ist schlecht.
+   Und die Logos haben manchmal einen haesslichen Hintergrund."
+   EINE Palette fuer alles: Interwetten GELB, Bwin SCHWARZ, Bet365
+   GRUEN (der einzige), Stake BLAU, Admiral ROT, Betway PETROL,
+   Merkur Bets ORANGE. Das Logo sitzt auf einem weissen Plaettchen,
+   damit der gebackene Symbol-Hintergrund wie ein App-Symbol wirkt.
+   Loeschbar: darunter gelten wieder die alten Markenfarben. */
+@media screen {
+  :root {
+    --anb-iw: #f4c20d; --anb-bw: #1d1d1f; --anb-b3: #14805e;
+    --anb-st: #1475e1; --anb-ad: #d2222d; --anb-bt: #0e7c86;
+    --anb-mb: #f57c00;
+  }
+  .marke.mit-logo { color: #fff; }
+  .marke.mit-logo .anb-logo { background: #fff; padding: 2px; border-radius: 5px; }
+  .marke.mit-logo.m-iw { background: var(--anb-iw); border-color: #c79c00; color: #241f00; }
+  .marke.mit-logo.m-bw { background: var(--anb-bw); border-color: #000; color: #ffd400; }
+  .marke.mit-logo.m-b3 { background: var(--anb-b3); border-color: #0b5b42; }
+  .marke.mit-logo.m-st { background: var(--anb-st); border-color: #0d5ab1; }
+  .marke.mit-logo.m-ad { background: var(--anb-ad); border-color: #a01822; }
+  .marke.mit-logo.m-bt { background: var(--anb-bt); border-color: #0a5b62; }
+  .marke.mit-logo.m-mb { background: var(--anb-mb); border-color: #c56300; }
+  /* Auch die Marken OHNE Logo und die farbigen Kanten der Karten
+     folgen der neuen Palette - dieselbe Farbe an jeder Stelle. */
+  .m-iw { background: var(--anb-iw); color: #241f00; border-color: #c79c00; }
+  .m-bw { background: var(--anb-bw); color: #ffd400; border-color: #000; }
+  .m-b3 { background: var(--anb-b3); color: #fff; border-color: #0b5b42; }
+  .m-st { background: var(--anb-st); color: #fff; border-color: #0d5ab1; }
+  .m-ad { background: var(--anb-ad); color: #fff; border-color: #a01822; }
+  .m-bt { background: var(--anb-bt); color: #fff; border-color: #0a5b62; }
+  .m-mb { background: var(--anb-mb); color: #fff; border-color: #c56300; }
+  .schein:has(.s-kopf .m-iw):not(:has(.niedrigkopf)) { border-top-color: var(--anb-iw); }
+  .schein:has(.s-kopf .m-bw):not(:has(.niedrigkopf)) { border-top-color: var(--anb-bw); }
+  .schein:has(.s-kopf .m-b3):not(:has(.niedrigkopf)) { border-top-color: var(--anb-b3); }
+  .schein:has(.s-kopf .m-st):not(:has(.niedrigkopf)) { border-top-color: var(--anb-st); }
+  .schein:has(.s-kopf .m-ad):not(:has(.niedrigkopf)) { border-top-color: var(--anb-ad); }
+  .schein:has(.s-kopf .m-bt):not(:has(.niedrigkopf)) { border-top-color: var(--anb-bt); }
+  .schein:has(.s-kopf .m-mb):not(:has(.niedrigkopf)) { border-top-color: var(--anb-mb); }
+  .ak-karte.ak-iw { box-shadow: inset 0 4px 0 var(--anb-iw); }
+  .ak-karte.ak-bw { box-shadow: inset 0 4px 0 var(--anb-bw); }
+  .ak-karte.ak-b3 { box-shadow: inset 0 4px 0 var(--anb-b3); }
+  .ak-karte.ak-st { box-shadow: inset 0 4px 0 var(--anb-st); }
+  .ak-karte.ak-ad { box-shadow: inset 0 4px 0 var(--anb-ad); }
+  .ak-karte.ak-bt { box-shadow: inset 0 4px 0 var(--anb-bt); }
+  .ak-karte.ak-mb { box-shadow: inset 0 4px 0 var(--anb-mb); }
+}
+/* ==== ENDE SCHICHT ANBIETER-FARBEN ==== */
+
+/* ==== SCHICHT KONTRAST (19.09.2026) ====
+   Karam: "Macht den Kontrast besser, auch am Handy. Und die
+   Gesamtsummen-Zeile ein bisschen dunkler." Nur Farben und Staerken,
+   keine Anordnung. Loeschbar. */
+@media screen {
+  .mini { color: #39445e; }
+  .unter { color: #2c3550; }
+  th { color: #101827; }
+  button { border-color: #7c89a6; color: #17203a; }
+  input, select, textarea { border-color: #8a97b4; }
+  .ak-summe td {
+    background: #dde4f0; border-top: 2px solid #8ea3c8;
+    color: #101827;
+  }
+  #konto tfoot td { background: #dde4f0; }
+}
+/* ==== ENDE SCHICHT KONTRAST ==== */
+
+/* ==== SCHICHT HANDY-FEIN (19.09.2026) ====
+   Karam: "Beim Auswerten am Handy: die Personen-Suchleiste UNTER den
+   Personen, die allgemeine Suchleiste unter allen Filtern direkt ueber
+   den Kombis - wie am Laptop." Reine Reihenfolge per order, das
+   Zeichnen bleibt gleich. Loeschbar. */
+@media screen and (max-width: 700px) {
+  #aw_pgruppe { display: flex; flex-direction: column; }
+  #aw_pgruppe .aw-ftitel { order: 1; }
+  #aw_pgruppe .aw-fchips { order: 2; }
+  #aw_pgruppe .aw-psuchzeile { order: 3; margin-top: 8px; }
+  #aw_pgruppe .aw-pmehr { order: 4; }
+  .aw-reihe { display: flex; flex-direction: column; }
+  .aw-reihe > .aw-links { order: 1; }
+  .aw-reihe > .aw-filter { order: 2; }
+  .aw-reihe > .aw-suche { order: 3; }
+}
+/* ==== ENDE SCHICHT HANDY-FEIN ==== */
+
+/* ==== SCHICHT NACHFRAGE (19.09.2026) ====
+   Karam: "Ersetz die Browser-Pop-ups mit custom-made Pop-ups."
+   Nur die Optik der eigenen Nachfrage-Fenster (frage.js). Loeschbar -
+   dann sehen die Fenster ungestylt aus, funktionieren aber weiter. */
+@media screen {
+  .fr-schleier {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(16, 24, 39, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .fr-kasten {
+    background: #fff; color: #17203a;
+    border-radius: 12px; border: 1px solid #8ea3c8;
+    box-shadow: 0 18px 50px rgba(10, 16, 30, 0.35);
+    max-width: min(560px, 94vw); width: 100%;
+    max-height: 86vh; overflow: auto;
+    padding: 18px 18px 14px;
+  }
+  .fr-titel { font-weight: 800; font-size: 17px; margin-bottom: 8px; }
+  .fr-text { white-space: pre-wrap; line-height: 1.45; font-size: 15px; }
+  .fr-feld { width: 100%; margin-top: 10px; padding: 9px 10px; font-size: 15px;
+    border: 1px solid #8a97b4; border-radius: 8px; box-sizing: border-box; }
+  .fr-tasten { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .fr-tasten button { min-height: 42px; padding: 8px 18px; font-size: 15px;
+    border-radius: 9px; cursor: pointer; }
+  .fr-ja { background: #1a2c50; color: #fff; border: 1px solid #101c36; font-weight: 700; }
+  .fr-nein { background: #eef1f7; color: #17203a; border: 1px solid #7c89a6; }
+}
+@media screen and (max-width: 700px) {
+  .fr-schleier { align-items: flex-end; padding: 0; }
+  .fr-kasten { border-radius: 14px 14px 0 0; max-width: 100%; }
+  .fr-tasten button { flex: 1 1 auto; }
+}
+/* ==== ENDE SCHICHT NACHFRAGE ==== */
+
+/* ==== SCHICHT HANDBUCH (19.09.2026) ====
+   Karam: "Erklaerungen und Handbuch zusammenfuegen, komplett
+   redesignen, viel geiler." Kapitel-Karten mit Springleiste oben.
+   Nur Optik der Handbuch-Seite. Loeschbar. */
+@media screen {
+  body[data-seite="hilfe"] .hb-nav {
+    position: sticky; top: 8px; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 10px 12px; margin: 12px 0 18px;
+    background: #1a2c50; border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(16, 24, 39, 0.25);
+  }
+  body[data-seite="hilfe"] .hb-nav a {
+    color: #fff; text-decoration: none; font-weight: 600; font-size: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 7px 12px; border-radius: 999px;
+  }
+  body[data-seite="hilfe"] .hb-nav a:hover { background: rgba(255, 255, 255, 0.25); }
+  body[data-seite="hilfe"] .hb-teil {
+    background: #fff; border: 1px solid #b9c4d8; border-radius: 14px;
+    padding: 18px 18px 12px; margin: 0 0 18px;
+    box-shadow: 0 2px 10px rgba(26, 44, 80, 0.07);
+    scroll-margin-top: 76px;
+  }
+  body[data-seite="hilfe"] .hb-teil > h2 {
+    margin-top: 0; padding-bottom: 8px; border-bottom: 3px solid #1a2c50;
+  }
+  body[data-seite="hilfe"] .hb-teil h3 { margin-top: 26px; }
+}
+@media screen and (max-width: 700px) {
+  body[data-seite="hilfe"] .hb-nav { position: static; padding: 8px; }
+  body[data-seite="hilfe"] .hb-teil { padding: 12px 12px 8px; }
+}
+/* ==== ENDE SCHICHT HANDBUCH ==== */
