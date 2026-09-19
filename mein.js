@@ -546,7 +546,10 @@ let fotoLaeuft = 0;
 function fotoBildHtml(s, extraKlasse) {
   const halter = (innen) => '<span class="fotoplatz" data-fotoid="' + s.id + '">' + innen + "</span>";
   if (s.foto && String(s.foto).startsWith("data:")) {
-    return halter('<img src="' + textSicherM(s.foto) + '" class="minifoto' +
+    // loading=lazy und decoding=async (19.09.2026, Karams "gute FPS"):
+    // Bilder ausserhalb des Bildes werden erst beim Scrollen geladen
+    // und blockieren das Zeichnen nicht.
+    return halter('<img src="' + textSicherM(s.foto) + '" loading="lazy" decoding="async" class="minifoto' +
       (extraKlasse ? " " + extraKlasse : "") + '" alt="Wettschein Nr. ' + (s.nummer || "") +
       '" title="Antippen macht das Bild groß">');
   }

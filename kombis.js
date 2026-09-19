@@ -1297,7 +1297,7 @@ function scheinHtml(s, z, gesetzt) {
     (foto ? (function () {
       const name = bild.name || "Wettschein";
       return '<div class="s-foto"><div class="fotoname">' + name + "</div>" +
-        '<img src="' + foto + '" alt="' + name + '">' +
+        '<img src="' + foto + '" loading="lazy" decoding="async" alt="' + name + '">' +
         '<div class="mini">' + (bild.ausDb
           ? "liegt in der Datenbank"
           : "hochgeladen " + (fotoZeit ? new Date(fotoZeit).toLocaleString("de-AT") : "")) +
@@ -3480,7 +3480,7 @@ function zeichneVerlauf() {
         textSicherK2(t.spiel) + " (" + textSicherK2(t.linie) + ")").join("<br>") +
       (foto ? '<div class="fotoname mini">' +
         (localStorage.getItem(fotoSchluessel(x.scheinId) + "_name") || "") + "</div>" +
-        '<div><img src="' + foto + '" class="minifoto"></div>' : "") + "</td>" +
+        '<div><img src="' + foto + '" loading="lazy" decoding="async" class="minifoto"></div>' : "") + "</td>" +
       "<td><b>" + x.quote.toFixed(2) + "</b></td><td>" + x.einsatz.toFixed(2) + " &euro;</td>" +
       "<td>" + x.moeglich.toFixed(2) + " &euro;</td>" +
       "<td><select onchange='standAendern(" + i + ", this.value)'>" +

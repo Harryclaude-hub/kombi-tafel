@@ -1,5 +1,5 @@
 # UEBERGABE Kombi-Tafel
-Stand: 19.09.2026 spät, Fassung `20260919c`, alles gepusht, 36 Test-Suiten grün.
+Stand: 19.09.2026 spät, Fassung `20260919d`, alles gepusht, 36 Test-Suiten grün.
 
 Das hier ist die **Startseite** jeder neuen Sitzung. Die Tiefe steckt in zwei Detail-Dateien:
 - **[UEBERGABE-GRUNDLAGEN.md](UEBERGABE-GRUNDLAGEN.md)** - die Grundlagen (Rechenregeln, Dateien, Datenbank, Karams Regeln; Stand 11.09.). Lesen, wenn du das Projekt nicht kennst.
@@ -38,6 +38,7 @@ Das **Auswerten** ist der eine Bearbeitungsort: grün/rot/**orange** (nicht zur 
 - Fassungsnummer nie von Hand: **immer** `node naechste-fassung.js --setzen`, dann committen UND pushen - nach jedem fertigen Stück.
 
 ## 6. Bekannte Fallen
+Neu vom 19.09. spät (Karams iPhone-Bild, Winz-Seite): **ein Flex-Kind hat min-width:auto** - macht man einen Kasten mit einem quer laufenden Chip-Streifen zur Flex-Spalte, wächst er auf die volle Streifenbreite (1739 px nachgemessen) und das iPhone schrumpft die GANZE Seite (Schicht HANDY-GROSS zügelt das mit min-width:0/max-width:100%); Scroll-Tempo: Schicht TEMPO (`content-visibility: auto` auf Karten, am Handy auch Tabellenzeilen - am Desktop NICHT auf echte Tabellenzeilen, das verstellt Spaltenbreiten) plus `loading="lazy" decoding="async"` an allen Schein-Bildern.
 Neu vom 19.09.: ein `schneide`-bis-Anker „function X" trifft auch „async function X" und lässt dann ein nacktes `async` am Schnittende stehen; das MCP-Werkzeug deploy_edge_function nimmt `files` weiterhin nur als Text an (ZodError, wie 05.09.); ein Spalten-REVOKE zieht NICHTS von einem Tabellen-GRANT ab (erst Tabellenrecht weg, dann Spalten einzeln zurückgeben, mit has_column_privilege nachmessen); wer eine synchrone Funktion mit Nachfrage auf `await nachfrage` umstellt, muss JEDEN Aufrufer prüfen (node --check findet vergessene async-Köpfe).
 Die vollständigen Listen stehen in den zwei Detail-Dateien. Die teuersten in Kürze: die **0-Zeilen-Falle** (jedes Supabase-Schreiben braucht `.select()` UND die `r.data.length`-Prüfung); `ebZeitPasst` filtert in seiner ersten Zeile `ebNurOffen` mit; ein `localStorage`-Schlüssel mit Altwert macht neue Vorgaben unsichtbar (neuen Schlüssel nehmen und übersetzen); Handy-Spaltenregeln hängen an `nth-child` (Spalte einschieben = Regeln nachziehen); ein verdecktes Vorschau-Fenster liefert leere Screenshots und Viewport 0 (mit `getBoundingClientRect`/`getComputedStyle` messen); Unteragenten können am Sitzungs-Limit sterben, der Hauptlauf nicht; alte Tests halten altes Verhalten fest - rote Anker nach Kehrtwenden sind nachzuziehen, nicht der Code.
 

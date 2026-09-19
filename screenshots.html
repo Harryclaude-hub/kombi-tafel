@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Kombis aus Screenshots</title>
-<link rel="stylesheet" href="stil.css?v=20260919c">
+<link rel="stylesheet" href="stil.css?v=20260919d">
 <link rel="icon" href="logo.svg">
 </head>
 <body>
@@ -26,9 +26,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="krypto.js?v=20260919c"></script>
-<script src="bildlager.js?v=20260919c"></script>
-<script src="supa.js?v=20260919c"></script>
+<script src="krypto.js?v=20260919d"></script>
+<script src="bildlager.js?v=20260919d"></script>
+<script src="supa.js?v=20260919d"></script>
 <script>
 "use strict";
 // Reine ANZEIGE-Seite (Karam, 19.09.2026): "ein Button, alle Kombis aus
@@ -115,7 +115,7 @@ async function alleHolen() {
       (d.anbieterId ? " &middot; Anbieter-ID <b>" + sicherS(d.anbieterId) + "</b>" : "") +
       (d.notiz ? " &middot; Notiz: " + sicherS(d.notiz) : "") + "</div>" +
       '<div class="s-foto" id="ssf_' + sicherS(s.id) + '">' +
-      (s.foto ? '<img src="' + sicherS(s.foto) + '" alt="Screenshot">'
+      (s.foto ? '<img src="' + sicherS(s.foto) + '" loading="lazy" decoding="async" alt="Screenshot">'
         : (s.fotoDa ? '<span class="mini">Bild lädt...</span>' : '<span class="mini">ohne Bild</span>')) +
       "</div></div>";
   }
@@ -138,7 +138,7 @@ async function bilderNachladen() {
           laeuft--;
           const ziel = document.getElementById("ssf_" + s.id);
           if (ziel) {
-            if (r && r.foto) ziel.innerHTML = '<img src="' + sicherS(r.foto) + '" alt="Screenshot">';
+            if (r && r.foto) ziel.innerHTML = '<img src="' + sicherS(r.foto) + '" loading="lazy" decoding="async" alt="Screenshot">';
             else if (r && r.unlesbar) ziel.innerHTML = '<span class="mini">Bild nicht lesbar (Schlüssel)</span>';
             else if (r && r.fehler) ziel.innerHTML = '<span class="mini">Bild nicht geladen: ' + sicherS(r.fehler) + "</span>";
             else ziel.innerHTML = '<span class="mini">ohne Bild</span>';

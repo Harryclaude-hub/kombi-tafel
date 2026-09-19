@@ -6371,3 +6371,74 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   body[data-seite="hilfe"] .hb-teil { padding: 12px 12px 8px; }
 }
 /* ==== ENDE SCHICHT HANDBUCH ==== */
+
+/* ==== SCHICHT HANDY-GROSS (19.09.2026, zweiter Anlauf) ====
+   Karam (mit iPhone-Bild): "Das muss wirklich viel, viel groesser
+   sein, so qualitativ wie die Desktop-Version. Buttons muessen
+   herausstechen, mit passendem Abstand, nicht so klein."
+   URSACHE des Winz-Bildes (nachgemessen): die HANDY-FEIN-Schicht
+   machte #aw_pgruppe zur Flex-Spalte, und Flex-Kinder haben
+   min-width:auto - der Personen-Streifen wurde 1739 px breit, das
+   iPhone schrumpfte die GANZE Seite darauf. Deshalb zuerst die
+   Breiten-Zuegel, dann die Groessen. Loeschbar. */
+@media screen and (max-width: 700px) {
+  /* 1. Kein Element darf die Seite breiter machen als das Handy. */
+  body { overflow-x: clip; }
+  .aw-reihe, .aw-reihe > *, .aw-filter, .aw-fgruppe, #aw_pgruppe,
+  #aw_pgruppe > *, .aw-fchips, .aw-zeiten, .aw-kopf, #auswerten {
+    min-width: 0; max-width: 100%;
+  }
+  .aw-fchips, .aw-zeiten { overflow-x: auto; }
+
+  /* 2. Alles eine Nummer groesser, wie am Laptop. */
+  body { font-size: 16px; line-height: 1.45; }
+  .mini { font-size: 13.5px; }
+  h2 { font-size: 21px; }
+  h3, h4 { font-size: 18px; }
+  input, select, textarea { font-size: 16px; min-height: 42px; }
+
+  /* 3. Knoepfe: Daumen-Hoehe, klare Abstaende, deutliche Kanten. */
+  button { min-height: 44px; padding: 9px 14px; font-size: 15.5px;
+    border-radius: 10px; border-width: 1.5px; }
+  .aw-chip { min-height: 40px; padding: 8px 13px; font-size: 14.5px; }
+  .aw-zeit { min-height: 44px; font-size: 14.5px; }
+  /* kleine Innen-Knoepfe duerfen kleiner bleiben */
+  .aw-psuchweg, .ob-stift, .knopfweg, .lm-frisch { min-height: 36px; padding: 6px 10px; }
+  /* Die grossen Karten-Knoepfe (aufgegangen / nicht / weniger / Stift)
+     stehen mit Luft untereinander und stechen heraus. */
+  #auswerten .schein button { display: block; width: 100%; margin: 7px 0;
+    min-height: 48px; font-size: 16px; font-weight: 700; }
+  #auswerten .schein .aw-gruen { border: 2px solid #0a7d3e; }
+  #auswerten .schein .aw-rot { border: 2px solid #a00000; }
+  /* Block-Wahl (Auswerten / Kombinationen / Screenshot / Buchhaltung) */
+  #mb_navi button { min-height: 48px; font-size: 15.5px; }
+
+  /* 4. Kacheln und Anbieter-Kopf lesbar gross. */
+  .aw-kachel .aw-kw { font-size: 19px; }
+  .aw-kachel .aw-kt { font-size: 12.5px; }
+  .ak-karte { min-height: 74px; }
+  .ak-karte .ak-name { font-size: 15px; }
+  .ak-karte .ak-zeile { font-size: 13px; }
+}
+/* ==== ENDE SCHICHT HANDY-GROSS ==== */
+
+/* ==== SCHICHT TEMPO (19.09.2026) ====
+   Karam: "Die Scroll-Animation ist langsamer geworden - es muss mit
+   guten FPS scrollen." Karten ausserhalb des Bildes werden nicht
+   gezeichnet (content-visibility), der Platz bleibt reserviert, damit
+   die Rolle nicht springt. Zusammen mit loading=lazy an den Bildern.
+   Loeschbar - dann wird wieder alles sofort gezeichnet. */
+@media screen {
+  #auswerten .schein, .ob-karte {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 280px;
+  }
+  .ob-karte { contain-intrinsic-size: auto 150px; }
+}
+/* Tabellenzeilen nur am Handy (dort sind sie Bloecke, keine echten
+   Tabellenzeilen - am Desktop wuerde content-visibility die
+   Spaltenbreiten verstellen). */
+@media screen and (max-width: 700px) {
+  #scheine_db tbody tr { content-visibility: auto; contain-intrinsic-size: auto 140px; }
+}
+/* ==== ENDE SCHICHT TEMPO ==== */
