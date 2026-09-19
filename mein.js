@@ -1493,20 +1493,19 @@ function zeichneOrdnerBox(scheine) {
           '<button class="ob-name" onclick="tuOrdnerFilter(\'' + o.id + '\')" ' +
             'title="Alles von ' + textSicherM(o.name) + ' ansehen">' + textSicherM(o.name) + "</button>" +
         "</div>" +
-        // Karam (19.09.2026, Nacht): "Bei jeder Person jeder Anbieter,
-        // der Geld drauf hat - Anbieter und Betrag; wenn null, nicht
-        // da. Und immer dabei, wann zuletzt aktualisiert wurde."
-        // Betrag = der von Hand gepflegte Kontostand (konto_stand),
-        // NICHT die gerechnete Buchhaltung.
-        obStaendeHtml(p) +
-        '<div class="ob-zahlen">' +
-          '<span><span class="ob-t" title="Geld, das diese Person übergeben hat - es liegt dann auf einem Zahlungsweg (PayPal, Paysafe, Neteller, Skrill).">Erhalten</span><b>' + p.erhaltengesamt.toFixed(2) + "</b></span>" +
+        // Karam (20.09.2026, Nacht): "Eingezahlt ganz oben links,
+        // rechts davon der Kontostand, drunter der Gewinn. Erhalten
+        // brauche ich nicht mehr. Und in der weissen Flaeche ein
+        // Gitter der Anbieter, die gerade Geld drauf haben."
+        // Kontostand = Summe der von Hand gepflegten Staende
+        // (konto_stand) - NICHT die gerechnete Buchhaltung.
+        '<div class="ob-zahlen ob-oben">' +
           '<span><span class="ob-t" title="Geld, das von den Zahlungswegen ZU Wettanbietern eingezahlt wurde - samt von Hand nachgetragenen Einzahlungen.">Eingezahlt</span><b>' + p.eingesamt.toFixed(2) + "</b></span>" +
-          '<span><span class="ob-t">Kombis</span><b>' + n + "</b></span>" +
-          '<span><span class="ob-t">Einsatz</span><b>' + personEinsatz(o.id, scheine).toFixed(2) + "</b></span>" +
-          '<span><span class="ob-t">Gewinn</span><b class="' + (gewinn >= 0 ? "e-gew" : "e-ver") +
+          '<span><span class="ob-t" title="Summe deiner von Hand eingetragenen Kontostände bei allen Anbietern.">Kontostand</span><b>' + obKontoSumme(p) + "</b></span>" +
+          '<span class="ob-gewinn"><span class="ob-t" title="Aus den entschiedenen Kombinationen dieser Person gerechnet (Auswerten).">Gewinn</span><b class="' + (gewinn >= 0 ? "e-gew" : "e-ver") +
             '">' + gewinn.toFixed(2) + "</b></span>" +
         "</div>" +
+        obStaendeHtml(p, scheine.filter(s => s.ordner === o.id)) +
         '<div class="ob-marken">' +
           (wartend[o.id] ? '<span class="fertigbadge">' + wartend[o.id] + " fertig</span>" : "") +
           (fehler ? '<span class="warnbadge">&#9888; ' + fehler + " Rechenfehler</span>" : "") +
@@ -2717,24 +2716,57 @@ function zeile2(titel, wert) {
   return "<tr><td>" + titel + "</td><td><b>" + wert.toFixed(2) + " &euro;</b></td></tr>";
 }
 
-// Die Hand-Kontostaende einer Person als kleine Chips (Karam, 19.09.
-// Nacht): jeder Anbieter mit Geld drauf, dazu wann zuletzt gepflegt
-// (letzte Einzahlung ODER letzter Kontostand). Null oder nie
-// eingetragen = kein Chip; ganz ohne Pflege bleibt die Zeile weg.
-function obStaendeHtml(p) {
-  const chips = [];
-  let pflege = "";
-  for (const [kz, nameA] of KASSE_ANBIETER) {
+// Die Summe der Hand-Kontostaende einer Person, als Text.
+// Noch nie etwas eingetragen: ein ehrlicher Strich statt 0.00.
+function obKontoSumme(p) {
+  let summe = 0, hat = false;
+  for (const [kz] of KASSE_ANBIETER) {
     const a = p.anbieter[kz];
-    if (a.kontoStand !== undefined && a.kontoStand > 0.004) {
-      chips.push('<span class="ob-stand ob-stand-' + kz + '"><b>' + textSicherM(nameA) +
-        "</b> " + a.kontoStand.toFixed(2) + " &euro;</span>");
-    }
-    if ((a.pflegeWann || "") > pflege) pflege = a.pflegeWann || "";
+    if (a.kontoStand !== undefined && a.kontoStand !== null) { summe += a.kontoStand; hat = true; }
   }
-  if (!chips.length && !pflege) return "";
-  return '<div class="ob-staende">' + chips.join("") +
-    (pflege ? '<span class="mini ob-pflege">zuletzt aktualisiert ' + zeitM(pflege) + "</span>" : "") +
+  return hat ? summe.toFixed(2) : "-";
+}
+
+// Das Anbieter-Gitter auf der Personen-Karte (Karam, 20.09.2026 Nacht):
+// "In der weissen Flaeche die Anbieter, die gerade Geld drauf haben -
+// Anbieter, aktueller Kontostand, aktueller Gewinn, und rechts wie
+// viele Kombis laufen, wie viele auszuwerten sind und wie viele schon
+// fertig. Hoechstens fuenf." Kontostand ist der Hand-Wert; Gewinn und
+// die Zaehler kommen je Anbieter aus den Kombinationen der Person.
+// Mehr als fuenf: die groessten Staende zuerst, der Rest steht als
+// "+N weitere" dabei - nichts verschwindet still. Darunter, wann
+// zuletzt gepflegt wurde (Einzahlung oder Kontostand).
+function obStaendeHtml(p, meine) {
+  const habenGeld = KASSE_ANBIETER
+    .filter(([kz]) => p.anbieter[kz].kontoStand !== undefined && p.anbieter[kz].kontoStand > 0.004)
+    .sort((x, y) => p.anbieter[y[0]].kontoStand - p.anbieter[x[0]].kontoStand);
+  let pflege = "";
+  for (const [kz] of KASSE_ANBIETER) {
+    if ((p.anbieter[kz].pflegeWann || "") > pflege) pflege = p.anbieter[kz].pflegeWann || "";
+  }
+  if (!habenGeld.length && !pflege) return "";
+  const zeilen = habenGeld.slice(0, 5).map(([kz, nameA]) => {
+    let gewinnKz = 0, laeuft = 0, auswerten = 0, fertig = 0;
+    for (const s of (meine || [])) {
+      if (!s.daten || s.daten.kz !== kz) continue;
+      if (s.stand === "gewonnen") { fertig++; gewinnKz += echtZurueckWert(s) - (s.daten.einsatz || 0); }
+      else if (s.stand === "verloren") { fertig++; gewinnKz -= (s.daten.einsatz || 0); }
+      else if (s.stand === "offen") { if (scheinWartet(s)) auswerten++; else laeuft++; }
+    }
+    return '<div class="ob-gz ob-gz-' + kz + '">' +
+      '<span class="ob-gz-name">' + textSicherM(nameA) + "</span>" +
+      '<span class="ob-gz-stand">' + p.anbieter[kz].kontoStand.toFixed(2) + " &euro;</span>" +
+      '<span class="ob-gz-gewinn ' + (gewinnKz >= 0 ? "e-gew" : "e-ver") + '">' +
+        (gewinnKz >= 0 ? "+" : "") + gewinnKz.toFixed(2) + "</span>" +
+      '<span class="ob-gz-zahl" title="laufen noch (Anstoß nicht vorbei)">&#9654; ' + laeuft + "</span>" +
+      '<span class="ob-gz-zahl ob-gz-warte" title="fertig - warten auf dein Ergebnis">&#8987; ' + auswerten + "</span>" +
+      '<span class="ob-gz-zahl" title="schon ausgewertet (gewonnen oder verloren)">&#10003; ' + fertig + "</span>" +
+      "</div>";
+  });
+  return '<div class="ob-gitter">' + zeilen.join("") +
+    (habenGeld.length > 5 ? '<div class="mini">+' + (habenGeld.length - 5) +
+      " weitere Anbieter mit Geld - alle stehen in der Personen-Kasse.</div>" : "") +
+    (pflege ? '<div class="mini ob-pflege">zuletzt aktualisiert ' + zeitM(pflege) + "</div>" : "") +
     "</div>";
 }
 
