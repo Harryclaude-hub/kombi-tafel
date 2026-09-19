@@ -225,18 +225,45 @@ function awSuchText(s) {
 
 // Mehrere Woerter sind eine UND-Suche: "girona palmas" findet die Partie,
 // auch wenn dazwischen noch etwas steht.
-function awSuchWorte() {
-  const q = awHart(awSuche);
-  return q ? q.split(" ").filter(Boolean) : [];
+// Karam (19.09.2026): "In der Suchleiste muss auch erkannt werden, wenn
+// ich eine Quote eingebe - nur die Gesamtquote jeder Kombi, nicht die
+// Einzelquoten." Ein Suchwort MIT Komma oder Punkt zwischen Ziffern ist
+// deshalb eine QUOTEN-Suche: "6,5" findet 6.50 bis 6.59, "6,53" genau
+// 6.53 (Komma und Punkt sind gleich). Ganze Zahlen bleiben normale
+// Textsuche (Nummern, Anbieter-IDs). Die Zerlegung passiert VOR dem
+// Verhaerten, weil awHart Satzzeichen zu Leerzeichen macht und aus
+// "6,53" sonst die zwei Woerter "6" und "53" wuerden.
+function awSuchTeile() {
+  const roh = String(awSuche || "");
+  const quoten = [];
+  const rest = roh.replace(/(^|\s)(\d+[.,]\d+)(?=\s|$)/g, (alles, vor, zahl) => {
+    quoten.push(zahl.replace(",", "."));
+    return vor;
+  });
+  const q = awHart(rest);
+  return { worte: q ? q.split(" ").filter(Boolean) : [], quoten: quoten };
 }
 
-function awPasstZurSuche(s, worte) {
-  if (!worte.length) return true;
+// Nur die Text-Woerter (fuer die Bein-Markierung auf der Karte).
+function awSuchWorte() {
+  return awSuchTeile().worte;
+}
+
+function awPasstZurSuche(s, teile) {
+  // Alte Aufrufer geben ein blosses Woerter-Feld herein - beides geht.
+  const worte = Array.isArray(teile) ? teile : (teile.worte || []);
+  const quoten = Array.isArray(teile) ? [] : (teile.quoten || []);
+  if (!worte.length && !quoten.length) return true;
   // Eine nicht lesbare Kombination hat keinen Text, der treffen koennte.
   // Sie wird deshalb NIE weggesucht, sondern bleibt als sichtbarer Rest
   // stehen - sonst faellt ihr Einsatz aus Umsatz und Gewinn heraus und
   // die Kacheln zeigten zu wenig Geld, ohne es zu sagen.
   if ((s.daten || {}).gesperrt) return true;
+  if (quoten.length) {
+    const q = Number((s.daten || {}).quote);
+    const qText = isFinite(q) ? q.toFixed(2) : "";
+    if (!quoten.every(z => qText.indexOf(z) === 0)) return false;
+  }
   const text = awSuchText(s);
   return worte.every(w => text.indexOf(w) > -1);
 }
@@ -418,7 +445,7 @@ function awGefiltert(imZeitraum) {
   // Kombinationen stehen - eine Geldzahl, die zu nichts gehoert.
   // Eine Stufe hoeher (awImZeitraum) sprangen die Personen- und
   // Anbieter-Chips bei jedem Tastendruck in Anzahl und Reihenfolge.
-  const worte = awSuchWorte();
+  const worte = awSuchTeile();
   // Die Basis darf hereingereicht werden: beim Tippen wuerde sonst jede
   // Stufe denselben Zeitraum viermal neu rechnen (10.000 mal new Date).
   const r = (imZeitraum || awImZeitraum()).filter(s => {
@@ -556,7 +583,7 @@ function awSucheHtml(gefiltert) {
         'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
         // Kurz genug fuers Handy - der alte Beispiel-Satz wurde dort
         // abgeschnitten (Karams Bild vom 18.09.).
-        'placeholder="z. B. Girona, Besiktas, oder die Nr." ' +
+        'placeholder="z. B. Girona, die Quote 6,53 oder die Nr." ' +
         'value="' + textSicherM(awSuche) + '" oninput="awSuchen(this.value)">' +
       '<button id="aw_suchweg" onclick="awSucheWeg()"' + (awSuche ? "" : " hidden") +
         ">Suche löschen</button>" +
@@ -571,7 +598,8 @@ function awSuchStandHtml(gefiltert, imZ) {
   if (!awSuche.trim()) {
     // EIN Satz statt vier - am Handy frass der alte Absatz einen halben
     // Schirm (Karam, 18.09.).
-    return "Findet Spiele, Linie, Anbieter, <b>Anbieter-ID</b>, Nummer und Person - " +
+    return "Findet Spiele, Linie, Anbieter, <b>Anbieter-ID</b>, Nummer, Person und die " +
+      "<b>Gesamtquote</b> (mit Komma tippen: <b>6,53</b>; 6,5 findet 6,50 bis 6,59) - " +
       "mehrere Wörter müssen alle vorkommen, Umlaute und Groß/Klein sind egal.";
   }
   const imZeitraum = imZ || awImZeitraum();

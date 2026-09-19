@@ -1,5 +1,5 @@
 # UEBERGABE Kombi-Tafel
-Stand: 19.09.2026 spät, Fassung `20260919d`, alles gepusht, 36 Test-Suiten grün.
+Stand: 19.09.2026 spät, Fassung `20260919e`, alles gepusht, 36 Test-Suiten grün. Dazu: Suche versteht die **Gesamtquote** (Suchwort mit Komma/Punkt, awSuchTeile), die Tempo-Schicht greift jetzt wirklich im Auswerten (die Karten heißen `aw-karte`, nicht `schein` - Falle!), und die Anbieter-Logos im Kopf liegen auf dem weißen Plättchen mit Palette-Rahmen (Schichten TEMPO-NACHSCHLAG und KOPF-LOGOS).
 
 Das hier ist die **Startseite** jeder neuen Sitzung. Die Tiefe steckt in zwei Detail-Dateien:
 - **[UEBERGABE-GRUNDLAGEN.md](UEBERGABE-GRUNDLAGEN.md)** - die Grundlagen (Rechenregeln, Dateien, Datenbank, Karams Regeln; Stand 11.09.). Lesen, wenn du das Projekt nicht kennst.

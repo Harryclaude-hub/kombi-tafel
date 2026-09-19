@@ -6442,3 +6442,58 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   #scheine_db tbody tr { content-visibility: auto; contain-intrinsic-size: auto 140px; }
 }
 /* ==== ENDE SCHICHT TEMPO ==== */
+
+/* ==== SCHICHT TEMPO-NACHSCHLAG (19.09.2026, spaeter Abend) ====
+   Karam: "Ich will, dass das Scrollen wirklich fluessiger geht, mit
+   viel mehr Frames." Fund beim Nachmessen: die Auswert-Karten heissen
+   aw-karte, nicht schein - die erste Tempo-Schicht griff im Auswerten
+   also gar nicht. Jetzt bekommen ALLE grossen Karten-Listen
+   content-visibility. Loeschbar. */
+@media screen {
+  #auswerten .aw-karte, .schein, .ob-karte, .pl-karte {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
+  }
+}
+@media screen and (max-width: 700px) {
+  #eigenbau tbody tr { content-visibility: auto; contain-intrinsic-size: auto 90px; }
+}
+/* ==== ENDE SCHICHT TEMPO-NACHSCHLAG ==== */
+
+/* ==== SCHICHT KOPF-LOGOS (19.09.2026, spaeter Abend) ====
+   Karam: "Ganz oben im Anbieter-Kopf hat das Logo noch den komischen
+   Hintergrund - unten ist es mit der Farbe richtig perfekt." Also
+   bekommt das Kopf-Logo dasselbe weisse Plaettchen wie unten, und
+   Rahmen und Namen folgen der neuen Palette. Loeschbar. */
+@media screen {
+  body[data-seite="mein"] .ak-karte .ak-name::before {
+    background-color: #fff;
+    border: 1px solid #c3ccd9;
+    border-radius: 6px;
+    background-size: 80%;
+    background-repeat: no-repeat;
+    background-position: center;
+    color: transparent;
+  }
+  .ak-karte.ak-iw { border-color: #c79c00; } .ak-iw .ak-name { color: #8a6400; }
+  .ak-karte.ak-bw { border-color: #1d1d1f; } .ak-bw .ak-name { color: #1d1d1f; }
+  .ak-karte.ak-b3 { border-color: #14805e; } .ak-b3 .ak-name { color: #0b5b42; }
+  .ak-karte.ak-st { border-color: #1475e1; } .ak-st .ak-name { color: #0d5ab1; }
+  .ak-karte.ak-ad { border-color: #d2222d; } .ak-ad .ak-name { color: #a01822; }
+  .ak-karte.ak-bt { border-color: #0e7c86; } .ak-bt .ak-name { color: #0a5b62; }
+  .ak-karte.ak-mb { border-color: #f57c00; } .ak-mb .ak-name { color: #c56300; }
+
+  /* Auf Seiten ohne Logo-Plaettchen (Kombi-Bau-Panel) folgen auch die
+     Buchstaben-Marken der neuen Palette - sonst stuende dort noch das
+     alte Gruen neben den neuen Namen. */
+  .ak-st .ak-name::before { background: var(--anb-st); border-color: #0d5ab1; color: #fff; }
+  .ak-iw .ak-name::before { background: var(--anb-iw); border-color: #c79c00; color: #241f00; }
+  .ak-bw .ak-name::before { background: var(--anb-bw); border-color: #000; color: #ffd400; }
+  .ak-b3 .ak-name::before { background: var(--anb-b3); border-color: #0b5b42; color: #fff; }
+  .ak-ad .ak-name::before { background: var(--anb-ad); border-color: #a01822; color: #fff; }
+  .ak-bt .ak-name::before { background: var(--anb-bt); border-color: #0a5b62; color: #fff; }
+  .ak-mb .ak-name::before { background: var(--anb-mb); border-color: #c56300; color: #fff; }
+  /* und auf Mein Bereich gewinnt weiter das weisse Plaettchen oben */
+  body[data-seite="mein"] .ak-karte .ak-name::before { background-color: #fff; color: transparent; }
+}
+/* ==== ENDE SCHICHT KOPF-LOGOS ==== */
