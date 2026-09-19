@@ -6523,41 +6523,43 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
 }
 /* ==== ENDE SCHICHT KONTOSTAENDE ==== */
 
-/* ==== SCHICHT PERSONEN-GITTER (20.09.2026, Nacht) ====
+/* ==== SCHICHT PERSONEN-GITTER (20.09.2026, Nacht; Tabelle am
+   fruehen Morgen) ====
    Karam: "Eingezahlt oben links, rechts der Kontostand, drunter der
-   Gewinn - und in der weissen Flaeche ein Gitter der Anbieter mit
-   Geld drauf: Kontostand, Gewinn, wie viele laufen, auszuwerten,
-   fertig. Klein, aber nicht zu klein." Ersetzt die Chip-Schicht
-   KONTOSTAENDE (deren Regeln haengen ohne .ob-staende in der Luft).
-   Loeschbar. */
+   Gewinn - und die Anbieter als TABELLE: die Symbole oben im Kopf,
+   die Zeilen nur mit einem Strich getrennt, nicht jede als eigener
+   Kasten - das nimmt zu viel Platz." Loeschbar. */
 @media screen {
   .ob-zahlen.ob-oben { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
   .ob-zahlen.ob-oben .ob-gewinn { grid-column: 1 / -1; }
-  .ob-gitter { margin: 6px 0 4px; display: flex; flex-direction: column; gap: 4px; }
-  .ob-gz {
-    display: grid;
-    grid-template-columns: minmax(60px, 1fr) auto auto auto auto auto;
-    gap: 7px; align-items: center;
-    font-size: 12.5px; line-height: 1.3;
-    background: #f4f6fb; border: 1px solid #b9c4d8; border-left-width: 4px;
-    border-radius: 8px; padding: 4px 8px;
+  .ob-gitter { margin: 6px 0 4px; }
+  .ob-gtafel { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.35; }
+  .ob-gtafel th {
+    font-weight: 600; color: #39445e; text-align: right;
+    padding: 2px 4px; border-bottom: 2px solid #8ea3c8; background: none;
   }
-  .ob-gz-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ob-gz-stand { font-weight: 800; white-space: nowrap; }
-  .ob-gz-gewinn { white-space: nowrap; }
-  .ob-gz-zahl { color: #39445e; white-space: nowrap; }
+  .ob-gtafel th:first-child { text-align: left; }
+  .ob-gtafel td { padding: 3px 4px; text-align: right; border-bottom: 1px solid #ccd3e0; background: none; }
+  .ob-gtafel tbody tr { background: none; }
+  .ob-gtafel td.ob-gz-name {
+    text-align: left; font-weight: 700; border-left: 4px solid #b9c4d8;
+    padding-left: 7px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 110px;
+  }
+  .ob-gtafel .ob-gz-stand { font-weight: 800; white-space: nowrap; }
   .ob-gz-warte { color: #a00000; font-weight: 700; }
-  .ob-gz-iw { border-left-color: var(--anb-iw); }
-  .ob-gz-bw { border-left-color: var(--anb-bw); }
-  .ob-gz-b3 { border-left-color: var(--anb-b3); }
-  .ob-gz-st { border-left-color: var(--anb-st); }
-  .ob-gz-ad { border-left-color: var(--anb-ad); }
-  .ob-gz-bt { border-left-color: var(--anb-bt); }
-  .ob-gz-mb { border-left-color: var(--anb-mb); }
+  .ob-gz-iw td.ob-gz-name { border-left-color: var(--anb-iw); }
+  .ob-gz-bw td.ob-gz-name { border-left-color: var(--anb-bw); }
+  .ob-gz-b3 td.ob-gz-name { border-left-color: var(--anb-b3); }
+  .ob-gz-st td.ob-gz-name { border-left-color: var(--anb-st); }
+  .ob-gz-ad td.ob-gz-name { border-left-color: var(--anb-ad); }
+  .ob-gz-bt td.ob-gz-name { border-left-color: var(--anb-bt); }
+  .ob-gz-mb td.ob-gz-name { border-left-color: var(--anb-mb); }
   /* Die Karte darf dafuer hoeher reservieren (Tempo-Schicht). */
-  .ob-karte { contain-intrinsic-size: auto 250px; }
+  .ob-karte { contain-intrinsic-size: auto 240px; }
 }
 @media screen and (max-width: 700px) {
-  .ob-gz { font-size: 13.5px; padding: 6px 9px; }
+  .ob-gtafel { font-size: 13.5px; }
+  .ob-gtafel td { padding: 5px 4px; }
 }
 /* ==== ENDE SCHICHT PERSONEN-GITTER ==== */

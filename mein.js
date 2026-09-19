@@ -2658,37 +2658,14 @@ function zeichnePersonenKasse(scheine) {
     if (pkOffen && pkOffen.ordnerId === person.id && !pkOffen.scheinId) html += pkFormularHtml(person.id);
   }
 
-  // ---------- Neue Buchung ----------
-  if (schreib) {
-    // Dieselbe Rasterform wie die Personendaten: jedes Feld hat seine
-    // Beschriftung darueber und dieselbe Breite. Vorher standen sechs
-    // Eingaben ohne Beschriftung in einer Zeile hintereinander, und beim
-    // Umbrechen rutschte alles durcheinander.
-    html += '<div class="kassenformular"><h4>&#10133; Neue Buchung</h4>' +
-      '<div class="feldraster">' +
-      '<label class="feld"><span class="feld-titel">Datum</span>' +
-        '<input type="date" id="pk_datum" value="' + heuteDatum() + '"></label>' +
-      '<label class="feld"><span class="feld-titel">Zahlungsweg</span><select id="pk_weg">' +
-        KASSE_WEGE.map(w => "<option value='" + w[0] + "'>" + w[1] + "</option>").join("") +
-        "</select></label>" +
-      '<label class="feld"><span class="feld-titel">Was</span>' +
-        '<select id="pk_art" onchange="pkArtWechsel()">' +
-        KASSE_ARTEN.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") +
-        "</select></label>" +
-      '<label class="feld" id="pk_anbieter_feld" style="display:none">' +
-        '<span class="feld-titel">Anbieter</span><select id="pk_anbieter">' +
-        KASSE_ANBIETER.map(a => "<option value='" + a[0] + "'>" + a[1] + "</option>").join("") +
-        "</select></label>" +
-      '<label class="feld"><span class="feld-titel">Betrag (&euro;)</span>' +
-        '<input type="number" id="pk_betrag" step="0.01" min="0" placeholder="0,00"></label>' +
-      '<label class="feld"><span class="feld-titel">Notiz (freiwillig)</span>' +
-        '<input id="pk_notiz" placeholder="z. B. bar übergeben"></label>' +
-      "</div>" +
-      '<div class="feld-leiste">' +
-      '<button class="haupt" id="pk_knopf" onclick="tuPersonBuchen(\'' + person.id + '\')">Eintragen</button>' +
-      '<span class="mini">Tipp: <b>auf eigenes Konto ausgezahlt</b> heißt, das Geld verlässt das System - ' +
-      "es steht nicht mehr zum Wetten bereit, bleibt aber in der Rechnung sichtbar.</span></div></div>";
-  }
+  // ---------- Neue Buchung: Block entfernt ----------
+  // Karam (20.09.2026, frueher Morgen): "Neue Buchung brauche ich
+  // nicht, bitte einfach wegmachen. Ich will nur aktuellen Stand und
+  // wirklich eingezahlt hinzufuegen." Das Formular (Datum, Zahlungsweg,
+  // Was, Betrag, Notiz) stand hier bis Fassung 20260919g - im
+  // Git-Verlauf jederzeit zurueckholbar. Die Funktionen tuPersonBuchen
+  // und pkArtWechsel bleiben unangetastet stehen, nur ohne Aufrufer;
+  // alte Buchungen stehen weiter in der Buchungsliste darunter.
 
   // ---------- Buchungsliste ----------
   if (blockAn(zg, "buchungen")) {
@@ -2745,6 +2722,9 @@ function obStaendeHtml(p, meine) {
     if ((p.anbieter[kz].pflegeWann || "") > pflege) pflege = p.anbieter[kz].pflegeWann || "";
   }
   if (!habenGeld.length && !pflege) return "";
+  // Karam (20.09.2026, frueher Morgen): "Die Symbole sollen OBEN sein,
+  // wie eine Tabelle - und die Zeilen darunter nur mit einem Strich
+  // getrennt, nicht jede als eigener Kasten. Das nimmt zu viel Platz."
   const zeilen = habenGeld.slice(0, 5).map(([kz, nameA]) => {
     let gewinnKz = 0, laeuft = 0, auswerten = 0, fertig = 0;
     for (const s of (meine || [])) {
@@ -2753,17 +2733,24 @@ function obStaendeHtml(p, meine) {
       else if (s.stand === "verloren") { fertig++; gewinnKz -= (s.daten.einsatz || 0); }
       else if (s.stand === "offen") { if (scheinWartet(s)) auswerten++; else laeuft++; }
     }
-    return '<div class="ob-gz ob-gz-' + kz + '">' +
-      '<span class="ob-gz-name">' + textSicherM(nameA) + "</span>" +
-      '<span class="ob-gz-stand">' + p.anbieter[kz].kontoStand.toFixed(2) + " &euro;</span>" +
-      '<span class="ob-gz-gewinn ' + (gewinnKz >= 0 ? "e-gew" : "e-ver") + '">' +
-        (gewinnKz >= 0 ? "+" : "") + gewinnKz.toFixed(2) + "</span>" +
-      '<span class="ob-gz-zahl" title="laufen noch (Anstoß nicht vorbei)">&#9654; ' + laeuft + "</span>" +
-      '<span class="ob-gz-zahl ob-gz-warte" title="fertig - warten auf dein Ergebnis">&#8987; ' + auswerten + "</span>" +
-      '<span class="ob-gz-zahl" title="schon ausgewertet (gewonnen oder verloren)">&#10003; ' + fertig + "</span>" +
-      "</div>";
+    return '<tr class="ob-gz ob-gz-' + kz + '">' +
+      '<td class="ob-gz-name">' + textSicherM(nameA) + "</td>" +
+      '<td class="ob-gz-stand">' + p.anbieter[kz].kontoStand.toFixed(2) + "</td>" +
+      '<td class="ob-gz-gewinn ' + (gewinnKz >= 0 ? "e-gew" : "e-ver") + '">' +
+        (gewinnKz >= 0 ? "+" : "") + gewinnKz.toFixed(2) + "</td>" +
+      '<td class="ob-gz-zahl">' + laeuft + "</td>" +
+      '<td class="ob-gz-zahl ob-gz-warte">' + auswerten + "</td>" +
+      '<td class="ob-gz-zahl">' + fertig + "</td></tr>";
   });
-  return '<div class="ob-gitter">' + zeilen.join("") +
+  return '<div class="ob-gitter">' +
+    (zeilen.length
+      ? '<table class="ob-gtafel"><thead><tr>' +
+        "<th>Anbieter</th><th>Stand &euro;</th><th>Gewinn</th>" +
+        '<th title="laufen noch (Anstoß nicht vorbei)">&#9654;</th>' +
+        '<th title="fertig - warten auf dein Ergebnis">&#8987;</th>' +
+        '<th title="schon ausgewertet (gewonnen oder verloren)">&#10003;</th>' +
+        "</tr></thead><tbody>" + zeilen.join("") + "</tbody></table>"
+      : "") +
     (habenGeld.length > 5 ? '<div class="mini">+' + (habenGeld.length - 5) +
       " weitere Anbieter mit Geld - alle stehen in der Personen-Kasse.</div>" : "") +
     (pflege ? '<div class="mini ob-pflege">zuletzt aktualisiert ' + zeitM(pflege) + "</div>" : "") +
