@@ -2407,7 +2407,9 @@ function kasseZeit(d) { return wannText(d); }   // ein Format, siehe zeitM
 // raus. Der RECHENWEG bleibt unangetastet: personPruefen rechnet die
 // Wege weiter mit (alte Buchungen!), und die Statistik-Zeile "Liegt
 // noch auf den Zahlungswegen" zeigt die Summe weiter an.
-const KASSE_BLOECKE = [["daten", "Personendaten"], ["statistik", "Statistik"], ["fluss", "Geldfluss"],
+// "fluss" (Geldfluss-Karte) ist seit 20.09.2026 raus - Karam: "macht
+// wenig Sinn." Die Bewegungen stehen in der Buchungsliste.
+const KASSE_BLOECKE = [["daten", "Personendaten"], ["statistik", "Statistik"],
   ["anbieter", "Wettanbieter"],
   ["kombis", "Kombinationen"], ["buchungen", "Buchungsliste"]];
 
@@ -2574,24 +2576,16 @@ function zeichnePersonenKasse(scheine) {
   // ---------- Personendaten ----------
   if (blockAn(zg, "daten")) html += personDatenHtml(person, schreib);
 
-  // ---------- Statistik ----------
-  if (blockAn(zg, "statistik")) {
-    html += "<h4>&#128200; Statistik</h4><table><tbody>" +
-      zeile2("Von der Person erhalten (rein)", p.erhaltengesamt) +
-      zeile2("Auf eigenes Konto ausgezahlt (raus)", p.ausgezahlt) +
-      zeile2("Liegt noch auf den Zahlungswegen", p.aufWegen) +
-      zeile2("Liegt bei den Wettanbietern", p.beiAnbietern) +
-      zeile2("Steckt gerade in offenen Wetten", p.imSpiel) +
-      "<tr><td><b>Unterm Strich (Gewinn/Verlust)</b></td><td class='" +
-        (p.bilanz >= 0 ? "e-gew" : "e-ver") + "'><b>" + (p.bilanz >= 0 ? "+" : "") +
-        p.bilanz.toFixed(2) + " &euro;</b></td></tr>" +
-      "</tbody></table>";
-  }
+  // ---------- Statistik: steht seit dem 20.09.2026 UNTER den
+  // Wettanbietern (Karam: "die Statistik unter den Wettanbietern,
+  // wo ich alles setzen kann") und rechnet aus SEINEN zwei Zahlen.
 
-  // ---------- Geldfluss (Karte + Verlauf) ----------
-  if (blockAn(zg, "fluss")) {
-    html += "<h4>&#128260; Geldfluss</h4>" + geldflussHtml(p, zg) + geldflussVerlaufHtml(p, schreib);
-  }
+  // ---------- Geldfluss: Block entfernt ----------
+  // Karam (20.09.2026, frueher Morgen): "Diese Statistik Geldfluss
+  // macht wenig Sinn." Karte und Verlauf standen hier bis Fassung
+  // 20260919h (Git-Verlauf); geldflussHtml/geldflussVerlaufHtml
+  // stehen ohne Aufrufer. Die Bewegungen selbst stehen weiter in
+  // der Buchungsliste.
 
   // ---------- Zahlungswege: Block entfernt ----------
   // Karam (19.09.2026): "Die Zahlungswege entfernen, die brauchen wir
@@ -2643,6 +2637,35 @@ function zeichnePersonenKasse(scheine) {
     html += "</table>" + standErklaerung(schreib);
   }
 
+  {
+    // ---------- Statistik (Karam, 20.09.2026, frueher Morgen) ----------
+    // "Wirklich eingezahlt ist, was ich aus meiner eigenen Tasche
+    // eingezahlt habe. Aktueller Stand ist, was gerade auf dem
+    // Wettanbieter liegt. Das rechnet, ob ich Plus oder Minus bin -
+    // und es zeigt immer den letzten Stand an."
+    if (blockAn(zg, "statistik")) {
+      let standSumme = 0, standDa = false, pflege = "";
+      for (const [kz] of KASSE_ANBIETER) {
+        const a2 = p.anbieter[kz];
+        if (a2.kontoStand !== undefined && a2.kontoStand !== null) { standSumme += a2.kontoStand; standDa = true; }
+        if ((a2.pflegeWann || "") > pflege) pflege = a2.pflegeWann || "";
+      }
+      const bilanzHand = standDa ? standSumme - p.eingesamt : null;
+      html += "<h4>&#128200; Statistik</h4><table><tbody>" +
+        zeile2("Wirklich eingezahlt (aus eigener Tasche)", p.eingesamt) +
+        (standDa
+          ? zeile2("Aktueller Stand (alle Anbieter zusammen)", standSumme)
+          : "<tr><td>Aktueller Stand</td><td class='mini'>noch kein Kontostand eingetragen</td></tr>") +
+        (bilanzHand === null
+          ? "<tr><td><b>Plus oder Minus</b></td><td class='mini'>erst rechenbar, wenn ein Kontostand da ist</td></tr>"
+          : "<tr><td><b>Plus oder Minus (Stand minus eingezahlt)</b></td><td class='" +
+            (bilanzHand >= 0 ? "e-gew" : "e-ver") + "'><b>" + (bilanzHand >= 0 ? "+" : "") +
+            bilanzHand.toFixed(2) + " &euro;</b></td></tr>") +
+        "</tbody></table>" +
+        (pflege ? '<p class="mini">zuletzt aktualisiert ' + zeitM(pflege) + "</p>" : "");
+    }
+  }
+
   // ---------- Kombinationen ----------
   // Die Liste selbst steht NUR noch unten unter "Kombinationen" - Karam
   // sah jede Kombi doppelt (oben in der Kasse, unten in der Liste).
@@ -2670,7 +2693,13 @@ function zeichnePersonenKasse(scheine) {
   // ---------- Buchungsliste ----------
   if (blockAn(zg, "buchungen")) {
     if (p.buch.length) {
-      html += "<h4>&#128203; Alle Buchungen</h4><table><thead><tr><th>Datum</th><th>Zahlungsweg</th><th>Was</th>" +
+      html += "<h4>&#128203; Alle Buchungen</h4>" +
+        // Karam (20.09.2026): "Ich will einen Button, wo ich einfach
+        // alle Buchungen leeren kann." Mit doppelter Warnung - das
+        // loescht auch Eingezahlt und den Kontostand-Verlauf.
+        (schreib ? '<p><button class="knopfweg" onclick="tuAlleBuchungenWeg(\'' + person.id + '\')">' +
+          "&#128465; Alle " + p.buch.length + " Buchungen dieser Person löschen</button></p>" : "") +
+        "<table><thead><tr><th>Datum</th><th>Zahlungsweg</th><th>Was</th>" +
         "<th>Anbieter</th><th>Betrag</th><th>Notiz</th>" + (schreib ? "<th></th>" : "") + "</tr></thead><tbody>";
       for (const b of p.buch.slice().reverse()) {
         html += "<tr><td class='mini'>" + b.datum + "</td><td>" + wegName(b.weg) + "</td>" +
@@ -2691,6 +2720,33 @@ function zeichnePersonenKasse(scheine) {
 
 function zeile2(titel, wert) {
   return "<tr><td>" + titel + "</td><td><b>" + wert.toFixed(2) + " &euro;</b></td></tr>";
+}
+
+// Karam (20.09.2026, frueher Morgen): "Ein Button, wo ich einfach alle
+// Buchungen leeren kann." Endgueltig, deshalb doppelt deutlich gefragt.
+// Geloescht werden NUR die Personen-Buchungen dieser einen Person -
+// Kombinationen, Fotos und alles andere bleiben unberuehrt.
+async function tuAlleBuchungenWeg(ordnerId) {
+  const meineBuch = (Array.isArray(personBuchungen) ? personBuchungen : [])
+    .filter(b => b.ordner === ordnerId);
+  if (!meineBuch.length) { meldungM("Hier gibt es keine Buchungen zu löschen.", "warn"); return; }
+  if (!await nachfrage("Wirklich ALLE " + meineBuch.length + " Buchungen dieser Person endgültig löschen?\n\n" +
+      "Damit werden auch Eingezahlt und der Kontostand-Verlauf geleert - " +
+      "\"aktuell drauf\" steht danach auf \"noch nie eingetragen\".\n" +
+      "Die Kombinationen der Person bleiben unberührt.\n\n" +
+      "Das lässt sich NICHT rückgängig machen.",
+      { ok: "Ja, alle löschen", abbrechen: "Lieber nicht" })) return;
+  const r = await supaPersonBuchungenLeeren(aktiverBereich.id, ordnerId);
+  if (r.error) { meldungM("Nicht gelöscht: " + textSicherM(String(r.error.message).slice(0, 140)), "warn"); return; }
+  // 0-Zeilen-Falle: kein Recht sieht sonst aus wie geschafft.
+  if (!r.data || !r.data.length) {
+    meldungM("Nichts gelöscht - kein Schreibrecht oder die Buchungen sind schon weg.", "warn");
+    return;
+  }
+  personBuchungen = personBuchungen.filter(b => b.ordner !== ordnerId);
+  meldungM("<b>" + r.data.length + " Buchung" + (r.data.length === 1 ? "" : "en") + " gelöscht.</b> " +
+    "Eingezahlt und Kontostand dieser Person sind jetzt leer - trag sie bei Bedarf frisch ein.", "gut");
+  zeichneBereich();
 }
 
 // Die Summe der Hand-Kontostaende einer Person, als Text.
@@ -2889,13 +2945,20 @@ function tuKassePdf(ordnerId) {
   }
 
   if (blockAn(zg, "statistik")) {
+    // Dieselbe Rechnung wie am Bildschirm (Karam, 20.09.2026):
+    // eingezahlt aus eigener Tasche gegen den letzten Hand-Kontostand.
+    let standSummeP = 0, standDaP = false;
+    for (const [kzS] of KASSE_ANBIETER) {
+      const aS = p.anbieter[kzS];
+      if (aS.kontoStand !== undefined && aS.kontoStand !== null) { standSummeP += aS.kontoStand; standDaP = true; }
+    }
     h += "<h2>Statistik</h2><table>" +
-      "<tr><td>Von der Person erhalten (rein)</td><td><b>" + p.erhaltengesamt.toFixed(2) + " Euro</b></td></tr>" +
-      "<tr><td>Auf eigenes Konto ausgezahlt (raus)</td><td><b>" + p.ausgezahlt.toFixed(2) + " Euro</b></td></tr>" +
-      "<tr><td>Liegt auf den Zahlungswegen</td><td><b>" + p.aufWegen.toFixed(2) + " Euro</b></td></tr>" +
-      "<tr><td>Liegt bei den Wettanbietern</td><td><b>" + p.beiAnbietern.toFixed(2) + " Euro</b></td></tr>" +
-      "<tr><td>Steckt in offenen Wetten</td><td><b>" + p.imSpiel.toFixed(2) + " Euro</b></td></tr>" +
-      "<tr><td><b>Unterm Strich</b></td><td><b>" + (p.bilanz >= 0 ? "+" : "") + p.bilanz.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Wirklich eingezahlt (aus eigener Tasche)</td><td><b>" + p.eingesamt.toFixed(2) + " Euro</b></td></tr>" +
+      "<tr><td>Aktueller Stand (alle Anbieter zusammen)</td><td><b>" +
+        (standDaP ? standSummeP.toFixed(2) + " Euro" : "noch kein Kontostand eingetragen") + "</b></td></tr>" +
+      "<tr><td><b>Plus oder Minus</b></td><td><b>" +
+        (standDaP ? ((standSummeP - p.eingesamt >= 0 ? "+" : "") + (standSummeP - p.eingesamt).toFixed(2) + " Euro")
+                  : "-") + "</b></td></tr>" +
       "</table>";
   }
 
@@ -2917,7 +2980,10 @@ function tuKassePdf(ordnerId) {
     h += "</table>";
   }
 
-  if (blockAn(zg, "fluss") && p.buch.length) {
+  // Geldfluss auch im PDF raus (Karam, 20.09.2026) - die Bewegungen
+  // stehen als Buchungsliste in der Kasse. Der Block bleibt hinter
+  // false stehen, falls er je wieder gebraucht wird.
+  if (false && blockAn(zg, "fluss") && p.buch.length) {
     h += "<h2>Geldfluss</h2><table><tr><th>Datum</th><th>Bewegung</th><th>Betrag</th></tr>";
     for (const b of p.buch) {
       if (b.weg && zg.wege[b.weg] === false) continue;

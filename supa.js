@@ -878,6 +878,13 @@ async function supaPersonBuchungLoeschen(id) {
   return await supa.from("kt_person_zahlungen").delete().eq("id", id).select("id");
 }
 
+// ALLE Buchungen EINER Person leeren (Karam, 20.09.2026). select()
+// liefert die geloeschten Kennungen - 0 Zeilen heisst: nichts passiert.
+async function supaPersonBuchungenLeeren(bereichId, ordnerId) {
+  return await supa.from("kt_person_zahlungen").delete()
+    .eq("bereich", bereichId).eq("ordner", ordnerId).select("id");
+}
+
 // ---------- Admin ----------
 // Karams Rolle steht in kt_profiles.rolle; hochgestuft wird nur direkt in
 // der Datenbank, nie über die Oberflaeche.
