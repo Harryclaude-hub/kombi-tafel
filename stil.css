@@ -6497,3 +6497,28 @@ body[data-seite="mein"] .aw-fhinweis { border-top: 1px dashed #ccd3e0; padding-t
   body[data-seite="mein"] .ak-karte .ak-name::before { background-color: #fff; color: transparent; }
 }
 /* ==== ENDE SCHICHT KOPF-LOGOS ==== */
+
+/* ==== SCHICHT KONTOSTAENDE (19.09.2026, Nacht) ====
+   Karam: "Bei jeder Person jeder Anbieter, der Geld drauf hat, mit
+   Betrag - und wann zuletzt aktualisiert." Chips auf der
+   Personen-Karte, Farben aus der Anbieter-Palette. Loeschbar. */
+@media screen {
+  .ob-staende {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin: 6px 0 4px;
+  }
+  .ob-stand {
+    display: inline-block; padding: 4px 9px; border-radius: 8px;
+    background: #f4f6fb; border: 1.5px solid #9aabc9;
+    font-size: 13px; white-space: nowrap;
+  }
+  .ob-stand-iw { border-color: var(--anb-iw); }
+  .ob-stand-bw { border-color: var(--anb-bw); }
+  .ob-stand-b3 { border-color: var(--anb-b3); }
+  .ob-stand-st { border-color: var(--anb-st); }
+  .ob-stand-ad { border-color: var(--anb-ad); }
+  .ob-stand-bt { border-color: var(--anb-bt); }
+  .ob-stand-mb { border-color: var(--anb-mb); }
+  .ob-pflege { flex-basis: 100%; }
+}
+/* ==== ENDE SCHICHT KONTOSTAENDE ==== */

@@ -864,7 +864,7 @@ async function supaPersonBuchen(bereichId, ordnerId, datum, weg, art, anbieter, 
   // und "einge_anbieter" (eingezahlt von Hand nachgetragen, Karam
   // 18.09.2026) haben keinen Zahlungsweg.
   const nurWeg = (art === "erhalten" || art === "ausgezahlt" || art === "stand_weg");
-  const ohneWeg = (art === "stand_anbieter" || art === "einge_anbieter");
+  const ohneWeg = (art === "stand_anbieter" || art === "einge_anbieter" || art === "konto_stand");
   return await supa.from("kt_person_zahlungen").insert({
     bereich: bereichId, ordner: ordnerId, autor: u.id, datum: datum,
     weg: ohneWeg ? null : weg,

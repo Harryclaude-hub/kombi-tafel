@@ -1493,11 +1493,17 @@ function zeichneOrdnerBox(scheine) {
           '<button class="ob-name" onclick="tuOrdnerFilter(\'' + o.id + '\')" ' +
             'title="Alles von ' + textSicherM(o.name) + ' ansehen">' + textSicherM(o.name) + "</button>" +
         "</div>" +
+        // Karam (19.09.2026, Nacht): "Bei jeder Person jeder Anbieter,
+        // der Geld drauf hat - Anbieter und Betrag; wenn null, nicht
+        // da. Und immer dabei, wann zuletzt aktualisiert wurde."
+        // Betrag = der von Hand gepflegte Kontostand (konto_stand),
+        // NICHT die gerechnete Buchhaltung.
+        obStaendeHtml(p) +
         '<div class="ob-zahlen">' +
+          '<span><span class="ob-t" title="Geld, das diese Person übergeben hat - es liegt dann auf einem Zahlungsweg (PayPal, Paysafe, Neteller, Skrill).">Erhalten</span><b>' + p.erhaltengesamt.toFixed(2) + "</b></span>" +
+          '<span><span class="ob-t" title="Geld, das von den Zahlungswegen ZU Wettanbietern eingezahlt wurde - samt von Hand nachgetragenen Einzahlungen.">Eingezahlt</span><b>' + p.eingesamt.toFixed(2) + "</b></span>" +
           '<span><span class="ob-t">Kombis</span><b>' + n + "</b></span>" +
           '<span><span class="ob-t">Einsatz</span><b>' + personEinsatz(o.id, scheine).toFixed(2) + "</b></span>" +
-          '<span><span class="ob-t">Erhalten</span><b>' + p.erhaltengesamt.toFixed(2) + "</b></span>" +
-          '<span><span class="ob-t">Eingezahlt</span><b>' + p.eingesamt.toFixed(2) + "</b></span>" +
           '<span><span class="ob-t">Gewinn</span><b class="' + (gewinn >= 0 ? "e-gew" : "e-ver") +
             '">' + gewinn.toFixed(2) + "</b></span>" +
         "</div>" +
@@ -2165,7 +2171,8 @@ function artName(a) {
   // Die Korrektur-Arten stehen nicht im Buchungs-Formular, aber in der
   // Buchungsliste sollen sie einen echten Namen haben, kein Kuerzel.
   return ({ stand_weg: "Stand-Korrektur (Weg)", stand_anbieter: "Stand-Korrektur (Anbieter)",
-    einge_anbieter: "Einzahlung nachgetragen (Anbieter)" })[a] || a;
+    einge_anbieter: "Einzahlung nachgetragen (Anbieter)",
+    konto_stand: "Kontostand eingetragen" })[a] || a;
 }
 
 // Was kam bei einem gewonnenen Schein WIRKLICH zurueck? Solange nichts
@@ -2243,13 +2250,38 @@ function personPruefen(ordnerId, scheine) {
       if (anbieter[b.anbieter]) {
         anbieter[b.anbieter].einge += betrag;
         anbieter[b.anbieter].eingeKorrektur = (anbieter[b.anbieter].eingeKorrektur || 0) + betrag;
+        // Wann zuletzt eingezahlt/nachgetragen (fuer "zuletzt aktualisiert")
+        const w1 = b.created_at || b.datum || "";
+        if (w1 > (anbieter[b.anbieter].pflegeWann || "")) anbieter[b.anbieter].pflegeWann = w1;
+      }
+      continue;
+    }
+    // Karam (19.09.2026, Nacht): "Bei Personen trage ich den aktuellen
+    // Betrag selbst ein - gewonnen oder verloren aendert bei dem
+    // nichts." konto_stand ist der ABSOLUTE, von Hand getippte
+    // Kontostand: er wird NUR GEMERKT (neueste Zeile gewinnt) und
+    // fliesst in KEINE Summe, keine Bilanz, keinen Rechenfehler ein.
+    // Die gerechnete Buchhaltung im Auswerten bleibt davon unberuehrt.
+    if (b.art === "konto_stand") {
+      const a2 = anbieter[b.anbieter];
+      if (a2) {
+        const wann = b.created_at || b.datum || "";
+        if (wann >= (a2.kontoWann || "")) { a2.kontoStand = betrag; a2.kontoWann = wann; }
+        if (wann > (a2.pflegeWann || "")) a2.pflegeWann = wann;
       }
       continue;
     }
     if (!wege[b.weg]) continue;
     if (b.art === "erhalten") wege[b.weg].erhalten += betrag;
     else if (b.art === "ausgezahlt") wege[b.weg].raus = (wege[b.weg].raus || 0) + betrag;
-    else if (b.art === "zum_anbieter") { wege[b.weg].hin += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].einge += betrag; }
+    else if (b.art === "zum_anbieter") {
+      wege[b.weg].hin += betrag;
+      if (anbieter[b.anbieter]) {
+        anbieter[b.anbieter].einge += betrag;
+        const w2 = b.created_at || b.datum || "";
+        if (w2 > (anbieter[b.anbieter].pflegeWann || "")) anbieter[b.anbieter].pflegeWann = w2;
+      }
+    }
     else { wege[b.weg].zurueck += betrag; if (anbieter[b.anbieter]) anbieter[b.anbieter].geholt += betrag; }
   }
   // Karam (16.09.2026): "Ich will, dass diese ganzen Anmerkungen bei der
@@ -2290,16 +2322,16 @@ function personPruefen(ordnerId, scheine) {
       rechenfehler.push(t);          // geht sich nicht aus: echter Rechenfehler
     }
   }
-  for (const [kz, nameA] of KASSE_ANBIETER) {
+  for (const [kz] of KASSE_ANBIETER) {
     const a = anbieter[kz];
     a.guthaben = a.einge - a.geholt - a.einsatz + a.gewonnen + (a.korrektur || 0);
-    if (a.guthaben < -0.004) {
-      const t = "Bei " + nameA + " geht es sich nicht aus: rechnerisch " +
-        a.guthaben.toFixed(2) + " Euro. Mehr gesetzt oder zurückgeholt als eingezahlt und gewonnen. " +
-        "Entweder fehlt eine Einzahlungs-Buchung, oder ein Schein gehört zu einer anderen Person.";
-      probleme.push(t);
-      rechenfehler.push(t);          // geht sich nicht aus: echter Rechenfehler
-    }
+    // Die alte Warnung "geht sich nicht aus: rechnerisch -X Euro" ist
+    // seit dem 19.09.2026 (Nacht) bewusst WEG: Karam pflegt Eingezahlt
+    // und Kontostand je Anbieter von Hand, die Kombi-Ergebnisse sollen
+    // die Personen-Ansicht nicht mehr beeinflussen. Das rechnerische
+    // guthaben lebt weiter (Buchhaltung, Berichte, Export), es schreit
+    // nur nicht mehr an der Person. Auch dann, wenn zum_anbieter mehr
+    // ist als erhalten, warnt weiter die Zahlungsweg-Pruefung oben.
   }
   const eingesamt = buch.filter(b => b.art === "zum_anbieter" || b.art === "einge_anbieter")
     .reduce((p, b) => p + Number(b.betrag), 0);
@@ -2577,43 +2609,38 @@ function zeichnePersonenKasse(scheine) {
       html += '<label><input type="checkbox"' + (zg.anbieter[kz] !== false ? " checked" : "") +
         ' onchange="tuKasseZeigen(\'' + person.id + "','anbieter','" + kz + '\', this.checked)"> ' + nameA + "</label> ";
     }
-    html += "</div><table><thead><tr><th>Anbieter</th><th>rein</th><th>raus</th>" +
-      "<th>eingesetzt</th><th>im Spiel</th><th>möglich offen</th><th>gewonnen</th>" +
-      "<th>fertig</th><th>Ergebnis ab</th><th>liegt dort</th>" +
-      // Karam (18.09.2026): das Eingezahlt-Feld LINKS vom Drauf-Feld.
-      (schreib ? "<th>wirklich eingezahlt</th><th>wirklich drauf</th>" : "") + "</tr></thead><tbody>";
+    // Karam (19.09.2026, Nacht): "Das Auswerten rechnet Einsatz und
+    // Gewinn - bei den Personen stehen nur noch MEINE zwei Zahlen je
+    // Anbieter: wie viel eingezahlt wurde und wie viel aktuell drauf
+    // ist. Gewonnen oder verloren aendert bei dem nichts." Die alten
+    // Kombi-Spalten (eingesetzt, im Spiel, moeglich, gewonnen,
+    // rechnerisch) sind deshalb hier RAUS - dieselben Zahlen stehen
+    // weiter im Auswerten, in der Statistik und in der Buchhaltung.
+    html += "</div><table><thead><tr><th>Anbieter</th><th>eingezahlt</th>" +
+      "<th>aktuell drauf</th><th>Stand vom</th>" +
+      (schreib ? "<th>wirklich eingezahlt</th><th>aktuellen Stand eintragen</th>" : "") + "</tr></thead><tbody>";
+    let suEinge = 0, suKonto = 0, ohneStand = 0;
     for (const kz of ["iw", "bw", "b3", "st", "ad", "bt", "mb"]) {
       if (zg.anbieter[kz] === false) continue;
       const a = p.anbieter[kz];
-      html += "<tr><td>" + markeM(kz) + korrekturMarke(a.korrektur) + "</td><td>" + a.einge.toFixed(2) + " &euro;" +
-        eingeMarke(a.eingeKorrektur) + "</td>" +
-        "<td>" + a.geholt.toFixed(2) + " &euro;</td><td>" + a.einsatz.toFixed(2) + " &euro;</td>" +
-        "<td>" + (a.imSpiel || 0).toFixed(2) + " &euro;</td>" +
-        "<td>" + (a.moeglichOffen || 0).toFixed(2) + " &euro;</td>" +
-        "<td>" + a.gewonnen.toFixed(2) + " &euro;</td>" +
-        "<td>" + (a.wartet ? "<b class='rot'>" + a.wartet + "</b>" : "-") + "</td>" +
-        "<td class='mini'>" + (a.endeMax ? kasseZeit(a.endeMax) : "-") + "</td>" +
-        "<td class='" + (a.guthaben < -0.004 ? "rot" : "") + "'><b>" + a.guthaben.toFixed(2) + " &euro;</b></td>" +
+      suEinge += a.einge;
+      const hatStand = a.kontoStand !== undefined && a.kontoStand !== null;
+      if (hatStand) suKonto += a.kontoStand; else ohneStand++;
+      html += "<tr><td>" + markeM(kz) + "</td>" +
+        "<td>" + a.einge.toFixed(2) + " &euro;" + eingeMarke(a.eingeKorrektur) + "</td>" +
+        "<td>" + (hatStand ? "<b>" + a.kontoStand.toFixed(2) + " &euro;</b>"
+                           : "<span class='mini'>noch nie eingetragen</span>") + "</td>" +
+        "<td class='mini'>" + (a.kontoWann ? zeitM(a.kontoWann) : "-") + "</td>" +
         (schreib ? "<td>" + eingeFeld(person.id, kz, a.einge) + "</td>" +
-          "<td>" + standFeld(person.id, "anbieter", kz, a.guthaben) + "</td>" : "") + "</tr>";
+          "<td>" + standFeld(person.id, kz, hatStand ? a.kontoStand : null) + "</td>" : "") + "</tr>";
     }
-    // Karam (19.09.2026): "unten dann immer die Gesamtsummen, ein
-    // bisschen dunkler." Die Summe geht ueber ALLE Anbieter, auch die
-    // per Haken ausgeblendeten - sonst fehlte Geld, ohne dass es
-    // jemand sieht (die dunkle Zeile sagt es dazu).
-    const su = { einge: 0, geholt: 0, einsatz: 0, imSpiel: 0, moeglichOffen: 0, gewonnen: 0, guthaben: 0 };
-    for (const [kz] of KASSE_ANBIETER) {
-      const a = p.anbieter[kz];
-      for (const f of Object.keys(su)) su[f] += a[f] || 0;
-    }
-    html += '</tbody><tfoot><tr class="ak-summe"><td><b>Zusammen</b> <span class="mini">(alle Anbieter)</span></td>' +
-      "<td><b>" + su.einge.toFixed(2) + " &euro;</b></td><td><b>" + su.geholt.toFixed(2) + " &euro;</b></td>" +
-      "<td><b>" + su.einsatz.toFixed(2) + " &euro;</b></td><td><b>" + su.imSpiel.toFixed(2) + " &euro;</b></td>" +
-      "<td><b>" + su.moeglichOffen.toFixed(2) + " &euro;</b></td><td><b>" + su.gewonnen.toFixed(2) + " &euro;</b></td>" +
-      "<td></td><td></td><td><b>" + su.guthaben.toFixed(2) + " &euro;</b></td>" +
+    // Die dunkle Gesamtzeile (Karam, 19.09.): Summen der ANGEZEIGTEN
+    // Anbieter; fehlt bei einem der Stand, steht das ehrlich dabei.
+    html += '</tbody><tfoot><tr class="ak-summe"><td><b>Zusammen</b></td>' +
+      "<td><b>" + suEinge.toFixed(2) + " &euro;</b></td>" +
+      "<td><b>" + suKonto.toFixed(2) + " &euro;</b>" +
+      (ohneStand ? " <span class='mini'>(" + ohneStand + " ohne Eintrag)</span>" : "") + "</td><td></td>" +
       (schreib ? "<td></td><td></td>" : "") + "</tr></tfoot>";
-    // Der Schnell-Rechner stand hier bis 20260919b - Karam: "diesen
-    // Schnellrechner einfach entfernen, brauche ich nicht."
     html += "</table>" + standErklaerung(schreib);
   }
 
@@ -2690,6 +2717,27 @@ function zeile2(titel, wert) {
   return "<tr><td>" + titel + "</td><td><b>" + wert.toFixed(2) + " &euro;</b></td></tr>";
 }
 
+// Die Hand-Kontostaende einer Person als kleine Chips (Karam, 19.09.
+// Nacht): jeder Anbieter mit Geld drauf, dazu wann zuletzt gepflegt
+// (letzte Einzahlung ODER letzter Kontostand). Null oder nie
+// eingetragen = kein Chip; ganz ohne Pflege bleibt die Zeile weg.
+function obStaendeHtml(p) {
+  const chips = [];
+  let pflege = "";
+  for (const [kz, nameA] of KASSE_ANBIETER) {
+    const a = p.anbieter[kz];
+    if (a.kontoStand !== undefined && a.kontoStand > 0.004) {
+      chips.push('<span class="ob-stand ob-stand-' + kz + '"><b>' + textSicherM(nameA) +
+        "</b> " + a.kontoStand.toFixed(2) + " &euro;</span>");
+    }
+    if ((a.pflegeWann || "") > pflege) pflege = a.pflegeWann || "";
+  }
+  if (!chips.length && !pflege) return "";
+  return '<div class="ob-staende">' + chips.join("") +
+    (pflege ? '<span class="mini ob-pflege">zuletzt aktualisiert ' + zeitM(pflege) + "</span>" : "") +
+    "</div>";
+}
+
 // ---------- Geldfluss als Karte ----------
 // Links die Zahlungswege, rechts die Anbieter, dazu die Auszahlung nach
 // aussen. Die Pfeile zeigen, wie viel wohin geflossen ist.
@@ -2741,6 +2789,7 @@ function geldflussVerlaufHtml(p, schreib) {
     else if (b.art === "stand_anbieter") text = "<b>" + betrag + "</b> Stand-Korrektur bei " + anbieterNameM(b.anbieter);
     else if (b.art === "stand_weg") text = "<b>" + betrag + "</b> Stand-Korrektur auf <b>" + wegName(b.weg) + "</b>";
     else if (b.art === "einge_anbieter") text = "<b>" + betrag + "</b> als eingezahlt nachgetragen bei " + anbieterNameM(b.anbieter);
+    else if (b.art === "konto_stand") text = "Kontostand bei " + anbieterNameM(b.anbieter) + " eingetragen: <b>" + betrag + "</b>";
     else text = "<b>" + betrag + "</b> von " + anbieterNameM(b.anbieter) + " &#8594; <b>" + wegName(b.weg) + "</b>";
     h += "<li><span class='mini'>" + b.datum + "</span> " + text +
       (b.notiz ? " <span class='mini'>(" + textSicherM(b.notiz) + ")</span>" : "") + "</li>";
@@ -2861,6 +2910,7 @@ function tuKassePdf(ordnerId) {
       else if (b.art === "stand_anbieter") text = "Stand-Korrektur bei " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1];
       else if (b.art === "stand_weg") text = "Stand-Korrektur auf " + wegName(b.weg);
       else if (b.art === "einge_anbieter") text = "als eingezahlt nachgetragen bei " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1];
+      else if (b.art === "konto_stand") text = "Kontostand eingetragen bei " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1];
       else text = "von " + (KASSE_ANBIETER.find(a => a[0] === b.anbieter) || ["", b.anbieter])[1] + " zurück auf " + wegName(b.weg);
       h += "<tr><td>" + b.datum + "</td><td>" + text + "</td><td><b>" + Number(b.betrag).toFixed(2) + "</b></td></tr>";
     }
@@ -3198,7 +3248,8 @@ function berichtInnenHtml() {
   if (w.buchungen && d.pb.length) {
     const kbArt2 = { erhalten: "von Person erhalten", ausgezahlt: "an Person ausgezahlt",
       zum_anbieter: "Geld zum Anbieter", stand_weg: "Stand-Korrektur (Weg)",
-      stand_anbieter: "Stand-Korrektur (Anbieter)", einge_anbieter: "Einzahlung nachgetragen (Anbieter)" };
+      stand_anbieter: "Stand-Korrektur (Anbieter)", einge_anbieter: "Einzahlung nachgetragen (Anbieter)",
+      konto_stand: "Kontostand eingetragen" };
     h += '<h3 style="margin:12px 0 4px">Personen-Buchungen (' + d.pb.length + ")</h3>" +
       '<table style="border-collapse:collapse;width:100%"><tr style="background:#eef1f7">' +
       ["Datum", "Was", "Person", "Betrag"].map(x =>
@@ -4111,7 +4162,7 @@ async function zeichneBuchhaltung() {
     erhalten: "von Person erhalten", ausgezahlt: "an Person ausgezahlt",
     hin: "Geld zum Anbieter", zurueck: "Geld zurückgeholt", raus: "entnommen",
     stand_weg: "Stand-Korrektur (Weg)", stand_anbieter: "Stand-Korrektur (Anbieter)",
-    einge_anbieter: "Einzahlung nachgetragen (Anbieter)" };
+    einge_anbieter: "Einzahlung nachgetragen (Anbieter)", konto_stand: "Kontostand eingetragen" };
   const kb = [];
   for (const b of buchungen) kb.push({ datum: b.datum,
     was: (kbArt[b.art] || b.art) + (b.konto ? " · " + b.konto : ""),
@@ -5241,20 +5292,26 @@ function tagHalterHtml(zeilen) {
 // wieder herausgerechnet.
 // ============================================================
 
-function standFeld(ordnerId, art, schluessel, jetzt) {
+// Karam (19.09.2026, Nacht): "Bei Personen trage ich den aktuellen
+// Betrag selbst ein - gewonnen oder verloren aendert bei dem nichts."
+// Das Feld speichert deshalb den ABSOLUTEN Kontostand (konto_stand),
+// keinen Differenz-Trick mehr: was du tippst, steht danach da, samt
+// Zeitpunkt - und keine Kombination verschiebt es je wieder.
+function standFeld(ordnerId, kz, kontoStand) {
   // Die Ordner-Kennung MUSS in die Feld-Kennung: dieselbe Anbieter-Spalte
   // steht im Anbieter-Kopf fuer JEDE Person einmal da - ohne Ordner in
   // der Kennung laese "setzen" immer das Feld der ersten Zeile.
-  const id = "st_" + art + "_" + schluessel + "_" + ordnerId;
+  const id = "st_anbieter_" + kz + "_" + ordnerId;
   return '<span class="standfeld">' +
     // BEWUSST type=text mit inputmode=decimal, nicht type=number:
     // ein Zahlenfeld verwirft "250,50" je nach Spracheinstellung des
     // Browsers still - das Feld ist dann leer und niemand weiss warum.
     // Nachgemessen: im Test kam genau das heraus. So geht Komma UND Punkt.
     '<input type="text" inputmode="decimal" id="' + id + '" placeholder="' +
-    Number(jetzt || 0).toFixed(2) + '" title="Wie viel liegt hier wirklich?">' +
-    '<button onclick="tuStandSetzen(&quot;' + ordnerId + '&quot;,&quot;' + art +
-    '&quot;,&quot;' + schluessel + '&quot;,' + Number(jetzt || 0) + ')">setzen</button></span>';
+    (kontoStand === undefined || kontoStand === null ? "noch nie eingetragen" : Number(kontoStand).toFixed(2)) +
+    '" title="Wie viel liegt bei diesem Anbieter gerade auf dem Konto?">' +
+    '<button onclick="tuStandSetzen(&quot;' + ordnerId + '&quot;,&quot;' + kz +
+    '&quot;)">setzen</button></span>';
 }
 
 // ---------- Eingezahlt von Hand (Karam, 18.09.2026) ----------
@@ -5288,15 +5345,15 @@ async function tuEingezahltSetzen(ordnerId, kz, jetzt) {
     return;
   }
   const wohin = anbieterNameTextM(kz);
-  // Ehrliche Rueckfrage: die Zahl hebt auch "liegt dort" mit an, denn
-  // liegt dort = eingezahlt - zurueckgeholt - gesetzt + gewonnen.
+  // Seit 19.09.2026 (Nacht) sind Auswerten und Personen-Zahlen
+  // getrennt: das Eingezahlt beruehrt "aktuell drauf" nicht mehr -
+  // in der Buchhaltung rechnet es weiter mit (gleiche Buchung).
   const frage = "Bei " + wohin + " stehen als eingezahlt gerechnet " + ist.toFixed(2) + " Euro.\n" +
     "Du sagst, eingezahlt wurden " + soll.toFixed(2) + " Euro.\n\n" +
     (diff > 0 ? "Es werden " + diff.toFixed(2) + " Euro als Einzahlung nachgetragen."
               : "Es werden " + Math.abs(diff).toFixed(2) + " Euro Einzahlung herausgenommen.") + "\n\n" +
-    "Das zählt NICHT als Gewinn. Achtung: \"liegt dort\" ändert sich um " +
-    "denselben Betrag mit - stimmt der echte Kontostand danach nicht, trag ihn " +
-    "daneben bei \"wirklich drauf\" ein.\n\nEintragen?";
+    "Das zählt NICHT als Gewinn und ändert am Feld \"aktuell drauf\" nichts - " +
+    "das pflegst du daneben selbst.\n\nEintragen?";
   if (!await nachfrage(frage)) return;
   const heute = new Date();
   const datum = heute.getFullYear() + "-" + String(heute.getMonth() + 1).padStart(2, "0") +
@@ -5340,53 +5397,44 @@ function korrekturMarke(k) {
 
 function standErklaerung(schreib) {
   if (!schreib) return "";
-  return '<p class="mini"><b>wirklich drauf:</b> trag hier ein, wie viel auf dem Konto ' +
-    'tatsächlich liegt. Das Programm merkt sich die Differenz zum gerechneten Stand. ' +
-    'Spätere Ein- und Auszahlungen rechnen ganz normal weiter, und du kannst die Zahl ' +
-    'jederzeit wieder ändern. <b>Die Differenz zählt nicht als Gewinn</b> - sie steht ' +
-    'als "ungeklärt" daneben, weil niemand weiß, woher das Geld kam. ' +
-    '<b>wirklich eingezahlt:</b> trag hier ein, wie viel insgesamt eingezahlt wurde. ' +
-    'Auch das wird als Differenz-Buchung gespeichert und zählt nicht als Gewinn.</p>';
+  // Karam (19.09.2026, Nacht): Auswerten und Personen-Zahlen sind
+  // getrennt - hier stehen nur noch die zwei von Hand gepflegten.
+  return '<p class="mini"><b>wirklich eingezahlt:</b> die echte Einzahl-Summe bei diesem ' +
+    'Anbieter - der Unterschied wird als Buchung nachgetragen und zählt nie als Gewinn. ' +
+    '<b>aktuellen Stand eintragen:</b> was JETZT auf dem Konto liegt - gespeichert wird ' +
+    'genau diese Zahl samt Datum und Uhrzeit. <b>Die Kombinationen im Auswerten ändern ' +
+    'an beiden Zahlen nichts</b> - du pflegst sie selbst, und daneben steht immer, ' +
+    'von wann der letzte Stand ist.</p>';
 }
 
-async function tuStandSetzen(ordnerId, art, schluessel, jetzt) {
-  const feld = el("st_" + art + "_" + schluessel + "_" + ordnerId);
+// Speichert den ABSOLUTEN Kontostand (konto_stand) - siehe standFeld.
+// Der alte Differenz-Weg (stand_anbieter/stand_weg) wird fuer NEUE
+// Eintraege nicht mehr benutzt; alte Buchungen bleiben gueltig und
+// rechnen in der Buchhaltung weiter mit.
+async function tuStandSetzen(ordnerId, kz) {
+  const feld = el("st_anbieter_" + kz + "_" + ordnerId);
   if (!feld) return;
   const text = String(feld.value || "").trim().replace(",", ".");
-  if (!text) { meldungM("Trag zuerst ein, wie viel wirklich drauf liegt.", "warn"); return; }
+  if (!text) { meldungM("Trag zuerst ein, wie viel auf dem Konto liegt.", "warn"); return; }
   const soll = parseFloat(text);
-  if (!isFinite(soll)) { meldungM("Das ist keine Zahl.", "warn"); return; }
-  const ist = Number(jetzt || 0);
-  const diff = Math.round((soll - ist) * 100) / 100;
-  if (Math.abs(diff) < 0.005) {
-    meldungM("Der Stand passt schon - es gibt nichts zu ändern.", "gut");
-    feld.value = "";
-    return;
-  }
-  const wohin = (art === "weg") ? wegName(schluessel) : anbieterNameM(schluessel);
-  // Rueckfrage: hier wird eine Geldzahl von Hand verbogen, das soll man
-  // nicht aus Versehen tun.
-  const frage = "Bei " + wohin + " stehen gerechnet " + ist.toFixed(2) + " Euro.\n" +
-    "Du sagst, es sind " + soll.toFixed(2) + " Euro.\n\n" +
-    (diff > 0 ? "Es kommen " + diff.toFixed(2) + " Euro dazu."
-              : "Es gehen " + Math.abs(diff).toFixed(2) + " Euro weg.") + "\n\n" +
-    "Das zählt NICHT als Gewinn - unterm Strich bleibt gleich.\n\nEintragen?";
-  if (!await nachfrage(frage)) return;
+  if (!isFinite(soll) || soll < 0) { meldungM("Das ist keine gültige Zahl (0 oder mehr).", "warn"); return; }
+  const wohin = anbieterNameM(kz);
+  if (!await nachfrage("Kontostand bei " + wohin + " auf " + soll.toFixed(2) + " Euro setzen?\n\n" +
+      "Diese Zahl gilt ab jetzt als \"aktuell drauf\" - mit Datum und Uhrzeit.\n" +
+      "Kombinationen im Auswerten ändern daran nichts mehr; du pflegst sie selbst.",
+      { ok: "Ja, Stand setzen" })) return;
   const heute = new Date();
   const datum = heute.getFullYear() + "-" + String(heute.getMonth() + 1).padStart(2, "0") +
     "-" + String(heute.getDate()).padStart(2, "0");
   const r = await supaPersonBuchen(aktiverBereich.id, ordnerId, datum,
-    art === "weg" ? schluessel : null,
-    art === "weg" ? "stand_weg" : "stand_anbieter",
-    art === "weg" ? null : schluessel,
-    diff, "Stand von Hand eingetragen: " + soll.toFixed(2) + " Euro");
+    null, "konto_stand", kz, Math.round(soll * 100) / 100,
+    "Kontostand von Hand eingetragen");
   if (r && r.error) {
     meldungM("Nicht eingetragen: " + textSicherM(String(r.error.message).slice(0, 140)), "warn");
     return;
   }
-  meldungM("<b>" + textSicherM(wohin) + " steht jetzt auf " + soll.toFixed(2) + " &euro;.</b> " +
-    "Die " + (diff >= 0 ? "+" : "") + diff.toFixed(2) + " &euro; stehen als <b>ungeklärt</b> " +
-    "daneben und zählen nicht als Gewinn. Ändern kannst du die Zahl jederzeit wieder.", "gut");
+  meldungM("<b>" + textSicherM(wohin) + ": aktuell drauf ist jetzt " + soll.toFixed(2) +
+    " &euro;</b> (Stand von eben). Ändern kannst du die Zahl jederzeit wieder.", "gut");
   zeichneBereich();
 }
 
@@ -5693,7 +5741,9 @@ function zeichneAnbieterKopf() {
     html += '<button class="ak-karte ak-' + kz + (anbieterFilter === kz ? " ak-aktiv" : "") +
       '" onclick="tuAnbieterFilter(\'' + kz + '\')">' +
       '<span class="ak-name">' + name + '</span>' +
-      '<span class="ak-zeile">drauf: <b>' + tagGeld(a.guthaben) + '</b></span>' +
+      // Seit 19.09.2026 (Nacht) heisst es ehrlich "rechnerisch": die
+      // Zahl kommt aus der Buchhaltung, nicht aus Karams Hand-Staenden.
+      '<span class="ak-zeile">rechnerisch: <b>' + tagGeld(a.guthaben) + '</b></span>' +
       '<span class="ak-zeile">noch m&ouml;glich: <b>' + tagGeld(a.moeglichOffen) + '</b></span>' +
       '<span class="ak-zeile mini">' + a.offen + ' offen &middot; ' + a.gew + ' gew &middot; ' + a.ver + ' ver' +
       (a.wartet ? ' &middot; ' + a.wartet + ' wartet' : '') + '</span></button>';
@@ -5708,15 +5758,15 @@ function anbieterDetailHtml(kz, a) {
   let html = '<div class="ak-detail">' + markeM(kz) + ' <b>komplette &Uuml;bersicht</b>' +
     '<div class="tabellenrand"><table><thead><tr><th></th><th>eingezahlt</th><th>zur&uuml;ckgeholt</th>' +
     '<th>gesetzt</th><th>gewonnen</th><th>im Spiel</th><th>noch m&ouml;glich</th><th>rechnerisch drauf</th>' +
-    // Karam (18.09.2026): das Eingezahlt-Feld LINKS vom Drauf-Feld.
-    (schreib ? '<th>wirklich eingezahlt</th><th>wirklich drauf</th>' : '') + '</tr></thead><tbody>';
+    // Karam (18.09.2026): das Eingezahlt-Feld LINKS vom Stand-Feld.
+    (schreib ? '<th>wirklich eingezahlt</th><th>aktuellen Stand eintragen</th>' : '') + '</tr></thead><tbody>';
   for (const p of a.personen) {
     html += '<tr><td>' + textSicherM(p.name) + '</td><td>' + tagGeld(p.a.einge) + eingeMarke(p.a.eingeKorrektur) + '</td>' +
       '<td>' + tagGeld(p.a.geholt) + '</td><td>' + tagGeld(p.a.einsatz) + '</td>' +
       '<td>' + tagGeld(p.a.gewonnen) + '</td><td>' + tagGeld(p.a.imSpiel || 0) + '</td>' +
       '<td>' + tagGeld(p.a.moeglichOffen || 0) + '</td><td>' + tagGeld(p.a.guthaben) + '</td>' +
       (schreib ? '<td>' + eingeFeld(p.id, kz, p.a.einge) + '</td>' +
-        '<td>' + standFeld(p.id, "anbieter", kz, p.a.guthaben) + '</td>' : '') + '</tr>';
+        '<td>' + standFeld(p.id, kz, (p.a.kontoStand === undefined ? null : p.a.kontoStand)) + '</td>' : '') + '</tr>';
   }
   html += '<tr class="ak-summe"><td><b>Zusammen</b></td><td><b>' + tagGeld(a.einge) + '</b></td>' +
     '<td><b>' + tagGeld(a.geholt) + '</b></td><td><b>' + tagGeld(a.einsatz) + '</b></td>' +
@@ -5724,10 +5774,9 @@ function anbieterDetailHtml(kz, a) {
     '<td><b>' + tagGeld(a.moeglichOffen) + '</b></td><td><b>' + tagGeld(a.guthaben) + '</b></td>' +
     (schreib ? '<td></td><td></td>' : '') + '</tr></tbody></table></div>' +
     '<p class="mini"><b>rechnerisch drauf</b> = eingezahlt - zur&uuml;ckgeholt - gesetzt + gewonnen (+ Korrekturen). ' +
-    'Stimmt die Zahl nicht (Altbestand von vor dem Programm, R&uuml;cknahme, Programmfehler): bei <b>wirklich drauf</b> ' +
-    'den echten Stand eintragen - der Unterschied wird als Korrektur-Buchung gespeichert und gilt ab sofort &uuml;berall. ' +
-    'Bei <b>wirklich eingezahlt</b> tr&auml;gst du genauso die echte Einzahl-Summe ein; auch das ist eine Buchung, ' +
-    'z&auml;hlt nicht als Gewinn und hebt &bdquo;rechnerisch drauf&ldquo; mit an. ' +
+    'Seit dem 19.09.2026 gilt: <b>aktuellen Stand eintragen</b> speichert genau die getippte Zahl samt Zeitpunkt ' +
+    '(sichtbar in der Personen-Kasse), die Kombinationen &auml;ndern daran nichts mehr. ' +
+    '<b>wirklich eingezahlt</b> tr&auml;gt die echte Einzahl-Summe nach; das z&auml;hlt nie als Gewinn. ' +
     'Alte Kombinationen tr&auml;gst du &uuml;ber <b>Kombi aus Screenshot</b> nach; ' +
     'gewonnen/verloren stellst du unten am Schein um.</p></div>';
   return html;
